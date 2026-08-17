@@ -1,0 +1,28 @@
+{
+  "name": "gtm-operator",
+  "owner": {
+    "name": "Sarah Madden",
+    "url": "https://github.com/sarahcallmesmadds"
+  },
+  "metadata": {
+    "description": "A GTM operating system in Notion, built by plugins rather than by a consultant. Six databases, created once, written to by six plugins that never call each other."
+  },
+  "plugins": [
+    {
+      "name": "setup",
+      "source": "./plugins/setup",
+      "description": "Creates the six Notion databases every other gtm-operator plugin reads and writes, wires the relations between them, and writes the one config file they all share. Explains the model before it asks anything, and asks five questions rather than twelve.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sarah Madden"
+      },
+      "category": "productivity",
+      "tags": [
+        "notion",
+        "gtm",
+        "revops",
+        "setup"
+      ]
+    }
+  ]
+}

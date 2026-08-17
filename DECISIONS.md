@@ -109,8 +109,19 @@ own setup. That is replaced by the structure below.
 These own no database. They read and write the foundation's. Not started, and
 not in scope until the foundation ships.
 
-`list-building`, `outbound-email`, `teammates` (a teams and people directory),
-and others as they come up.
+`list-building`, `outbound-email`, and others as they come up.
+
+**`teammates` is v2, decided 2026-08-17, and that resolves the contradiction it
+carried.** A teams and people directory owns an object, so by the rule below it
+would be a foundation plugin and would own a seventh database. It sat in tier 2
+anyway, which broke the rule for the one case nobody had decided.
+
+**Deferring it to v2 is what makes the rule hold rather than an exception to it.**
+The foundation is six databases and `setup` creates all six every time, so a
+seventh added later is a schema change to `setup` and a migration for everybody
+already installed. That is a real cost and it buys a directory nothing in v1 reads.
+**When it is built it is a foundation plugin with its own database, not a job
+plugin.** It is out of v1 because of when, not because of what it is.
 
 ### The rule this gives you
 
@@ -689,4 +700,7 @@ empty project rows.
 
 ### Tier 2, not started and not in scope yet
 
-`list-building`, `outbound-email`, `teammates`.
+`list-building`, `outbound-email`.
+
+**`teammates` is not in this list.** It is a foundation plugin deferred to v2, see
+the tier 2 section above. Filing it here is what created the contradiction.

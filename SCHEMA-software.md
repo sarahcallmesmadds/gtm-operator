@@ -568,11 +568,11 @@ reasoning is not lost and the same ground is not re-covered.
 
 ## Open
 
-1. **`teammates` is listed in tier two, and a teams and people directory owns a
-   database.** The rule says a plugin that owns a database is tier one. This
-   schema works either way, because it uses `Domain` and `Audience` rather than a
-   Teams relation, but the contradiction is real and it will bite whoever designs
-   `teammates`.
+1. ~~**`teammates` is listed in tier two, and a teams and people directory owns a
+   database.**~~ **Resolved 2026-08-17: `teammates` is a foundation plugin
+   deferred to v2**, so it is not tier two and the rule holds unchanged. This
+   schema was already safe either way, because it uses `Domain` and `Audience`
+   rather than a Teams relation. See `DECISIONS.md`.
 2. **`Integrates with` as one-way.** The reasoning is above and the cost is one
    extra query. Worth revisiting only if a reader on a tool page turns out to
    genuinely need both directions visible without a skill.
