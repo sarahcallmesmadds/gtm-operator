@@ -88,8 +88,8 @@ in order and wires every relation itself.
 ## problem-scan
 
 **This was a name with nothing behind it. Below is a proposal.** It has no
-ancestor in the reference skills, so unlike the others it is not reconstructed from
-anything that ran.
+ancestor in the reference skills, so unlike the others it is not reconstructed
+from anything that ran.
 
 **What it does.** Finds problems that keep coming up and that nobody has written
 down, and hands them to `problem-statement`.
@@ -299,8 +299,8 @@ useful answer there, and it gets written rather than left out.
 
 ## ship
 
-**This was a name with nothing behind it.** It is reconstructed from the reference
-`revops-release` skill, which owned exactly this job.
+**This was a name with nothing behind it.** It is reconstructed from the
+reference set's release skill, which owned exactly this job.
 
 **What it does.** Records that a project shipped, and closes it.
 
@@ -342,8 +342,8 @@ they know what it gives them.
 
 ## What was taken from the reference skills, and what was not
 
-References: `scope.md`, `new-project.md`, `revops-release.md`, `pm.md` and
-`prd.md` in `reference-kit/skills/`. Structure and reasoning only.
+References: the scope, project-creation, release, project-management and product
+requirements skills in the reference set. Structure and reasoning only.
 
 **Carried across:**
 

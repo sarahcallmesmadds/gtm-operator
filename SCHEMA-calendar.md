@@ -53,8 +53,8 @@ not a data model.
 
 ## What the reference taught, which is what not to do
 
-The reference is the reference set's MKT Calendar. **It is not a model and it is not treated
-as one.** Sarah's call, 2026-08-17: it was built by people without an ops
+The reference is the marketing calendar in the reference set. **It is not a model
+and it is not treated as one.** Sarah's call, 2026-08-17: it was built by people without an ops
 background and it shows. It is used here the way a worked wrong answer is useful,
 and the general shape of what they were reaching for is right even where the
 execution is not.

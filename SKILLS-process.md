@@ -155,7 +155,7 @@ Fields it always sets without asking:
 3. **The duplicate and supersede branch.** The duplicate check runs **before**
    structuring, because a near-match found afterwards means a document that gets
    merged away. **What counts as a near match is deliberately unspecified here.**
-   the reference set used a 70% title and topic match. Pick the threshold against real
+   The reference used a 70% title and topic match. Pick the threshold against real
    artifacts rather than inheriting a number, and make it configurable, because a
    similarity threshold set blind is the classic way this kind of check ends up
    either silent or unusable. If the near match is a Strategy Decision reaching a *different*
@@ -383,8 +383,8 @@ the least ceremonious.
 
 ## What was taken from the reference skills, and what was not
 
-The reference is `reference-kit/skills/new-doc.md`, the direct ancestor of
-`new`. Taken as structure and reasoning only, per the standing rule.
+The reference is the document-creation skill in the reference set, the direct
+ancestor of `new`. Taken as structure and reasoning only, per the standing rule.
 
 **Carried across, because they are hard-won and not obvious:**
 
@@ -409,8 +409,8 @@ The reference is `reference-kit/skills/new-doc.md`, the direct ancestor of
 | `Owner` as a body section | It is a property. A body section that duplicates a field is two things that disagree later |
 | Auto-suggesting two or three companion child documents after every create | Plausible, but it manufactures work. Left out of v1 |
 
-**The structural finding.** The reference set had `new-doc` and nothing else for the
-documentation library. No update, no audit, no find, no backfill. It could create
+**The structural finding.** The reference set had a document-creation skill and
+nothing else for the documentation library. No update, no audit, no find, no backfill. It could create
 documents and never maintain them, which is exactly how a library becomes
 something nobody trusts. Four of our six skills exist to close that gap, and this
 is the clearest evidence that they are the right four.
@@ -474,7 +474,7 @@ extracting the field tables mechanically rather than by eye.
     which v1 forbids, since there are no unattended runs. It runs when a person
     runs it, and reads the cadence to decide what to flag. Those are different
     things and the spec now says which.
-11. **The duplicate check had no threshold.** the reference set used 70% on title and topic.
+11. **The duplicate check had no threshold.** The reference used 70% on title and topic.
     Rather than inherit a number blind, the spec now says to set it against real
     artifacts and make it configurable, and says why: a similarity threshold set
     blind ends up either silent or unusable.

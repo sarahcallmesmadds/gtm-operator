@@ -164,8 +164,8 @@ of this section.
 
 Same reasoning as `SCHEMA-process.md`, which holds the full argument. In
 short: a maximum only, because a floor manufactures filler and a ceiling stops
-bloat, and the reference skill's 400 word floor had to be followed by a second rule
-telling itself not to pad.
+bloat, and the reference skill's 400 word floor had to be followed by a second
+rule telling itself not to pad.
 
 **600 rather than 800**, because a memo is read once on the day it lands. An
 artifact is returned to for years and can afford more. The three types most

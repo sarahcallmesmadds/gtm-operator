@@ -512,8 +512,8 @@ tool, which is what a reader wants next from an index entry.
 
 ## What was taken from the reference, and what was not
 
-The reference is `reference-index/design/software-library-schema-spec.md` and
-the exported schema beside it. Taken as structure and reasoning only, per the
+The reference is the software library schema spec in the reference set, and the
+exported schema beside it. Taken as structure and reasoning only, per the
 standing rule. Nothing about fill rates, row counts or migration order came
 across, because none of it is about the design.
 

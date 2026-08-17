@@ -13,8 +13,13 @@ destination was settled (see "Where this ships" below).
 
 Building new, shareable plugins for people who do not have Sarah's setup.
 
-The reference exports (`reference-kit`, `reference-index`) are **reference
-only**. What we take from them is:
+**The reference set is reference only.** It is an export of the internal skills
+and schemas from a prior engagement, and it is deliberately not named anywhere in
+this repository. Do not reintroduce the name, the repository names or the file
+paths: this is a public-facing design and naming somebody else's internal tooling
+in it is not ours to do. "The reference" is the term throughout.
+
+What we take from it is:
 
 - the schema, including page body structure
 - why it was built that way
@@ -23,11 +28,11 @@ only**. What we take from them is:
 - why it helps
 
 **What we are not doing.** Not fixing, auditing, migrating or cleaning anything
-at the reference organisation. Sarah does not work there. Row counts, fill rates, staleness,
-adherence and drift between existing docs are irrelevant and must not appear in
-this work. Where two old docs disagree, pick the better one and move on rather
-than raising it as a decision. the reference set is used only to identify the most recent
-and best-developed version of a structure.
+in the organisation the reference came from. Sarah does not work there. Row
+counts, fill rates, staleness, adherence and drift between existing docs are
+irrelevant and must not appear in this work. Where two old docs disagree, pick the
+better one and move on rather than raising it as a decision. The reference is used
+only to identify the most recent and best-developed version of a structure.
 
 **Frameworks and judgment calls belong inside the skills.** Anything worked out
 here that helps a user decide something (how granular a Strategy Decision should
@@ -82,8 +87,8 @@ negotiate.
 - The thing is the **Process Library**. Not Documentation Library, not Docs Library.
 - Its rows are **artifacts**. The Type field holds **artifact types**.
 - The communications log is **Memos**. Never "the Updates DB". This supersedes
-  the 2026-07-17 note in `reference-index/design/notion-db-inventory-proposal.md`
-  which had said the name stays "Updates".
+  the 2026-07-17 note in the reference database inventory proposal, which had
+  said the name stays "Updates".
 
 ---
 
