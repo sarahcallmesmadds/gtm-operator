@@ -1,0 +1,114 @@
+{
+  "_comment": "The schema Notion returned after creating the Process Library from schema.js on 2026-08-17, in a live workspace. Transcribed from the create response. This is a record of what Notion actually does, not what the design hoped it would do, and it is the fixture `verify` is tested against. Two things in here were surprises: RICH_TEXT reads back as \"text\" and PEOPLE reads back as \"person\".",
+  "Name": { "name": "Name", "type": "title" },
+  "Description": { "name": "Description", "type": "text" },
+  "Type": {
+    "name": "Type",
+    "type": "select",
+    "options": [
+      { "name": "Strategy Decision", "color": "purple" },
+      { "name": "SOP/ROE", "color": "blue" },
+      { "name": "Enablement", "color": "green" },
+      { "name": "Reporting", "color": "yellow" },
+      { "name": "Technical Reference", "color": "gray" }
+    ]
+  },
+  "Domain": {
+    "name": "Domain",
+    "type": "select",
+    "options": [
+      { "name": "Customer Success", "color": "green" },
+      { "name": "Data & Systems", "color": "gray" },
+      { "name": "Deal Execution", "color": "orange" },
+      { "name": "GTM Strategy & ICP", "color": "purple" },
+      { "name": "Marketing & Campaigns", "color": "pink" },
+      { "name": "Partnerships & Agency", "color": "brown" },
+      { "name": "Pipeline & Demand Gen", "color": "yellow" },
+      { "name": "Sales Enablement", "color": "blue" }
+    ]
+  },
+  "Audience": {
+    "name": "Audience",
+    "type": "multi_select",
+    "options": [
+      { "name": "AE", "color": "blue" },
+      { "name": "Eng", "color": "gray" },
+      { "name": "Everyone", "color": "default" },
+      { "name": "FDE", "color": "gray" },
+      { "name": "Finance", "color": "green" },
+      { "name": "GM", "color": "purple" },
+      { "name": "Leadership", "color": "purple" },
+      { "name": "Marketing", "color": "pink" },
+      { "name": "Partner", "color": "brown" },
+      { "name": "People Ops", "color": "orange" },
+      { "name": "RevOps", "color": "blue" },
+      { "name": "SDR", "color": "blue" },
+      { "name": "Sales", "color": "blue" },
+      { "name": "Solutions", "color": "gray" }
+    ]
+  },
+  "Segment": {
+    "name": "Segment",
+    "type": "multi_select",
+    "options": [
+      { "name": "Enterprise", "color": "purple" },
+      { "name": "Mid-Market", "color": "blue" },
+      { "name": "SMB", "color": "green" }
+    ]
+  },
+  "L2C Lifecycle": {
+    "name": "L2C Lifecycle",
+    "type": "multi_select",
+    "options": [
+      { "name": "0 - Everywhere all the time", "color": "default" },
+      { "name": "1 - ToFu & Engagement", "color": "pink" },
+      { "name": "2 - Eval & Demo", "color": "orange" },
+      { "name": "3 - Contracting", "color": "yellow" },
+      { "name": "4 - Customer Activation", "color": "green" },
+      { "name": "5 - Onboarding", "color": "blue" },
+      { "name": "6 - Steady State & Expansion", "color": "purple" },
+      { "name": "7 - Contraction", "color": "red" },
+      { "name": "8 - Renewal", "color": "brown" }
+    ]
+  },
+  "Tags": {
+    "name": "Tags",
+    "type": "multi_select",
+    "options": [
+      { "name": "AI", "color": "blue" },
+      { "name": "Data", "color": "gray" },
+      { "name": "Meetings", "color": "orange" },
+      { "name": "Products", "color": "purple" },
+      { "name": "Sales Messaging", "color": "pink" },
+      { "name": "Tools", "color": "green" },
+      { "name": "Teammate Onboarding", "color": "yellow" },
+      { "name": "Teammate Offboarding", "color": "brown" }
+    ]
+  },
+  "Status": {
+    "name": "Status",
+    "type": "select",
+    "options": [
+      { "name": "Active", "color": "green" },
+      { "name": "Draft", "color": "yellow" },
+      { "name": "Archive", "color": "gray" }
+    ]
+  },
+  "Owner": { "name": "Owner", "type": "person" },
+  "Last checked for accuracy": { "name": "Last checked for accuracy", "type": "date" },
+  "Review cadence": {
+    "name": "Review cadence",
+    "type": "select",
+    "options": [
+      { "name": "Monthly", "color": "red" },
+      { "name": "Quarterly", "color": "orange" },
+      { "name": "Twice a year", "color": "yellow" },
+      { "name": "Yearly", "color": "green" },
+      { "name": "On change only", "color": "blue" },
+      { "name": "None", "color": "gray" }
+    ]
+  },
+  "Verified by": { "name": "Verified by", "type": "person" },
+  "Verified date": { "name": "Verified date", "type": "date" },
+  "Created time": { "name": "Created time", "type": "created_time" }
+}
