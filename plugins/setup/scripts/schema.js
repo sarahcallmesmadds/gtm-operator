@@ -127,6 +127,237 @@ const DATABASES = {
       { name: 'Verified date', type: 'date' },
       { name: 'Created time', type: 'created_time' }
     ]
+  },
+
+  /**
+   * Memos. Time-stamped communication, append-only. The counterpart to the
+   * Process Library and the line everything else in the design follows from.
+   *
+   * Append-only is narrower than it sounds: the body and content properties are
+   * immutable after publication, Published to Canceled is the one permitted
+   * transition, and the far sides of two-way relations update themselves.
+   */
+  memos: {
+    title: 'Memos',
+    properties: [
+      { name: 'Name', type: 'title' },
+      { name: 'Description', type: 'text', note: 'one sentence' },
+
+      // Each is a genuinely different kind of communication with a different
+      // page body, which is the test used to cut the list.
+      { name: 'Type', type: 'select', options: [
+        ['Memo', 'default'],
+        ['Project Update', 'blue'],
+        ['Team Update', 'purple'],
+        ['Meeting Notes', 'gray'],
+        ['Problem Statement', 'orange'],
+        ['Release', 'green'],
+        ['Incident Report', 'red']
+      ] },
+
+      { name: 'Published date', type: 'date', note: 'the timestamp that makes it a record' },
+      { name: 'Author', type: 'person', note: 'skipped when there is no personId' },
+
+      // Skills never write Draft. Published to Canceled is a retraction and
+      // requires a correcting memo.
+      { name: 'Status', type: 'select', options: [
+        ['Draft', 'yellow'], ['Published', 'green'], ['Canceled', 'gray']
+      ] },
+
+      { name: 'Domain', type: 'select', options: DOMAIN },
+      { name: 'Audience', type: 'multi_select', options: AUDIENCE },
+      { name: 'Segment', type: 'multi_select', options: SEGMENT },
+      { name: 'L2C Lifecycle', type: 'multi_select', options: L2C },
+      { name: 'Tags', type: 'multi_select', options: TAGS },
+      { name: 'Period covered', type: 'date', note: 'range, for anything summarising a stretch of time' },
+      { name: 'Created time', type: 'created_time' }
+    ]
+  },
+
+  /**
+   * Projects. Status is a Select and not Notion's Status type, forced by
+   * measurement: the API cannot create a Status property with custom options.
+   */
+  projects: {
+    title: 'Projects',
+    properties: [
+      { name: 'Name', type: 'title' },
+      { name: 'Description', type: 'text', note: 'one sentence' },
+
+      { name: 'Status', type: 'select', options: [
+        ['Intake', 'gray'],
+        ['Scoped', 'blue'],
+        ['In progress', 'yellow'],
+        ['Done', 'green'],
+        ['Canceled', 'red']
+      ] },
+
+      { name: 'Priority', type: 'select', options: [
+        ['Prio 1', 'red'], ['Prio 2', 'orange'], ['Prio 3', 'yellow'], ['TBD', 'gray']
+      ] },
+
+      { name: 'Level of Effort', type: 'select', options: [
+        ['Low', 'green'], ['Med', 'yellow'], ['High', 'red'], ['TBD', 'gray']
+      ] },
+
+      { name: 'Owner', type: 'person', note: 'one accountable person, not a list' },
+      { name: 'Stakeholders', type: 'person', note: 'who is consulted or affected' },
+      { name: 'Domain', type: 'select', options: DOMAIN },
+      { name: 'Segment', type: 'multi_select', options: SEGMENT },
+      { name: 'L2C Lifecycle', type: 'multi_select', options: L2C },
+      { name: 'Timeline', type: 'date', note: 'range, start and target end' },
+      { name: 'Business outcome', type: 'text', note: 'what success looks like in a sentence' },
+      { name: 'Created time', type: 'created_time' }
+    ]
+  },
+
+  /**
+   * Tasks. Ten fields against the reference's nineteen. The most numerous rows
+   * in the system and the most abandoned, so every field earns itself twice.
+   *
+   * The title is `Task name`, not `Name`. That is deliberate and it is the kind
+   * of detail a generator gets wrong.
+   */
+  tasks: {
+    title: 'Tasks',
+    properties: [
+      { name: 'Task name', type: 'title' },
+      { name: 'Description', type: 'text', note: 'one line' },
+
+      // Deliberately different from Projects. Scoped has no meaning on a task,
+      // and Blocked has real meaning on one.
+      { name: 'Status', type: 'select', options: [
+        ['Not started', 'gray'],
+        ['In progress', 'yellow'],
+        ['Blocked', 'red'],
+        ['Done', 'green'],
+        ['Canceled', 'brown']
+      ] },
+
+      { name: 'Assignee', type: 'person' },
+      { name: 'Due date', type: 'date' },
+      { name: 'Order', type: 'number', note: 'manual ordering within a project' },
+      { name: 'Created time', type: 'created_time' }
+    ]
+  },
+
+  /**
+   * Software. Twenty-eight fields in five groups, and the grouping is how a
+   * person reads the row rather than anything Notion knows about.
+   */
+  software: {
+    title: 'Software',
+    properties: [
+      // What it is
+      { name: 'Name', type: 'title', note: "the vendor's own spelling" },
+      { name: 'Description', type: 'text', note: 'one sentence, ending with the team that depends on it' },
+      { name: 'Status', type: 'select', options: [
+        ['Evaluating', 'yellow'], ['Active', 'green'], ['Sunsetting', 'orange'],
+        ['Retired', 'gray'], ['Rejected', 'red']
+      ] },
+      { name: 'Importance', type: 'select', options: [
+        ['Business critical', 'red'], ['Important', 'orange'], ['Standard', 'gray']
+      ] },
+      { name: 'Domain', type: 'select', options: DOMAIN },
+      { name: 'Audience', type: 'multi_select', options: AUDIENCE },
+
+      // Who
+      { name: 'Owner', type: 'person', note: 'accountable for the tool' },
+      { name: 'Technical owner', type: 'person' },
+      { name: 'Admins', type: 'person' },
+      { name: 'Billing owner', type: 'person' },
+
+      // The contract. Kept after review overruled cutting it: one argument
+      // cannot produce two answers in one schema.
+      { name: 'Contract dates', type: 'date', note: 'range' },
+      { name: 'Notice deadline', type: 'date', note: 'the date by which you have to cancel to get out' },
+      { name: 'Renews', type: 'select', options: [
+        ['Automatically', 'red'], ['Manually', 'green'], ['No renewal', 'gray'], ['Unknown', 'yellow']
+      ] },
+      { name: 'Annual cost', type: 'number' },
+      { name: 'Contract link', type: 'url' },
+
+      // Risk and surface
+      { name: 'AI access', type: 'multi_select', options: [
+        ['MCP (connected)', 'green'], ['MCP (available)', 'blue'], ['API', 'purple'],
+        ['CLI', 'gray'], ['None', 'default'], ['Unknown', 'yellow']
+      ] },
+      { name: 'Stores PII', type: 'select', options: [
+        ['Customer PII', 'red'], ['Employee PII', 'orange'], ['None', 'green'], ['Unknown', 'yellow']
+      ] },
+      { name: 'SOC 2', type: 'select', options: [
+        ['Yes', 'green'], ['No', 'red'], ['Unknown', 'yellow']
+      ] },
+      { name: 'SSO', type: 'select', options: [
+        ['Enforced', 'green'], ['Enabled', 'blue'], ['Available', 'yellow'],
+        ['Not supported', 'red'], ['Unknown', 'gray']
+      ] },
+      { name: 'Customer facing', type: 'checkbox' },
+      { name: 'Given to new teammates', type: 'checkbox' },
+
+      // Pointers and freshness
+      { name: 'Login', type: 'url' },
+      { name: 'Documentation', type: 'url' },
+      { name: 'Status page', type: 'url' },
+      { name: 'Last reviewed', type: 'date', note: 'the freshness stamp for the whole row' },
+      { name: 'Created time', type: 'created_time' }
+    ]
+  },
+
+  /**
+   * Calendar. Anything that happens on a date and reaches somebody outside the
+   * team. Gets the Tasks discipline, because a heavy template on a numerous row
+   * guarantees blank rows.
+   *
+   * Three fields apply to events only and three do not apply to events. That is
+   * deliberate rather than sloppy: the alternative was separate databases.
+   */
+  calendar: {
+    title: 'Calendar',
+    properties: [
+      { name: 'Name', type: 'title' },
+      { name: 'Description', type: 'text', note: 'one sentence' },
+
+      { name: 'Type', type: 'select', options: [
+        ['Event', 'purple'], ['Content', 'blue'], ['Social post', 'pink'],
+        ['Email send', 'orange'], ['Launch', 'green']
+      ] },
+
+      // Date is optional at Idea and Planned and required by the skills from
+      // Confirmed onwards. Notion enforces none of that, so setup builds a
+      // Needs attention view for it. See manifest.js.
+      { name: 'Status', type: 'select', options: [
+        ['Idea', 'gray'], ['Planned', 'yellow'], ['Confirmed', 'blue'],
+        ['Done', 'green'], ['Canceled', 'red']
+      ] },
+
+      { name: 'Date', type: 'date', note: 'range. Time optional' },
+
+      { name: 'Our role', type: 'select', options: [
+        ['Hosting', 'purple'], ['Sponsoring', 'orange'], ['Speaking', 'blue'], ['Attending', 'gray']
+      ], note: 'events only' },
+
+      { name: 'Format', type: 'select', options: [
+        ['Conference', 'purple'], ['Webinar', 'blue'], ['Dinner', 'orange'],
+        ['Roundtable', 'yellow'], ['Workshop', 'green'], ['Meetup', 'pink']
+      ], note: 'events only, and editable' },
+
+      { name: 'Location', type: 'text', note: 'city, venue, or Online. Events only' },
+
+      { name: 'Channel', type: 'multi_select', options: [
+        ['LinkedIn', 'blue'], ['X', 'gray'], ['Instagram', 'pink'], ['TikTok', 'red'],
+        ['YouTube', 'red'], ['Blog', 'green'], ['Newsletter', 'orange'],
+        ['Podcast', 'purple'], ['Email', 'yellow']
+      ], note: 'not for events' },
+
+      { name: 'Domain', type: 'select', options: DOMAIN },
+      { name: 'Audience', type: 'multi_select', options: AUDIENCE },
+      { name: 'Segment', type: 'multi_select', options: SEGMENT },
+      { name: 'L2C Lifecycle', type: 'multi_select', options: L2C },
+      { name: 'Owner', type: 'person', note: 'one accountable person' },
+      { name: 'Link', type: 'url', note: 'registration page, published post, event site' },
+      { name: 'Created time', type: 'created_time' }
+    ]
   }
 }
 
