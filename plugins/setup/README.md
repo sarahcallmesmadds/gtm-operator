@@ -8,9 +8,15 @@ config.** That is the decision the whole architecture rests on.
 
 ## Status
 
-**Designed and part-built. Do not run it.** The manifest and its checks exist.
-The Notion calls do not. Running anything here against a real workspace is not
-possible yet, and when it is, it creates databases in an account you care about.
+**Part-built. Do not run it against a workspace you care about.**
+
+What exists: the manifest, the six database schemas, the statement generator, the
+verifier, and the checks that hold all of it to the design documents. The whole
+chain has been proved once end to end, by creating the Process Library in a live
+workspace, adding its relations, reading it back, comparing it, and deleting it.
+
+What does not exist: the `install` flow that runs the chain for all six, the
+config file, the views, and the `check` and `add` skills.
 
 ## Its skills
 
@@ -65,13 +71,20 @@ Each was correct on the day it was written.
 ## Tests
 
 ```bash
-node ../../tests/manifest-agrees-with-design.test.js
+sh ../../tests/run.sh
 ```
 
-Six checks. They confirm the manifest agrees with the relation map in the design
-document row by row, that it does not contradict itself, that no count written in
-a document disagrees with it, and that the `--summary` output agrees with the
-data it summarises.
+Three files, and they hold the design and the code together in both directions:
+
+- The manifest agrees with the relation map in the design document, row by row,
+  and does not contradict itself. No count written in a document disagrees with
+  it, and the `--summary` output agrees with the data it summarises.
+- Every property in the schema documents exists in `schema.js`, and nothing
+  exists in `schema.js` that the documents do not define. Six databases, checked
+  field by field against their own documents.
+- `verify` catches what it claims to: a missing property, a wrong type, a missing
+  option, options in the wrong order, an extra property somebody else added, and
+  an empty response, which must read as a failure rather than a clean pass.
 
 **Each one has been proved to fail on the fault it names**, by breaking the
 manifest on purpose and confirming the right check went red. A check that has
