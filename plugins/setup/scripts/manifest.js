@@ -120,10 +120,35 @@ const VIEWS = [
  * are, and a filter cannot reach across a relation to read a property on the
  * related page. Those two are reported by `check` instead.
  *
- * UNMEASURED. Both limits are read off how Notion filters behave and have not
- * been tested against a live workspace. They are cheap to test and worth
- * testing before this plugin is finished. If either turns out to be wrong, the
- * rule moves back to a view and only this file changes.
+ * MEASURED 2026-08-17 against a live workspace, and both limits are real:
+ *
+ *   FILTER "Tags" > 3
+ *     400 validation_error, `Operator ">" is not supported for multi_select
+ *     properties`.
+ *   FILTER "Parent.Type" != "Strategy Decision"
+ *     400 validation_error, `Could not find property with name or id
+ *     "Parent.Type"`. There is no path syntax across a relation.
+ *
+ * The workarounds were measured too, and neither survives:
+ *
+ *   A formula counting tags came back typed as text, so `> 3` was rejected with
+ *   `Operator ">" is not supported for text properties`. Two attempts.
+ *
+ *   A rollup of the parent's Type is worse than a failure. The view was created,
+ *   the call reported success, and the filter was SILENTLY DISCARDED: the
+ *   returned view had `filters: []`. A `Needs attention` view built that way
+ *   would exist, look correct, and match every row forever.
+ *
+ * Formula and rollup columns also come back under `notAvailableInQuerySql`, so
+ * `check` could not read them even if they worked.
+ *
+ * WHAT THIS MEANS FOR ANYONE EDITING THIS FILE: an unsupported filter fails in
+ * two different ways depending on the property type, and only one of them is
+ * loud. Never conclude a view filter works because the create call returned
+ * success. Read the view back and confirm the filter is in it. Both the
+ * ordinary select filter and the relation IS EMPTY filter were confirmed this
+ * way and both persist correctly, which is why the three view-backed rules
+ * below are sound.
  */
 const RULES = [
   { key: 'projects-problem-statement', database: 'projects', caughtBy: 'view',
@@ -144,12 +169,18 @@ const RULES = [
   { key: 'tags-max-3', databases: ['process', 'memos'], caughtBy: 'check',
     rule: 'Tags capped at 3',
     noFilter: 'A multi-select filter tests contains and does not contain. It cannot count values',
-    why: 'Tags stop being a filter once a row carries six of them' },
+    why: 'Tags stop being a filter once a row carries six of them',
+    // Proved on real rows 2026-08-17: returned exactly the 4-tag and 5-tag rows
+    // and correctly excluded the 2-tag one.
+    checkQuery: 'SELECT "Name" FROM <ds> WHERE json_array_length("Tags") > 3' },
 
   { key: 'process-parent-type', database: 'process', caughtBy: 'check',
     rule: 'Only a Strategy Decision may be a parent',
     noFilter: 'The Type being tested is on the related page, and a filter cannot read across a relation',
-    why: 'The hierarchy is the whole navigation model, and any row can parent any row' }
+    why: 'The hierarchy is the whole navigation model, and any row can parent any row',
+    // Proved on real rows 2026-08-17: a self-join through the relation returned
+    // the child of an SOP and not the child of a Strategy Decision.
+    checkQuery: 'SELECT c."Name" FROM <ds> c JOIN <ds> p ON p.url = json_extract(c."Parent", \'$[0]\') WHERE c."Parent" IS NOT NULL AND p."Type" != \'Strategy Decision\'' }
 ]
 
 /** Derived. Never write these numbers down anywhere else. */

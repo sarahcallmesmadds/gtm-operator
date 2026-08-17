@@ -9,6 +9,33 @@ destination was settled (see "Where this ships" below).
 
 ---
 
+## Measured against a live workspace, 2026-08-17
+
+Run in a throwaway database under a testing page, deleted afterwards. Recorded
+here because these are the facts the design rests on, and because two of them
+were assumptions until this ran.
+
+| Question | Answer |
+|---|---|
+| Can a view filter count multi-select values | **No.** 400, `Operator ">" is not supported for multi_select properties` |
+| Can a view filter read a property across a relation | **No.** 400, no path syntax exists |
+| Can a formula carry the tag count instead | **No.** It comes back typed as text and `>` is rejected on text |
+| Can a rollup carry the parent's type instead | **No, and it lies.** The view is created, success is reported, and the filter is silently discarded |
+| Can `check` find both violations in SQL | **Yes.** Both queries proved on real rows |
+| Can a two-way self-relation be added in a second pass | **Yes** |
+| Do ordinary select and relation `IS EMPTY` filters persist | **Yes**, confirmed by reading the views back |
+
+**The rollup result is the one to remember.** A filter Notion cannot express is
+sometimes rejected with a 400 and sometimes accepted and quietly emptied, and
+which one you get depends on the property type. Nothing in the response
+distinguishes them. **This is why `install` step 7 reads back everything it
+created rather than trusting that the create calls returned success.**
+
+It also settles the open choice about the two unenforceable rules: routing them
+to `check` was not merely the tidier option, it is the only one that works.
+
+---
+
 ## What we are doing
 
 Building new, shareable plugins for people who do not have Sarah's setup.

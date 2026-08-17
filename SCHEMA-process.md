@@ -203,8 +203,8 @@ not the customer's, and it now lives in Tags.
 **The rule:** a tag is what the doc is *about*. Never who it is for, never when
 in the lifecycle, never what kind of doc it is. **Max 3, enforced by the skills and
 reported by `setup:check`.** Notion has no maximum on a multi-select and no filter
-that can count one, so this is one of the two rules no `Needs attention` view can
-watch. See `SKILLS-setup.md`.
+that can count one, measured 2026-08-17 and rejected with a 400, so this is one of
+the two rules no `Needs attention` view can watch. See `SKILLS-setup.md`.
 
 AI, Data, Meetings, Products, Sales Messaging, Tools, Teammate Onboarding,
 Teammate Offboarding.
@@ -573,7 +573,9 @@ so the cut was correct at the time and so is the restoration.
   Parent.** Only a Strategy Decision can be a parent. **The plugin enforces this
   on every row it writes, and `setup:check` reports the rows it did not write that
   break it.** A filter cannot reach across the relation to read the parent's
-  `Type`, so there is no view for this one. See `SKILLS-setup.md`.
+  `Type`, measured 2026-08-17, so there is no view for this one. A rollup looks
+  like the way round it and is not: the view is created, reported as successful,
+  and silently loses its filter. See `SKILLS-setup.md`.
 - **Ceiling of 800 words across the required sections. No minimum.** Conditional
   sections (Sources) sit outside the count. See below for why there is no floor
   and what happens at the ceiling.
