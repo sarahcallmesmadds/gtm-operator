@@ -24,7 +24,7 @@ databases. A change to one is a change to all.
 |---|---|---|
 | Name | Title | |
 | Description | Text | one sentence |
-| Status | Status | Intake, Scoped, In progress, Done, Canceled |
+| Status | Select | Intake, Scoped, In progress, Done, Canceled. **Select, not Notion's Status type**, see below |
 | Priority | Select | Prio 1, Prio 2, Prio 3, TBD |
 | Level of Effort | Select | Low, Med, High, TBD |
 | Owner | Person | one accountable person, not a list |
@@ -34,9 +34,10 @@ databases. A change to one is a change to all.
 | L2C Lifecycle | Multi-select | the same 0 to 8, see "Impact to Funnel" below |
 | Timeline | Date range | start and target end |
 | Business outcome | Text | what success looks like in a sentence |
-| Problem Statement | Relation to Memos | **required**, see the review findings |
+| Problem Statement | Relation to Memos | **required by the skills, and surfaced when it is not.** Two-way, inverse `Resulting Projects` on Memos. See the review findings, and the Needs attention views in `SKILLS-setup.md` |
 | Artifacts | Relation to Process Library | what this project produced or changed |
 | Memos | Relation | updates and releases about this project |
+| Calendar | Relation | inverse of `Project` on Calendar. What this project is putting in market, and when. Added 2026-08-17, see `SCHEMA-calendar.md` |
 | Tasks | Relation | |
 | Created time | Created time | |
 
@@ -45,6 +46,38 @@ databases. A change to one is a change to all.
 `Intake` to `Scoped` to `In progress` to `Done` or `Canceled`. Settled earlier
 and unchanged, see DECISIONS.md for why `Backlog` was renamed and why `Scoped`
 exists.
+
+#### It is a Select, and that was measured rather than chosen
+
+**Proved by running, 2026-08-17.** Both databases were specified as Notion's
+`status` property type, which is the one that groups values into to-do, in
+progress and complete and gives you a board you drag cards across.
+
+**The API cannot create one with your own values.** A throwaway database was
+created with a `STATUS` column and it came back carrying Notion's three defaults,
+Not started, In progress and Done, and nothing else. Supplying options was then
+rejected two ways, on creation and on alter:
+
+> Invalid statements at position 25: Expected ADD, DROP, RENAME, or ALTER
+> keyword, got "("
+
+A `SELECT` column created in the same call took its five custom options without
+complaint, in the order given.
+
+**So both databases use `Select`.** What is lost is Notion's built-in status
+grouping. A board view grouped by a Select still works, so the drag-across-columns
+experience survives.
+
+**This also makes the design more consistent than it was.** All four databases now
+use `Select` for status, where previously two used one property type and two used
+another, which was a difference nobody had chosen and that would have broken any
+shared helper.
+
+**The wider lesson, and it is the second time today.** This was carried as the
+highest-risk unverified assumption in the design, on the reasoning that it would
+change a schema rather than a line of code. It did. Ten minutes against a real
+workspace settled it, the same way the select-value question was settled after two
+written sources had it wrong.
 
 **The reference had ten values.** `Backlog`, `Planning`, `Blocked`, `Paused`,
 `Always-on`, `UAT Completed` and `Exclude` are all cut. `Blocked` and `Paused`
@@ -169,8 +202,8 @@ alone, because that is how the two start disagreeing.
 |---|---|---|
 | Task name | Title | |
 | Description | Text | one line |
-| Status | Status | Not started, In progress, Blocked, Done, Canceled |
-| Project | Relation | **required**. A task with no project is invisible |
+| Status | Select | Not started, In progress, Blocked, Done, Canceled. **Select**, same reason as Projects |
+| Project | Relation | **required by the skills, and surfaced when it is not.** A task with no project is invisible from every project, which is why setup builds a Needs attention view filtered to exactly those rows. Notion cannot make a relation required |
 | Assignee | Person | |
 | Due date | Date | |
 | Parent task | Relation (self) | |

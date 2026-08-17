@@ -29,7 +29,7 @@ both. A change to one is a change to both.
 | Audience | Multi-select | which teams need to know |
 | Segment | Multi-select | optional |
 | L2C Lifecycle | Multi-select | 0 to 8, see below |
-| Tags | Multi-select | optional, max 3, subject only |
+| Tags | Multi-select | optional, max 3, subject only. Skills enforce it, `check` reports it, Notion does neither |
 | Status | Select | Active, Draft, Archive. Skills only ever write `Active` or `Archive`. `Draft` is a person's to set |
 | Owner | Person | defaults to whoever runs the skill |
 | Last checked for accuracy | Date | |
@@ -39,9 +39,12 @@ both. A change to one is a change to both.
 | Created time | Created time | keep it; you do not see it unless the property is exposed |
 | Parent | Relation (self) | |
 | Child Docs | Relation (self) | inverse of Parent |
-| Superseded Strategy | Relation (self) | see mechanism below |
-| Projects | Relation | **conditional, see below.** Only exists once `projects` is installed |
-| Software | Relation | **not created in v1, see below** |
+| Supersedes | Relation (self) | the decision this one replaces. Renamed from `Superseded Strategy` 2026-08-17, see mechanism below |
+| Superseded By | Relation (self) | inverse of Supersedes |
+| Memos | Relation | inverse of `Artifacts` on Memos. What has been announced about this artifact. Added 2026-08-17 when that relation was made two-way |
+| Projects | Relation | inverse of `Artifacts` on Projects. `setup` creates every database, so this is never conditional |
+| Software | Relation | inverse of `Artifacts` on Software. The tools this document concerns. Defined in `SCHEMA-software.md` |
+| Calendar | Relation | inverse of `Artifacts` on Calendar. What this document was the playbook for. Defined in `SCHEMA-calendar.md` |
 
 **Dropped from the reference:** Customer Tasks, MKT Projects (pointed at
 databases that existed in one org only), Teams relation (folded into Audience),
@@ -54,34 +57,39 @@ database id at the moment the property is created.** There is no way to create a
 relation pointing at nothing and fill it in later. Two fields are affected, and
 the rule generalises to every cross-database relation in this design.
 
-| Field | What setup does |
-|---|---|
-| `Software` | **Not created at all in v1.** There is no Software directory, so there is no target. It is listed here as a planned field, not a shipped one |
-| `Projects` | Created only if the Projects database already exists. Otherwise `setup` adds it later, to both the Process Library and Memos, as part of creating Projects |
+**Superseded again on 2026-08-17, later the same day.** Neither field is
+conditional any more. `setup` creates all six foundation databases in one pass
+before it adds a single relation, so every target exists by the time any relation
+is created. `Software` and `Projects` are both ordinary fields.
 
-**Simplified 2026-08-17.** This previously described two setups negotiating over
-which relations each could add, and which had to be added back later by the
-other. One `setup` plugin creates every database in the foundation, so it
-creates them in dependency order and adds every relation itself. The two-stage
-rule still applies within a single database, because a self-relation needs the id
-of the database being created.
+This previously said `Software` was not created at all in v1 and that `Projects`
+was created only if the Projects database already existed. Both of those were
+written when setup was expected to build a partial foundation. See
+`SKILLS-setup.md` for the two-phase order and the full relation map.
 
-**Do not ship a relation property pointing at a database the plugin did not
-create and cannot find.** It fails at property-creation time, which is during
-setup, which is the worst possible moment.
+**The rule itself still holds and still has teeth**, because a relation property
+requires a target database id at the moment it is created. What changed is that
+one setup satisfies it for every relation by ordering, instead of each relation
+carrying a condition. **Do not ship a relation property pointing at a database the
+plugin did not create and cannot find.** It fails at property-creation time, which
+is during setup, which is the worst possible moment.
 
 ### Self-relations have the same problem
 
-`Parent`, `Child Docs` and `Superseded Strategy` all point at the Process Library
-itself, and its id does not exist until it has been created. **Setup is therefore
-two stage**, and this was missed when the rule above was first written:
+`Parent`, `Child Docs`, `Supersedes` and `Superseded By` all point at the Process
+Library itself, and its id does not exist until it has been created. **Setup is
+therefore two stage**, and this was missed when the rule above was first written:
 
 1. Create the database and its data source with every non-relation property.
 2. Add the self-relations in a second call, using the id returned by step 1.
 
+**Generalised 2026-08-17**: `setup` now runs the same two stages across the whole
+foundation rather than per database, creating all six databases first and every
+relation second. See `SKILLS-setup.md`.
+
 Pair them explicitly. `Parent` and `Child Docs` are the two sides of one
-relation. `Superseded Strategy` is a separate relation that must not be wired as
-the inverse of either.
+relation. `Supersedes` and `Superseded By` are the two sides of a second, separate
+relation that must not be wired as the inverse of the first.
 
 ### Store the data source id, not only the database id
 
@@ -193,7 +201,10 @@ not the customer's, and it now lives in Tags.
 ### Tags
 
 **The rule:** a tag is what the doc is *about*. Never who it is for, never when
-in the lifecycle, never what kind of doc it is. Max 3.
+in the lifecycle, never what kind of doc it is. **Max 3, enforced by the skills and
+reported by `setup:check`.** Notion has no maximum on a multi-select and no filter
+that can count one, so this is one of the two rules no `Needs attention` view can
+watch. See `SKILLS-setup.md`.
 
 AI, Data, Meetings, Products, Sales Messaging, Tools, Teammate Onboarding,
 Teammate Offboarding.
@@ -229,7 +240,20 @@ rollup would be wrong here because the child genuinely needs to differ.
 | Tags | **No** |
 | Owner | **No.** Defaults to whoever runs the skill. The strategy owner is usually a leader, the SOP owner runs the process, the enablement owner trains people. Inheriting would be wrong more often than right |
 
-### Superseded Strategy
+### Supersedes and Superseded By
+
+**Both sides are labelled, decided 2026-08-17.** The new decision carries
+`Supersedes`, pointing at the one it replaced. The replaced decision carries
+`Superseded By`, pointing forward at what replaced it. Notion maintains the second
+one, so nothing writes it.
+
+Both sides, rather than one, because the reader who most needs the link is the one
+who lands on the old decision. Archived tells them it is dead and nothing tells
+them what to read instead.
+
+**Renamed from `Superseded Strategy`** at the same time. Labelling both sides
+means naming both sides, and one name cannot cover a field that means "the one I
+replaced" on one page and "the one that replaced me" on the other.
 
 **When it is set:** only at the moment someone writes a new Strategy Decision.
 
@@ -249,8 +273,14 @@ judgment call and getting it wrong archives a live doc.
 `audit` can flag candidates it finds later (two Active Strategy Decisions on the
 same question with different answers) but only flags, never writes.
 
-Open: a Notion self-relation gives both directions, so the new doc could show
-"Supersedes" and the old one "Superseded by". Decide whether to label both sides.
+**Why this is a second page rather than an edit.** Everywhere else in the Process
+Library, a change is an edit, because the library is living reference. This one
+case is not, for three reasons. The Why This Approach section is the whole point
+of the type, and overwriting it destroys the record of what was decided before and
+why. Children hang off a Strategy Decision, and editing one in place leaves every
+child implementing a rule its parent no longer states. And an edited page looks
+identical whether somebody fixed a typo or reversed the policy, where two pages
+and a link are a visible event.
 
 ### Context SoT, deferred
 
@@ -413,10 +443,10 @@ match.
 
 **When someone runs it.** A process happened twice and went differently both times.
 
-**Related view:** sibling docs under the same parent, so a reader following a
-process can reach the next step. **Changed 2026-08-17**: this was a Software
-view, and Software is not created in v1, so the template required a view of a
-database that does not exist.
+**Related view:** the `Software` relation, filtered to this document's tools. A
+reader following a process needs to know which systems it touches, and on an SOP
+that beats a sibling list. **Restored 2026-08-17** once Software was put back into
+v1 and `SCHEMA-software.md` defined the database.
 
 ### Enablement
 
@@ -485,8 +515,9 @@ common reporting error is reading a stale number as current.
 **When someone runs it.** A number got quoted wrong in a meeting, or a new report
 went live.
 
-**Related view:** a Child Docs view when this report has children, otherwise
-sibling docs under the same parent. **Changed 2026-08-17**, was a Software view.
+**Related view:** the `Software` relation. Which systems the numbers come out of,
+which is the first thing somebody asks when a figure looks wrong. **Restored
+2026-08-17**, see the SOP note above.
 
 ### Technical Reference
 
@@ -518,12 +549,15 @@ failure mode at 6pm is not missing documentation, it is not knowing who to call.
 **When someone runs it.** Something was built or changed, or the person who
 understood it is leaving.
 
-**Related view:** sibling docs under the same parent. **Changed 2026-08-17**, was
-a Software view.
+**Related view:** the `Software` relation. The tool this document describes, which
+on a technical reference is the whole subject. **Restored 2026-08-17**, see the
+SOP note above.
 
-**When the Software directory ships**, these three revert to Software views,
-which is what they want to be. They are not the right views, they are the right
-views available in v1.
+**All three of these went and came back inside one day.** They were Software views
+originally, dropped when Software was cut from v1, and restored when Software was
+put back and `SCHEMA-software.md` was written. Recorded because the round trip is
+the useful part: a template cannot name a view of a database nobody has described,
+so the cut was correct at the time and so is the restoration.
 
 ### Rules that apply to every type
 
@@ -536,7 +570,10 @@ views available in v1.
 - **A section that does not apply says so in place.** Deleting it loses the
   information that it was considered.
 - **No type may have an SOP, Enablement, Reporting or Technical Reference as its
-  Parent.** Only a Strategy Decision can be a parent. The plugin enforces this.
+  Parent.** Only a Strategy Decision can be a parent. **The plugin enforces this
+  on every row it writes, and `setup:check` reports the rows it did not write that
+  break it.** A filter cannot reach across the relation to read the parent's
+  `Type`, so there is no view for this one. See `SKILLS-setup.md`.
 - **Ceiling of 800 words across the required sections. No minimum.** Conditional
   sections (Sources) sit outside the count. See below for why there is no floor
   and what happens at the ceiling.

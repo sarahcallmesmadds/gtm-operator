@@ -97,12 +97,12 @@ own setup. That is replaced by the structure below.
 
 | Plugin | Owns | Status of the design |
 |---|---|---|
-| `setup` | Creates every database | Needs writing as its own plugin |
+| `setup` | Creates every database | Designed, `SKILLS-setup.md` |
 | `process` | Process Library | Schema done, 5 skills done |
 | `memos` | Memos | Schema done, skills not started |
 | `projects` | Projects and Tasks | Schema done, 6 skills done |
-| `software` | Software directory | Not started |
-| `calendar` | The calendar of external things: events attended, events hosted, webinars, launches, and possibly social | Not started |
+| `software` | Software | Schema done, skills not started |
+| `calendar` | Everything that happens on a date and reaches somebody outside the team | Schema done, skills not started |
 
 ### Tier 2: jobs. Plugins named for the work they do.
 
@@ -151,6 +151,56 @@ Not a rename. These need actual rework:
    applies to one setup building six databases in order rather than two setups
    negotiating.
 
+### Setup creates all six, every time (decided 2026-08-17, later the same day)
+
+**Setup does not ask which databases you want and does not read which plugins are
+installed. It builds the whole foundation in one pass.**
+
+This is what makes the two-tier architecture pay. Every database exists before any
+relation is added, so no relation is conditional, nothing is added back later by a
+second install, and no plugin checks whether another plugin is present. The old
+design spent four separate mechanisms on that problem. This spends one ordering
+rule.
+
+The cost is real: somebody who only wants a documentation library gets six
+databases. That is cheaper than six plugins negotiating.
+
+**What this invalidates.** Every "conditional relation" note in
+`SCHEMA-process.md` and `SCHEMA-memos.md`. Both are corrected.
+
+**What this creates.** A hard dependency. Setup cannot be built until all six
+schema files exist, and `SCHEMA-software.md` and `SCHEMA-calendar.md` do not.
+
+### Software is in v1 (decided 2026-08-17, reversing the same day)
+
+`software` is a foundation plugin that owns the Software directory, and setup
+creates it. This reverses "v1 has no Software directory" and the `Software`
+relation being listed as planned rather than shipped.
+
+Three places had disagreed: the two-tier table listed `software` as tier one, the
+Process Library schema said the relation was not created in v1, and the cut list
+said there was no Software directory. The two-tier architecture wins.
+
+**Follow-on:** SOP, Reporting and Technical Reference revert to Software related
+views, which is what they wanted before Software was cut. Blocked on
+`SCHEMA-software.md`, and recorded in `SCHEMA-process.md` rather than changed,
+because a template cannot name a view of a database nobody has described.
+
+### Supersession labels both sides (decided 2026-08-17)
+
+Closes an open question that had been carried since the field was designed. The
+new decision carries `Supersedes` and the replaced one carries `Superseded By`.
+The reader who most needs the link is the one who lands on the old page, where
+Archive says it is dead and nothing says what to read instead.
+
+**Renamed from `Superseded Strategy`**, because labelling both sides means naming
+both sides, and one name cannot mean "the one I replaced" on one page and "the one
+that replaced me" on the other.
+
+The reasoning for why this is a second page rather than an edit was written down
+at the same time, in `SCHEMA-process.md`. It had been assumed everywhere and
+stated nowhere.
+
 ### Naming note
 
 `calendar` was chosen on 2026-08-17 after `campaigns`, `in-market`, `programs`,
@@ -169,14 +219,29 @@ Split out on 2026-08-17 so they are findable and so nothing has to retype them.
 | `SCHEMA-process.md` | Process Library fields, every value list, the rolldown and superseded rules, the granularity framework, the type-selection tree, and the five page body templates |
 | `SCHEMA-memos.md` | Memos fields, every value list, the seven page body templates, and what the three review passes changed |
 | `SCHEMA-projects.md` | Projects and Tasks fields, every value list, both page body templates, and what the three review passes changed. Both belong to `projects`, which creates them together |
+| `SCHEMA-software.md` | Software fields, every value list, the one page template, how rows get created including `software:backfill`, and what was taken from the reference spec and what was not. Belongs to `software` |
+| `SCHEMA-calendar.md` | Calendar fields, every value list, the one page template, the boundary test for what belongs in it, and the manifest of database-level views setup has to create. Belongs to `calendar` |
+| `SKILLS-setup.md` | The `setup` plugin's three skills, the two-phase creation order, the full relation map, the config shape, and the build risks worth measuring first |
+| `SKILLS-memos.md` | The `memos` plugin's four skills, why there is no `update`, `backfill` or `audit`, and the rule that any plugin may write any database but no plugin may call another plugin's skill |
+| `SKILLS-software.md` | The `software` plugin's four skills, the one-row-per-thing-you-can-cancel test, and why there is no `find` |
+| `SKILLS-calendar.md` | The `calendar` plugin's three skills, the clash check, why the debrief is folded into `update`, and why this is the one foundation plugin with no `backfill` |
 | `SKILLS-process.md` | The `process` plugin's five skills in five slots each, plus the rules that apply to all of them and what was taken from the reference skills |
 | `SKILLS-projects.md` | The `projects` plugin's six skills in the same five slots. `problem-scan` and `ship` were names with nothing behind them and are marked as such |
 | `REVIEW-codex-2026-08-17.md` | The independent Codex review of the above. Twelve findings, my verdict on each, and the three still open |
 
-**Those files define. This file explains.** Field names and values appear in
-exactly one place, which is the schema file for that database. Do not restate a
-field list here, in a `SKILLS-` file, in a handoff, or in a skill. Point at the
-schema file instead.
+**Those files define. This file explains.** Value lists and full field
+definitions appear in exactly one place, which is the schema file for that
+database. Do not restate a field list here, in a handoff, or in a skill. Point at
+the schema file instead.
+
+**A `SKILLS-` file may name the properties its skills write, and two of them
+must.** `SKILLS-setup.md` cannot state a relation map or a config shape without
+naming properties, and `SKILLS-projects.md` writes to a database it does not own,
+so its write contract has to say which properties it fills. **Narrowed 2026-08-17**,
+when review found the rule already broken by both files on the day it was written.
+A rule broken by its own page teaches people to ignore it, and the tables it
+forbade are load-bearing. What stays forbidden is copying a value list, which is
+the thing that actually drifts.
 
 Shared fields (Domain, Audience, Segment, L2C Lifecycle, Tags) carry identical
 value lists across all four databases. Changing one means changing all.
@@ -319,9 +384,17 @@ supersession branch, and template selection. A user with their own seven types
 would break all four, and supporting that means building a translation layer with
 no way to test it.
 
-**What setup does offer is renaming.** Config already maps a logical field or
-value name to a display name, so a user can call a Strategy Decision a "Decision
-Record". The meaning stays fixed, only the label moves.
+**What setup does offer is renaming.** Config maps a logical field or value name
+to a display name, so a user can call a Strategy Decision a "Decision Record". The
+meaning stays fixed.
+
+**Renaming is not a config edit, and this is where that was got wrong.** Changing
+a name writes to Notion first and to config second. Config may never name a
+property or an option that verification did not find in the workspace, because the
+next write would look for something that is not there. **The full three operations,
+adopt, rename and add an option, are in `SKILLS-setup.md`.** Corrected 2026-08-17,
+when review found this paragraph still carrying the collapsed version that the
+fix had already replaced elsewhere.
 
 Using a genuinely different set of types is a later version or a separate
 option. It is not v1.
@@ -334,15 +407,17 @@ The cut line. A first version is defined by what it leaves out.
    runs. Every artifact is previewed and confirmed.
 2. **`audit` flags, it never fixes.** It hands findings to `update`, which is
    where a human approves the change.
-3. **No Software directory.** The `Software` relation is optional and points at a
-   database the user already has. Building that directory is a later plugin pack.
+3. ~~**No Software directory.**~~ **Reversed 2026-08-17.** `software` is a
+   foundation plugin, `setup` creates the database, and the `Software` relation is
+   an ordinary field. See `SCHEMA-software.md`.
 4. **No agents or builds tracking**, which is why `Context SoT` is out. Marking a
    doc as one a skill depends on is only useful once something records which
    skill reads what.
 5. **No approval workflow.** No review chain, no two-person sign-off. Status is a
    field a person sets.
 6. **No taxonomy design at setup, and no remapping either.** The five types
-   ship, fixed. Setup explains them and offers renaming for display. It does not
+   ship, fixed. Setup explains them and offers renaming, which writes to Notion
+   and then to config. It does not
    interview anyone into inventing their own five, and it does not accept a
    different set. See "Setup explains the types" above.
 
@@ -450,7 +525,10 @@ skill can read. Other plugins read those artifacts at runtime.
 
 ### Data model
 - **Memos is time-stamped communication and append-only. Artifacts are living
-  reference. Do not merge them.**
+  reference. Do not merge them.** Append-only is narrower than it reads and
+  `SCHEMA-memos.md` states it exactly: the body and content properties are
+  immutable, `Published` to `Canceled` is the one permitted transition, and the far
+  sides of two-way relations update themselves.
 - **Problem statements stay in Memos.** A change means a new row, never an edit.
 - **`comms` writes to Memos with Type = Project Update.**
 - **PRDs live in the task body.** Artifact pointers per task: sometimes, not
@@ -515,12 +593,69 @@ unverified.
 
 ### Not designed at all
 
-1. **`setup`**, the plugin everything else now depends on. Needs its own file.
-2. **`software`**, the tool directory. No schema, no skills.
-3. **`calendar`**. No schema, no skills. Holds events attended, events hosted,
-   webinars, launches, and possibly social posts. Each row relates to a project.
-4. **`memos` skills.** The schema is done. Nothing writes `Memo`, `Team Update`,
-   `Meeting Notes` or `Incident Report`.
+**Nothing. All six schemas and all six skill sets are written as of 2026-08-17.**
+
+| Plugin | Schema | Skills |
+|---|---|---|
+| `setup` | n/a | 3, `SKILLS-setup.md` |
+| `process` | `SCHEMA-process.md` | 5, `SKILLS-process.md` |
+| `memos` | `SCHEMA-memos.md` | 4, `SKILLS-memos.md` |
+| `projects` | `SCHEMA-projects.md` | 6, `SKILLS-projects.md` |
+| `software` | `SCHEMA-software.md` | 4, `SKILLS-software.md` |
+| `calendar` | `SCHEMA-calendar.md` | 3, `SKILLS-calendar.md` |
+
+**The design is drafted, which is not the same as finished.** Nothing has been
+built, no repo exists, no skill has been written or run, and nothing has been
+tested against a real user. What has changed is that there are no longer any
+undesigned pieces, so the next failure will be found by building rather than by
+reading.
+
+**Done: the independent review.** Round 2 found fourteen problems, four of them
+build blockers, all fixed. See `REVIEW-codex-2026-08-17-round-2.md`.
+
+**Done: both open measurements**, run against a live workspace on 2026-08-17.
+
+1. **The API cannot create a Status property with custom options.** It returns
+   Notion's three defaults and rejects any options supplied, on creation and on
+   alter. **Projects and Tasks now use `Select`**, which the other two databases
+   already used, so all four now agree. This was carried as the highest-risk
+   assumption in the design on the grounds that it would change a schema rather
+   than code, and it did.
+2. **Resolving who the user is works on this connection, and the review was wrong
+   about it.** Asking for the current user returned a person with a name and an
+   email rather than a bot, and listing workspace users worked. The finding was
+   correct about an internal integration token and wrong about a user-authorised
+   connector. **The three-tier fallback in `SKILLS-setup.md` stays**, because the
+   measurement proves tier 1 is reachable and not that it is universal.
+
+**Also learned, and it closes an old note:** this connection **can** trash a data
+source, using `in_trash` on the data source update call. `MEMORY` and the
+2026-08-17 handoff both recorded that it had no delete tool. The test database
+created today was cleaned up with it.
+
+**The rule that keeps paying: when two sources disagree about observable
+behaviour, measure it.** Three times now. The select-value question, the status
+property, and the current user. Two of the three had a confident written source
+on each side and both sides were wrong at least once.
+
+**Done 2026-08-17: `setup`.** Three skills, the two-phase creation order, the
+relation map, the config shape and the build risks, in `SKILLS-setup.md`. **The
+counts live there and are not repeated here**, having been wrong here twice: the
+map went from eleven to thirteen and the risk list from four to five while this
+sentence stayed still.
+
+**Done 2026-08-17: the Software schema.** Twenty-eight fields, one page template,
+in `SCHEMA-software.md`. Contracts and security both ship, and `software:backfill`
+reads a folder of contracts and the user's own mailbox to find tools they already
+pay for.
+
+**The lesson from its review, worth keeping.** The first draft cut both the
+contract group and the security group using the same argument, that answers rot
+and v1 has nothing to sweep them. The contract group was overruled, and that
+should have taken the security group with it. **One argument cannot produce two
+answers in one schema**, and a cut applied unevenly reads as a considered
+distinction when it is an inconsistency. `Last reviewed` is what makes both groups
+honest, and it was already there.
 
 ### Designed but now needing rework against the two-tier architecture
 
@@ -530,9 +665,27 @@ unverified.
 
 ### Smaller, still open
 
-6. **Superseded Strategy:** label one side of the relation or both.
-7. **Does the social calendar live in `calendar`**, or somewhere else. It is the
-   only row type in there that is not an event.
+6. Nothing. The two open measurements were run on 2026-08-17, see below.
+
+**Closed 2026-08-17.** Two things, both because changing them after people have
+installed would be a migration rather than an edit:
+
+- Supersession labels both sides, and the field is renamed `Supersedes` /
+  `Superseded By`.
+- The memo-to-artifact relation is two-way. The artifact gains a `Memos` property,
+  so a reader on an SOP can see what has been announced about it.
+
+**Also closed 2026-08-17: social lives in `calendar`.** The question had been
+whether it belongs, since it is the only row type that is not an event. It belongs,
+and the question was the wrong shape: this is not an events database. A row is
+anything that happens on a date and reaches somebody outside the team, which a
+LinkedIn post does. Two calendars would mean neither could answer what is in
+market that week, which is the one question the database exists for.
+
+**Corrected at the same time:** this file recorded that every Calendar row relates
+to a project. **The relation is optional.** Events, launches and campaigns almost
+always have a project. A Tuesday social post does not, and forcing one manufactures
+empty project rows.
 
 ### Tier 2, not started and not in scope yet
 

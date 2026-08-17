@@ -1,6 +1,6 @@
 # process: what each skill does
 
-Part 3 for `process`. Six skills, each described in the same five slots
+Part 3 for `process`. Five skills, each described in the same five slots
 so a gap in one is visible as a gap rather than as something that did not apply.
 
 The five slots: what it does, when it runs, what it reads and writes, what it
@@ -11,7 +11,7 @@ file does not restate a field name or a value list.
 
 ---
 
-## Rules that apply to all six
+## Rules that apply to all five
 
 - **Never invent a select value.** Before choosing any value, fetch that
   property's current options from Notion and choose only from them.
@@ -37,11 +37,11 @@ file does not restate a field name or a value list.
   writing, not a pointer to a file.
 - **Route to `setup` on first run** when config is absent. Never rely on the
   README.
-- **Pin the Notion API version.** The design relies on data sources and on the
-  Views API, which need `Notion-Version: 2025-09-03` or later, and `2026-03-11`
-  carries its own breaking changes. Pin the version and the SDK floor in the
-  plugin rather than taking whatever the client defaults to, because an
-  unpinned version means the plugin breaks on a date nobody chose.
+- **Pin the Notion API version and the client floor.** Both are defined once, in
+  `SKILLS-setup.md` step 0, and checked there at install. This plugin pins the same
+  two values rather than restating them, because an unpinned version means the
+  plugin breaks on a date nobody chose, and six copies of a version number is how
+  five of them go stale.
 - **A related view is not a block.** Every page template requires one embedded
   related-database view, and most are described by intent ("sibling docs under
   the same parent") rather than by definition. Each one needs its data source,
@@ -79,10 +79,16 @@ having re-read the artifact for accuracy. On a yes it sets `Last checked for
 accuracy`, `Verified by` and `Verified date`. On a no it changes the content and
 moves nothing.
 
-**Corrected 2026-08-17.** `update` previously set `Last checked` on every edit.
-Since that field drives the staleness check, correcting a single word suppressed
-the warning for a whole cadence period on a document nobody had re-read. The
-review clock must only move when a review actually happened.
+**Corrected 2026-08-17, and again the same day.** `update` previously set
+`Last checked` on every edit. Since that field drives the staleness check,
+correcting a single word suppressed the warning for a whole cadence period on a
+document nobody had re-read. The review clock must only move when a review
+actually happened.
+
+**The second correction is the one worth learning from.** The rule was fixed here
+and the operative description of `update` further down still set `Last checked for
+accuracy` unconditionally, so the fault survived in the half of the file somebody
+builds from. **All three fields, not "either date": there are three.**
 
 ---
 
@@ -102,9 +108,10 @@ when config is absent, and never relies on a README. Config lives at
 ids, data source ids, the property name map, the user's Notion person id, and
 the default review cadence.
 
-**Still to write:** the `setup` plugin itself, in its own file. It carries the
-type explanation, the two-stage relation creation, and the option order for every
-select.
+**Written 2026-08-17: `SKILLS-setup.md`.** It carries the type explanation, the
+creation order, the relation map and the option order for every select. It has
+three skills, `install`, `check` and `add`, and the one this plugin routes to on
+first run is `install`.
 
 ---
 
@@ -126,9 +133,9 @@ Fields it always sets without asking:
 | Field | Value |
 |---|---|
 | `Status` | `Active`. **`Draft` is only reachable by a person setting it in Notion**, because a skill that writes a draft has written nothing useful |
-| `Owner` | the user, from their Notion person id in config |
+| `Owner` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
 | `Last checked for accuracy` | today |
-| `Verified by`, `Verified date` | the user, today |
+| `Verified by`, `Verified date` | the user, today. **`Verified by` is skipped when there is no person id**, and `Verified date` is set either way |
 | `Review cadence` | the default from config, offered for change in the preview |
 
 **What it does not do.**
@@ -166,9 +173,15 @@ Fields it always sets without asking:
 spots that a document is wrong.
 
 **What it reads and writes.** Reads the artifact. Writes the changed properties
-and body sections, and sets `Last checked for accuracy`. Asks separately whether
-this counts as verifying the artifact, and sets `Verified by` and `Verified date`
-only on a yes. Shows a before and after before writing.
+and body sections. Asks separately whether this edit counts as having re-read the
+artifact for accuracy, and **on a yes sets all three of `Last checked for
+accuracy`, `Verified by` and `Verified date`. On a no it moves none of them.**
+Shows a before and after before writing.
+
+**All three move together or none of them do.** `Last checked for accuracy` is
+what drives the staleness check, so setting it on an edit that was not a review is
+the whole of the fault this rule exists to prevent. See the rule above, which this
+restates because it is the line somebody reads when building `update`.
 
 **What it does not do.**
 - Does not create. That is `new`.
@@ -377,13 +390,13 @@ The reference is `reference-kit/skills/new-doc.md`, the direct ancestor of
 
 | Lesson | Where it lives now |
 |---|---|
-| Never invent a select value, because Notion drops unknown ones silently | A rule for all six |
-| Verify the body actually wrote, because pages can ship empty on a partial failure | A rule for all six |
+| Never invent a select value, because Notion drops unknown ones silently | A rule for all five |
+| Verify the body actually wrote, because pages can ship empty on a partial failure | A rule for all five |
 | The duplicate check runs before structuring, not after | `new` |
 | Hierarchy is type-driven, not order-driven. The parent is always a Strategy Decision | `new`, and the plugin enforces it |
 | When two type patterns match, ask rather than take the first | `new` |
-| A hard confirmation gate, where anything ambiguous counts as not yet confirmed | A rule for all six |
-| Preview the full body inline rather than pointing at a file | A rule for all six |
+| A hard confirmation gate, where anything ambiguous counts as not yet confirmed | A rule for all five |
+| Preview the full body inline rather than pointing at a file | A rule for all five |
 
 **Deliberately not carried:**
 
@@ -435,9 +448,11 @@ extracting the field tables mechanically rather than by eye.
    target database id**, and two fields pointed at databases v1 may not have
    created. `Software` has no target at all in v1, and `Projects` only exists if
    `projects` is installed. Setup would have failed at property-creation time,
-   during setup, which is the worst moment for it. Both are now conditional, with
-   the rule written into `SCHEMA-process.md` and each setup responsible
-   for adding the relations it enables.
+   during setup, which is the worst moment for it. Both were made conditional,
+   with the rule written into `SCHEMA-process.md`. **Superseded 2026-08-17**:
+   neither is conditional any more, because one setup creates all six databases
+   before adding any relation, so every target exists. The rule survives, the
+   conditions do not.
 6. **An empty date does not match a "before" filter in Notion.** Since `backfill`
    now leaves `Last checked for accuracy` empty, backfilled rows escape `audit`
    signal 1 entirely. That is fine, because signal 4 catches them, but a builder

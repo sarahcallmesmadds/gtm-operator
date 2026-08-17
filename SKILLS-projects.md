@@ -1,6 +1,6 @@
 # projects: what each skill does
 
-Part 3 for `projects`. Seven skills in the same five slots as
+Part 3 for `projects`. Six skills in the same five slots as
 `SKILLS-process.md`: what it does, when it runs, what it reads and
 writes, what it does not do, and the judgment it carries.
 
@@ -12,12 +12,14 @@ are marked below with what they became and where that came from.
 
 ---
 
-## Rules that apply to all seven
+## Rules that apply to all six
 
-The five cross-cutting rules in `SKILLS-process.md` apply here unchanged:
-never invent a select value (Notion rejects the whole write with a 400, tested),
-verify the write landed, a hard confirmation gate, preview in full inline, and
-route to setup on first run. Two more are specific to this plugin.
+**Every cross-cutting rule in `SKILLS-process.md` applies here unchanged**, all
+eight of them: never invent a select value (Notion rejects the whole write with a
+400, tested), verify the write landed, a hard confirmation gate, preview in full
+inline, route to `setup:install` on first run, pin the Notion API version and
+client floor to the two values `SKILLS-setup.md` defines, treat a related view as a view rather than a block, and record only
+sources actually opened. Two more are specific to this plugin.
 
 - **Iterate in chat, write once on approval.** These skills produce projects and
   tasks, which are expensive to undo. Refinement happens in conversation and one
@@ -34,7 +36,7 @@ route to setup on first run. Two more are specific to this plugin.
   | `Type` | `Problem Statement`, `Project Update`, `Release` respectively |
   | `Status` | **`Published`.** Skills never write `Draft` |
   | `Published date` | Today. This is what `process:audit` reads, so it is not optional |
-  | `Author` | The user, from their Notion person id in config |
+  | `Author` | The user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
   | `Projects` | The related project, when there is one. `problem-statement` may have none |
   | `Artifacts` | Any Process Library artifact this announced or changed. **`ship` in particular sets this**, since a release usually changes an SOP, and it is what makes the audit signal work |
   | `Domain` | Inherited from the project when there is one, otherwise asked |
@@ -45,6 +47,9 @@ route to setup on first run. Two more are specific to this plugin.
   **`Draft` and `Canceled` are for a person to set in Notion.** No skill writes
   or advances them, because iteration happens in chat and one write happens on
   approval, so a memo that reaches Notion has already been approved.
+  **Published to Canceled is the only status change permitted after publication**,
+  it is a retraction, and it requires a correcting memo saying why. See "What
+  append-only actually means" in `SKILLS-memos.md`.
 - **A skill never advances a status it did not earn.** Exactly three skills
   touch a project's status, and no skill moves it more than one step:
 
@@ -176,8 +181,11 @@ project row, which is a contradiction: whichever ran second would either
 duplicate it or find its own branch unreachable. `scope` owns the row. `new`
 owns the tasks.
 
-**The `Problem Statement` relation is required.** A project that cannot name its
-problem statement has not been scoped, and the stakes then live nowhere.
+**The `Problem Statement` relation is required by the skills, and surfaced when
+it is not.** A project that cannot name its problem statement has not been scoped,
+and the stakes then live nowhere, so `scope` refuses to finish without one. Notion
+enforces nothing, so a project made by hand can have none, and `setup` builds a
+`Needs attention` view showing exactly those rows. See `SKILLS-setup.md`.
 
 **What it does not do.**
 - **Does not create tasks.** That is `new`.
@@ -191,7 +199,7 @@ problem statement has not been scoped, and the stakes then live nowhere.
 things, in this order:
 
 1. **What already exists, checked before scoping rather than after.** Search the
-   Projects database, and the Process Library **if it is present**. Every hit
+   Projects database, and the Process Library, which is always there. Every hit
    becomes an Out Of Scope line reading "already exists". This is the single
    largest source of trimming, and it is why context comes first: a competent
    scoper over-scopes *because* they lack context, not despite expertise.
@@ -214,7 +222,9 @@ everything is Prio 1 carries no information.
 
 ## new
 
-**What it does.** Creates the project and its tasks.
+**What it does.** Creates the tasks for a project that `scope` has already
+created, and moves that project to `In progress`. **It does not create the project
+row.** See the split above: `scope` owns the row, `new` owns the tasks.
 
 **When it runs.** After `scope`. Expects a project at `Scoped`. Leaves it at
 `In progress`.
@@ -347,7 +357,7 @@ References: `scope.md`, `new-project.md`, `revops-release.md`, `pm.md` and
 | Four to seven tasks, verb first, one per integration, no generic ceremonies | `new` |
 | The last task is always live verification | `new` |
 | Unverified facts become "review and confirm" tasks rather than assertions | `new` |
-| A problem statement is point in time and never updated | `problem-statement` |
+| A problem statement is point in time, and its content is never updated | `problem-statement` |
 | Release bullets: action verb, concrete system, fifteen to twenty words | `ship` |
 
 **Deliberately not carried:**
