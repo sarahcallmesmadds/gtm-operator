@@ -99,10 +99,11 @@ for a gap in a text-scanning check is a check on behaviour, not a wider pattern.
 
 - **Nothing here has touched a real Notion workspace.** Every design claim is
   unverified against real use.
-- **Two Notion filter limits are unmeasured.** Whether a multi-select filter can
-  count values, and whether a filter can read a property across a relation. Two
-  rules are routed to `check` instead of a view on the strength of those two
-  claims. If either is wrong, the rule moves back to a view and only the manifest
-  changes.
+- ~~Two Notion filter limits are unmeasured.~~ **Measured 2026-08-17 and both are
+  real.** A multi-select filter cannot count values and a filter cannot read
+  across a relation, both rejected with a 400. The workarounds were measured too:
+  a counting formula comes back typed as text, and a rollup filter is accepted,
+  reported as created, and silently emptied. The two rules stay with `check`, and
+  both `check` queries were proved on real rows.
 - **Whether the API can create a page template**, as opposed to apply one, is
   unknown.

@@ -310,10 +310,53 @@ counting formula on two databases and a copy of the parent's type on the Process
 Library, and adding fields to carry a rule is what rounds 2 and 3 both declined to
 do elsewhere.
 
-**Reasoned, not measured.** The two filter limits above are read off how Notion
-filters behave and have not been tested against a live workspace. They are cheap
-to test and worth testing before `setup` is built, because if either is wrong the
-rule moves back into a view.
+**Measured 2026-08-17 against a live workspace, and both limits are real.** A
+throwaway database was created, both filters were attempted, both were rejected,
+and it was deleted afterwards.
+
+| Attempted | Result |
+|---|---|
+| `FILTER "Tags" > 3` | `400 validation_error`, `Operator ">" is not supported for multi_select properties` |
+| `FILTER "Parent.Type" != "Strategy Decision"` | `400 validation_error`, `Could not find property with name or id "Parent.Type"`. There is no path syntax across a relation |
+
+**The workarounds were measured too, and neither survives.** This matters because
+the alternative to routing these two rules to `check` was adding properties to
+carry them:
+
+- **A formula counting tags came back typed as text**, so `> 3` was rejected with
+  `Operator ">" is not supported for text properties`. Two attempts, including an
+  explicitly numeric one.
+- **A rollup of the parent's `Type` is worse than a failure.** The view was
+  created, the call returned success, and **the filter was silently discarded**:
+  the view came back with `filters: []`. A `Needs attention` view built that way
+  would exist, look right in every listing, and match every row forever.
+
+Formula and rollup columns are also returned under `notAvailableInQuerySql`, so
+`check` could not read them even if they had worked.
+
+**Both `check` queries were then proved on real rows.** Counting tags with
+`json_array_length` returned exactly the four-tag and five-tag rows and excluded
+the two-tag one. A self-join through the relation returned the child of an SOP
+and not the child of a Strategy Decision. The queries are recorded in
+`scripts/manifest.js`.
+
+### An unsupported filter fails in two different ways, and only one is loud
+
+**This is the finding worth carrying past this decision.** Two filters Notion
+cannot express behaved completely differently:
+
+- The multi-select and dotted-path filters were **rejected with a 400**.
+- The rollup filter was **accepted, reported as created, and quietly emptied**.
+
+Which one you get depends on the property type, and nothing in the response
+distinguishes a view that kept its filter from one that threw it away.
+
+**So step 7 is not a formality.** Reading back what was created is the only way to
+tell those two apart, and a plugin that trusted the success of a create call would
+ship a workspace full of views watching nothing. The ordinary select filter and
+the relation `IS EMPTY` filter were both confirmed by reading them back, both
+persist correctly, and that is why the three view-backed rules above are sound
+rather than assumed.
 
 **Everywhere else in the design, the wording changed from "required" to "required
 by the skills, and surfaced when it is not"**, because that is what is true. The
