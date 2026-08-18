@@ -22,13 +22,15 @@ const path = require('path')
 
 const { DATABASES } = require('./manifest')
 const { fingerprint } = require('./fingerprint')
+const schema = require('./schema')
+const mapped = require('./names')
 
 /**
  * Bumped when the shape below changes in a way that would make an older reader
  * wrong. It exists so `check` can refuse a file it cannot read instead of
  * quietly misreading one.
  */
-const CONFIG_VERSION = 2
+const CONFIG_VERSION = 3
 
 const CONFIG_PATH = process.env.GTM_OPERATOR_CONFIG || path.join(os.homedir(), '.claude', 'gtm-operator.config.json')
 
@@ -173,12 +175,21 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
     )
   }
 
+  // The name map is written HERE, at the moment the plugin created these
+  // properties and therefore knows what they are called. Every logical name
+  // points at itself, including the ones nobody will ever rename.
+  //
+  // It used to be initialised to `{}` and never written to by anything, so an
+  // empty map meant both "no renames" and "never recorded" and no reader could
+  // tell which. `check` has to tell a renamed property from a deleted one, and
+  // that is impossible without knowing whether a map was ever taken.
+  const identity = schema.identityNames(key)
   config.databases[key] = {
     databaseId,
     dataSourceId,
     displayName: displayName || DATABASES.find(d => d.key === key).title,
-    properties: (already && already.properties) || {},
-    values: (already && already.values) || {}
+    properties: (already && already.properties && Object.keys(already.properties).length) ? already.properties : identity.properties,
+    values: (already && already.values && Object.keys(already.values).length) ? already.values : identity.values
   }
   invalidateVerification(config)
   write(config)
@@ -242,6 +253,61 @@ function recordVerified (at) {
 }
 
 /** The ids phase B and the views need, in the shape those files expect. */
+/**
+ * The names this workspace uses for one database, or null if none were ever
+ * recorded.
+ *
+ * Null and "nothing was renamed" are different answers and a caller that
+ * cannot tell them apart must refuse rather than assume. `check` refuses.
+ */
+function namesFor (key) {
+  const config = read()
+  const entry = config && config.databases && config.databases[key]
+  if (!entry) return null
+  const names = { properties: entry.properties || {}, values: entry.values || {} }
+  return mapped.recorded(names) ? names : null
+}
+
+/** Every recorded name map, keyed by database, for the callers that check all six. */
+function allNames () {
+  const out = {}
+  for (const d of DATABASES) {
+    const names = namesFor(d.key)
+    if (names) out[d.key] = names
+  }
+  return out
+}
+
+/**
+ * Adopt a rename somebody made in Notion.
+ *
+ * This is the only way a map changes after install, and `check` is the only
+ * caller, on an explicit yes. It refuses a map that is not complete and refuses
+ * two logical names pointing at one Notion property, because both leave every
+ * later read answering about the wrong property while looking healthy.
+ */
+function recordNames (key, { properties, values }) {
+  if (!DATABASES.some(d => d.key === key)) {
+    throw new Error(`"${key}" is not a database in the manifest. Known: ${DATABASES.map(d => d.key).join(', ')}`)
+  }
+  const config = read()
+  if (!config || !config.databases[key]) {
+    throw new Error(`${key} is not recorded yet, so there is nothing to rename. Record the database first.`)
+  }
+
+  const expected = Object.keys(schema.identityNames(key).properties)
+  const problems = mapped.problems({ properties, values }, expected)
+  if (problems.length) {
+    throw new Error(`${key}: this name map cannot be recorded.\n  ${problems.join('\n  ')}`)
+  }
+
+  config.databases[key].properties = properties
+  config.databases[key].values = values || config.databases[key].values
+  invalidateVerification(config)
+  write(config)
+  return config
+}
+
 function ids () {
   const config = read()
   if (!config) return {}
@@ -296,5 +362,6 @@ function complete () {
 module.exports = {
   recordVerified, clearVerified,
   CONFIG_PATH, CONFIG_VERSION, blank, exists, read, write, begin,
-  recordDatabase, recordPerson, ids, missingDatabases, complete
+  recordDatabase, recordPerson, ids, missingDatabases, complete,
+  namesFor, allNames, recordNames
 }
