@@ -727,10 +727,15 @@ check('a proof is refused when the code that builds the calls changes', () => {
   }
 })
 
-check('renumbering the relations does not throw away a proof', () => {
-  // The other direction. `n` numbers the design table and reaches no statement,
-  // so a proof must survive it. An earlier fingerprint included it and would
-  // have forced a re-verify after the renumbering this branch already did.
+check('a relation number is not in the proof, because it is in no statement', () => {
+  // Titled for what it proves. It used to claim it covered RENUMBERING, and it
+  // did not: it changed `n` in place and left the relation where it was, a state
+  // `manifest.validate()` rejects outright because it requires n to equal the
+  // array index. So it asserted something about a manifest that cannot exist.
+  //
+  // What it does prove is still worth keeping. `n` numbers the design table and
+  // reaches no statement, so it must not be in the hash, and an earlier version
+  // of the fingerprint had it there.
   const fingerprint = require(path.join(ROOT, 'plugins/setup/scripts/fingerprint.js'))
   const { RELATIONS } = require(path.join(ROOT, 'plugins/setup/scripts/manifest.js'))
   const before = fingerprint.fingerprint()
@@ -741,6 +746,39 @@ check('renumbering the relations does not throw away a proof', () => {
     assert.strictEqual(fingerprint.fingerprint(), before)
   } finally {
     relation.n = wasN
+  }
+})
+
+check('reordering relations on one database does move the proof, and should', () => {
+  // Raised as over-hashing on 2026-08-18: renumber a relation and the proof is
+  // discarded although "the same set of statements" is sent. The set is the
+  // same and the bytes are not. Phase B sends one statement per database with
+  // its relations joined in order, so swapping two of them changes the string
+  // that goes to Notion.
+  //
+  // The fingerprint is over what is sent. So it moves, and that is right. The
+  // proposed alternative was to sort both the hash and the statements, which
+  // means changing what an install sends in order to keep a hash still. That is
+  // backwards, and the sorted order has never been measured against Notion.
+  const fingerprint = require(path.join(ROOT, 'plugins/setup/scripts/fingerprint.js'))
+  const { RELATIONS } = require(path.join(ROOT, 'plugins/setup/scripts/manifest.js'))
+  const relations = require(path.join(ROOT, 'plugins/setup/scripts/relations.js'))
+
+  const sameSource = RELATIONS.filter(r => r.from === 'process')
+  assert.ok(sameSource.length > 1, 'this needs a database owning more than one relation')
+  const i = RELATIONS.indexOf(sameSource[0])
+  const j = RELATIONS.indexOf(sameSource[1])
+
+  const sentBefore = relations.statementsFor('process', fingerprint.PLACEHOLDER)
+  const hashBefore = fingerprint.fingerprint()
+
+  ;[RELATIONS[i], RELATIONS[j]] = [RELATIONS[j], RELATIONS[i]]
+  try {
+    const sentAfter = relations.statementsFor('process', fingerprint.PLACEHOLDER)
+    assert.notStrictEqual(sentAfter, sentBefore, 'the statement really should differ')
+    assert.notStrictEqual(fingerprint.fingerprint(), hashBefore, 'and the proof should follow it')
+  } finally {
+    ;[RELATIONS[i], RELATIONS[j]] = [RELATIONS[j], RELATIONS[i]]
   }
 })
 
