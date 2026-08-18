@@ -57,30 +57,79 @@ function recorded (names) {
 /**
  * What is wrong with a map, as sentences.
  *
- * Two logical names must never resolve to one Notion property. That is not a
+ * Two logical names must never resolve to one Notion name. That is not a
  * rename, it is two things pointed at one, and every read through the map after
- * it would be answering about the wrong property while looking healthy. It is
+ * it would be answering about the wrong thing while looking healthy. It is
  * refused at the point of recording rather than found later.
+ *
+ * BOTH HALVES ARE CHECKED. The first version of this checked the properties and
+ * left the option values alone, which put the whole fault back one level down: a
+ * values map could drop an option, invent one, or point two options at one
+ * Notion name, and `verify` would then read a workspace with a missing option
+ * and report it correct. A missing option is not cosmetic. A write naming an
+ * option that is not there is a 400 that takes the whole page with it.
+ *
+ * `expected` is the identity map for this database, which is both the list of
+ * logical property names and, per property, the list of logical option values.
  */
-function problems (names, expectedLogical) {
+function problems (names, expected) {
   const out = []
   if (!names || !names.properties) return ['no property map was given']
 
+  const expectedProperties = Object.keys(expected.properties || {})
+  const expectedValues = expected.values || {}
+
+  out.push(...oneToOne(names.properties, expectedProperties, 'property', 'this database has'))
+
+  if (!names.values && Object.keys(expectedValues).length) {
+    out.push('the map has no option values at all, and this database has properties with options')
+    return out
+  }
+
+  for (const property of Object.keys(expectedValues)) {
+    const got = (names.values || {})[property]
+    if (!got) {
+      out.push(`"${property}" has options and the map records none of them`)
+      continue
+    }
+    out.push(...oneToOne(got, Object.keys(expectedValues[property]), `option of "${property}"`, `"${property}" has`))
+  }
+
+  for (const property of Object.keys(names.values || {})) {
+    if (!(property in expectedValues)) {
+      out.push(`the map records options for "${property}", which has no options`)
+    }
+  }
+
+  return out
+}
+
+/**
+ * One half of the map, checked three ways: nothing missing, nothing invented,
+ * and no two logical names sharing one Notion name.
+ *
+ * Shared by the properties and the option values because they are the same
+ * three failures, and writing them twice is how the second copy ends up
+ * checking two of the three.
+ */
+function oneToOne (map, expectedLogical, what, belongsTo) {
+  const out = []
+
   for (const logical of expectedLogical) {
-    if (!(logical in names.properties)) {
+    if (!(logical in map)) {
       out.push(`"${logical}" is not in the map. A map records every logical name, including the ones nobody changed`)
     }
   }
-  for (const logical of Object.keys(names.properties)) {
+  for (const logical of Object.keys(map)) {
     if (!expectedLogical.includes(logical)) {
-      out.push(`"${logical}" is in the map and is not a property this database has`)
+      out.push(`"${logical}" is in the map and is not a ${what} ${belongsTo}`)
     }
   }
 
   const seen = new Map()
-  for (const [logical, observed] of Object.entries(names.properties)) {
+  for (const [logical, observed] of Object.entries(map)) {
     if (seen.has(observed)) {
-      out.push(`"${logical}" and "${seen.get(observed)}" both map to "${observed}". Two logical properties cannot be one Notion property`)
+      out.push(`"${logical}" and "${seen.get(observed)}" both map to "${observed}". Two logical names cannot be one Notion name`)
     }
     seen.set(observed, logical)
   }

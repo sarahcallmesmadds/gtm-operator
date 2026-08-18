@@ -155,6 +155,16 @@ function verify (readback) {
   // Every view, and then the rows it actually returns.
   for (const view of VIEWS) {
     const entry = given[view.database]
+    // Views are found by the name they shipped with, and that is the one lookup
+    // here the name map does not cover. A view somebody renamed in Notion reads
+    // as missing rather than as renamed, which is the bug the map was built to
+    // remove, still live one object along.
+    //
+    // Left deliberately and written down rather than fixed quietly: the map
+    // holds properties and option values, views are a third kind of name, and
+    // adding them is a config shape change that belongs with `check` where a
+    // rename is actually adopted. Until then a renamed view is a false failure,
+    // which is the safe direction to be wrong in.
     const found = ((entry && entry.views) || []).find(v => v && v.name === view.name)
     problems.push(...views.verifyView(view, found))
 

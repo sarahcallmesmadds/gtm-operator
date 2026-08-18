@@ -73,6 +73,16 @@ check('recording a database writes a complete map, not an empty one', () => {
   for (const p of schema.DATABASES.process.properties) {
     assert.strictEqual(names.properties[p.name], p.name, `${p.name} is not in the recorded map`)
   }
+  // Both halves. Asserting the properties alone passed while `values` was
+  // written empty, and an unrecorded option map is what lets a missing option
+  // read as correct.
+  for (const p of schema.DATABASES.process.properties) {
+    if (!p.options) continue
+    for (const [option] of p.options) {
+      assert.strictEqual((names.values[p.name] || {})[option], option,
+        `${p.name} option "${option}" is not in the recorded map`)
+    }
+  }
 })
 
 check('relation properties are in the map too, both directions', () => {
@@ -130,8 +140,11 @@ check('a renamed property that is genuinely gone is still caught', () => {
   names.properties.Domain = 'Business Area'
 
   const problems = schema.verify('process', broken, relations.propertyNamesFor('process'), names).join('\n')
-  assert.ok(problems.includes('Business Area'),
-    `a property the map points at, which is not in the workspace, passed. The map cannot be allowed to hide an absence:\n${problems}`)
+  // The mapped name AND the word missing. Asserting the name alone passes on
+  // any mention of it at all, including the opposite finding, that a property
+  // by that name is present and unowned.
+  assert.ok(/Business Area.*: missing/.test(problems),
+    `a property the map points at, which is not in the workspace, was not reported missing. The map cannot be allowed to hide an absence:\n${problems}`)
 })
 
 console.log('\na renamed option value is followed, and a missing one still fails\n')
@@ -193,6 +206,48 @@ check('recording names throws away a verify taken against the old ones', () => {
   config.recordNames('process', names)
   assert.strictEqual(config.read().verified, null,
     'a rename left the old proof standing, so `complete` could rest on a verify taken against different names')
+})
+
+check('an option map that drops a value is refused', () => {
+  fresh()
+  const names = schema.identityNames('process')
+  delete names.values.Type.Reporting
+  assert.throws(() => config.recordNames('process', names), /is not in the map/,
+    'an option map missing a value was recorded, so a workspace missing that option would read as correct')
+})
+
+check('two option values cannot map to one Notion option', () => {
+  fresh()
+  const names = schema.identityNames('process')
+  names.values.Type.Reporting = 'Enablement'
+  assert.throws(() => config.recordNames('process', names), /both map to/)
+})
+
+check('an option map for a property with no options is refused', () => {
+  fresh()
+  const names = schema.identityNames('process')
+  names.values.Owner = { Someone: 'Someone' }
+  assert.throws(() => config.recordNames('process', names), /which has no options/)
+})
+
+check('a map already on disk is checked before it is kept, not kept because it is there', () => {
+  fresh()
+  const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))
+  raw.databases.process.properties.Domain = raw.databases.process.properties.Audience
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(raw))
+  assert.throws(
+    () => config.recordDatabase('process', { databaseId: 'db-process', dataSourceId: 'ds-process' }),
+    /cannot be used/,
+    'a hand-edited map went through the one gate that is not recordNames, which is how an unvalidated map reaches every later read')
+})
+
+check('a map that is present and wrong is not answered as no map at all', () => {
+  fresh()
+  const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))
+  delete raw.databases.process.properties.Domain
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(raw))
+  assert.throws(() => config.namesFor('process'), /cannot be used/,
+    'a broken map was handed back as null, which reads as "nothing recorded" and is a different thing with a different remedy')
 })
 
 check('a database cannot be renamed before it is recorded', () => {
