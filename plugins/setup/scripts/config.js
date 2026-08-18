@@ -27,7 +27,7 @@ const { DATABASES } = require('./manifest')
  * wrong. It exists so `check` can refuse a file it cannot read instead of
  * quietly misreading one.
  */
-const CONFIG_VERSION = 1
+const CONFIG_VERSION = 2
 
 const CONFIG_PATH = process.env.GTM_OPERATOR_CONFIG || path.join(os.homedir(), '.claude', 'gtm-operator.config.json')
 
@@ -41,6 +41,9 @@ function blank (parentPageId) {
       personId: null
     },
     databases: {},
+    // Set only by a verify that passed, and cleared by anything that changes
+    // what was verified. `complete` reads this and nothing else.
+    verified: null,
     defaults: { reviewCadence: 'Quarterly' },
     sources: { callRecorder: null },
     taxonomyPath: path.join(os.homedir(), '.claude', 'gtm-operator', 'artifact-types.md')
@@ -93,18 +96,35 @@ function write (config) {
   return CONFIG_PATH
 }
 
+/**
+ * Forget that a verify passed.
+ *
+ * Called by everything that changes what the verify was run against. Without
+ * this, `complete` would still be resting on a proof taken before the change:
+ * verify, then point a database somewhere else, then complete, and the config
+ * would say the workspace matches the manifest on the strength of a check that
+ * ran against a different workspace.
+ */
+function invalidateVerification (config) {
+  config.verified = null
+  config.verifiedAt = null
+  return config
+}
+
 /** Start a run, or refuse to start on top of one that is already complete. */
 function begin (parentPageId) {
   const current = read()
   if (current && current.state === 'complete') {
     throw new Error(
-      `Config at ${CONFIG_PATH} says an install is already complete. ` +
-      `Re-running install on a complete config is the settings path: it creates nothing and re-asks the five questions.`
+      `Config at ${CONFIG_PATH} says an install is already complete, so this refuses to start a second one over the top of it.\n` +
+      `There is no settings path yet: nothing here can re-ask the five questions on a complete config. ` +
+      `Change a setting by editing that file, and move it aside if you genuinely want to install again.`
     )
   }
   const config = current || blank(parentPageId)
   if (parentPageId) config.notion.parentPageId = parentPageId
   config.state = 'creating'
+  invalidateVerification(config)
   write(config)
   return config
 }
@@ -128,10 +148,21 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
 
   const config = read() || blank(null)
   const already = config.databases[key]
-  if (already && already.dataSourceId !== dataSourceId) {
+  // Both halves of the pair, not just one. This used to compare the data source
+  // id alone, so a different database id arriving with a matching data source id
+  // was written straight over the recorded one: the guard against overwriting
+  // committed the fault it was written to stop, one field along.
+  //
+  // The two ids are separate identities and a data source belongs to exactly one
+  // database, so a mismatch on either is not a legitimate move. It is a mangled
+  // create response, a hand-edited config or a bug, and none of the three is
+  // safe to resolve by overwriting.
+  if (already && (already.dataSourceId !== dataSourceId || already.databaseId !== databaseId)) {
     throw new Error(
-      `${key} is already recorded as ${already.dataSourceId} and this run created ${dataSourceId}. ` +
-      `Two databases now exist for one logical name. Nothing is being overwritten: a person has to say which one to keep.`
+      `${key} is already recorded as database ${already.databaseId} / data source ${already.dataSourceId}, ` +
+      `and this run is offering database ${databaseId} / data source ${dataSourceId}. ` +
+      `Two databases now exist for one logical name, or something recorded the wrong pair. ` +
+      `Nothing is being overwritten: a person has to say which one to keep.`
     )
   }
 
@@ -142,6 +173,7 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
     properties: (already && already.properties) || {},
     values: (already && already.values) || {}
   }
+  invalidateVerification(config)
   write(config)
   return config
 }
@@ -149,6 +181,24 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
 function recordPerson (personId) {
   const config = read() || blank(null)
   config.notion.personId = personId || null
+  invalidateVerification(config)
+  write(config)
+  return config
+}
+
+/**
+ * Record that a verify passed, which is the only thing `complete` will accept.
+ *
+ * Written by `install.js verify` and by nothing else. It used to be that
+ * `complete` took a timestamp as an argument and believed it, so any non-empty
+ * string was accepted as evidence that a check had run.
+ */
+function recordVerified (at) {
+  const config = read()
+  if (!config) throw new Error('There is no config to record a verify against.')
+  if (!at) throw new Error('recordVerified needs the time the verify passed.')
+  config.verified = { at }
+  config.verifiedAt = at
   write(config)
   return config
 }
@@ -174,20 +224,29 @@ function missingDatabases () {
  * claim that the workspace matches the manifest, and the create calls returning
  * without an error is a different and much weaker claim.
  */
-function complete (verifiedAt) {
+function complete () {
   const config = read()
   if (!config) throw new Error('There is no config to complete.')
-  if (!verifiedAt) throw new Error('An install is only complete once it has been verified against what Notion returned.')
   if (missingDatabases().length) {
     throw new Error(`Not complete: ${missingDatabases().map(d => d.title).join(', ')} ${missingDatabases().length === 1 ? 'is' : 'are'} not recorded.`)
   }
+  // The proof has to be in the file, put there by a verify that passed. This
+  // used to take the timestamp as an argument and check only that it was not
+  // empty, so the presence of a string stood in for the check having run.
+  if (!config.verified || !config.verified.at) {
+    throw new Error(
+      'Not complete: no verify has passed against this config. ' +
+      'Run `install.js verify <readback.json>` first. It records the result itself, and it records nothing when anything is unproved.'
+    )
+  }
   config.state = 'complete'
-  config.verifiedAt = verifiedAt
+  config.verifiedAt = config.verified.at
   write(config)
   return config
 }
 
 module.exports = {
+  recordVerified,
   CONFIG_PATH, CONFIG_VERSION, blank, exists, read, write, begin,
   recordDatabase, recordPerson, ids, missingDatabases, complete
 }

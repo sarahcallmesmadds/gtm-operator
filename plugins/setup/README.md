@@ -28,10 +28,16 @@ with anything in it.** Every failure it has survived is one that was arranged.
 | `check` | Tells you whether the plugin can still see what it created, and repairs what it owns |
 | `add` | Creates a database that is missing, and wires it into the ones already there |
 
-Three rather than four: changing a display name or the default cadence after
-install is handled by re-running `install`, which on a complete config creates
-nothing and only re-asks the five questions. A separate settings skill would be a
-fourth thing to find for a job people do roughly once.
+Three rather than four: a separate settings skill would be a fourth thing to find
+for a job people do roughly once.
+
+**There is no settings path yet, and this said there was.** Until 2026-08-18
+these documents described re-running `install` on a complete config as the way to
+change an answer. `config.begin()` refuses to start on a complete config and
+always has, there is no `settings` command, and nothing can reset the state from
+the CLI, so the described route has never existed. Change an answer by editing
+the config file directly. A real settings path is worth building and has not been
+built.
 
 ## Why it creates everything, every time
 

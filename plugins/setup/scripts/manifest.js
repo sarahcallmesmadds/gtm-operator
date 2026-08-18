@@ -98,8 +98,11 @@ const RELATIONS = [
  * `schema.js` before it is sent.
  *
  * The operators here are deliberately only the ones proved to work against a
- * live workspace: `=`, `IN`, `IS EMPTY` and `IS NOT EMPTY`. See views.js for
- * what happens to the ones that are not on that list.
+ * live workspace: `=`, `IN` and `IS EMPTY`. `IS NOT EMPTY` was on this list and
+ * in the whitelist until 2026-08-18 on the reasoning that it is the exact
+ * inverse of one that was measured, which is an assumption sitting inside the
+ * one guard whose whole job is to keep assumptions out. See views.js for what
+ * happens to the ones that are not on that list.
  */
 const VIEWS = [
   { database: 'calendar', name: 'Calendar',   layout: 'calendar',

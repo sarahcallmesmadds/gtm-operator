@@ -33,14 +33,32 @@ const config = require('./config')
 
 const { DATABASES, VIEWS, byKey } = manifest
 
-/** Phase A: one create call per database, and none of them refer to each other. */
-function phaseA () {
+/**
+ * Phase A: one create call per database, and none of them refer to each other.
+ *
+ * The parent page id is a parameter because these calls get SENT. It used to be
+ * the literal string `<parent page id>` baked into the payload, which `begin`
+ * had already recorded properly and this function never read, so the first
+ * create call of any install but the author's went to Notion with a placeholder
+ * where the page id belonged.
+ *
+ * `plan` passes its own placeholder on purpose, because the plan is printed
+ * before anything exists and is never sent. Sending is the caller's job, and so
+ * is having a real id to send.
+ */
+function phaseA (parentPageId) {
+  if (!parentPageId) {
+    throw new Error(
+      'Phase A needs the parent page id, and none was given. `begin` records it, and `install.js phase-a` reads it back from the config. ' +
+      'If this install has not begun, run `install.js begin <parent page id>` first.'
+    )
+  }
   return DATABASES.map(d => ({
     key: d.key,
     title: d.title,
     call: 'notion-create-database',
     arguments: {
-      parent: { type: 'page_id', page_id: '<parent page id>' },
+      parent: { type: 'page_id', page_id: parentPageId },
       title: d.title,
       schema: schema.createStatement(d.key)
     }
@@ -99,7 +117,7 @@ function viewCalls (ids) {
  */
 function verify (readback) {
   const problems = []
-  const notes = []
+  const unchecked = []
   const given = (readback && readback.databases) || {}
   const schemas = {}
 
@@ -129,32 +147,43 @@ function verify (readback) {
     problems.push(...views.verifyView(view, found))
 
     const key = `${view.database}::${view.name}`
+    const where = `${byKey(view.database).title} / ${view.name}`
     const fromView = readback && readback.viewRows && readback.viewRows[key]
     const fromSql = readback && readback.sqlRows && readback.sqlRows[key]
 
     if (!views.expectedRows(view)) continue
 
-    if (!fromView || !fromSql) {
+    if (!Array.isArray(fromView) || !Array.isArray(fromSql)) {
       // Said out loud rather than passed over. A view whose filter reads back
       // correctly can still match nothing at all: measured 2026-08-18, when a
       // relative date read back looking perfect and returned no rows.
-      notes.push(`${byKey(view.database).title} / ${view.name}: the filter is the one that was asked for, and which rows it returns was not checked`)
+      unchecked.push(`${where}: the filter is the one that was asked for, and which rows it returns was not checked`)
       continue
     }
 
-    const a = [...fromView].sort().join(' | ')
-    const b = [...fromSql].sort().join(' | ')
-    if (a !== b) {
+    // Both empty proves nothing. It used to pass, because two empty lists
+    // joined to the same empty string, so on a fresh workspace every filtered
+    // view was reported proved. That is the exact failure this check exists to
+    // catch, arriving through the check itself.
+    if (!fromView.length && !fromSql.length) {
+      unchecked.push(`${where}: the view and the rule both returned nothing, so neither one proved the other. A filter that matches nothing looks exactly like this`)
+      continue
+    }
+
+    // Compared by page identity rather than by title. Titles are not unique.
+    const a = [...fromView].map(views.pageIdentity).sort()
+    const b = [...fromSql].map(views.pageIdentity).sort()
+    if (a.join(' | ') !== b.join(' | ')) {
       problems.push(
-        `${byKey(view.database).title} / ${view.name}: the view returns different rows from the rule it is supposed to show.\n` +
-        `    the view:  ${a || 'nothing'}\n` +
-        `    the rule:  ${b || 'nothing'}\n` +
+        `${where}: the view returns different rows from the rule it is supposed to show.\n` +
+        `    the view:  ${a.join(', ') || 'nothing'}\n` +
+        `    the rule:  ${b.join(', ') || 'nothing'}\n` +
         `    A filter can persist, read back correctly and match nothing. This is that check.`
       )
     }
   }
 
-  return { problems, notes }
+  return { problems, unchecked, verified: problems.length === 0 && unchecked.length === 0 }
 }
 
 /**
@@ -188,7 +217,13 @@ function status () {
     state: current.state,
     parentPageId: current.notion.parentPageId,
     personId: current.notion.personId,
-    recorded: Object.keys(current.databases).map(k => byKey(k).title),
+    recorded: Object.keys(current.databases).map(k => {
+      const known = byKey(k)
+      // A key the manifest no longer has is stale state, and worth seeing. This
+      // used to throw, which told you something was wrong by refusing to say
+      // anything at all.
+      return known ? known.title : `${k} (not in this version's manifest)`
+    }),
     missing: config.missingDatabases().map(d => d.title),
     verifiedAt: current.verifiedAt || null
   }
@@ -212,7 +247,7 @@ if (require.main === module) {
       case 'plan': {
         const ids = planningIds()
         console.log('\nPhase A. Create every database, with no relations in it.\n')
-        for (const step of phaseA()) console.log(`  ${step.title}\n      ${step.arguments.schema.slice(0, 96)}...\n`)
+        for (const step of phaseA('<parent page id, from the question above>')) console.log(`  ${step.title}\n      ${step.arguments.schema.slice(0, 96)}...\n`)
         console.log('Phase B. Add every relation, once every id from phase A exists.\n')
         for (const step of phaseB(ids)) console.log(`  ${step.title}\n      ${step.arguments.statements.split('; ').join('\n      ')}\n`)
         console.log('Then the views, last, because two of them filter on a property phase B creates.\n')
@@ -220,7 +255,12 @@ if (require.main === module) {
         console.log('Then read all of it back and compare it. A create call returning is not evidence.\n')
         break
       }
-      case 'phase-a': show(phaseA()); break
+      case 'phase-a': {
+        const current = config.read()
+        const parentPageId = current && current.notion && current.notion.parentPageId
+        show(phaseA(parentPageId))
+        break
+      }
       case 'phase-b': show(phaseB(config.ids())); break
       case 'views': show(viewCalls(config.ids())); break
       case 'begin': {
@@ -244,20 +284,36 @@ if (require.main === module) {
       case 'verify': {
         if (!rest[0]) throw new Error('Usage: install.js verify <readback.json>')
         const readback = JSON.parse(fs.readFileSync(rest[0], 'utf8'))
-        const { problems: found, notes } = verify(readback)
-        for (const note of notes) console.log(`  unchecked  ${note}`)
+        const { problems: found, unchecked, verified } = verify(readback)
+
+        for (const note of unchecked) console.error(`  not proved  ${note}`)
         if (found.length) {
           console.error(`\nWhat Notion returned does not match the manifest, in ${found.length} ${found.length === 1 ? 'place' : 'places'}:\n`)
           for (const p of found) console.error(`  ${p}`)
+        }
+
+        // An unproved view is not a pass. This used to print the unproved ones
+        // and then exit 0, so an install whose views were never proved could go
+        // straight on to `complete`, which is what the whole file exists to
+        // stop.
+        if (!verified) {
+          console.error(
+            `\nThis install is not verified: ${found.length} ${found.length === 1 ? 'thing does' : 'things do'} not match ` +
+            `and ${unchecked.length} ${unchecked.length === 1 ? 'was' : 'were'} not proved. Nothing has been recorded as verified.`
+          )
           process.exit(1)
         }
-        console.log('\nEverything Notion returned matches the manifest.')
+
+        const at = new Date().toISOString()
+        config.recordVerified(at)
+        console.log(`\nEverything Notion returned matches the manifest, and every view was proved by its rows. Recorded as verified at ${at}.`)
         break
       }
       case 'complete': {
-        if (!rest[0]) throw new Error('Usage: install.js complete <iso timestamp of the verify that passed>')
-        config.complete(rest[0])
-        console.log('Config says complete.')
+        // No timestamp argument. It used to take one and believe it, so any
+        // non-empty string stood in for a verify that may never have run.
+        const done = config.complete()
+        console.log(`Config says complete, on the verify that passed at ${done.verifiedAt}.`)
         break
       }
       case 'status': show(status()); break

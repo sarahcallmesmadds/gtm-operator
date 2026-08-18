@@ -75,8 +75,33 @@ function bare (id) {
   return String(id).replace(/^collection:\/\//, '')
 }
 
+/**
+ * Two data source references naming the same data source.
+ *
+ * A missing id on either side is NOT a match. It used to be: both sides absent
+ * compared equal and the relation passed, which is a check answering "I do not
+ * know" with "yes".
+ */
 function sameDataSource (a, b) {
-  return bare(a || '') === bare(b || '')
+  if (!a || !b) return false
+  return bare(a) === bare(b)
+}
+
+/**
+ * The data source a `collectionProperty://` url names.
+ *
+ * Measured 2026-08-18 across every relation in
+ * `tests/fixtures/full-install-as-notion-returned-it.json`: the counterpart url
+ * is `collectionProperty://<data source id>/<property id>`, and its data source
+ * half is the TARGET of the relation, the same one `dataSourceUrl` names. So it
+ * can be compared, and until 2026-08-18 nothing compared it: the check asked
+ * only whether the url existed, which is one bit for the thing that separates a
+ * two-way relation from a one-way one.
+ */
+function counterpartDataSource (propertyUrl) {
+  if (!propertyUrl) return null
+  const match = String(propertyUrl).match(/^collectionProperty:\/\/([^/]+)\//)
+  return match ? match[1] : null
 }
 
 /**
@@ -106,9 +131,14 @@ function verifyRelation (relation, schemas, ids) {
     return problems
   }
 
+  // Not skipped when the id is absent. It used to be gated on `target` being
+  // present, so a workspace whose databases were read back but never recorded in
+  // config had every relation destination go unchecked and pass.
   const target = ids[relation.to]
-  if (target && !sameDataSource(property.dataSourceUrl, target.dataSourceId)) {
-    problems.push(`${label}: points at ${property.dataSourceUrl}, and ${to} is ${target.dataSourceId}`)
+  if (!target || !target.dataSourceId) {
+    problems.push(`${label}: ${to} is not recorded in the config, so where this relation points could not be checked`)
+  } else if (!sameDataSource(property.dataSourceUrl, target.dataSourceId)) {
+    problems.push(`${label}: points at ${property.dataSourceUrl || 'nothing'}, and ${to} is ${target.dataSourceId}`)
   }
 
   if (relation.kind === 'two-way') {
@@ -116,6 +146,14 @@ function verifyRelation (relation, schemas, ids) {
     // one does not. This is what catches a relation built the wrong way round.
     if (!property.propertyUrl) {
       problems.push(`${label}: has no synced counterpart, so it was created one-way where the design says two-way`)
+    } else if (target && target.dataSourceId) {
+      // Where the counterpart lives, not merely that there is one.
+      const counterpart = counterpartDataSource(property.propertyUrl)
+      if (!counterpart) {
+        problems.push(`${label}: its counterpart is recorded as ${property.propertyUrl}, which is not a collectionProperty:// url and cannot be checked`)
+      } else if (!sameDataSource(counterpart, target.dataSourceId)) {
+        problems.push(`${label}: its synced counterpart sits on ${counterpart}, and ${to} is ${target.dataSourceId}`)
+      }
     }
 
     const targetSchema = schemas[relation.to]
@@ -129,8 +167,16 @@ function verifyRelation (relation, schemas, ids) {
         problems.push(`${label}: ${to}."${relation.reverse}" is a ${reverse.type} and not a relation`)
       } else {
         const sourceId = ids[relation.from]
-        if (sourceId && !sameDataSource(reverse.dataSourceUrl, sourceId.dataSourceId)) {
-          problems.push(`${label}: ${to}."${relation.reverse}" points at ${reverse.dataSourceUrl} rather than back at ${from}`)
+        if (!sourceId || !sourceId.dataSourceId) {
+          problems.push(`${label}: ${from} is not recorded in the config, so the far side of this relation could not be checked`)
+        } else {
+          if (!sameDataSource(reverse.dataSourceUrl, sourceId.dataSourceId)) {
+            problems.push(`${label}: ${to}."${relation.reverse}" points at ${reverse.dataSourceUrl || 'nothing'} rather than back at ${from}`)
+          }
+          const back = counterpartDataSource(reverse.propertyUrl)
+          if (reverse.propertyUrl && back && !sameDataSource(back, sourceId.dataSourceId)) {
+            problems.push(`${label}: ${to}."${relation.reverse}" has its counterpart on ${back} rather than back at ${from}`)
+          }
         }
       }
     }

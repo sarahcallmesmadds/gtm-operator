@@ -47,10 +47,16 @@ one, and it is cheaper than the alternative, which is six plugins negotiating.
 | `check` | Tells you whether the plugin can still see what it created, and repairs what it owns |
 | `add` | Creates a database that is missing, and wires it into the ones that are already there |
 
-**Three, not four.** Changing a display name or the default cadence after install
-is handled by re-running `install`, which on a complete config creates nothing and
-only re-asks the five questions. A separate settings skill would be a fourth
-thing to find for a job people do roughly once.
+**Three, not four.** A separate settings skill would be a fourth thing to find
+for a job people do roughly once.
+
+**There is no settings path yet, and this said there was.** Until 2026-08-18
+these documents described re-running `install` on a complete config as the way to
+change an answer. `config.begin()` refuses to start on a complete config and
+always has, there is no `settings` command, and nothing can reset the state from
+the CLI, so the described route has never existed. Change an answer by editing
+the config file directly. A real settings path is worth building and has not been
+built.
 
 ---
 
@@ -64,10 +70,11 @@ user's to decide, creates every database and every relation, and writes config.
 every other plugin routes here when config is absent. **Setup is discovered at the
 moment of need, never at install time**, because nobody reads the README.
 
-Re-running it on a complete config is the settings path. It creates no databases,
-verifies what exists, and offers to change the five answers. **Changing an answer
-writes to Notion**, see "Renaming is three operations" below, because config
-holding a name the workspace does not have breaks every skill downstream.
+**Re-running it on a complete config is refused**, and it does not fall through
+to a settings path, because there is no settings path. See the note above. When
+one is built, changing an answer will have to write to Notion, see "Renaming is
+three operations" below, because config holding a name the workspace does not
+have breaks every skill downstream.
 
 **What it reads and writes.** Reads the Notion workspace to resolve the parent
 page, the user's person id, and whether anything it is about to create already

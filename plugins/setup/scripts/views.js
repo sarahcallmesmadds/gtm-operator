@@ -51,8 +51,27 @@ const { DATABASES: SCHEMAS } = require('./schema')
 const OPS = {
   '=':            { arity: 'one',  readsBackAs: 'enum_is',     measured: '2026-08-18, on select. Returned exactly the matching row' },
   'IN':           { arity: 'many', readsBackAs: 'enum_is',     measured: '2026-08-18, on select. Compiles to an OR group, one enum_is per value' },
-  'IS EMPTY':     { arity: 'none', readsBackAs: 'is_empty',    measured: '2026-08-18, on date and on relation. Returned exactly the empty rows' },
-  'IS NOT EMPTY': { arity: 'none', readsBackAs: 'is_not_empty', measured: 'not measured. Present because it is the exact inverse of one that was, and it is unused by any view below' }
+  'IS EMPTY':     { arity: 'none', readsBackAs: 'is_empty',    measured: '2026-08-18, on date and on relation. Returned exactly the empty rows' }
+}
+
+/**
+ * Notion's own name for the type of a property, for the types a filter here can
+ * name.
+ *
+ * Read out of a live install on 2026-08-18, the one recorded in
+ * `tests/fixtures/full-install-as-notion-returned-it.json`. A returned filter
+ * carries `propertyType` beside the property name, and until 2026-08-18 nothing
+ * compared it, so a filter that moved to a different property of the same name
+ * and a different type read back as correct.
+ *
+ * A type that is not on this list has never been seen in a returned filter, so
+ * a view that filters on one is refused when it compiles rather than checked
+ * against a guess. Same rule as `OPS`, for the same reason.
+ */
+const NOTION_PROPERTY_TYPE = {
+  select:   'select',
+  date:     'date',
+  relation: 'relation'
 }
 
 /**
@@ -122,6 +141,7 @@ function configureFor (view) {
   if (view.filter && view.filter.length) {
     const clauses = view.filter.map(condition => {
       requireProperty(condition.property, 'a filter')
+      notionTypeOf(view.database, condition.property)
       const op = OPS[condition.op]
       if (!op) {
         throw new Error(
@@ -171,39 +191,111 @@ function configureFor (view) {
 }
 
 /**
- * What Notion should hand back for this view's filter, flattened.
+ * Notion's name for the type of one property, or a refusal.
  *
- * Deliberately not a deep comparison of the nested groups. Notion's grouping
- * varies with the number of clauses: one clause comes back as a property filter
- * sitting directly in the top group, and two come back as one sub-group each.
- * Both were measured on 2026-08-18. A verifier that insisted on the nesting
- * would report a correct view as broken, which is how a verifier gets switched
- * off. What matters is which property, which operator and which value.
+ * Refusing here rather than returning nothing is deliberate. A type this file
+ * has not seen come back from Notion is a type it cannot compare, and comparing
+ * it against a guess is how a verifier reports a broken view as fine.
  */
-function expectedSignature (view) {
-  const out = []
-  for (const condition of view.filter || []) {
-    const op = OPS[condition.op]
-    if (op.arity === 'none') out.push(`${condition.property}|${op.readsBackAs}|`)
-    else if (op.arity === 'one') out.push(`${condition.property}|${op.readsBackAs}|${condition.value}`)
-    else for (const v of condition.values) out.push(`${condition.property}|${op.readsBackAs}|${v}`)
+function notionTypeOf (key, name) {
+  const property = propertyDefinition(key, name)
+  if (!property) throw new Error(`${byKey(key).title}: no property named "${name}"`)
+  const type = NOTION_PROPERTY_TYPE[property.type]
+  if (!type) {
+    throw new Error(
+      `${byKey(key).title}: a filter names "${name}", which is a ${property.type}. ` +
+      `Notion's own name for that type in a returned filter has never been measured here, so the filter could not be checked after it was sent. ` +
+      `Measure it and add it to NOTION_PROPERTY_TYPE. Measured so far: ${Object.keys(NOTION_PROPERTY_TYPE).join(', ')}.`
+    )
   }
-  return out.sort()
+  return type
 }
 
-/** The same signature, read out of what Notion returned. */
-function actualSignature (advancedFilter) {
-  const out = []
+function leaf (property, propertyType, operator, value) {
+  return { kind: 'leaf', property, propertyType: propertyType || null, operator, value: value === undefined ? '' : value }
+}
+
+/**
+ * A group of one IS its only child.
+ *
+ * This is the whole of the normalisation, and it is what lets the structure be
+ * compared at all. See the note on `expectedFilter`.
+ */
+function group (operator, children) {
+  return children.length === 1 ? children[0] : { kind: 'group', operator, children }
+}
+
+/**
+ * What Notion should hand back for this view's filter, as a shape.
+ *
+ * This used to be a flat sorted list of `property|operator|value`, which threw
+ * away two things worth keeping. An `or` group sitting where an `and` was asked
+ * for read back as correct, so a view showing rows matching ANY clause passed as
+ * one showing rows matching ALL of them. And the property type was never looked
+ * at, so a filter that moved to a different property of the same name and a
+ * different type also passed.
+ *
+ * The nesting really does vary, which is why it was flattened in the first
+ * place, and a verifier that insists on the literal nesting reports correct
+ * views as broken. Measured 2026-08-18 across the five filters in
+ * `tests/fixtures/full-install-as-notion-returned-it.json`:
+ *
+ *   one clause      group(and, [property])
+ *   one IN clause   group(or,  [property, property])   <- the top group is `or`
+ *   two clauses     group(and, [group(or, [..]), group(and, [property])])
+ *
+ * One rule covers all three: **a group with exactly one child is that child**.
+ * Collapse those and the three shapes become a bare leaf, an `or` of two leaves,
+ * and an `and` of an `or` and a leaf, which is what the manifest asked for in
+ * each case. Nothing else is normalised, so an `or` where an `and` belongs now
+ * fails, which is the point.
+ *
+ * Siblings are sorted rather than compared in order. `and` and `or` commute, so
+ * order carries no meaning, and comparing it would fail a view that is right.
+ */
+function expectedFilter (view) {
+  const conditions = view.filter || []
+  if (!conditions.length) return null
+
+  const clauses = conditions.map(condition => {
+    const op = OPS[condition.op]
+    const type = notionTypeOf(view.database, condition.property)
+    if (op.arity === 'none') return leaf(condition.property, type, op.readsBackAs, '')
+    if (op.arity === 'one') return leaf(condition.property, type, op.readsBackAs, condition.value)
+    return group('or', condition.values.map(v => leaf(condition.property, type, op.readsBackAs, v)))
+  })
+
+  return group('and', clauses)
+}
+
+/** The same shape, read out of what Notion returned. */
+function actualFilter (advancedFilter) {
   const walk = node => {
-    if (!node || typeof node !== 'object') return
-    if (node.type === 'group') { for (const f of node.filters || []) walk(f); return }
+    if (!node || typeof node !== 'object') return null
     if (node.type === 'property') {
       const value = node.value && 'value' in node.value ? node.value.value : ''
-      out.push(`${node.property}|${node.operator}|${value}`)
+      return leaf(node.property, node.propertyType, node.operator, value)
     }
+    if (node.type === 'group') {
+      const children = (node.filters || []).map(walk).filter(Boolean)
+      if (!children.length) return null
+      return group(node.operator, children)
+    }
+    return null
   }
-  walk(advancedFilter)
-  return out.sort()
+  return walk(advancedFilter)
+}
+
+/** One filter shape as a line, used both to compare and to say what differs. */
+function renderFilter (node) {
+  if (!node) return 'no filter'
+  if (node.kind === 'leaf') {
+    const type = node.propertyType || 'no type recorded'
+    const value = node.value === '' ? '' : ` "${node.value}"`
+    return `${node.property} (${type}) ${node.operator}${value}`
+  }
+  const parts = node.children.map(renderFilter).sort()
+  return `(${parts.join(` ${String(node.operator).toUpperCase()} `)})`
 }
 
 /**
@@ -228,14 +320,32 @@ function verifyView (view, actual) {
     problems.push(`${title}: expected the calendar to run on "${view.calendarBy}", got ${actual.calendarBy || 'nothing'}`)
   }
 
-  const wantFilter = expectedSignature(view)
-  const gotFilter = actualSignature(actual.advancedFilter)
-  if (wantFilter.join(' ') !== gotFilter.join(' ')) {
+  const wantFilter = renderFilter(expectedFilter(view))
+  const gotFilter = renderFilter(actualFilter(actual.advancedFilter))
+  if (wantFilter !== gotFilter) {
     problems.push(
       `${title}: the filter is not the one that was asked for.\n` +
-      `    wanted: ${wantFilter.join(', ') || 'no filter'}\n` +
-      `    got:    ${gotFilter.join(', ') || 'no filter, which is what a silently discarded one looks like'}`
+      `    wanted: ${wantFilter}\n` +
+      `    got:    ${gotFilter === 'no filter' ? 'no filter, which is what a silently discarded one looks like' : gotFilter}`
     )
+  }
+
+  // Grouping was emitted and never read back. A view can lose its GROUP BY
+  // silently, the same way a filter can, and until 2026-08-18 nothing here
+  // would have said so.
+  const gotGroup = actual.groupBy && actual.groupBy.property
+  if (view.groupBy && gotGroup !== view.groupBy) {
+    problems.push(`${title}: expected it to be grouped by "${view.groupBy}", got ${gotGroup ? `"${gotGroup}"` : 'no grouping'}`)
+  }
+  if (!view.groupBy && gotGroup) {
+    problems.push(`${title}: it is grouped by "${gotGroup}" and no grouping was asked for`)
+  }
+  if (view.groupBy && gotGroup === view.groupBy) {
+    const wantType = notionTypeOf(view.database, view.groupBy)
+    const gotType = actual.groupBy.propertyType
+    if (gotType !== wantType) {
+      problems.push(`${title}: it is grouped by "${view.groupBy}", but on a ${gotType || 'property with no type recorded'} where the schema says ${wantType}`)
+    }
   }
 
   const wantSorts = (view.sort || []).map(s => `${s.property} ${s.direction === 'DESC' ? 'descending' : 'ascending'}`)
@@ -257,6 +367,13 @@ function verifyView (view, actual) {
  *
  * `<ds>` is replaced with the quoted data source url by the caller, the same
  * convention the check queries in `manifest.js` use.
+ *
+ * **It selects `url`, not the title.** Titles are not unique, two rows can carry
+ * the same one, and a title containing the separator the caller joins on would
+ * collide with a pair of other rows. Proving a filter on display text is the
+ * same class of mistake as trusting a create call: it usually looks right.
+ * `url` is the page identity, and it is already the column the relation check
+ * queries in `manifest.js` join on.
  */
 function expectedRows (view) {
   if (!view.filter || !view.filter.length) return null
@@ -270,20 +387,33 @@ function expectedRows (view) {
 
     switch (condition.op) {
       case 'IS EMPTY':     return `(${column} IS NULL OR ${column} = '' OR ${column} = '[]')`
-      case 'IS NOT EMPTY': return `(${column} IS NOT NULL AND ${column} != '' AND ${column} != '[]')`
       case '=':            return `${column} = ${quote(condition.value)}`
       case 'IN':           return `${column} IN (${condition.values.map(quote).join(', ')})`
       default:             throw new Error(`no SQL form for operator ${condition.op}`)
     }
   })
 
-  return `SELECT "${titleProperty(view.database)}" FROM <ds> WHERE ${where.join(' AND ')}`
+  return `SELECT url FROM <ds> WHERE ${where.join(' AND ')}`
 }
 
-function titleProperty (key) {
-  const schema = SCHEMAS[key]
-  const title = schema.properties.find(p => p.type === 'title')
-  return title.name
+/**
+ * A page url or id reduced to the bare id, so the two halves of the row proof
+ * can be compared.
+ *
+ * The SQL half returns `url`. The view half is a query through the API, which
+ * hands back page ids. They name the same page in two notations: a url ends
+ * with the id, dashless, sometimes behind a slug and sometimes with a query
+ * string. Anything that is not a 32-character hex id after that is returned
+ * unchanged, so a caller that recorded something else fails the comparison
+ * rather than passing through a silent no-op.
+ */
+function pageIdentity (value) {
+  const text = String(value == null ? '' : value).trim()
+  const withoutQuery = text.split(/[?#]/)[0]
+  const last = withoutQuery.split('/').pop() || ''
+  const hex = last.replace(/-/g, '')
+  const match = hex.match(/([0-9a-fA-F]{32})$/)
+  return match ? match[1].toLowerCase() : text
 }
 
 function quote (value) {
@@ -304,7 +434,7 @@ function validate () {
   return problems
 }
 
-module.exports = { OPS, configureFor, propertiesFor, verifyView, expectedSignature, actualSignature, expectedRows, validate }
+module.exports = { OPS, NOTION_PROPERTY_TYPE, configureFor, propertiesFor, verifyView, expectedFilter, actualFilter, renderFilter, expectedRows, pageIdentity, validate }
 
 if (require.main === module) {
   const problems = validate()
