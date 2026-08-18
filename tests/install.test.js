@@ -479,26 +479,109 @@ check('status still reports on a config holding a key this version does not know
   assert.ok(reported.recorded.some(r => r.includes('marketing_ops')), reported.recorded.join(', '))
 })
 
-check('a verify that passed, then one that failed, does not leave a usable record', () => {
-  // The sequence, not the setter. Every other test here calls recordVerified
-  // directly, which is the one path that cannot show this: a passing run used to
-  // leave its record standing while a later run failed, and complete accepted
-  // the old one.
+// Run the real CLI, because the point of these three is the command and not the
+// helper it calls. The previous versions called recordVerified then
+// clearVerified by hand and passed with the clearVerified call deleted from
+// install.js entirely, which is the same "prove the helper, skip the command"
+// fault they were written to close.
+const runVerify = readbackPath => {
+  const { execFileSync } = require('child_process')
+  try {
+    execFileSync('node', [path.join(ROOT, 'plugins/setup/scripts/install.js'), 'verify', readbackPath], {
+      env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
+      encoding: 'utf8',
+      stdio: 'pipe'
+    })
+    return 0
+  } catch (error) {
+    return error.status === undefined ? 1 : error.status
+  }
+}
+
+const writeReadback = (name, value) => {
+  const file = path.join(SANDBOX, name)
+  fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
+  return file
+}
+
+check('a verify that fails leaves no usable record behind, through the CLI', () => {
+  // The sequence that matters: one run passes, the workspace drifts, the next
+  // run fails, and complete must refuse. Deleting the clearVerified call from
+  // install.js fails this.
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
-  config.clearVerified()
+
+  const broken = goodReadback()
+  delete broken.databases.process
+  const status = runVerify(writeReadback('broken.json', broken))
+
+  assert.notStrictEqual(status, 0, 'a failing verify must not exit 0')
+  assert.strictEqual(config.read().verified, null, 'the old record survived a failed verify')
   assert.throws(() => config.complete(), /no verify has passed/)
 })
 
-check('a config that will not parse also leaves no usable record', () => {
-  // clearVerified runs before the readback file is opened, so a parse error
-  // cannot leave an earlier proof behind either.
+check('a readback that will not parse also leaves no usable record, through the CLI', () => {
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
-  const before = config.read()
-  assert.ok(before.verified, 'the record should exist before clearing')
+
+  const status = runVerify(writeReadback('not-json.json', '{ this is not json'))
+
+  assert.notStrictEqual(status, 0)
+  assert.strictEqual(config.read().verified, null, 'a parse error left the old record standing')
+})
+
+check('a verify that dies on the definitions preflight leaves no usable record', () => {
+  // The preflight exits before the command is dispatched, so clearing inside
+  // the verify case was too late: correct the definitions afterwards and the
+  // old proof is usable again with nothing checked in between.
+  //
+  // Run against a COPY of the scripts with a deliberately contradictory
+  // manifest, because that is the only way to reach the preflight's exit as the
+  // CLI really reaches it. Requiring install.js from another file does not work:
+  // `require.main === module` is false there and the CLI block never runs at
+  // all, which is how the first version of this test passed the wrong thing.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+
+  const copy = path.join(SANDBOX, 'scripts')
+  fs.mkdirSync(copy, { recursive: true })
+  for (const file of fs.readdirSync(path.join(ROOT, 'plugins/setup/scripts'))) {
+    fs.copyFileSync(path.join(ROOT, 'plugins/setup/scripts', file), path.join(copy, file))
+  }
+  const manifestPath = path.join(copy, 'manifest.js')
+  const broken = fs.readFileSync(manifestPath, 'utf8').replace(
+    'const VIEWS = [',
+    "const VIEWS = [\n  { database: 'projects', name: 'Broken', layout: 'table', filter: [{ property: 'No Such Property', op: 'IS EMPTY' }], describe: 'deliberately contradictory' },"
+  )
+  fs.writeFileSync(manifestPath, broken)
+
+  const { execFileSync } = require('child_process')
+  let status = 0
+  try {
+    execFileSync('node', [path.join(copy, 'install.js'), 'verify', path.join(SANDBOX, 'anything.json')], {
+      env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
+      encoding: 'utf8',
+      stdio: 'pipe'
+    })
+  } catch (error) {
+    status = error.status === undefined ? 1 : error.status
+  }
+
+  assert.notStrictEqual(status, 0, 'a contradictory manifest should not exit 0')
+  assert.strictEqual(config.read().verified, null, 'the preflight exit left the old record standing')
+})
+
+check('a withdrawn proof takes the completion claim with it', () => {
+  // Every other plugin decides whether to trust this workspace by reading
+  // `state`, not by reading the proof. A config left saying `complete` with no
+  // verification is the proof being withdrawn where nobody looks.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
+  assert.strictEqual(config.read().state, 'complete')
+
   config.clearVerified()
-  assert.strictEqual(config.read().verified, null)
+  assert.strictEqual(config.read().state, 'creating')
   assert.strictEqual(config.read().verifiedAt, null)
 })
 

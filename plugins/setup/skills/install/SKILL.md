@@ -224,10 +224,17 @@ Write what came back into a file:
 ```json
 {
   "databases": { "<key>": { "schema": { ... }, "views": [ ... ] } },
-  "viewRows":  { "<key>::<view name>": ["a title", "another"] },
-  "sqlRows":   { "<key>::<view name>": ["a title", "another"] }
+  "viewRows":  { "<key>::<view name>": ["https://app.notion.com/p/<32 hex page id>"] },
+  "sqlRows":   { "<key>::<view name>": ["https://app.notion.com/<32 hex page id>"] }
 }
 ```
+
+**Page urls or page ids on both sides, never titles.** Record the `url` each
+half returns. The view query and the SQL query hand back the same page in two
+different url shapes and both are accepted. A title is refused outright, and the
+verify will say so: titles are not unique, so two different rows sharing one used
+to compare as the same row. Note this is the page's own `url`, not `public_url`,
+which for a published page can carry a custom slug with no id in it at all.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" verify <that file>
