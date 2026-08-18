@@ -358,7 +358,13 @@ check('a view returning different rows from its own rule is caught', () => {
   assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
 })
 
-check('a view returning the rows its rule returns is proved, and not merely noted', () => {
+check('a view whose two rows match its rule is reported proved', () => {
+  // Titled for what it proves. It used to claim it covered the row COMPARISON,
+  // and it does not: both sides are valid page ids in a different order, which
+  // the element-by-element comparison and the join it replaced accept equally,
+  // so reverting the comparison leaves this green. The comparison cannot be
+  // reached from here at all, and the reason is recorded at the comparison
+  // itself in install.js rather than implied by a name here.
   setUpConfig()
   const readback = goodReadback()
   readback.viewRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'] }
@@ -693,6 +699,49 @@ check('a proof taken against different definitions is refused', () => {
   config.write(tampered)
 
   assert.throws(() => config.complete(), /different set of definitions/)
+})
+
+check('a proof is refused when the code that builds the calls changes', () => {
+  // The fingerprint hashed the manifest, then the manifest and the schema data,
+  // and both times it missed the generators. Changing DDL_TYPE.date from DATE to
+  // DATETIME alters every create statement an install sends and left the hash
+  // byte for byte identical, so a proof taken before the change stayed valid.
+  //
+  // Asserted through the generated calls rather than by editing a source file:
+  // this is what a change to the generator does to the thing that is hashed.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  assert.doesNotThrow(() => config.complete())
+
+  const schemaModule = require(path.join(ROOT, 'plugins/setup/scripts/schema.js'))
+  const original = schemaModule.DDL_TYPE.date
+  schemaModule.DDL_TYPE.date = () => 'DATETIME'
+  try {
+    assert.ok(
+      schemaModule.createStatement('tasks').includes('DATETIME'),
+      'the probe should really have changed what is sent'
+    )
+    assert.throws(() => config.complete(), /different set of definitions/)
+  } finally {
+    schemaModule.DDL_TYPE.date = original
+  }
+})
+
+check('renumbering the relations does not throw away a proof', () => {
+  // The other direction. `n` numbers the design table and reaches no statement,
+  // so a proof must survive it. An earlier fingerprint included it and would
+  // have forced a re-verify after the renumbering this branch already did.
+  const fingerprint = require(path.join(ROOT, 'plugins/setup/scripts/fingerprint.js'))
+  const { RELATIONS } = require(path.join(ROOT, 'plugins/setup/scripts/manifest.js'))
+  const before = fingerprint.fingerprint()
+  const relation = RELATIONS[RELATIONS.length - 1]
+  const wasN = relation.n
+  relation.n = 99
+  try {
+    assert.strictEqual(fingerprint.fingerprint(), before)
+  } finally {
+    relation.n = wasN
+  }
 })
 
 check('a proof is refused after a schema change, not only a manifest change', () => {

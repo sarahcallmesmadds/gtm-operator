@@ -20,7 +20,8 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const { DATABASES, fingerprint } = require('./manifest')
+const { DATABASES } = require('./manifest')
+const { fingerprint } = require('./fingerprint')
 
 /**
  * Bumped when the shape below changes in a way that would make an older reader
