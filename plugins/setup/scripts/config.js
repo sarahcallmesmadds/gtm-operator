@@ -208,10 +208,16 @@ function recordPerson (personId) {
  */
 function clearVerified () {
   const config = read()
-  if (!config) return null
+  if (!config) return { existed: false, wasComplete: false }
+  const wasComplete = config.state === 'complete'
   invalidateVerification(config)
   write(config)
-  return config
+  // What it was is handed back, because a verify that PASSES has to be able to
+  // put it back. Demoting without that made a passing re-verify of a finished
+  // install silently un-complete it: state 'creating' beside a fresh
+  // verifiedAt, which is the same contradiction the demotion was added to
+  // remove, pointing the other way.
+  return { existed: true, wasComplete }
 }
 
 /**

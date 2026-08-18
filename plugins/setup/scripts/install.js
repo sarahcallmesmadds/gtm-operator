@@ -287,7 +287,7 @@ if (require.main === module) {
     // fix the definitions, and the old proof is usable again without anything
     // having been checked. Same fault as the one this call was added for, one
     // exit earlier.
-    if (command === 'verify') config.clearVerified()
+    const cleared = command === 'verify' ? config.clearVerified() : null
 
     const problems = [...manifest.validate(), ...views.validate()]
     if (problems.length) {
@@ -360,6 +360,11 @@ if (require.main === module) {
 
         const at = new Date().toISOString()
         config.recordVerified(at)
+        // Put back what clearing took, and only that. An install that was
+        // complete before this verify and has just passed it again is still
+        // complete; one that was not is not suddenly finished because a check
+        // passed.
+        if (cleared && cleared.wasComplete) config.complete()
         console.log(`\nEverything Notion returned matches the manifest, and every view was proved by its rows. Recorded as verified at ${at}.`)
         break
       }
