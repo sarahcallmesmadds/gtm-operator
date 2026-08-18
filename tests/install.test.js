@@ -353,7 +353,7 @@ check('a view returning different rows from its own rule is caught', () => {
   setUpConfig()
   const readback = goodReadback()
   readback.viewRows = { 'projects::Needs attention': [] }
-  readback.sqlRows = { 'projects::Needs attention': ['A project with no problem statement'] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
   const { problems } = install.verify(readback)
   assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
 })
@@ -361,8 +361,8 @@ check('a view returning different rows from its own rule is caught', () => {
 check('a view returning the rows its rule returns is proved, and not merely noted', () => {
   setUpConfig()
   const readback = goodReadback()
-  readback.viewRows = { 'projects::Needs attention': ['One', 'Two'] }
-  readback.sqlRows = { 'projects::Needs attention': ['Two', 'One'] }
+  readback.viewRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
   const { problems, unchecked } = install.verify(readback)
   assert.strictEqual(problems.length, 0, problems.join('\n'))
   assert.ok(!unchecked.some(n => n.includes('projects') && n.includes('Needs attention')))
@@ -395,8 +395,8 @@ check('one side empty and the other not is a mismatch, not an unchecked view', (
 check('rows are compared by page identity, so a url and its id are the same row', () => {
   setUpConfig()
   const readback = goodReadback()
-  readback.viewRows = { 'projects::Needs attention': ['https://www.notion.so/A-Project-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
-  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'] }
+  readback.viewRows = { 'projects::Needs attention': ['https://app.notion.com/p/A-Project-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'] }
   const { problems } = install.verify(readback)
   assert.strictEqual(problems.length, 0, problems.join('\n'))
 })
@@ -409,6 +409,33 @@ check('two different rows sharing a title are not averaged into one', () => {
   readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'] }
   const { problems } = install.verify(readback)
   assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
+})
+
+check('rows recorded as titles are refused, not proved', () => {
+  // The one that mattered. pageIdentity used to hand back anything it did not
+  // recognise, so two lists of titles matched each other and the view was
+  // reported proved with no identity compared at all. Reverting either half of
+  // that fix fails this.
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': ['Unscoped project'] }
+  readback.sqlRows = { 'projects::Needs attention': ['Unscoped project'] }
+  const { problems, verified } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('cannot prove which rows came back'), problems.join('\n'))
+  assert.strictEqual(verified, false)
+})
+
+check('one row is not the same as two rows that spell it', () => {
+  // The rows used to be joined on ' | ' before comparing, so a single row
+  // called "alpha | beta" compared equal to two rows called "alpha" and "beta".
+  // Selecting url did not fix that on its own, because the join survived it.
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': ['alpha | beta'] }
+  readback.sqlRows = { 'projects::Needs attention': ['alpha', 'beta'] }
+  const { problems, verified } = install.verify(readback)
+  assert.ok(problems.length > 0, 'a row named with the separator must not pass')
+  assert.strictEqual(verified, false)
 })
 
 console.log('\nwhat complete will accept as proof\n')
@@ -450,6 +477,29 @@ check('status still reports on a config holding a key this version does not know
   config.write(current)
   const reported = install.status()
   assert.ok(reported.recorded.some(r => r.includes('marketing_ops')), reported.recorded.join(', '))
+})
+
+check('a verify that passed, then one that failed, does not leave a usable record', () => {
+  // The sequence, not the setter. Every other test here calls recordVerified
+  // directly, which is the one path that cannot show this: a passing run used to
+  // leave its record standing while a later run failed, and complete accepted
+  // the old one.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.clearVerified()
+  assert.throws(() => config.complete(), /no verify has passed/)
+})
+
+check('a config that will not parse also leaves no usable record', () => {
+  // clearVerified runs before the readback file is opened, so a parse error
+  // cannot leave an earlier proof behind either.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  const before = config.read()
+  assert.ok(before.verified, 'the record should exist before clearing')
+  config.clearVerified()
+  assert.strictEqual(config.read().verified, null)
+  assert.strictEqual(config.read().verifiedAt, null)
 })
 
 check('phase A refuses to build a create call with no parent page id', () => {

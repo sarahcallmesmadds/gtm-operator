@@ -268,27 +268,43 @@ function expectedFilter (view) {
   return group('and', clauses)
 }
 
-/** The same shape, read out of what Notion returned. */
+/**
+ * The same shape, read out of what Notion returned.
+ *
+ * A node this does not recognise becomes an explicit `unknown`, and it is NOT
+ * dropped. Dropping was the first version, and it meant a view carrying an extra
+ * clause in a shape not modelled here, a timestamp filter for instance, had that
+ * clause deleted on the way in. The group was then left with one child, the
+ * one-child collapse turned it into that child, and a filter doing something
+ * else entirely compared equal to the one that was asked for.
+ *
+ * An empty group stays `null`, because that is a measured real case rather than
+ * an unrecognised one: a rollup filter on 2026-08-17 came back as
+ * `filters: []`, and `no filter` is exactly what a silently discarded filter
+ * should read as.
+ */
 function actualFilter (advancedFilter) {
   const walk = node => {
-    if (!node || typeof node !== 'object') return null
+    if (!node || typeof node !== 'object') return { kind: 'unknown', describe: node === null ? 'null' : typeof node }
     if (node.type === 'property') {
       const value = node.value && 'value' in node.value ? node.value.value : ''
       return leaf(node.property, node.propertyType, node.operator, value)
     }
     if (node.type === 'group') {
-      const children = (node.filters || []).map(walk).filter(Boolean)
-      if (!children.length) return null
-      return group(node.operator, children)
+      const filters = node.filters || []
+      if (!filters.length) return null
+      return group(node.operator, filters.map(walk))
     }
-    return null
+    return { kind: 'unknown', describe: node.type ? `a ${node.type} clause` : 'a clause with no type' }
   }
+  if (advancedFilter === undefined || advancedFilter === null) return null
   return walk(advancedFilter)
 }
 
 /** One filter shape as a line, used both to compare and to say what differs. */
 function renderFilter (node) {
   if (!node) return 'no filter'
+  if (node.kind === 'unknown') return `<${node.describe}, which this cannot check>`
   if (node.kind === 'leaf') {
     const type = node.propertyType || 'no type recorded'
     const value = node.value === '' ? '' : ` "${node.value}"`
@@ -397,23 +413,45 @@ function expectedRows (view) {
 }
 
 /**
- * A page url or id reduced to the bare id, so the two halves of the row proof
- * can be compared.
+ * A page url or id reduced to the bare id, or `null` when it is not a page
+ * reference at all.
  *
- * The SQL half returns `url`. The view half is a query through the API, which
- * hands back page ids. They name the same page in two notations: a url ends
- * with the id, dashless, sometimes behind a slug and sometimes with a query
- * string. Anything that is not a 32-character hex id after that is returned
- * unchanged, so a caller that recorded something else fails the comparison
- * rather than passing through a silent no-op.
+ * **Returning null rather than the input is the point.** The first version
+ * handed back anything it did not recognise, so a caller who recorded page
+ * TITLES got their titles back unchanged on both sides, the two sides matched,
+ * and the view was reported as proved without a single page identity being
+ * looked at. That is the same false pass this function was written to remove,
+ * one step further along. A value that is not a page reference is missing
+ * evidence, and the caller is told so.
+ *
+ * Two shapes are accepted, both measured on 2026-08-18:
+ *
+ *   the SQL half   https://app.notion.com/<32 hex>
+ *   the view half  https://app.notion.com/p/<32 hex>
+ *
+ * plus a bare or dashed id, and the slug form `Some-Page-Title-<32 hex>` that
+ * Notion puts in a browser url. Dashes are only stripped from something already
+ * shaped like a uuid, never from a slug, because a slug's own words can contain
+ * hex letters and stripping first would let the 32-character window slide off
+ * the id and into the title.
  */
+const BARE_ID = /^[0-9a-f]{32}$/i
+const DASHED_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SLUGGED_ID = /^(?:.*-)?([0-9a-f]{32})$/i
+
 function pageIdentity (value) {
-  const text = String(value == null ? '' : value).trim()
-  const withoutQuery = text.split(/[?#]/)[0]
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  if (!text) return null
+
+  const withoutQuery = text.split(/[?#]/)[0].replace(/\/+$/, '')
   const last = withoutQuery.split('/').pop() || ''
-  const hex = last.replace(/-/g, '')
-  const match = hex.match(/([0-9a-fA-F]{32})$/)
-  return match ? match[1].toLowerCase() : text
+
+  if (BARE_ID.test(last)) return last.toLowerCase()
+  if (DASHED_ID.test(last)) return last.replace(/-/g, '').toLowerCase()
+  const slugged = last.match(SLUGGED_ID)
+  if (slugged) return slugged[1].toLowerCase()
+  return null
 }
 
 function quote (value) {

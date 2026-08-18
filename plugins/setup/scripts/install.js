@@ -170,10 +170,49 @@ function verify (readback) {
       continue
     }
 
-    // Compared by page identity rather than by title. Titles are not unique.
-    const a = [...fromView].map(views.pageIdentity).sort()
-    const b = [...fromSql].map(views.pageIdentity).sort()
-    if (a.join(' | ') !== b.join(' | ')) {
+    // Every row has to reduce to a page id. Anything that does not is evidence
+    // that cannot prove anything, and saying so is the whole point: an earlier
+    // version of this handed unrecognised values straight back, so two lists of
+    // page TITLES matched each other and the view was reported proved without a
+    // single identity being compared.
+    const identify = (rows, half) => {
+      const ids = []
+      const unusable = []
+      for (const row of rows) {
+        const id = views.pageIdentity(row)
+        if (id) ids.push(id)
+        else unusable.push(String(row))
+      }
+      if (unusable.length) {
+        problems.push(
+          `${where}: ${unusable.length} of the ${rows.length} rows from ${half} ${unusable.length === 1 ? 'is not a page reference' : 'are not page references'}, ` +
+          `so they cannot prove which rows came back: ${unusable.slice(0, 3).map(v => JSON.stringify(v)).join(', ')}${unusable.length > 3 ? ', ...' : ''}.\n` +
+          `    Record page urls or page ids on both sides. Titles are not unique, and two rows sharing one used to compare as the same row.`
+        )
+        return null
+      }
+      return ids.sort()
+    }
+
+    const a = identify(fromView, 'the view')
+    const b = identify(fromSql, 'the rule')
+    if (!a || !b) continue
+
+    // Compared element by element rather than by joining on a separator.
+    //
+    // The join is how a single row called "alpha | beta" compared equal to two
+    // rows called "alpha" and "beta". That specific collision is already closed
+    // one step above, by `pageIdentity` refusing anything that is not a page
+    // reference: every value reaching here is 32 hex characters and none of them
+    // can contain a separator.
+    //
+    // **So no test can tell this line from the join it replaced**, and that is
+    // stated rather than left to be assumed. It is kept because the guarantee it
+    // rests on lives in another function: loosen `pageIdentity` and the join
+    // becomes exploitable again with nothing to catch it. Checked by reverting
+    // it on 2026-08-18, and the suite stayed green.
+    const same = a.length === b.length && a.every((id, index) => id === b[index])
+    if (!same) {
       problems.push(
         `${where}: the view returns different rows from the rule it is supposed to show.\n` +
         `    the view:  ${a.join(', ') || 'nothing'}\n` +
@@ -283,6 +322,12 @@ if (require.main === module) {
       }
       case 'verify': {
         if (!rest[0]) throw new Error('Usage: install.js verify <readback.json>')
+
+        // Before the file is opened, not after the checks run. A verify that
+        // fails, throws, or is handed a file that will not parse must not leave
+        // an earlier passing record behind for `complete` to accept.
+        config.clearVerified()
+
         const readback = JSON.parse(fs.readFileSync(rest[0], 'utf8'))
         const { problems: found, unchecked, verified } = verify(readback)
 

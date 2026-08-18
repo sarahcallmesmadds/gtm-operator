@@ -295,9 +295,15 @@ The skills comply. A person clicking New in Notion does not, and that is the
 common case, not the edge case.
 
 **Setup creates a saved `Needs attention` view on the first three**, filtered to
-exactly the rows that break the rule. It costs nothing, it is visible to a person
+the rows that break the rule. It costs nothing, it is visible to a person
 without running anything, and it turns a rule nobody can enforce into one somebody
 can see.
+
+**Two of the three show exactly those rows. The Projects one is wider.** It shows
+projects with no memos at all, where the rule is a project with no problem
+statement memo, because narrowing it to the memo `Type` needs a filter that reads
+through the relation and a rollup filter was measured on 2026-08-17 to be
+accepted and then silently discarded. `scope` is what holds that rule exactly.
 
 **The last two get no view, because Notion cannot filter for either of them.**
 This was found on 2026-08-17, after the views had already been designed for all
@@ -603,7 +609,7 @@ library carries one back named after the database: `Memos`, `Projects`,
 rule is worth holding on to, because it means somebody reading any schema can
 guess the other side correctly.
 
-**Relation 11 is the only one-way relation in the design, and it is on purpose.**
+**Relation 10 is the only one-way relation in the design, and it is on purpose.**
 A two-way self-relation needs a different name on each side and connecting two
 tools is symmetric, so there is no honest pair of names. The full blast radius
 takes two reads instead of one. See `SCHEMA-software.md`.

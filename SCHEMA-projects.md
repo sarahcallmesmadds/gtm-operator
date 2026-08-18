@@ -310,9 +310,10 @@ Same three lenses used on the Memos templates.
 - **The decisive finding: a project page never said why the project was worth
   doing.** It described the work in detail and the stakes nowhere. The fix is
   not another section, because that would duplicate the Problem Statement memo
-  and the two would disagree. **The `Problem Statement` relation is required
-  instead**, so the stakes are always exactly one click away and exist in one
-  place. A project that cannot name its problem statement has not been scoped.
+  and the two would disagree. **An attached problem statement memo is required
+  instead**, reached through the `Memos` relation, so the stakes are always one
+  click away and exist in one place. A project that cannot name its problem
+  statement has not been scoped.
 - Success Criteria was originally written as "Objectives", which states an
   intention rather than a test. Renamed so it has to be checkable.
 - The reference carried both `Impact to Funnel` and `LOB impact` while the

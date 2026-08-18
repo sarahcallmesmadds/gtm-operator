@@ -322,11 +322,57 @@ check('the two halves of the proof come back in different url shapes, and still 
   )
 })
 
-check('something that is not a page reference is left alone rather than made to match', () => {
-  // A caller that recorded titles by mistake should fail the comparison, not be
-  // quietly normalised into agreeing.
-  assert.strictEqual(views.pageIdentity('Confirmed with no date'), 'Confirmed with no date')
-  assert.strictEqual(views.pageIdentity(''), '')
+check('something that is not a page reference is refused, not handed back', () => {
+  // It used to be handed back unchanged, which is why two lists of titles
+  // matched each other and the view was reported proved.
+  assert.strictEqual(views.pageIdentity('Confirmed with no date'), null)
+  assert.strictEqual(views.pageIdentity('alpha | beta'), null)
+  assert.strictEqual(views.pageIdentity(''), null)
+  assert.strictEqual(views.pageIdentity(null), null)
+  assert.strictEqual(views.pageIdentity(42), null)
+})
+
+check('a trailing slash and a query string do not change the row', () => {
+  const bare = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+  assert.strictEqual(views.pageIdentity(`https://app.notion.com/p/${bare}/`), bare)
+  assert.strictEqual(views.pageIdentity(`https://app.notion.com/p/${bare}?pvs=4`), bare)
+})
+
+check('a clause Notion returns in a shape this does not model is caught, not dropped', () => {
+  // It used to be dropped. The group was then left with one child, the
+  // one-child collapse turned the group into that child, and a filter doing
+  // something else compared equal to the one asked for.
+  const view = find('projects', 'Needs attention')
+  const withExtra = {
+    name: 'Needs attention',
+    type: 'table',
+    sorts: [{ property: 'Name', direction: 'ascending' }],
+    advancedFilter: {
+      type: 'group',
+      operator: 'and',
+      filters: [
+        { type: 'property', property: 'Memos', propertyType: 'relation', operator: 'is_empty' },
+        { type: 'timestamp', timestamp: 'created_time', operator: 'after', value: { value: '2026-01-01' } }
+      ]
+    }
+  }
+  const problems = views.verifyView(view, withExtra)
+  assert.ok(problems.join('\n').includes('not the one that was asked for'), problems.join('\n'))
+  assert.ok(problems.join('\n').includes('timestamp'), problems.join('\n'))
+})
+
+check('a filter that came back empty still reads as discarded, not as unrecognised', () => {
+  // Measured 2026-08-17: a rollup filter came back as filters: []. That is a
+  // real case and has to keep its own wording, so the fix above must not
+  // swallow it.
+  const view = find('projects', 'Needs attention')
+  const discarded = {
+    name: 'Needs attention',
+    type: 'table',
+    sorts: [{ property: 'Name', direction: 'ascending' }],
+    advancedFilter: { type: 'group', operator: 'and', filters: [] }
+  }
+  assert.ok(views.verifyView(view, discarded).join('\n').includes('silently discarded'))
 })
 
 console.log(failures ? `\n${failures} failed.\n` : `\nAll checks passed. ${VIEWS.length} views.\n`)

@@ -187,6 +187,28 @@ function recordPerson (personId) {
 }
 
 /**
+ * Forget any recorded verify, on disk, before a new one is attempted.
+ *
+ * `install.js verify` calls this the moment it starts, ahead of reading or
+ * parsing anything. Without it a run that passed left its record standing while
+ * a later run failed, and `complete` accepted the old one: verify, change the
+ * workspace, verify again and watch it fail, complete anyway. That is the fault
+ * this whole file was just changed to remove, sitting one level up from where it
+ * was removed.
+ *
+ * It is deliberately not inside `write`. `recordVerified` and `complete` both
+ * write, and clearing from in there would erase the proof as it was being
+ * recorded.
+ */
+function clearVerified () {
+  const config = read()
+  if (!config) return null
+  invalidateVerification(config)
+  write(config)
+  return config
+}
+
+/**
  * Record that a verify passed, which is the only thing `complete` will accept.
  *
  * Written by `install.js verify` and by nothing else. It used to be that
@@ -246,7 +268,7 @@ function complete () {
 }
 
 module.exports = {
-  recordVerified,
+  recordVerified, clearVerified,
   CONFIG_PATH, CONFIG_VERSION, blank, exists, read, write, begin,
   recordDatabase, recordPerson, ids, missingDatabases, complete
 }

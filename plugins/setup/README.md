@@ -106,10 +106,17 @@ They hold the design, the code and Notion together. A count of them is not writt
 - The config file cannot be pointed at a second database for a name it already
   holds, cannot be completed before it has been verified, and is never
   overwritten when it will not parse.
-- **A whole install, as Notion returned it.** Six databases, twelve relations
-  and seven views, fetched back from a live workspace and compared field by
-  field. This is the only test that can catch Notion behaving differently from
-  what the code assumed, which it has done three times so far.
+- **A whole install, as Notion returned it.** Every database, relation and view
+  fetched back from a live workspace and compared field by field. This is the
+  only test that can catch Notion behaving differently from what the code
+  assumed, which it has done three times so far.
+
+  **It records an older install than the manifest now describes**, so it carries
+  a relation that was dropped on 2026-08-18, a property added after it was taken,
+  and row evidence recorded as titles rather than page ids. Every one of those
+  differences is asserted by name in `tests/full-install.test.js`, so a new
+  difference fails rather than hiding among the known ones. The fix is to
+  re-record it, not to loosen the test.
 
 **A check is proved by breaking the thing it watches and confirming it goes
 red**, because a check that has never failed is a check nobody has tested. That
