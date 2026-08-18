@@ -285,6 +285,34 @@ check('a relation whose far side was never read back is not re-added', () => {
   assert.ok(said && /not read back/.test(said.reason), `the reason should say the far side was not read back:\n${said && said.reason}`)
 })
 
+check('a relation whose OWN database was never read back is not re-added', () => {
+  // The mirror of the far-side case, and the one the first version of this
+  // guard missed: `schemas[from] || {}` turned a database nobody looked at into
+  // a database with no properties, so the near half read as absent and the
+  // rebuild went out.
+  const relation = RELATIONS.find(r => r.kind === 'two-way' && r.from !== r.to)
+  const schemas = correctSchemas()
+  delete schemas[relation.from]
+
+  assert.strictEqual(relations.repairStatements(schemas, IDS)[relation.from], undefined,
+    'a relation was rebuilt without anybody having looked at the database it lives on')
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said && /not read back/.test(said.reason), `the reason should say its own database was not read back:\n${said && said.reason}`)
+})
+
+check('a withheld reason names the property that is actually there', () => {
+  // The lookup goes through the map and the sentence used to quote the shipped
+  // name, so a renamed side was refused for a property nobody would find.
+  const relation = RELATIONS.find(r => r.from === 'process' && r.property === 'Parent')
+  const names = { process: { properties: { Parent: 'Parent Doc', 'Child Docs': 'Child Docs' }, values: {} } }
+  const schemas = { process: { 'Parent Doc': { type: 'relation', dataSourceUrl: 'collection://ds-memos', propertyUrl: 'x' }, 'Child Docs': { type: 'relation' } } }
+
+  const said = relations.unrepairable(schemas, IDS, names).find(u => u.n === relation.n)
+  assert.ok(said, 'the renamed relation was not withheld at all')
+  assert.ok(said.reason.includes('"Parent Doc"'), `the reason quotes a name that is not on the database:\n${said.reason}`)
+  assert.ok(!/"Parent"/.test(said.reason), `the shipped name was quoted as the thing that is there:\n${said.reason}`)
+})
+
 check('a relation that is present but wrong is reported as unrepairable, not dropped', () => {
   const schemas = correctSchemas()
   delete schemas.memos.Artifacts.propertyUrl

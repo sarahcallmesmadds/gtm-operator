@@ -427,7 +427,9 @@ check('a relation that was renamed and then deleted is rebuilt under the name it
   const repairs = relations.repairStatements(gone, ids, names)
   assert.ok(repairs.process.includes('"Parent Doc"'),
     `the rebuild used the shipped name, so the map would point at a property that does not exist:\n${repairs.process}`)
-  assert.ok(!repairs.process.includes('"Parent"  '), 'the shipped name was used')
+  // One space, not two. It was two, so the substring could never occur and the
+  // assertion was true of every string, including an empty one.
+  assert.ok(!repairs.process.includes('"Parent" '), 'the shipped name was used')
   assert.ok(!/ADD COLUMN "Parent" /.test(repairs.process),
     `both names were used, which builds two properties for one relation:\n${repairs.process}`)
 })
