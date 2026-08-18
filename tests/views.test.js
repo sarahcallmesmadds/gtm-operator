@@ -305,6 +305,11 @@ check('the two halves of the proof come back in different url shapes, and still 
   // The SQL half returns https://app.notion.com/<id> and the view half returns
   // https://app.notion.com/p/<id>. Same three pages, two notations. Comparing
   // the strings as they arrive would have reported every row as different.
+  //
+  // The ids are placeholders, the same convention the fixture uses and for the
+  // same reason: the real ones point at pages in a private workspace and this
+  // repository is public. The url SHAPES are exactly as measured, which is the
+  // whole of what this test is about.
   const fromSql = [
     'https://app.notion.com/ca1e0da40000000000000000000000a1',
     'https://app.notion.com/ca1e0da40000000000000000000000a2',
