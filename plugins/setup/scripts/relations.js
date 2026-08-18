@@ -40,7 +40,7 @@ const mapped = require('./names')
  * data source id is needed: the statement is sent to the source's data source,
  * so the source names itself by where it is sent.
  */
-function statementFor (relation, ids) {
+function statementFor (relation, ids, names = {}) {
   const target = ids[relation.to]
   if (!target || !target.dataSourceId) {
     throw new Error(
@@ -49,11 +49,19 @@ function statementFor (relation, ids) {
     )
   }
 
-  const column = `"${relation.property}"`
+  // Built with the names this workspace uses, not the shipped ones.
+  //
+  // On a first install the two are the same and this changes nothing. It
+  // matters on a repair: a relation somebody renamed and then deleted is
+  // rebuilt here, and rebuilding it under the shipped name leaves the map
+  // pointing at a property that does not exist beside a property nothing
+  // points at. The next verify reports it missing again, and the repair after
+  // that builds it again.
+  const column = `"${mapped.propertyName(names[relation.from], relation.property)}"`
   const dataSource = `'${bare(target.dataSourceId)}'`
 
   if (relation.kind === 'one-way') return `ADD COLUMN ${column} RELATION(${dataSource})`
-  return `ADD COLUMN ${column} RELATION(${dataSource}, DUAL '${relation.reverse}')`
+  return `ADD COLUMN ${column} RELATION(${dataSource}, DUAL '${mapped.propertyName(names[relation.to], relation.reverse)}')`
 }
 
 /**
@@ -65,10 +73,10 @@ function statementFor (relation, ids) {
  * reading the data sources back, in `missing` below, not by remembering which
  * calls returned.
  */
-function statementsFor (key, ids) {
+function statementsFor (key, ids, names = {}) {
   const relations = relationsFrom(key)
   if (!relations.length) return null
-  return relations.map(r => statementFor(r, ids)).join('; ')
+  return relations.map(r => statementFor(r, ids, names)).join('; ')
 }
 
 /** Notion accepts a bare uuid or a collection:// url. The DDL wants the bare id. */
@@ -242,7 +250,8 @@ function repairStatements (schemas, ids, names = {}) {
     // answers "not there" for every renamed relation, and the answer decides
     // whether a second one gets added.
     if (source[mapped.propertyName(names[relation.from], relation.property)]) continue
-    out[relation.from] = out[relation.from] ? `${out[relation.from]}; ${statementFor(relation, ids)}` : statementFor(relation, ids)
+    const statement = statementFor(relation, ids, names)
+    out[relation.from] = out[relation.from] ? `${out[relation.from]}; ${statement}` : statement
   }
   return out
 }
