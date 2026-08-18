@@ -1,5 +1,5 @@
 {
-  "_comment": "The schema Notion returned after creating the Process Library from schema.js on 2026-08-17, in a live workspace. Transcribed from the create response. This is a record of what Notion actually does, not what the design hoped it would do, and it is the fixture `verify` is tested against. Two things in here were surprises: RICH_TEXT reads back as \"text\" and PEOPLE reads back as \"person\".",
+  "_comment": "The schema Notion returned after creating the Process from schema.js on 2026-08-17, in a live workspace. Transcribed from the create response. This is a record of what Notion actually does, not what the design hoped it would do, and it is the fixture `verify` is tested against. Two things in here were surprises: RICH_TEXT reads back as \"text\" and PEOPLE reads back as \"person\".",
   "Name": { "name": "Name", "type": "title" },
   "Description": { "name": "Description", "type": "text" },
   "Type": {

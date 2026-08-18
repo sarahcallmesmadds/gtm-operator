@@ -38,7 +38,7 @@ It answers five questions, and every field earns itself against one of them:
    anything.
 
 **It is an index, not a manual.** Depth about how a tool is wired lives in the
-Process Library as a Technical Reference, related through `Artifacts`. A Software
+Process as a Technical Reference, related through `Artifacts`. A Software
 row that is growing long is a Technical Reference waiting to be written.
 
 ---
@@ -83,7 +83,7 @@ how the table view should be arranged, not a property of Notion.
 | Status page | URL | where the vendor announces outages and changes |
 | Last reviewed | Date | the freshness stamp for the whole row |
 | Integrates with | Relation (self) | tool-to-tool connections actually wired. One-way, see below |
-| Artifacts | Relation to Process Library | inverse of `Software` there. The docs about this tool |
+| Artifacts | Relation to Process | inverse of `Software` there. The docs about this tool |
 | Created time | Created time | |
 
 ### The four person fields, and which one to drop first
@@ -341,7 +341,7 @@ in a skill, paid once, rather than an awkward column on every row forever.
 ### Last reviewed
 
 The freshness stamp for the whole row, and the parallel to `Last checked for
-accuracy` in the Process Library.
+accuracy` in Process.
 
 **Its fill events, named now so the skills have to honour them:** set by
 `software:new` when a row is created, and by `software:review` when a row gets a
@@ -429,7 +429,7 @@ anything is written. A weak detector then produces noise rather than damage.
 
 **The duplicate check runs before a candidate is offered**, using the same
 mechanism `software:new` uses. That is what makes backfill safe to run repeatedly,
-which matters more here than in the Process Library, because new receipts arrive
+which matters more here than in Process, because new receipts arrive
 every month.
 
 **This skill is why the directory is worth building.** Recorded plainly because it
@@ -466,7 +466,7 @@ what makes this schema real rather than aspirational.
 |---|---|
 | Plan / Edition | Free text that no view can filter. The tier and its limits are a sentence, and sentences go in Notes |
 | The finance system as the source of truth for contracts | One company's stack. The general version is a number, a link, and a date it was last confirmed |
-| Department and End-Users as relations to a Teams database | There is no Teams database in the foundation. `Domain` is the function that owns it and `Audience` is who uses it, both already defined and already shared. Same move that folded a Teams relation into Audience in the Process Library |
+| Department and End-Users as relations to a Teams database | There is no Teams database in the foundation. `Domain` is the function that owns it and `Audience` is who uses it, both already defined and already shared. Same move that folded a Teams relation into Audience in Process |
 | Support/Help as a property | Became a body section, with the vendor contact. Names and email addresses of people at the vendor are not workspace users and do not belong in a person field |
 | Help centre URL | The fourth URL column, and the least reached for. It goes in the body under Links |
 | Domain Usage, Field Mappings, GTM Fields, Customer Tasks | Pointed at databases that existed in one organisation only. The same treatment these got in the other three schemas |
@@ -518,7 +518,7 @@ a limit, goes in Notes.
   rule as a Technical Reference, and this row is more likely to tempt somebody
   because it already holds the login URL.
 - **A body running long means a Technical Reference is owed.** Write it in the
-  Process Library and relate it, rather than growing this page.
+  Process and relate it, rather than growing this page.
 - If there is no vendor because it is something you built, say so in place rather
   than deleting the section.
 
@@ -528,7 +528,7 @@ sections sit outside the count.
 **400 rather than 800 or 600**, and the reasoning is not that tools deserve fewer
 words. It is that this row is an index entry with a Technical Reference behind it,
 so length here is a signal that content is in the wrong place. Hitting the ceiling
-routes to writing the artifact, in the same way hitting the Process Library's
+routes to writing the artifact, in the same way hitting Process's
 ceiling routes to the granularity framework.
 
 **Related view:** the `Artifacts` relation. What documentation exists about this

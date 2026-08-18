@@ -78,7 +78,7 @@ check('a database that is not in the manifest is refused', () => {
 
 check('a second database for a name already recorded is refused, not overwritten', () => {
   // This is the one that stops a re-run quietly pointing config at a second
-  // Process Library and orphaning the first, which holds the user's rows.
+  // Process and orphaning the first, which holds the user's rows.
   reset()
   config.begin('parent-page')
   config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })

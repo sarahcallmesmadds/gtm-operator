@@ -65,7 +65,7 @@ prevent.
    unshared parent returns not-found rather than forbidden, which reads as a typo
    and is not one. Say which it is.
 5. **Nothing this install would create is already there.** Fetch the parent and
-   look. This is the check that stops a second Process Library appearing.
+   look. This is the check that stops a second Process appearing.
 
 If any fails, **say exactly what to do about it and stop.** Do not offer to
 continue with a subset.
@@ -79,8 +79,8 @@ assumes it landed.
 Cover, in this order:
 
 - **Each database and what it holds.**
-- **The line between Memos and the Process Library.** Memos is time-stamped
-  communication and append-only. The Process Library is living reference that is
+- **The line between Memos and Process.** Memos is time-stamped
+  communication and append-only. The Process is living reference that is
   maintained and kept true. **Everything else follows from this**, and somebody
   who misses it will put status updates in the library and process documentation
   in memos.

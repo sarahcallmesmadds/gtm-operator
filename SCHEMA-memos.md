@@ -20,7 +20,7 @@ change to both.
 
 ### The rule that decides everything else
 
-**Memos is time-stamped communication and append-only. The Process Library is
+**Memos is time-stamped communication and append-only. The Process is
 living reference.** A memo records what was said on a date. An artifact is
 maintained and kept true. Every field decision below follows from that one line.
 
@@ -57,12 +57,12 @@ carries the same three lines as a table of what may change and by what.
 | Period covered | Date range | optional, for anything summarising a stretch of time |
 | Corrects | Relation (self) | the memo this one corrects. Empty on almost everything |
 | Corrected by | Relation (self) | inverse of Corrects |
-| Artifacts | Relation to Process Library | what this memo announced, changed, or drew on. **Two-way, decided 2026-08-17.** The artifact carries `Memos` on the other side, so a reader on an artifact page can see what has been said about it |
+| Artifacts | Relation to Process | what this memo announced, changed, or drew on. **Two-way, decided 2026-08-17.** The artifact carries `Memos` on the other side, so a reader on an artifact page can see what has been said about it |
 | Projects | Relation | inverse of `Memos` on Projects. Updates and releases about a project. **No longer conditional, 2026-08-17.** `setup` creates all six databases before it adds any relation, so the target always exists |
 | Resulting Projects | Relation | inverse of `Problem Statement` on Projects. What was built in response to this problem. **Added 2026-08-17**, see below |
 | Created time | Created time | |
 
-**Every shared field reuses the Process Library's exact value list.** Two
+**Every shared field reuses Process's exact value list.** Two
 vocabularies for one concept is how filtering across the two databases stops
 working. If a value list changes, it changes in both.
 
@@ -71,7 +71,7 @@ word reinforces the append-only rule at the moment someone fills the field.
 
 **`Corrects` and `Corrected by`, added 2026-08-17.** The append-only rule says a
 correction is a new memo relating to the old one, and review found there was no
-relation capable of expressing that. `Artifacts` points at the Process Library
+relation capable of expressing that. `Artifacts` points at Process
 and `Projects` points at Projects, so neither could. A rule with no mechanism is
 not a rule.
 
@@ -110,7 +110,7 @@ the room. Their page bodies will not resemble each other. Do not re-merge them.
 | Dropped | Reason |
 |---|---|
 | Last checked for accuracy | A memo cannot go stale. It records what was said on a date, so freshness is meaningless, and keeping the field would invite `audit` to nag about documents that are correct by definition. This is the clearest line between the two databases |
-| Team Informed | The same job as Audience. Folded in, exactly as it was for the Process Library |
+| Team Informed | The same job as Audience. Folded in, exactly as it was for Process |
 | Software, Sprints, Eval Log, Brain Log | Pointed at databases that existed in one organisation only. The same treatment as Customer Tasks and MKT Projects |
 | Cx Funnel | Renamed to L2C Lifecycle, for one vocabulary across both databases |
 | Project Overview (a Type) | Its sections are Purpose, Objectives, Scope, Stakeholders, Success Criteria and Risks. That is a living project record, not a broadcast, and scope was already decided to live on the project rather than in Memos |
@@ -144,12 +144,12 @@ of this section.
 - **Every template ends on the reader, not the writer.** The last required
   section says what the reader must do, decide, or accept. A memo that only
   reports is a filing cabinet entry, and filing cabinet entries belong in the
-  Process Library.
+  Process.
 - **The outcome leads.** The first section is what happened or what is being
   asked, never the work that produced it.
 - **Five sections is the ceiling**, and four is better. The counts below are
   limits rather than targets.
-- **A section that does not apply says so in place.** Same rule as the Process
+- **A section that does not apply says so in place.** Same rule as Process
   Library: deleting it loses the fact that it was considered.
 - **Conditional sections are marked as such** and always come last.
 - **Nothing in the body is edited after publishing.** A correction is a new memo that
@@ -174,7 +174,7 @@ three the length belongs in a conditional section or in a linked artifact rather
 than in the memo body.
 
 **At the ceiling the skill asks rather than trims.** For a memo, running long
-usually means the detail belongs in a Process Library artifact that this memo
+usually means the detail belongs in a Process artifact that this memo
 should link to instead.
 
 ### Memo
@@ -306,8 +306,19 @@ session is one click away.
 **What it is.** The case that something is worth fixing, made before anyone
 proposes a fix.
 
-**Body sections, in order:** What's Happening, Who Feels It, Evidence, Cost Of
-Doing Nothing, Sources (conditional).
+**Body sections, in order:** What This Blocks, What's Happening, Who Feels It,
+Evidence, Cost Of Doing Nothing, Sources (conditional).
+
+**What This Blocks leads, added 2026-08-18, Sarah's call.** A problem statement
+drives work, so the first thing the reader needs is the business goal that is at
+risk, not the situation. It carries four things: the goal, where it stands now,
+who owns it, and the dated decision it holds up. Without the dated decision the
+problem has no urgency and sits unread.
+
+**Evidence has to be citable.** Every line names its source: the channel and date
+for a quote, the report or file for a number, and the person's role. A section
+also names what is missing and why that absence matters, because a gap in the
+evidence is often the finding.
 
 **Why it is built this way.** Kept from the reference almost unchanged, because
 it is the strongest of the original shapes. Cost Of Doing Nothing is the section

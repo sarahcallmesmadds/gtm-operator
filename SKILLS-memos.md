@@ -114,7 +114,7 @@ so is the record that it was withdrawn.
 
 | Field | Value |
 |---|---|
-| `Status` | `Published`. **`Draft` is only reachable by a person setting it in Notion**, because a skill that writes a draft has written nothing useful. Same rule as `Active` on the Process Library |
+| `Status` | `Published`. **`Draft` is only reachable by a person setting it in Notion**, because a skill that writes a draft has written nothing useful. Same rule as `Active` on Process |
 | `Published date` | today |
 | `Author` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
 
@@ -346,7 +346,7 @@ Recorded so the gaps read as decisions.
 |---|---|
 | `update` | Memos is append-only. This is the plugin's entire identity |
 | `backfill` | A memo is a record that something was communicated on a date. Manufacturing one afterwards forges a document. See the top of this file |
-| `audit` | A memo cannot go stale, so there is nothing to flag. The Process Library needs `audit` because an artifact is maintained and can quietly stop being true |
+| `audit` | A memo cannot go stale, so there is nothing to flag. The Process needs `audit` because an artifact is maintained and can quietly stop being true |
 | A separate skill per type | `new` carries the type tree, the same way `process:new` carries one for five types. Seven skills that differ only by template is seven places to fix one bug |
 
 **`meeting-notes` and `team-update` are separate from `new` for the same reason

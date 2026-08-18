@@ -5,7 +5,7 @@
  *
  * `~/.claude/gtm-operator.config.json`, named for the marketplace and not for a
  * plugin. Six plugins reading six config files is six chances for them to
- * disagree about which database is the Process Library.
+ * disagree about which database is Process.
  *
  * `setup` is the only thing that writes it. Everything else reads it.
  *
@@ -13,7 +13,7 @@
  * halfway leaves a file that says `creating`, which is what lets the next run
  * tell a retry from a mess. A config written only on success would leave a
  * half-built workspace with no record that anything had started, and the next
- * run would create a second Process Library beside the first.
+ * run would create a second Process beside the first.
  */
 
 const fs = require('fs')

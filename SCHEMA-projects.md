@@ -35,7 +35,7 @@ databases. A change to one is a change to all.
 | Timeline | Date range | start and target end |
 | Business outcome | Text | what success looks like in a sentence |
 | Problem Statement | Relation to Memos | **required by the skills, and surfaced when it is not.** Two-way, inverse `Resulting Projects` on Memos. See the review findings, and the Needs attention views in `SKILLS-setup.md` |
-| Artifacts | Relation to Process Library | what this project produced or changed |
+| Artifacts | Relation to Process | what this project produced or changed |
 | Memos | Relation | updates and releases about this project |
 | Calendar | Relation | inverse of `Project` on Calendar. What this project is putting in market, and when. Added 2026-08-17, see `SCHEMA-calendar.md` |
 | Tasks | Relation | |
@@ -110,7 +110,7 @@ Why a parent project does not work:
   Intake, Scoped, In progress, Done, so it sits in every filtered view forever
   and nothing computes its progress, because the rollup fields are dropped in
   v1 as derived.
-- **The Process Library parallel does not hold.** There, `Parent` carries a rule
+- **The Process parallel does not hold.** There, `Parent` carries a rule
   the plugin enforces: only a Strategy Decision can be a parent, so the
   hierarchy means something specific. Projects has no type distinction to hang a
   rule on, so nothing prevents a five-level tree, which is how project
@@ -123,7 +123,7 @@ field:
 
 1. **Domain**, eight controlled values. Grouping by function.
 2. **The Strategy Decision.** This is the better answer. A large effort's "why"
-   belongs in the Process Library as a Strategy Decision, and several projects
+   belongs in Process as a Strategy Decision, and several projects
    relating to it is exactly the grouping a parent was reaching for. It also
    puts the reasoning where it is maintained rather than in a project row nobody
    updates.
@@ -151,7 +151,7 @@ project hierarchy.
 ### Page body: Projects
 
 **What it is.** The scope document. `projects:scope` writes it, and scope lives
-here rather than in Memos or the Process Library because it is a working
+here rather than in Memos or Process because it is a working
 document rather than a broadcast.
 
 **Body sections, in order:** What We Are Building, Out Of Scope, Success
@@ -304,6 +304,6 @@ Same three lenses used on the Memos templates.
 - Success Criteria was originally written as "Objectives", which states an
   intention rather than a test. Renamed so it has to be checkable.
 - The reference carried both `Impact to Funnel` and `LOB impact` while the
-  Process Library already defined richer versions of both. Carrying a blunter
+  Process already defined richer versions of both. Carrying a blunter
   second copy of a field you have already designed is how cross-database views
   stop working.

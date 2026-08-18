@@ -96,7 +96,7 @@ check('the reverse properties Notion created are on the databases they belong to
   const fixture = recorded()
   // Two relations put a property called Calendar on two different databases,
   // which the manifest allows and which is worth seeing proved.
-  assert.ok(fixture.databases.process.schema.Calendar, 'Process Library has no Calendar')
+  assert.ok(fixture.databases.process.schema.Calendar, 'Process has no Calendar')
   assert.ok(fixture.databases.projects.schema.Calendar, 'Projects has no Calendar')
 })
 

@@ -1,13 +1,13 @@
 # software: what each skill does
 
-Part 3 for `software`. Four skills, in the same five slots as the other skill
+Part 3 for `software`. Five skills, in the same five slots as the other skill
 files: what it does, when it runs, what it reads and writes, what it does not do,
 and the judgment it carries.
 
 The database is defined in `SCHEMA-software.md`, which also names every field's
 fill event. This file does not restate a field name or a value list.
 
-Written 2026-08-17.
+Written 2026-08-17. `update` added and the names confirmed 2026-08-18.
 
 ---
 
@@ -28,11 +28,12 @@ Three more belong to this plugin.
 - **Never guess a person.** Four fields here are people. An agent guessing at an
   owner is worse than an empty field, because an empty field asks a question and a
   wrong one answers it.
-- **`Last reviewed` moves only when a review happened.** Not on a rename, not when
-  `contracts` reads the row, not when `backfill` creates it. This is the same
-  correction `process:update` needed on 2026-08-17, where fixing a typo was
-  resetting the review clock and suppressing the staleness warning for a whole
-  cadence period.
+- **`Last reviewed` moves only when a review happened.** Not on a rename, not on
+  anything else `update` does, not when `contracts` reads the row, not when
+  `backfill` creates it. **`review` is the only skill here that writes it.** This
+  is the same correction `process:update` needed on 2026-08-17, where fixing a
+  typo was resetting the review clock and suppressing the staleness warning for a
+  whole cadence period.
 
 ---
 
@@ -72,6 +73,86 @@ value. Writes one row and its body. Verifies the body wrote.
 2. **`Importance`, asked properly.** People inflate this, so the skill never asks
    how important a tool is. It asks what stops working and how quickly, and picks
    the value from the answer.
+
+---
+
+## update
+
+**What it does.** Changes the facts on a row that already exists, one row at a
+time.
+
+**When it runs.** Whenever something about a tool changes and somebody is willing
+to write it down. The vendor is acquired and the product renamed, a contract is
+extended or shortened, the cost moves at renewal, the owner leaves, the access
+list widens, the tool is dropped.
+
+**What it reads and writes.** Reads the row. Writes the properties and the body
+sections that changed, and shows a before and after first. **It never writes
+`Last reviewed`**, whatever it changed and however much of the row it touched.
+
+**What it does not do.**
+- **Never moves `Last reviewed`.** Not on a rename, not on a cost change, not on
+  a retirement. `review` is the only skill in this plugin that moves it. An edit
+  that resets the freshness stamp suppresses the staleness warning for a whole
+  cadence period, which is the same fault `process:update` was corrected for on
+  2026-08-17.
+- Does not create a row. That is `new`.
+- Does not delete or archive a tool that is gone. `Status` moves to `Retired` and
+  the row stays, which is what keeps the record of what was dropped.
+- Does not rewrite a body wholesale when one section is what changed.
+- Does not fill a person field the user did not name. An owner who left is
+  cleared or replaced by name, never guessed at, the same rule `new` carries.
+- Does not re-confirm anything it was not told about. It changes what it was
+  asked to change and leaves the rest of the row alone, including the parts that
+  are visibly stale. Fixing a cost is not a licence to tidy the security group.
+
+**The judgment it carries.** **Whether the thing in front of you is still the
+same thing.** Three cases arrive looking identical and only one of them is an
+edit.
+
+1. **A rename is an edit.** Same contract, same spend, same seat, new word. One
+   row, and see below for what has to survive it.
+2. **A replacement is two operations.** You stopped using one tool and started
+   using another. The old row goes to `Retired` here and the new one goes through
+   `new`, because it has its own contract, its own owner and its own answers to
+   the security group. Editing the old row into the new tool destroys the record
+   that you ever paid for the first one.
+3. **A merge is a retirement plus an edit.** Your vendor was folded into a
+   product you already have a row for. The absorbed row goes to `Retired`, the
+   surviving row picks up whatever it now covers, and **the spend lands on one of
+   them and not both**, or `contracts` reports a renewal that nobody owes.
+
+**Why it is a separate skill from `review`.** `update` changes facts you already
+know changed. `review` confirms a whole row is still true, and is the only thing
+that moves `Last reviewed`. Somebody correcting one cost should not have to sit
+through a four group sweep, and that friction at the exact moment somebody was
+willing to record something is what this skill removes.
+
+**This diverges from `process:update` on purpose.** There, an edit can count as
+having re-read the artifact, and on an explicit yes it moves all three
+verification fields. Here it never can, because a software review is not a
+re-read. It goes to the contract in Drive, to a spend source, and to whether the
+tool is actually connected, and no edit does any of that by accident.
+
+### What a rename does to the history
+
+**Nothing, and that is the decision.** Sarah's call, 2026-08-18. `Name` is the
+vendor's own spelling, so an acquired and renamed product gets the page renamed
+and that is the whole operation. No former name is kept, and no property is added
+to keep one in.
+
+**The cost, accepted.** The duplicate check matches on the name, so a `backfill`
+re-run that meets an invoice still issued under the old name will offer the tool
+as a candidate again. **That is one "no" at the approval gate**, the same cost as
+any other junk candidate, because backfill never writes without approval. It
+becomes a second row for the same contract only if somebody approves it.
+
+**So the whole rename is two things: the page name, and the URLs.** An acquired
+product moves domain, so `Login`, `Documentation` and `Status page` are updated
+in the same pass and the skill asks about all three. Nothing else moves. The
+contract group in particular does not: an acquisition does not change terms
+already signed, and the new terms arrive at the next renewal, which is
+`contracts` and then `review`.
 
 ---
 
@@ -206,7 +287,7 @@ The defaults lean closed, and the user sets the scope.
 
 **The duplicate check runs before a candidate is offered**, using the same
 mechanism `new` uses. That is what makes backfill safe to re-run, and it matters
-more here than in the Process Library, because new receipts arrive every month.
+more here than in Process, because new receipts arrive every month.
 
 **The judgment it carries.** What counts as evidence that you use a tool. A
 receipt is strong. A product announcement is weaker, because vendors email people

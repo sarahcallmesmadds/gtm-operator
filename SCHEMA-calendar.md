@@ -111,7 +111,7 @@ template on a numerous row guarantees blank rows.
 | Owner | Person | one accountable person |
 | Link | URL | the registration page, the published post, the event site |
 | Project | Relation to Projects | optional, see below |
-| Artifacts | Relation to Process Library | inverse of `Calendar` there. The playbook, the run of show |
+| Artifacts | Relation to Process | inverse of `Calendar` there. The playbook, the run of show |
 | Created time | Created time | |
 
 **Three fields apply to one type only**, and that is deliberate rather than
@@ -253,7 +253,7 @@ here rather than left to be inferred.
 | Segment | **External.** Who it is aimed at, by size or vertical |
 | L2C Lifecycle | **External.** Where in the customer journey it lands |
 
-`Audience` keeps the meaning it has in the Process Library and Memos, which is
+`Audience` keeps the meaning it has in Process and Memos, which is
 which internal teams need to know. Redefining a shared field for one database is
 how a cross-database view stops working.
 
@@ -329,7 +329,7 @@ enough that a heavy template guarantees blanks.
 ### Calendar
 
 **What it is.** The working page for one thing that is going out. Light by design,
-because the depth belongs in the related project or in a Process Library artifact.
+because the depth belongs in the related project or in a Process artifact.
 
 **Body sections, in order:** What It Is, Why We Are Doing It, What We Need To Do
 (conditional), How It Went (conditional).
