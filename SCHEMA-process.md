@@ -1,6 +1,6 @@
-# Process Library: schema and templates
+# Process: schema and templates
 
-**This file defines the Process Library.** Field names, property types, allowed
+**This file defines Process.** Field names, property types, allowed
 values and option order live here and nowhere else. Anything in another document
 that restates them is a copy, and copies drift.
 
@@ -16,7 +16,7 @@ both. A change to one is a change to both.
 
 ---
 
-## Part 1: Process Library schema
+## Part 1: Process schema
 
 ### Fields
 
@@ -76,7 +76,7 @@ is during setup, which is the worst possible moment.
 
 ### Self-relations have the same problem
 
-`Parent`, `Child Docs`, `Supersedes` and `Superseded By` all point at the Process
+`Parent`, `Child Docs`, `Supersedes` and `Superseded By` all point at Process
 Library itself, and its id does not exist until it has been created. **Setup is
 therefore two stage**, and this was missed when the rule above was first written:
 
@@ -273,7 +273,7 @@ judgment call and getting it wrong archives a live doc.
 `audit` can flag candidates it finds later (two Active Strategy Decisions on the
 same question with different answers) but only flags, never writes.
 
-**Why this is a second page rather than an edit.** Everywhere else in the Process
+**Why this is a second page rather than an edit.** Everywhere else in Process
 Library, a change is an edit, because the library is living reference. This one
 case is not, for three reasons. The Why This Approach section is the whole point
 of the type, and overwriting it destroys the record of what was decided before and

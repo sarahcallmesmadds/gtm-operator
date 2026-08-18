@@ -93,7 +93,7 @@ types file. Writes no content rows.
 4. **The chosen parent page is reachable by this connection.** An unshared parent
    returns not-found rather than forbidden, which reads as a typo and is not one.
 5. **Nothing this install would create is already there**, which is the check that
-   stops a second Process Library appearing.
+   stops a second Process appearing.
 
 If any of them fails, say exactly what to do about it and stop.
 
@@ -106,8 +106,8 @@ teach the model rather than impose it, and it is the only moment a user is
 guaranteed to be paying attention. It covers:
 
 - The six databases and what each holds.
-- **The line between Memos and the Process Library.** Memos is time-stamped
-  communication and append-only. The Process Library is living reference that is
+- **The line between Memos and Process.** Memos is time-stamped
+  communication and append-only. The Process is living reference that is
   maintained and kept true. Everything else follows from that, and someone who
   misses it will put status updates in the library and process documentation in
   memos.
@@ -179,7 +179,7 @@ four times is how it drifts:
 > property entirely** rather than writing an empty value. No skill asks the user
 > for it at write time, and no skill fails because of it.
 
-This covers `Owner` and `Verified by` on the Process Library, `Author` on Memos,
+This covers `Owner` and `Verified by` on Process, `Author` on Memos,
 and every person field on Software and Tasks. **Where a skills file lists a person
 field in its "always sets without asking" table, "always" means whenever there is
 a person id**, and each of those tables now says so.
@@ -281,8 +281,8 @@ the design stated them as if they could:
 | `Problem Statement` is required | Projects | Nothing. A project can be saved without one | A `Needs attention` view |
 | `Project` is required | Tasks | Nothing. An orphan task is invisible from every project | A `Needs attention` view |
 | `Date` is required from `Confirmed` onwards | Calendar | Nothing. A confirmed row can have no date | A `Needs attention` view |
-| `Tags` capped at 3 | Process Library, Memos | Nothing. Multi-select has no maximum | `check`, step 8 |
-| Only a Strategy Decision may be a parent | Process Library | Nothing. Any row can be any row's parent | `check`, step 8 |
+| `Tags` capped at 3 | Process, Memos | Nothing. Multi-select has no maximum | `check`, step 8 |
+| Only a Strategy Decision may be a parent | Process | Nothing. Any row can be any row's parent | `check`, step 8 |
 
 The skills comply. A person clicking New in Notion does not, and that is the
 common case, not the edge case.
@@ -306,7 +306,7 @@ already reports what it finds without fixing it. The cost is honest and worth
 naming: a violation of those two is invisible until somebody runs `check`, where
 the other three are sitting in Notion where a person will see them. **The
 alternative was three new properties existing only to make a rule filterable**, a
-counting formula on two databases and a copy of the parent's type on the Process
+counting formula on two databases and a copy of the parent's type on Process
 Library, and adding fields to carry a rule is what rounds 2 and 3 both declined to
 do elsewhere.
 
@@ -414,7 +414,7 @@ an explicit yes, and only to repair. Never touches a content row.
    failure.** A recorded id that no longer resolves is a real finding.
 7. Every relation still points at the database it should.
 8. **The two rules no view can watch.** Rows carrying more than three `Tags`, in
-   the Process Library and in Memos. Rows in the Process Library whose `Parent` is
+   Process and in Memos. Rows in Process whose `Parent` is
    not a Strategy Decision. Both are queried and counted here because Notion
    cannot filter for either, see the rules table above. **`check` reports them and
    never fixes them**, because both are content a person wrote and the line this
@@ -496,7 +496,7 @@ properties only. Every relation is added afterwards, once all six ids exist.
 
 ```
 Phase A   create six databases, non-relation properties, option order set
-          1. Process Library
+          1. Process
           2. Memos
           3. Projects
           4. Tasks
@@ -540,8 +540,8 @@ view on the target page.
 
 | # | What it links | Source | Property there | Property on the target | Kind |
 |---|---|---|---|---|---|
-| 1 | A doc to its parent decision | Process Library | `Parent` | `Child Docs` | Two-way, self |
-| 2 | A decision to the one it replaced | Process Library | `Supersedes` | `Superseded By` | Two-way, self |
+| 1 | A doc to its parent decision | Process | `Parent` | `Child Docs` | Two-way, self |
+| 2 | A decision to the one it replaced | Process | `Supersedes` | `Superseded By` | Two-way, self |
 | 3 | A memo to the one it corrects | Memos | `Corrects` | `Corrected by` | Two-way, self |
 | 4 | A memo to what it is about | Memos | `Artifacts` | `Memos` | Two-way |
 | 5 | A project to its problem statement | Projects | `Problem Statement` | `Resulting Projects` | Two-way |
@@ -576,7 +576,7 @@ means naming both sides, and one name cannot do it. The document doing the
 replacing carries `Supersedes` and the one being replaced carries `Superseded By`.
 Decided 2026-08-17. `SCHEMA-process.md` has been updated.
 
-**Four databases point at the Process Library and all four call it `Artifacts`.**
+**Four databases point at Process and all four call it `Artifacts`.**
 Memos, Projects, Software and Calendar each carry a property of that name, and the
 library carries one back named after the database: `Memos`, `Projects`,
 `Software`, `Calendar`. The
@@ -608,7 +608,7 @@ fills them.
 One file at `~/.claude/gtm-operator.config.json`, for the whole marketplace.
 
 **Named for the marketplace, not for a plugin.** Six plugins reading six config
-files is six chances for them to disagree about which database is the Process
+files is six chances for them to disagree about which database is Process
 Library.
 
 ```
@@ -640,7 +640,7 @@ creating pages and defining relation targets all need a `data_source_id`. Setup
 resolves and stores both, and records which data source it chose, so a second one
 appearing later does not silently break `new`, `find` and `audit`.
 
-**Config holds identifiers. The Process Library holds judgment.** Database ids
+**Config holds identifiers. The Process holds judgment.** Database ids
 and names go here. The rules an organisation decided live in the library as
 artifacts, in a form both a person and a skill can read.
 

@@ -179,6 +179,101 @@ reads back as `file`, another type that does not round-trip under the name it is
 written with, alongside `RICH_TEXT` reading back as `text` and `PEOPLE` as
 `person`.
 
+### `software:review` checks what it can before it asks anything
+
+**As designed it confirmed nothing.** It walked four groups of questions, took
+the answers, and stamped `Last reviewed`. The only thing it verified was that
+somebody answered, which is a date stamp for talking to yourself.
+
+**So it reads first, then asks about the remainder.**
+
+| Group | Confirmed from |
+|---|---|
+| Contract dates, cost, notice deadline, renewal terms | The contract in Drive, via `Contract link` |
+| Still being paid for | A card or banking source, and invoices in the mailbox |
+| AI access | Whether the tool is actually connected |
+| Owner, SSO, PII, still in use | Nothing. These stay questions, because there is no source |
+
+It shows what disagrees with the row rather than correcting it, the same way
+`backfill` offers candidates rather than writing them.
+
+**Spend sources: Ramp or Brex**, Sarah's call 2026-08-18.
+
+**Neither is connected on this machine today.** QuickBooks and Mercury are, and
+both answer the same question, so the spec should name the source as a
+configurable thing rather than hard-coding one vendor. Which sources are actually
+available is a `setup` question, alongside the call recorder.
+
+### The five `software` skills, and the line between `review` and `update`
+
+**Confirmed 2026-08-18**, read out one at a time and taken as a set: `new`,
+`update`, `review`, `contracts`, `backfill`. Four of them existed and `update` is
+the addition.
+
+**The boundary, also hers:**
+
+- **`update` changes facts you already know changed**, one row at a time, and
+  **never writes `Last reviewed`.**
+- **`review` confirms a whole row is still true**, and is **the only skill in the
+  plugin that writes `Last reviewed`.**
+
+**Why it needed settling.** `review` was written when it was the only way to
+change anything on a row, so it was doing `update`'s job as well and the two
+overlapped with nothing dividing them. The split keeps the existing rule intact,
+the one saying the review clock moves only when a review actually happened, and
+it gives somebody correcting a cost a path that is not a four group sweep.
+
+**It diverges from `process:update` deliberately.** There an edit can count as
+having re-read the artifact, and on an explicit yes it moves all three
+verification fields. Here it never can, because a software review reads the
+contract in Drive, a spend source and whether the tool is connected, and no edit
+does any of that in passing.
+
+**Spec written** in `SKILLS-software.md`, including what a rename does to the
+history, which is the question retirement never raised.
+
+### A rename is a rename, and nothing records the old name
+
+**Decided 2026-08-18, hers.** A tool acquired and renamed gets its page renamed
+and its `Login`, `Documentation` and `Status page` URLs updated, because an
+acquired product moves domain. That is the whole operation. **No former name is
+kept and no property is added to hold one.**
+
+**The alternative was a text property**, `Also known as`, so the old name stayed
+somewhere a query could reach. It was turned down as overbuilt, and the schema
+stays at twenty-eight fields.
+
+**The cost, accepted.** The duplicate check matches on the name, so a `backfill`
+re-run meeting an invoice still issued under the old name offers the tool as a
+candidate again. That is one "no" at the approval gate, the same as any other
+junk candidate, because backfill never writes without approval. It only becomes a
+second row for the same contract if somebody approves it.
+
+### Status ships as a select, and the user converts it by hand
+
+**Measured 2026-08-18.** The API creates a status property but cannot create or
+rename its options. Both forms are rejected at the parser:
+
+- `ALTER COLUMN "Status" SET STATUS('Draft':yellow, ...)` -> 400
+- `ADD COLUMN "X" STATUS('Draft':yellow, ...)` -> 400
+
+Converting without options succeeds and silently replaces the option list with
+Notion's defaults, Not started / In progress / Done. That is wrong for four of
+the six databases and it discards values the design chose.
+
+**So install ships every Status as a select carrying the right values**, and
+`POST-INSTALL.md` tells the user to convert each one and where each option goes
+in the three status groups.
+
+**Tasks is the exception and ships as a status property.** `Percent complete` on
+Projects rolls up task status by group, and group rollups exist only for status
+properties. The user adds the two options the default list is missing.
+
+**The same limit applies to page layout.** Property grouping, tabs and the
+sidebar are UI only. The API reaches the schema and the view configuration and
+nothing else. This is the other half of `POST-INSTALL.md`, and it is owed
+screenshots that do not exist yet.
+
 ### `calendar:new` checks for duplicates as well as clashes
 
 It already showed what else was aimed at a similar audience in the same window.
@@ -242,7 +337,7 @@ Sarah's order, set 2026-08-07. Do not skip ahead.
 3. **What each skill does.** Only after 1 and 2, because by then we know which
    properties get filled and by whom.
 
-After the Process Library schema is settled, do the **Memos** schema the same
+After Process schema is settled, do the **Memos** schema the same
 way. The Projects and Tasks schema belongs to `projects`.
 
 **Scope discipline:** finish the full detailed plan for `process` before
@@ -274,7 +369,7 @@ negotiate.
 
 ## Naming
 
-- The thing is the **Process Library**. Not Documentation Library, not Docs Library.
+- The thing is the **Process**. Not Documentation Library, not Docs Library.
 - Its rows are **artifacts**. The Type field holds **artifact types**.
 - The communications log is **Memos**. Never "the Updates DB". This supersedes
   the 2026-07-17 note in the reference database inventory proposal, which had
@@ -293,7 +388,7 @@ own setup. That is replaced by the structure below.
 | Plugin | Owns | Status of the design |
 |---|---|---|
 | `setup` | Creates every database | Designed, `SKILLS-setup.md` |
-| `process` | Process Library | Schema done, 5 skills done |
+| `process` | Process | Schema done, 5 skills done |
 | `memos` | Memos | Schema done, skills not started |
 | `projects` | Projects and Tasks | Schema done, 6 skills done |
 | `software` | Software | Schema done, skills not started |
@@ -334,7 +429,7 @@ Every hard problem the design hit came from setup being duplicated:
 
 - Two setups both creating Memos, unable to find each other's
 - A shared registry file invented to solve that
-- `scope` having to check whether the Process Library was even installed
+- `scope` having to check whether Process was even installed
 - Four Memos types belonging to no plugin
 
 One setup that creates every database removes all four. Everything downstream
@@ -384,7 +479,7 @@ creates it. This reverses "v1 has no Software directory" and the `Software`
 relation being listed as planned rather than shipped.
 
 Three places had disagreed: the two-tier table listed `software` as tier one, the
-Process Library schema said the relation was not created in v1, and the cut list
+Process schema said the relation was not created in v1, and the cut list
 said there was no Software directory. The two-tier architecture wins.
 
 **Follow-on:** SOP, Reporting and Technical Reference revert to Software related
@@ -422,7 +517,7 @@ Split out on 2026-08-17 so they are findable and so nothing has to retype them.
 
 | File | Holds |
 |---|---|
-| `SCHEMA-process.md` | Process Library fields, every value list, the rolldown and superseded rules, the granularity framework, the type-selection tree, and the five page body templates |
+| `SCHEMA-process.md` | Process fields, every value list, the rolldown and superseded rules, the granularity framework, the type-selection tree, and the five page body templates |
 | `SCHEMA-memos.md` | Memos fields, every value list, the seven page body templates, and what the three review passes changed |
 | `SCHEMA-projects.md` | Projects and Tasks fields, every value list, both page body templates, and what the three review passes changed. Both belong to `projects`, which creates them together |
 | `SCHEMA-software.md` | Software fields, every value list, the one page template, how rows get created including `software:backfill`, and what was taken from the reference spec and what was not. Belongs to `software` |
@@ -718,11 +813,11 @@ are copied in or referenced from `infra-plugins`.
 
 ## The central idea
 
-**Config holds identifiers. The Process Library holds judgment.**
+**Config holds identifiers. The Process holds judgment.**
 
 Database ids and property names go in `config.json`. The rules the organisation
 decided (a campaign record type by member status grid, an operating-context
-artifact) live in the Process Library as artifacts, in a form both a person and a
+artifact) live in Process as artifacts, in a form both a person and a
 skill can read. Other plugins read those artifacts at runtime.
 
 ---
@@ -785,7 +880,7 @@ assumes a planning cadence most installers do not have.
 2. Clean, enrich, dedupe and match into the CRM as contacts or leads, and accounts.
 3. Set the CRM fields the org requires. Captured at setup, confirmed at run time.
 4. Create or match a campaign and set member statuses **by following a process doc
-   from the Process Library** rather than hardcoding the grid.
+   from Process** rather than hardcoding the grid.
 5. Import, and confirm account and contact owners where no routing exists.
 
 ---

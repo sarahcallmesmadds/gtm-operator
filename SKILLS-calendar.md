@@ -118,7 +118,7 @@ is the failure this design has caught twice already.
 the row is finished.
 
 **When it runs.** Constantly. Dates move, statuses advance, owners change. On this
-database edits vastly outnumber creates, in the same way they do in the Process
+database edits vastly outnumber creates, in the same way they do in Process
 Library.
 
 **What it reads and writes.** Reads the row. Writes the changed properties and

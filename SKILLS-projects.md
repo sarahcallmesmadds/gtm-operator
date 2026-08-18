@@ -38,7 +38,7 @@ sources actually opened. Two more are specific to this plugin.
   | `Published date` | Today. This is what `process:audit` reads, so it is not optional |
   | `Author` | The user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
   | `Projects` | The related project, when there is one. `problem-statement` may have none |
-  | `Artifacts` | Any Process Library artifact this announced or changed. **`ship` in particular sets this**, since a release usually changes an SOP, and it is what makes the audit signal work |
+  | `Artifacts` | Any Process artifact this announced or changed. **`ship` in particular sets this**, since a release usually changes an SOP, and it is what makes the audit signal work |
   | `Domain` | Inherited from the project when there is one, otherwise asked |
   | `Audience`, `Segment`, `L2C Lifecycle`, `Tags` | Offered in the preview, never invented, left empty rather than guessed |
   | `Period covered` | Not used by this plugin. It belongs to Team Update |
@@ -199,12 +199,12 @@ enforces nothing, so a project made by hand can have none, and `setup` builds a
 things, in this order:
 
 1. **What already exists, checked before scoping rather than after.** Search the
-   Projects database, and the Process Library, which is always there. Every hit
+   Projects database, and Process, which is always there. Every hit
    becomes an Out Of Scope line reading "already exists". This is the single
    largest source of trimming, and it is why context comes first: a competent
    scoper over-scopes *because* they lack context, not despite expertise.
    **No longer conditional as of 2026-08-17.** This previously hedged, because
-   two plugins each created their own databases and the Process Library might be
+   two plugins each created their own databases and Process might be
    absent. One `setup` creates every database in the foundation, so it is always
    there and `scope` can rely on it.
 2. **The smallest version that proves it.** A required sentence inside What We

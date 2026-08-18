@@ -14,7 +14,7 @@
  * purpose and asserts the right complaint comes out.
  *
  * The fixture is not invented. It is the schema Notion actually returned when
- * this plugin created the Process Library in a live workspace.
+ * this plugin created the Process in a live workspace.
  *
  * Run: node tests/schema-verify.test.js
  */
@@ -26,7 +26,7 @@ const ROOT = path.join(__dirname, '..')
 const schema = require(path.join(ROOT, 'plugins/setup/scripts/schema.js'))
 
 const clean = () => {
-  const f = JSON.parse(JSON.stringify(require('./fixtures/process-library-as-notion-returned-it.json')))
+  const f = JSON.parse(JSON.stringify(require('./fixtures/process-as-notion-returned-it.json')))
   delete f._comment
   return f
 }

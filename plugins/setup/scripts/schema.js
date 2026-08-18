@@ -71,12 +71,12 @@ const TAGS = [
 
 const DATABASES = {
   /**
-   * The Process Library. Living reference that is maintained and kept true, as
+   * Process. Living reference that is maintained and kept true, as
    * against Memos, which is time-stamped communication and append-only. Every
    * other decision in this database follows from that line.
    */
   process: {
-    title: 'Process Library',
+    title: 'Process',
     properties: [
       { name: 'Name', type: 'title' },
       { name: 'Description', type: 'text', note: 'one sentence' },
@@ -130,8 +130,8 @@ const DATABASES = {
   },
 
   /**
-   * Memos. Time-stamped communication, append-only. The counterpart to the
-   * Process Library and the line everything else in the design follows from.
+   * Memos. Time-stamped communication, append-only. The counterpart to
+   * Process and the line everything else in the design follows from.
    *
    * Append-only is narrower than it sounds: the body and content properties are
    * immutable after publication, Published to Canceled is the one permitted

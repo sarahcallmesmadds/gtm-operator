@@ -30,7 +30,7 @@
  * whole reason the phases are split.
  */
 const DATABASES = [
-  { key: 'process',  title: 'Process Library', plugin: 'process'  },
+  { key: 'process',  title: 'Process', plugin: 'process'  },
   { key: 'memos',    title: 'Memos',           plugin: 'memos'    },
   { key: 'projects', title: 'Projects',        plugin: 'projects' },
   { key: 'tasks',    title: 'Tasks',           plugin: 'projects' },
