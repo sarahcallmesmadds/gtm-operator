@@ -275,7 +275,13 @@ const DATABASES = {
         ['Automatically', 'red'], ['Manually', 'green'], ['No renewal', 'gray'], ['Unknown', 'yellow']
       ] },
       { name: 'Annual cost', type: 'number' },
-      { name: 'Contract link', type: 'url' },
+      // The description is deliberate and it is the answer to a measurement.
+      // A PDF in Drive can be read through this link. A PDF uploaded into Notion
+      // cannot: the download refuses binaries and the read-back gives no URL
+      // anything can fetch. So the property stays a URL, and the description is
+      // where a person finds that out, rather than a document nobody opens.
+      { name: 'Contract link', type: 'url',
+        description: 'Put the contract PDF in Google Drive and paste the link here. Claude can read the contract through this link. A file uploaded straight into Notion cannot be read.' },
 
       // Risk and surface
       { name: 'AI access', type: 'multi_select', options: [
@@ -407,6 +413,25 @@ function optionList (property) {
 }
 
 /**
+ * The `COMMENT` clause for a property that carries a description.
+ *
+ * Notion shows this under the property name when somebody clicks it, which makes
+ * it the only place in this whole design where a rule reaches a person at the
+ * moment they are breaking it. Measured 2026-08-18: `COMMENT 'text'` is accepted
+ * on a column and comes back as that property's `description`.
+ *
+ * `note` is a different thing and is not emitted. Notes are for whoever is
+ * reading this file; a description is for whoever is filling in the row.
+ */
+function comment (property) {
+  if (!property.description) return ''
+  if (property.description.includes("'")) {
+    throw new Error(`${property.name}: a description cannot contain an apostrophe, which the DDL quoting cannot carry`)
+  }
+  return ` COMMENT '${property.description}'`
+}
+
+/**
  * Build the CREATE TABLE statement for one database.
  *
  * Relations are deliberately absent. They belong to phase B and cannot be
@@ -424,7 +449,7 @@ function createStatement (key) {
     const render = DDL_TYPE[p.type]
     if (!render) throw new Error(`${db.title}.${p.name}: unknown property type "${p.type}"`)
     if (p.name.includes('"')) throw new Error(`${db.title}.${p.name}: a property name cannot contain a double quote`)
-    return `"${p.name}" ${render(p)}`
+    return `"${p.name}" ${render(p)}${comment(p)}`
   })
 
   const titles = db.properties.filter(p => p.type === 'title')
@@ -488,6 +513,18 @@ function verify (key, actual, alsoExpected = []) {
     const expected = READ_BACK_AS[want.type] || want.type
     if (got.type !== expected) {
       problems.push(`${db.title}.${want.name}: expected type ${expected}, got ${got.type}`)
+    }
+
+    // Checked only when the read-back actually carries the field. A real fetch
+    // always does, returning "" where there is none. A partial transcription may
+    // not, and reporting a missing description against a recording that never
+    // captured one would be complaining about the record rather than the row.
+    if (want.description && 'description' in got && got.description !== want.description) {
+      problems.push(
+        `${db.title}.${want.name}: the description does not match.\n` +
+        `    wanted: ${want.description}\n` +
+        `    got:    ${got.description || 'nothing'}`
+      )
     }
 
     if (want.options) {

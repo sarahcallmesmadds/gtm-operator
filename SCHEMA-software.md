@@ -69,7 +69,7 @@ how the table view should be arranged, not a property of Notion.
 | Notice deadline | Date | the date by which you have to cancel to get out |
 | Renews | Select | 4 values, see below |
 | Annual cost | Number | currency format. What a year costs, see below |
-| Contract link | URL | where the agreement itself lives |
+| Contract link | URL | where the agreement itself lives. Carries a property description, see below |
 | **Risk and surface** | | |
 | AI access | Multi-select | 6 values, see below |
 | Stores PII | Select | 4 values, see below |
@@ -215,6 +215,32 @@ The reference's rule was that the record never owns data another system owns, so
 spend was a link to the finance system and never a number in Notion. That rule is
 right where a finance system exists. Here it usually does not, and a link to
 nothing is not more honest than a number, it is just emptier.
+
+### `Contract link` carries a property description, and it is the only one that does
+
+Notion shows a property's description when somebody clicks the property, which
+makes it the one place in this design where a rule reaches a person at the moment
+they are filling the field in. Every other rule lives in a document.
+
+The text is:
+
+> Put the contract PDF in Google Drive and paste the link here. Claude can read
+> the contract through this link. A file uploaded straight into Notion cannot be
+> read.
+
+**It says what to do and why, because the why is not guessable.** Measured
+2026-08-18: a PDF stored in Google Drive can be read in full, and a PDF uploaded
+into Notion cannot. The download refuses binary files, and reading the page back
+gives a reference nothing can fetch. A person putting the contract in the
+"obvious" place would produce a row that looks like it carries the agreement and
+can answer nothing about it.
+
+**This is why the property stays a URL** rather than becoming Files & media. The
+only thing that type adds is the ability to hold an upload, and an upload is the
+one form nothing can read.
+
+**Proved on a live workspace**, not just generated: the statement was sent, and
+the description came back on the property word for word.
 
 **So `Annual cost` is a number and `Contract link` is where the agreement lives.**
 The number answers what we spend, which is the question people ask. The link is

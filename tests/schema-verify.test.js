@@ -193,6 +193,71 @@ check('no relation is also declared as a phase A property', () => {
   assert.strictEqual(problems.length, 0, problems.join('\n'))
 })
 
+console.log('\nproperty descriptions\n')
+
+check('a description is emitted as a COMMENT, which is what Notion stores', () => {
+  // Proved against a live workspace 2026-08-18: this exact clause came back as
+  // the property's description, word for word.
+  const ddl = schema.createStatement('software')
+  assert.ok(ddl.includes("COMMENT 'Put the contract PDF in Google Drive"), ddl.slice(0, 200))
+})
+
+check('a property with no description gets no COMMENT', () => {
+  assert.ok(!schema.createStatement('tasks').includes('COMMENT'))
+})
+
+check('a note is not a description, and is never sent', () => {
+  // schema.js carries notes for whoever is reading it. Emitting those would put
+  // remarks like "skipped when there is no personId" in front of a user.
+  const ddl = schema.createStatement('process')
+  assert.ok(!ddl.includes('skipped when there is no personId'))
+})
+
+check('an apostrophe in a description is refused rather than breaking the quoting', () => {
+  const broken = JSON.parse(JSON.stringify(schema.DATABASES.tasks))
+  const original = schema.DATABASES.tasks.properties
+  schema.DATABASES.tasks.properties = [
+    ...original.filter(p => p.type === 'title'),
+    { name: 'Bad', type: 'url', description: "the vendor's own copy" }
+  ]
+  try {
+    assert.throws(() => schema.createStatement('tasks'), /cannot contain an apostrophe/)
+  } finally {
+    schema.DATABASES.tasks.properties = original
+    void broken
+  }
+})
+
+check('a description that came back different is caught', () => {
+  const broken = clean()
+  broken.Description.description = 'something else entirely'
+  const want = schema.DATABASES.process.properties.find(p => p.name === 'Description')
+  const had = want.description
+  want.description = 'one sentence describing the artifact'
+  try {
+    const problems = schema.verify('process', broken)
+    assert.ok(problems.join('\n').includes('the description does not match'), problems.join('\n'))
+  } finally {
+    if (had === undefined) delete want.description
+    else want.description = had
+  }
+})
+
+check('a read-back that never recorded descriptions is not complained about', () => {
+  // The full-install fixture was transcribed without them. Reporting a missing
+  // description there would be complaining about the recording, not the row.
+  const partial = clean()
+  for (const p of Object.values(partial)) delete p.description
+  const want = schema.DATABASES.process.properties.find(p => p.name === 'Description')
+  want.description = 'one sentence describing the artifact'
+  try {
+    const problems = schema.verify('process', partial)
+    assert.ok(!problems.join('\n').includes('description'), problems.join('\n'))
+  } finally {
+    delete want.description
+  }
+})
+
 console.log(failures === 0
   ? `\nAll checks passed. ${schema.defined().length} databases, ${schema.defined().reduce((n, k) => n + schema.DATABASES[k].properties.length, 0)} properties.\n`
   : `\n${failures} check(s) failed.\n`)
