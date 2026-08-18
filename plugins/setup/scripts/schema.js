@@ -459,8 +459,15 @@ const READ_BACK_AS = {
  * is not evidence of anything. Reading the result back and comparing it is.
  *
  * `actual` is the `schema` object from the data source state Notion returns.
+ *
+ * `alsoExpected` is the names of properties that belong on the database without
+ * being in this file: the relation properties, which phase B adds and which
+ * live in `manifest.js` because they cannot be created with the database. Pass
+ * them after phase B has run. Leave them out and every one of them is reported
+ * as a property somebody else added, which would turn a correct install into a
+ * page of complaints.
  */
-function verify (key, actual) {
+function verify (key, actual, alsoExpected = []) {
   const db = DATABASES[key]
   if (!db) throw new Error(`No schema defined for "${key}"`)
 
@@ -503,7 +510,7 @@ function verify (key, actual) {
 
   // Extra properties are reported and never removed. They may be the user's,
   // and this plugin repairs what it owns and never touches what the user wrote.
-  const wantedNames = new Set(db.properties.map(p => p.name))
+  const wantedNames = new Set([...db.properties.map(p => p.name), ...alsoExpected])
   for (const name of Object.keys(actual)) {
     if (!wantedNames.has(name)) problems.push(`${db.title}.${name}: present in Notion and not in the schema. Reported, not removed`)
   }

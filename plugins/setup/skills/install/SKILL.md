@@ -1,7 +1,7 @@
 ---
 name: install
-description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is the settings path: it creates nothing and offers to change the five answers.
-allowed-tools: Read, Bash(node:*)
+description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is the settings path: it creates nothing and offers to change the five answers.
+allowed-tools: Read, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
 ---
 
 # install
@@ -11,6 +11,27 @@ the user's to decide, create everything, and write config.
 
 **Nothing else in this marketplace creates a database and nothing else writes
 config.** If you are reading this from another plugin, you are in the right place.
+
+## How this skill works
+
+**`scripts/install.js` decides what to send. You send it.** The Notion calls go
+through the connected client, which a script cannot reach, so the script builds
+every payload and checks every answer, and you make the calls in between.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" plan      # the whole run, in order
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" phase-a   # what to create
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" phase-b   # the relation statements
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" views     # the view calls
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status    # where this run has got to
+```
+
+**Do not compose a statement, a filter or a count by hand.** Not the DDL, not the
+`ADD COLUMN`, not the view `configure` string, not the number of anything. Every
+one of them is generated, and every one of them has been checked against a live
+workspace in a form the generator produces. A hand-written filter is how the
+2026-08-18 measurement happened: `"today"` looks reasonable, parses, saves, reads
+back correctly and matches nothing.
 
 ## Before anything: what this skill is allowed to do
 
@@ -22,23 +43,6 @@ it.
 So there is exactly one confirmation gate, at step 4, and it covers everything.
 Do not create anything before it. Do not ask for a second yes after it.
 
-## The manifest is the source of truth
-
-Everything this skill creates is defined in `scripts/manifest.js`. Read it, and
-derive from it. **Do not write a count, a database name, a property name or a
-relation into your output by hand**, and do not carry one over from an earlier
-run in the conversation.
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/manifest.js" --summary
-```
-
-This is not a style preference. Three review rounds of the design found six
-counts that had gone stale, every one of them a number somebody wrote in a
-sentence beside the thing it counted, correct on the day and wrong a week later.
-The manifest exists so there is one copy. Adding a second copy in the transcript
-is the same bug in a shorter-lived medium.
-
 ---
 
 ## Step 0. Refuse to start without what it needs
@@ -48,20 +52,20 @@ because an earlier version checked authentication alone, passed, and then failed
 halfway through creating databases, which is the exact failure it was meant to
 prevent.
 
-1. **The connection authenticates.**
+1. **The connection authenticates.** Fetch `self`.
 2. **The client can actually do views.** The pinned wire version proves nothing
-   about the installed client. Check that the client exposes the view calls.
-   Calendar's views are most of what gets built, so discovering this halfway
-   means an install that got most of the way and cannot finish.
+   about the installed client. Check that the view calls are exposed. Calendar's
+   views are most of what gets built, so discovering this halfway means an
+   install that got most of the way and cannot finish.
 3. **The capabilities this skill uses are granted**, not just some of them.
    Creating databases needs insert. Filling properties needs update. Resolving
    the user needs user information. **A connection with read alone authenticates
    perfectly and then fails on the first create.**
-4. **The chosen parent page is reachable by this connection.** An unshared parent
-   returns not-found rather than forbidden, which reads as a typo and is not one.
-   Say which it is.
-5. **Nothing this install would create is already there.** This is the check that
-   stops a second Process Library appearing.
+4. **The chosen parent page is reachable by this connection.** Fetch it. An
+   unshared parent returns not-found rather than forbidden, which reads as a typo
+   and is not one. Say which it is.
+5. **Nothing this install would create is already there.** Fetch the parent and
+   look. This is the check that stops a second Process Library appearing.
 
 If any fails, **say exactly what to do about it and stop.** Do not offer to
 continue with a subset.
@@ -128,7 +132,11 @@ Three tiers, in order:
 
 **Tier 3 is a working install, not a failed one.** Databases with correct schemas
 and no owner recorded is far better than an install that stops, and far better
-than one that guesses. Write `personId: null` and move on.
+than one that guesses.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" person <id or nothing>
+```
 
 > **Every write to a person property, in every plugin, is conditional on
 > `personId`.** If it resolves, set the property. If config records that there is
@@ -139,58 +147,114 @@ later: owner fields that stay empty, and nothing broken.
 
 ## Step 4. Show the whole plan and wait for one yes
 
-Every database, every property, every relation, every view, and where they will
-be created. Derived from the manifest, not typed out.
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" plan
+```
+
+That prints every database, every relation and every view, derived. Show it.
+**It runs before anything exists**, which is the point: the ids in it are
+placeholders until phase A fills them in.
 
 **This is the only gate.** After the yes, run to completion or fail with a clear
 account of what exists.
 
-## Step 5. Create, in two phases
+## Step 5. Create, in two phases and then the views
 
-**Two phases, not one per database.**
-
-```
-Phase A   create every database with its non-relation properties only
-Phase B   add every relation, using the ids phase A returned
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" begin <parent page id>
 ```
 
-**Why the split.** A relation needs the id of the database it points at, and a
-self-relation needs the id of the database being created. Neither exists until
-the database does. Splitting by phase applies that rule once instead of
-remembering it per database, and nothing in phase A refers to anything else in
-phase A, so its order does not matter.
+That writes config with `state: creating`, before anything is created. A run that
+dies from here on leaves a file that says so.
 
-**A two-way relation is one relation with a synced property, not two.** Building
-both sides produces duplicates. The manifest records which are two-way and names
-the property Notion creates on the target.
+**Phase A. Every database, with no relations in it.**
 
-**Set the option order when the property is created.** Notion sorts a select by
-the order given. The schema files define it, `Type` reads broadest to narrowest
-and `L2C Lifecycle` runs 0 to 8. **Getting it wrong is invisible until somebody
-opens a grouped view.**
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" phase-a
+```
 
-Then create the database-level views in the manifest. These reference no page, so
-unlike the related views inside page bodies they can be built once, now.
+Send each one as a create-database call, and after each, record what came back:
 
-## Step 6. Write config as it goes, not at the end
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" record <key> <database id> <data source id>
+```
 
-Config carries `state: creating` while work is in progress and `state: complete`
-when it is done. **A run that dies halfway leaves a file that says so**, which is
-what lets a retry tell itself apart from a mess.
+**Both ids, every time.** The create response carries the data source id in its
+`<data-source>` tag and the database id in its url. Views need the database id
+and everything else needs the data source id, and a lookup later can return a
+different answer than the one this run used.
 
-Store **both** the database id and the data source id. A database can hold more
-than one data source, and querying, creating pages and defining relation targets
-all need the data source id. Record which one was chosen, so a second appearing
-later does not silently break the plugins that read it.
+**Phase B. Every relation, once every id exists.**
 
-## Step 7. Verify by reading it back
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" phase-b
+```
 
-**Re-fetch every database and compare it to the manifest.** Property names, types,
-option lists and option order, every relation and its direction, every view.
+One update-data-source call per database. **Why the split:** a relation needs the
+id of the database it points at, and a self-relation needs the id of the database
+being created. Neither exists until the database does.
 
-Do not report success from the fact that the create calls returned without error.
-**A write that returned 200 and a workspace that matches the manifest are
-different claims**, and only the second one is worth making.
+**A two-way relation is one statement, and that includes a self-relation.**
+Measured 2026-08-18: `ADD COLUMN "Parent" RELATION('<same ds>', DUAL 'Child
+Docs')` creates both sides. The Notion tool's own documentation shows a
+two-statement form for self-relations, and following it would build four
+properties where the design wants two.
+
+**Then the views, last.**
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" views
+```
+
+**Views come after phase B, not with phase A.** Two of them filter on a relation
+property, which does not exist until phase B has run.
+
+## Step 6. Verify by reading it back, and by the rows
+
+**Fetch every data source and every database.** A database fetch also returns its
+views, which is what the view half of this needs.
+
+Write what came back into a file:
+
+```json
+{
+  "databases": { "<key>": { "schema": { ... }, "views": [ ... ] } },
+  "viewRows":  { "<key>::<view name>": ["a title", "another"] },
+  "sqlRows":   { "<key>::<view name>": ["a title", "another"] }
+}
+```
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" verify <that file>
+```
+
+**Reading the filter back is not enough, and this is the hardest-won thing in
+this plugin.** Measured 2026-08-18: a view filtered on a relative date was
+created, reported as created, read back with its filter intact and looking
+perfectly correct, and returned no rows at all. A row four months in the future
+did not appear. Nothing in the read-back distinguished it from the working
+version.
+
+**So each view is also proved by its rows.** Query the view itself, run the same
+rule as SQL against the data source, and compare. `views.js` prints the SQL:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/views.js"
+```
+
+`verify` compares the two sets for you and says `unchecked` for any view where
+you did not supply both. **Do not treat `unchecked` as a pass.** It is the
+plugin telling you which half of the proof is missing.
+
+## Step 7. Only then, say it is complete
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" complete <the timestamp of the verify that passed>
+```
+
+`complete` refuses if a database is unrecorded, and `state: complete` is a claim
+that the workspace matches the manifest. **The create calls returning without an
+error is a different and much weaker claim.**
 
 ## Step 8. Say what to do next, not that it is done
 
@@ -218,18 +282,27 @@ about what to do with it.**
 
 ## The rules Notion will not enforce
 
-Some rules in this design cannot be enforced by Notion, and until they were
-written down the design stated them as if they could. The manifest lists them and
-records where each one is caught: a saved `Needs attention` view where Notion can
-express the filter, and `check` where it cannot.
+The manifest lists them and records where each is caught: a saved `Needs
+attention` view where Notion can express the filter, and `check` where it cannot.
 
-**Two of them have no possible view.** A multi-select filter tests whether a value
-is present, not how many there are, and a filter cannot reach across a relation to
-read a property on the related page.
+**Two of them have no possible view, and both limits were measured on
+2026-08-17.** A multi-select filter tests whether a value is present, not how
+many there are, and a filter cannot reach across a relation to read a property on
+the related page. Both were rejected with a 400. The workarounds were measured
+too and neither survives: a counting formula comes back typed as text, and a
+rollup filter is accepted, reported as created, and silently emptied.
 
-**Both limits are unmeasured.** They are read off how Notion filters behave and
-have not been tested against a live workspace. If either turns out to be wrong,
-the rule moves back to a view and only the manifest changes.
+## `In market` and `Upcoming` are narrower than the design asked for
+
+`In market` and `Upcoming` were specified with a date window: the current month,
+and dated in the future. **Neither can be built.** Notion's view DSL has no
+relative date, and a literal one is accepted and matches nothing. Both were built
+without the date clause, both are recorded in the manifest with a `reduced` note
+saying why, and `Upcoming` now sorts a past-dated confirmed row to the top, which
+is a row worth seeing rather than a row in the wrong place.
+
+**This is a decision, not a workaround, and it is open.** If a relative date is
+wanted, it has to come from somewhere other than a saved view.
 
 ## The judgment this skill carries
 
@@ -238,5 +311,8 @@ the rule moves back to a view and only the manifest changes.
    than enforced.
 2. **What to ask and what to decide.** Five questions is the design.
 3. **Telling a retry from a mess.** A failed create that can simply be run again
-   is different from one that left a database with half its properties, and this
-   skill has to know which it is looking at before offering to continue.
+   is different from one that left a database with half its properties. Phase B
+   works this out by reading rather than remembering: re-run it and only what is
+   genuinely absent gets created. A relation that is present but wrong is
+   reported and never added a second time, because adding it again makes a
+   duplicate, and this plugin cannot delete one.

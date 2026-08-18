@@ -8,15 +8,17 @@ config.** That is the decision the whole architecture rests on.
 
 ## Status
 
-**Part-built. Do not run it against a workspace you care about.**
+**`install` runs, and it has been run.** On 2026-08-18 the whole flow went
+against a live Notion workspace: every database created, every relation added,
+every view built, all of it read back and compared to the manifest, and each view
+proved a second time by the rows it actually returns. The recording of that run
+is in `tests/fixtures/full-install-as-notion-returned-it.json` and the test suite
+checks against it.
 
-What exists: the manifest, the six database schemas, the statement generator, the
-verifier, and the checks that hold all of it to the design documents. The whole
-chain has been proved once end to end, by creating the Process Library in a live
-workspace, adding its relations, reading it back, comparing it, and deleting it.
+What does not exist: the `check` and `add` skills, and the other five plugins.
 
-What does not exist: the `install` flow that runs the chain for all six, the
-config file, the views, and the `check` and `add` skills.
+**It has not been run by anyone but its author, and never against a workspace
+with anything in it.** Every failure it has survived is one that was arranged.
 
 ## Its skills
 
@@ -56,6 +58,9 @@ views, and the rules Notion will not enforce.
 node scripts/manifest.js --summary     # what setup creates, derived
 node scripts/manifest.js --validate    # does the manifest contradict itself
 node scripts/manifest.js --json        # the whole thing, for another tool
+node scripts/views.js                  # each view's filter, and the SQL that proves it
+node scripts/relations.js              # the statements phase B sends
+node scripts/install.js plan           # the whole run, in order
 ```
 
 **Every count in this plugin is derived from that file.** To add a database, a
@@ -74,7 +79,7 @@ Each was correct on the day it was written.
 sh ../../tests/run.sh
 ```
 
-Three files, and they hold the design and the code together in both directions:
+They hold the design, the code and Notion together. A count of them is not written here, for the same reason no other count is:
 
 - The manifest agrees with the relation map in the design document, row by row,
   and does not contradict itself. No count written in a document disagrees with
@@ -85,10 +90,29 @@ Three files, and they hold the design and the code together in both directions:
 - `verify` catches what it claims to: a missing property, a wrong type, a missing
   option, options in the wrong order, an extra property somebody else added, and
   an empty response, which must read as a failure rather than a clean pass.
+- The view compiler refuses what cannot work, and `verifyView` catches a filter
+  that came back different, a filter that was silently discarded, a wrong layout
+  and a dropped sort.
+- Phase B builds one statement per relation, both ends of every two-way relation
+  are checked, and a relation built the wrong way round is caught. A half-run
+  phase B lists only what is absent, and a relation that is present but wrong is
+  never added a second time.
+- The config file cannot be pointed at a second database for a name it already
+  holds, cannot be completed before it has been verified, and is never
+  overwritten when it will not parse.
+- **A whole install, as Notion returned it.** Six databases, thirteen relations
+  and seven views, fetched back from a live workspace and compared field by
+  field. This is the only test that can catch Notion behaving differently from
+  what the code assumed, which it has done three times so far.
 
-**Each one has been proved to fail on the fault it names**, by breaking the
-manifest on purpose and confirming the right check went red. A check that has
-never failed is a check nobody has tested.
+**A check is proved by breaking the thing it watches and confirming it goes
+red**, because a check that has never failed is a check nobody has tested. That
+was done for the original three files when they were written, and on 2026-08-18
+for four of the new ones: the ISO date guard, the one-way versus two-way
+relation check, the refusal to point config at a second database, and the
+comparison of a view's rows against its rule. **The rest of the new checks have
+not been broken on purpose**, and saying otherwise would be the shape of claim
+this plugin exists to avoid.
 
 Two limits are documented in the test file rather than hidden. The prose check
 skips the word "one", because English uses it as an article more often than as a
@@ -110,8 +134,15 @@ for a gap in a text-scanning check is a check on behaviour, not a wider pattern.
 
 ## Open, and honest about it
 
-- **Nothing here has touched a real Notion workspace.** Every design claim is
-  unverified against real use.
+- ~~Nothing here has touched a real Notion workspace.~~ **The whole install has,
+  on 2026-08-18.** What remains unverified is anything a second person does with
+  it: a workspace that is not empty, a connection with narrower capabilities, a
+  parent page that is not reachable.
+- **`In market` and `Upcoming` are narrower than the design asked for.** Both
+  were specified with a date window and neither can have one: Notion's view DSL
+  has no relative date, and a literal one is accepted and matches nothing. Both
+  are built without the date clause and both carry a `reduced` note in the
+  manifest saying so. Whether that is good enough is open.
 - ~~Two Notion filter limits are unmeasured.~~ **Measured 2026-08-17 and both are
   real.** A multi-select filter cannot count values and a filter cannot read
   across a relation, both rejected with a 400. The workarounds were measured too:

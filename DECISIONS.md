@@ -36,6 +36,43 @@ to `check` was not merely the tidier option, it is the only one that works.
 
 ---
 
+## Measured against a live workspace, 2026-08-18
+
+The whole `install` flow was run: six databases created, thirteen relations
+added, seven views built, everything fetched back and compared, and each view
+queried for the rows it actually returns. Run under the `Plugins testing` page.
+
+| Question | Answer |
+|---|---|
+| Is a two-way relation one statement or two | **One.** `ADD COLUMN "X" RELATION('<ds>', DUAL 'Reverse')` creates both sides |
+| Does that hold for a self-relation | **Yes**, and the tool's own documentation says otherwise |
+| How does a one-way relation differ in the read-back | It comes back with **no `propertyUrl`**. A two-way one carries it |
+| Can a view filter use a relative date | **No, and it lies.** `> "today"` is accepted, stored, reads back correctly and matches nothing |
+| Does an ISO date filter work | **Yes**, proved by the rows. The identical view with a real date returned the row |
+| Does a relation `IS EMPTY` filter work on rows | **Yes**, proved by the rows, not only by reading the filter back |
+| Can a view be queried for the rows it shows | **Yes**, in view mode. This is what makes a filter provable |
+
+**The relative date is the finding to carry.** It is the third time a Notion
+filter this design needed has been accepted and then not worked, and it is the
+first one that **survives being read back**. The rollup failure on 2026-08-17 was
+caught by re-fetching the view and seeing `filters: []`. This one re-fetches
+identically to a working filter: same operator, same shape, same everything. Only
+querying the view and looking at the rows told them apart.
+
+**So step 7 of `install` grew a second half.** Reading a filter back proves it was
+stored. Running the same rule as SQL and comparing the rows proves it works.
+`verify` does both and says `unchecked` for any view where the second half is
+missing, because silence there would be the plugin repeating the mistake it was
+built to catch.
+
+**What this cost the design.** `In market` and `Upcoming` were both specified
+with a date window, the current month and dated in the future. Neither can be
+built. Both now exist without the date clause, both carry a `reduced` note in the
+manifest recording why, and whether that is good enough is **open and hers to
+decide**. Nothing else in the design changed.
+
+---
+
 ## What we are doing
 
 Building new, shareable plugins for people who do not have Sarah's setup.
