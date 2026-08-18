@@ -275,8 +275,13 @@ function whyNotRepairable (relation, schemas, names = {}) {
     return `${to} was not read back, so whether it still carries "${relation.reverse}" is unknown. Not knowing is not the same as it being gone.`
   }
 
+  // Said without claiming what the surviving property IS. This used to call it
+  // "the half Notion syncs", which is only true when it is a relation carrying
+  // a synced counterpart. A text property somebody typed into that name is
+  // withheld for the same reason and is not that, so the reason described a
+  // situation the code had not checked for.
   if (far[mapped.propertyName(names[relation.to], relation.reverse)]) {
-    return `${to} still has "${relation.reverse}", the half Notion syncs. One statement builds both halves, so rebuilding this one would ask for a counterpart that is already there.`
+    return `${to} already has a property called "${relation.reverse}". One statement builds both halves, so rebuilding this one would ask for a counterpart whose name is already taken.`
   }
 
   return null
