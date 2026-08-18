@@ -280,13 +280,56 @@ check('a renamed relation property is not reported missing, and no second one is
   assert.ok(withoutMap.includes('missing from'),
     `the fixture does not reproduce the problem: without the map a renamed relation should read as missing.\n${withoutMap}`)
 
-  const withMap = relations.verifyRelation(relation, renamed, ids, names).join('\n')
-  assert.ok(!withMap.includes('missing from'),
-    `a renamed relation still read as missing with the map in play:\n${withMap}`)
+  // No problems at all, not merely no problem containing one phrase. Asserting
+  // the absence of "missing from" passes just as well when the relation is
+  // reported wrong for some other reason, which is the test passing while the
+  // thing it watches is broken.
+  const withMap = relations.verifyRelation(relation, renamed, ids, names)
+  assert.deepStrictEqual(withMap, [],
+    `a renamed relation was still reported once the map was in play:\n${withMap.join('\n')}`)
+
+  // Process's repairs, exactly. Not "no repairs at all", which this fixture can
+  // never produce: it supplies Process alone, so every relation on the other
+  // five databases is genuinely absent and correctly repaired. And not "does
+  // not mention Parent", which passes just as well if the repair path collapsed
+  // and returned nothing for anything.
+  //
+  // What is left on Process is Supersedes, which this fixture really is missing.
+  const supersedes = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS
+    .find(r => r.from === 'process' && r.property === 'Supersedes')
+  const repairs = relations.repairStatements(renamed, ids, names)
+  assert.strictEqual(repairs.process, relations.statementFor(supersedes, ids),
+    `Process's repairs are not the one relation this fixture is missing. A renamed relation producing an ADD COLUMN is how a rename becomes two relations:\n${repairs.process}`)
+})
+
+check('a renamed relation that is ALSO wrong is reported and never added a second time', () => {
+  // The case that reaches the guard in repairStatements, which the test above
+  // does not. There, the renamed relation is correct, so it is never in the
+  // missing list and the guard is never consulted: breaking the guard's lookup
+  // leaves that test green.
+  //
+  // Here the renamed relation points at the wrong database. That puts it in the
+  // missing list, so the guard runs, and the guard is what decides between
+  // "report it" and "add a second one beside it".
+  const ids = {}
+  for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
+
+  const renamed = {
+    process: {
+      'Parent Doc': { type: 'relation', dataSourceUrl: 'collection://ds-memos', propertyUrl: 'collectionProperty://ds-memos/abc' },
+      'Child Docs': { type: 'relation', dataSourceUrl: 'collection://ds-process', propertyUrl: 'collectionProperty://ds-process/def' }
+    }
+  }
+  const names = { process: { properties: { Parent: 'Parent Doc', 'Child Docs': 'Child Docs' }, values: {} } }
+  const relation = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS.find(r => r.from === 'process' && r.property === 'Parent')
+
+  const problems = relations.verifyRelation(relation, renamed, ids, names).join('\n')
+  assert.ok(problems.includes('points at'),
+    `the fixture does not reproduce the problem: this relation is supposed to point at the wrong database.\n${problems}`)
 
   const repairs = relations.repairStatements(renamed, ids, names)
-  assert.ok(!(repairs.process || '').includes('"Parent"'),
-    `a renamed relation produced an ADD COLUMN, which is how a rename becomes two relations:\n${repairs.process}`)
+  assert.ok(!(repairs.process || '').includes(`DUAL 'Child Docs'`),
+    `a relation that is present, renamed and wrong produced an ADD COLUMN. Adding it again is how one renamed relation becomes two:\n${repairs.process}`)
 })
 
 check('the relation property names handed to verify are the observed ones', () => {
