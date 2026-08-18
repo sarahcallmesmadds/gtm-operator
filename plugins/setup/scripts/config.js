@@ -184,12 +184,33 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
   // tell which. `check` has to tell a renamed property from a deleted one, and
   // that is impossible without knowing whether a map was ever taken.
   const identity = schema.identityNames(key)
+
+  // An existing map is kept, because it may hold renames somebody adopted, and
+  // it is CHECKED before it is kept. `recordNames` is meant to be the only way
+  // a map changes, and it validates. It is not the only way one arrives: this
+  // function used to write back whatever was already on disk, so a hand-edited
+  // or half-written map went straight through the gate and into every later
+  // read. Silently replacing it with the identity map would be worse, because
+  // that quietly discards a real rename. So it is refused loudly.
+  const existing = already && mapped.recorded({ properties: already.properties })
+    ? { properties: already.properties, values: already.values || {} }
+    : null
+  if (existing) {
+    const problems = mapped.problems(existing, identity)
+    if (problems.length) {
+      throw new Error(
+        `${key} already carries a name map that cannot be used:\n  ${problems.join('\n  ')}\n` +
+        `  Nothing has been written. Fix the map in ${CONFIG_PATH}, or remove the properties and values entries to start again from the shipped names.`
+      )
+    }
+  }
+
   config.databases[key] = {
     databaseId,
     dataSourceId,
     displayName: displayName || DATABASES.find(d => d.key === key).title,
-    properties: (already && already.properties && Object.keys(already.properties).length) ? already.properties : identity.properties,
-    values: (already && already.values && Object.keys(already.values).length) ? already.values : identity.values
+    properties: existing ? existing.properties : identity.properties,
+    values: existing ? existing.values : identity.values
   }
   invalidateVerification(config)
   write(config)
@@ -265,7 +286,20 @@ function namesFor (key) {
   const entry = config && config.databases && config.databases[key]
   if (!entry) return null
   const names = { properties: entry.properties || {}, values: entry.values || {} }
-  return mapped.recorded(names) ? names : null
+  if (!mapped.recorded(names)) return null
+
+  // A map that is present and wrong is not the same as no map, and answering
+  // null for both would collapse them into one answer, which is the thing this
+  // map exists to stop one level up. A caller can handle "nothing recorded". No
+  // caller can handle being handed a map that misdirects its reads.
+  const problems = mapped.problems(names, schema.identityNames(key))
+  if (problems.length) {
+    throw new Error(
+      `The name map recorded for ${key} cannot be used:\n  ${problems.join('\n  ')}\n` +
+      `  It is in ${CONFIG_PATH}. Nothing was read through it.`
+    )
+  }
+  return names
 }
 
 /** Every recorded name map, keyed by database, for the callers that check all six. */
@@ -282,9 +316,9 @@ function allNames () {
  * Adopt a rename somebody made in Notion.
  *
  * This is the only way a map changes after install, and `check` is the only
- * caller, on an explicit yes. It refuses a map that is not complete and refuses
- * two logical names pointing at one Notion property, because both leave every
- * later read answering about the wrong property while looking healthy.
+ * caller, on an explicit yes. It refuses a map that is not complete, in either
+ * half, and refuses two logical names pointing at one Notion name, because both
+ * leave every later read answering about the wrong thing while looking healthy.
  */
 function recordNames (key, { properties, values }) {
   if (!DATABASES.some(d => d.key === key)) {
@@ -295,8 +329,7 @@ function recordNames (key, { properties, values }) {
     throw new Error(`${key} is not recorded yet, so there is nothing to rename. Record the database first.`)
   }
 
-  const expected = Object.keys(schema.identityNames(key).properties)
-  const problems = mapped.problems({ properties, values }, expected)
+  const problems = mapped.problems({ properties, values }, schema.identityNames(key))
   if (problems.length) {
     throw new Error(`${key}: this name map cannot be recorded.\n  ${problems.join('\n  ')}`)
   }
