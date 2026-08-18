@@ -10,8 +10,11 @@
  * renames anything in Notion, and that this map exists so the plugin adapts to
  * their names rather than the other way round.
  *
- * So every lookup that used to index the read-back by the shipped name goes
- * through here instead.
+ * So every property and option-value lookup that used to index the read-back by
+ * the shipped name goes through here instead. Views are not covered: their
+ * names, and the property names inside their filters, grouping, sorts and rule
+ * SQL, are still the shipped ones. That gap is deliberate, and the reason is at
+ * the view lookup in `install.js`.
  *
  * NO DEPENDENCIES ON PURPOSE. `schema.js` and `relations.js` both need this, and
  * `schema.js` reads relation property names out of `relations.js`. Putting the

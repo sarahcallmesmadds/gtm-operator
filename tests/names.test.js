@@ -129,7 +129,11 @@ check('the same rename without the map is reported as missing AND as a stranger'
 
   const problems = schema.verify('process', broken, relations.propertyNamesFor('process')).join('\n')
   assert.ok(problems.includes('Domain: missing'), `expected the shipped name to be reported missing, got:\n${problems}`)
-  assert.ok(problems.includes('Business Area'), `expected the new name to be reported as a stranger, got:\n${problems}`)
+  // The stranger wording, not the name on its own. The name alone also appears
+  // when it is reported missing, which is the other half of this same test and
+  // would have made this half pass without checking anything.
+  assert.ok(problems.includes('Business Area: present in Notion and not in the schema'),
+    `expected the new name to be reported as a property the plugin does not own, got:\n${problems}`)
 })
 
 check('a renamed property that is genuinely gone is still caught', () => {
@@ -330,6 +334,43 @@ check('a renamed relation that is ALSO wrong is reported and never added a secon
   const repairs = relations.repairStatements(renamed, ids, names)
   assert.ok(!(repairs.process || '').includes(`DUAL 'Child Docs'`),
     `a relation that is present, renamed and wrong produced an ADD COLUMN. Adding it again is how one renamed relation becomes two:\n${repairs.process}`)
+})
+
+check('a relation that was renamed and then deleted is rebuilt under the name it had', () => {
+  // The shape neither of the tests above reaches. The map points at a name that
+  // is no longer in Notion, so the guard does not fire and a statement is built.
+  //
+  // Built under the SHIPPED name, that statement leaves the workspace with a
+  // property nothing points at and the map pointing at one that does not exist.
+  // The next verify reports it missing again, and the repair after that builds
+  // it again.
+  const ids = {}
+  for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
+
+  const gone = { process: { 'Child Docs': { type: 'relation', dataSourceUrl: 'collection://ds-process', propertyUrl: 'collectionProperty://ds-process/def' } } }
+  const names = { process: { properties: { Parent: 'Parent Doc', 'Child Docs': 'Child Docs' }, values: {} } }
+
+  const repairs = relations.repairStatements(gone, ids, names)
+  assert.ok(repairs.process.includes('"Parent Doc"'),
+    `the rebuild used the shipped name, so the map would point at a property that does not exist:\n${repairs.process}`)
+  assert.ok(!repairs.process.includes('"Parent"  '), 'the shipped name was used')
+  assert.ok(!/ADD COLUMN "Parent" /.test(repairs.process),
+    `both names were used, which builds two properties for one relation:\n${repairs.process}`)
+})
+
+check('the far side of a rebuilt relation uses the name that side actually has', () => {
+  const ids = {}
+  for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
+
+  // Memos.Artifacts points at Process, and its far side is Process."Memos".
+  // Process renamed that far side, so a rebuild has to name it their way or
+  // Notion creates a second property beside the one they renamed.
+  const names = { process: { properties: { Memos: 'Announcements' }, values: {} } }
+  const relation = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+
+  const statement = relations.statementFor(relation, ids, names)
+  assert.ok(statement.includes("DUAL 'Announcements'"),
+    `the far side was named with the shipped name, which puts a second property on Process beside the renamed one:\n${statement}`)
 })
 
 check('the relation property names handed to verify are the observed ones', () => {
