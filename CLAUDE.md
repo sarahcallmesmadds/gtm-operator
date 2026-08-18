@@ -1,8 +1,8 @@
 # gtm-operator
 
 A Claude Code marketplace that builds a go-to-market operating system in Notion.
-One plugin per foundation object under `plugins/`, and the design documents at
-the root that each plugin is built from.
+The design is one plugin per foundation object under `plugins/`, built from the
+design documents at the root. Only `setup` is built so far.
 
 **The design lives in the root documents, not in this file.** `DECISIONS.md`
 holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
@@ -58,11 +58,12 @@ skills and renames of existing ones.
 
 **A create call that returned without an error proves nothing.** Notion accepts
 some things it cannot do and discards them silently, and which failure you get
-depends on the property type: a rollup filter is created, reported as created,
-and quietly emptied, while a relative date filter is stored, reads back
-correctly and matches nothing. Anything built against this API is proved by
-reading it back, and a view is proved by the rows it returns rather than by the
-filter it reports. The measurements behind this are dated in `DECISIONS.md`.
+depends on the property type: a view carrying a rollup filter is created and
+reported as created, and the filter itself is silently discarded, while a
+relative date filter is stored, reads back correctly and matches nothing.
+Anything built against this API is proved by reading it back, and a view is
+proved by the rows it returns rather than by the filter it reports. The
+measurements behind this are dated in `DECISIONS.md`.
 
 **A count written beside the thing it counts is a copy.** Derive it from
 `manifest.js` or point a reader at `node plugins/setup/scripts/manifest.js
