@@ -181,11 +181,22 @@ project row, which is a contradiction: whichever ran second would either
 duplicate it or find its own branch unreachable. `scope` owns the row. `new`
 owns the tasks.
 
-**The `Problem Statement` relation is required by the skills, and surfaced when
-it is not.** A project that cannot name its problem statement has not been scoped,
-and the stakes then live nowhere, so `scope` refuses to finish without one. Notion
-enforces nothing, so a project made by hand can have none, and `setup` builds a
-`Needs attention` view showing exactly those rows. See `SKILLS-setup.md`.
+**A problem statement is required by the skills, and surfaced when it is not.** A
+project that cannot name its problem statement has not been scoped, and the stakes
+then live nowhere, so `scope` refuses to finish without one.
+
+**It is attached through `Memos`**, as a memo whose `Type` is `Problem Statement`.
+There is no separate relation for it: the second relation to Memos was dropped on
+2026-08-18, and one relation now carries the problem statement, the updates and
+the releases alike.
+
+Notion enforces nothing, so a project made by hand can have none, and `setup`
+builds a `Needs attention` view showing projects with no memos at all. **That view
+is wider than the rule.** A project carrying updates but no problem statement is
+not caught by it, because narrowing the filter to the memo `Type` needs a filter
+that reads through the relation, and a rollup filter was measured on 2026-08-17 to
+be accepted and then silently discarded. `scope` is the check that holds the rule
+exactly. See `SKILLS-setup.md`.
 
 **What it does not do.**
 - **Does not create tasks.** That is `new`.
@@ -241,7 +252,7 @@ Exactly what it may touch on the project:
 | `Status` | Moves to `In progress`, and only from `Scoped` |
 | `Tasks` | Populated as tasks are created |
 | `Domain`, `Segment`, `L2C Lifecycle` | Sets only if `scope` left them empty |
-| `Problem Statement`, `Priority`, `Level of Effort`, `Business outcome`, the page body | **Preserves. Never writes.** These are `scope`'s output and overwriting them silently discards a scoping conversation |
+| `Memos`, `Priority`, `Level of Effort`, `Business outcome`, the page body | **Preserves. Never writes.** These are `scope`'s output and overwriting them silently discards a scoping conversation |
 
 **It does two jobs and keeps the name:** creates the tasks for a scoped project,
 and fills in or edits a project someone created by hand. The description carries

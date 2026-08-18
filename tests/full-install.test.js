@@ -69,8 +69,23 @@ check('the install that was run passes verification, apart from one dated gap', 
   const fixture = recorded()
   withConfig(fixture)
   const { problems } = install.verify(fixture)
-  assert.strictEqual(problems.length, 1, problems.join('\n'))
-  assert.ok(problems[0].startsWith('Software.Contract link: the description does not match'), problems[0])
+
+  // Each expected difference is named, so a fifth one fails this rather than
+  // hiding inside a loosened count.
+  const expected = [
+    // Relation 5, projects.Problem Statement / memos.Resulting Projects, dropped
+    // 2026-08-18. The fixture install still carries both sides of it.
+    'Memos.Resulting Projects: present in Notion and not in the schema',
+    'Projects.Problem Statement: present in Notion and not in the schema',
+    // And the view that filtered on it.
+    'Projects view "Needs attention": the filter is not the one that was asked for',
+    // Added to schema.js after this install ran.
+    'Software.Contract link: the description does not match'
+  ]
+  assert.strictEqual(problems.length, expected.length, problems.join('\n'))
+  for (const want of expected) {
+    assert.ok(problems.some(p => p.startsWith(want)), `nothing reported: ${want}\n${problems.join('\n')}`)
+  }
 })
 
 check('every view was proved by the rows it returned, not just by its filter', () => {

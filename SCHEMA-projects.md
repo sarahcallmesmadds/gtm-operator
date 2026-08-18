@@ -34,7 +34,6 @@ databases. A change to one is a change to all.
 | L2C Lifecycle | Multi-select | the same 0 to 8, see "Impact to Funnel" below |
 | Timeline | Date range | start and target end |
 | Business outcome | Text | what success looks like in a sentence |
-| Problem Statement | Relation to Memos | **required by the skills, and surfaced when it is not.** Two-way, inverse `Resulting Projects` on Memos. See the review findings, and the Needs attention views in `SKILLS-setup.md` |
 | Artifacts | Relation to Process | what this project produced or changed |
 | Memos | Relation | updates and releases about this project |
 | Calendar | Relation | inverse of `Project` on Calendar. What this project is putting in market, and when. Added 2026-08-17, see `SCHEMA-calendar.md` |
@@ -181,6 +180,19 @@ Strategy Decision: it is what stops a well-scoped project quietly growing.
 **Why the problem is not a section.** It lives in the related Problem Statement
 memo, which already has the stakes written into it. Restating it here would make
 two copies that disagree within a month.
+
+**And it is reached through `Memos`, not through a relation of its own.** Until
+2026-08-18 Projects carried a second relation to Memos called `Problem
+Statement`, with `Resulting Projects` as its far side. Two relations between the
+same two databases meant two places to look and two places to get it wrong. There
+is now one: a project's problem statement is the memo of that `Type` attached
+through `Memos`.
+
+**The rule is still required and still not enforceable by Notion.** The `Needs
+attention` view in `SKILLS-setup.md` now catches a project with no memos at all,
+which is the widest check a view can make. Narrowing it to the memo `Type` needs
+a filter that reads through the relation, and a rollup filter was measured on
+2026-08-17 to be accepted, reported as created, and read back as `filters: []`.
 
 **Where a property and a section overlap, the body wins.** `Description` overlaps
 What We Are Building, and `Business outcome` overlaps Success Criteria. In both

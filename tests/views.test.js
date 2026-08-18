@@ -57,7 +57,7 @@ check('a filter compiles to the DSL that was measured working', () => {
 check('a relation filter compiles, and it is one phase B creates', () => {
   assert.strictEqual(
     views.configureFor(find('projects', 'Needs attention')),
-    'FILTER "Problem Statement" IS EMPTY; SORT BY "Name" ASC'
+    'FILTER "Memos" IS EMPTY; SORT BY "Name" ASC'
   )
 })
 
@@ -179,7 +179,7 @@ check('the nesting Notion chooses does not matter, only the filter does', () => 
     advancedFilter: {
       type: 'group',
       operator: 'and',
-      filters: [{ type: 'property', property: 'Problem Statement', propertyType: 'relation', operator: 'is_empty' }]
+      filters: [{ type: 'property', property: 'Memos', propertyType: 'relation', operator: 'is_empty' }]
     },
     sorts: [{ property: 'Name', direction: 'ascending' }]
   }
@@ -211,13 +211,26 @@ const asReturned = (database, name) => JSON.parse(JSON.stringify(
   fixture.databases[database].views.find(v => v.name === name)
 ))
 
-check('every filter in the real read-back still passes', () => {
+check('every filter in the real read-back still passes, bar one dated exception', () => {
   // The guard against the new check being stricter than Notion. If this fails,
   // the verifier is calling a correct install broken, which is how a verifier
   // gets switched off.
+  //
+  // The exception is not a loosening. The fixture records an install built when
+  // Projects / Needs attention filtered on `Problem Statement`, a relation
+  // dropped on 2026-08-18, so that one view is expected to disagree and the
+  // disagreement is asserted rather than skipped. Re-record the fixture and this
+  // whole check goes back to no exceptions.
   for (const view of VIEWS) {
     const actual = asReturned(view.database, view.name)
-    assert.deepStrictEqual(views.verifyView(view, actual), [], `${view.database} / ${view.name}`)
+    const problems = views.verifyView(view, actual)
+    if (view.database === 'projects' && view.name === 'Needs attention') {
+      assert.strictEqual(problems.length, 1, problems.join('\n'))
+      assert.ok(problems[0].includes('wanted: Memos (relation) is_empty'), problems[0])
+      assert.ok(problems[0].includes('got:    Problem Statement (relation) is_empty'), problems[0])
+      continue
+    }
+    assert.deepStrictEqual(problems, [], `${view.database} / ${view.name}`)
   }
 })
 

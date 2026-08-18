@@ -290,6 +290,41 @@ sidebar are UI only. The API reaches the schema and the view configuration and
 nothing else. This is the other half of `POST-INSTALL.md`, and it is owed
 screenshots that do not exist yet.
 
+### Projects reaches Memos through one relation, and the memo's Type says which memo it is
+
+**Decided 2026-08-18, in review.** Projects carried two relations to Memos:
+`Memos` / `Projects` for updates and releases, and `Problem Statement` /
+`Resulting Projects` for the one memo making the case that the work was worth
+doing. The second one is dropped. Twelve relations now, not thirteen.
+
+**Why.** Two relations between the same two databases mean two places to look and
+two places to file something wrongly. A project's problem statement is a memo. It
+is attached through `Memos` like every other memo, and the memo's `Type` says
+which one it is. That property already existed and already carried the
+distinction.
+
+**This reverses a decision taken the day before.** On 2026-08-17 the second
+relation was made two-way precisely so a problem statement could show what was
+built in response, on the reasoning that the only other `Projects` property would
+file a problem statement as a project update. **That reasoning does not survive
+the removal**, because the relation left standing is two-way: a memo attached
+through `Memos` shows its project under `Projects`. The trace the 08-17 fix was
+protecting is intact with one relation carrying it.
+
+**The cost, accepted.** The `Projects / Needs attention` view is now wider than
+the rule it enforces. It shows projects with no memos at all, where the rule is a
+project with no problem statement memo. Narrowing it to the memo `Type` needs a
+filter that reads through the relation, and a rollup filter was measured on
+2026-08-17 to be accepted, reported as created, and read back as `filters: []`.
+So the view is the widest check that actually works, and `scope` is what holds
+the rule exactly by refusing to finish without a problem statement.
+
+**How it was found.** The decision was taken in review, applied to the test
+workspace by hand, and written into no file. It surfaced on 2026-08-18 when the
+rule query for that view was run against the live workspace and failed with "no
+such column: Problem Statement". The code and every document had agreed with each
+other and disagreed with the workspace for a day.
+
 ### `calendar:new` checks for duplicates as well as clashes
 
 It already showed what else was aimed at a similar audience in the same window.
