@@ -148,8 +148,31 @@ carries the agreement and cannot answer a single question about it.
 upload, and an upload is the one form that cannot be read. Keeping `Contract link`
 as a URL costs nothing that can be used and keeps the name true.
 
-**Recommendation: leave it as `Contract link`, a URL, and point it at Drive.**
-Not decided; hers.
+**Decided: `Contract link` stays a URL, pointing at Drive.** Sarah's call,
+2026-08-18.
+
+**And the rule now travels with the field.** The property carries a description,
+which Notion shows when somebody clicks it:
+
+> Put the contract PDF in Google Drive and paste the link here. Claude can read
+> the contract through this link. A file uploaded straight into Notion cannot be
+> read.
+
+**This is the first property description in the design, and the pattern is worth
+naming.** Every other rule in this system lives in a document, which means it
+reaches a person only if they go looking. A description reaches them at the
+moment they are filling the field in, which is the moment the rule matters. It
+says what to do and why, because "why not just upload it" is the obvious next
+thought and the answer is not guessable.
+
+`schema.js` emits it as a `COMMENT` clause, `verify` checks it came back, and it
+was proved on a live workspace rather than only generated: the statement was
+sent and the description came back word for word.
+
+**`note` in `schema.js` is a different thing and is never sent.** Notes are for
+whoever is reading that file. A description is for whoever is filling in the row,
+and shipping a remark like "skipped when there is no personId" to a user would be
+the same mistake as a stale count.
 
 **A separate note if Files & media is ever adopted anyway:** `FILES` in the DDL
 reads back as `file`, another type that does not round-trip under the name it is
