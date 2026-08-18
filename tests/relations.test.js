@@ -232,18 +232,27 @@ check('the far side with a counterpart url this cannot parse is caught', () => {
   complains(4, s => { s.process.Memos.propertyUrl = 'wrong-shape' }, 'cannot be checked')
 })
 
-check('two missing data source ids do not count as pointing at the same place', () => {
-  // sameDataSource returned true when both sides were absent, which is a check
-  // answering "I do not know" with "yes".
-  //
-  // Asserted on the destination comparison itself. The earlier version of this
-  // test went through verifyRelation with an empty config id, where the
-  // not-recorded guard reports first, so it passed with sameDataSource
-  // reverted and proved nothing about it.
+check('a relation pointing at nothing is caught', () => {
+  // What the previous version of this test actually checked, under the name of
+  // something else. Keeping it, with the honest title.
   const schemas = correctSchemas()
   delete schemas.memos.Artifacts.dataSourceUrl
   const problems = relations.verifyRelation(relation(4), schemas, IDS)
   assert.ok(problems.some(p => p.includes('points at nothing')), problems.join('\n'))
+})
+
+check('two missing data source ids do not count as pointing at the same place', () => {
+  // sameDataSource returned true when both sides were absent, which is a check
+  // answering "I do not know" with "yes".
+  //
+  // Asserted directly, because it cannot be reached any other way: both callers
+  // in verifyRelation now report a missing id themselves before they get here.
+  // Two earlier versions of this test went through verifyRelation and passed
+  // with the guard reverted, having exercised a different branch entirely.
+  assert.strictEqual(relations.sameDataSource(undefined, undefined), false)
+  assert.strictEqual(relations.sameDataSource('', ''), false)
+  assert.strictEqual(relations.sameDataSource('ds-memos', undefined), false)
+  assert.strictEqual(relations.sameDataSource('collection://ds-memos', 'ds-memos'), true)
 })
 
 check('a synced counterpart living on the wrong database is caught', () => {
