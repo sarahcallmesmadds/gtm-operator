@@ -508,14 +508,20 @@ const provenReadback = () => {
 const runVerify = readbackPath => {
   const { execFileSync } = require('child_process')
   try {
-    execFileSync('node', [path.join(ROOT, 'plugins/setup/scripts/install.js'), 'verify', readbackPath], {
+    const out = execFileSync('node', [path.join(ROOT, 'plugins/setup/scripts/install.js'), 'verify', readbackPath], {
       env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
       encoding: 'utf8',
       stdio: 'pipe'
     })
-    return 0
+    return { status: 0, output: out }
   } catch (error) {
-    return error.status === undefined ? 1 : error.status
+    // The reason, not only the code. A test asserting "it failed" passes when it
+    // failed for a completely different reason, which is how the preflight test
+    // below was passing on a missing file rather than on the preflight.
+    return {
+      status: error.status === undefined ? 1 : error.status,
+      output: `${error.stdout || ''}${error.stderr || ''}`
+    }
   }
 }
 
@@ -532,11 +538,16 @@ check('a verify that fails leaves no usable record behind, through the CLI', () 
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
 
-  const broken = goodReadback()
+  // From a readback that WOULD pass, so the missing database is the only thing
+  // wrong with it. Starting from goodReadback made this fail as "not proved",
+  // because that one carries no row evidence on purpose, so the test stayed
+  // green whatever happened to the mismatch it was written for.
+  const broken = provenReadback()
   delete broken.databases.process
-  const status = runVerify(writeReadback('broken.json', broken))
+  const { status, output } = runVerify(writeReadback('broken.json', broken))
 
   assert.notStrictEqual(status, 0, 'a failing verify must not exit 0')
+  assert.ok(output.includes('nothing was read back for it'), `it failed for the wrong reason:\n${output}`)
   assert.strictEqual(config.read().verified, null, 'the old record survived a failed verify')
   assert.throws(() => config.complete(), /no verify has passed/)
 })
@@ -545,9 +556,10 @@ check('a readback that will not parse also leaves no usable record, through the 
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
 
-  const status = runVerify(writeReadback('not-json.json', '{ this is not json'))
+  const { status, output } = runVerify(writeReadback('not-json.json', '{ this is not json'))
 
   assert.notStrictEqual(status, 0)
+  assert.ok(/JSON/i.test(output), `it failed for the wrong reason:\n${output}`)
   assert.strictEqual(config.read().verified, null, 'a parse error left the old record standing')
 })
 
@@ -576,19 +588,32 @@ check('a verify that dies on the definitions preflight leaves no usable record',
   )
   fs.writeFileSync(manifestPath, broken)
 
+  // A readback that would otherwise verify clean, so the preflight is the only
+  // thing that can fail this. Pointing it at a file that does not exist made the
+  // test pass on the missing file instead, which would have let the preflight
+  // regression come straight back.
+  const readbackPath = path.join(SANDBOX, 'preflight-readback.json')
+  fs.writeFileSync(readbackPath, JSON.stringify(provenReadback()))
+
   const { execFileSync } = require('child_process')
   let status = 0
+  let output = ''
   try {
-    execFileSync('node', [path.join(copy, 'install.js'), 'verify', path.join(SANDBOX, 'anything.json')], {
+    execFileSync('node', [path.join(copy, 'install.js'), 'verify', readbackPath], {
       env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
       encoding: 'utf8',
       stdio: 'pipe'
     })
   } catch (error) {
     status = error.status === undefined ? 1 : error.status
+    output = `${error.stdout || ''}${error.stderr || ''}`
   }
 
   assert.notStrictEqual(status, 0, 'a contradictory manifest should not exit 0')
+  assert.ok(
+    output.includes('The definitions contradict themselves'),
+    `it should have died on the definitions preflight, and did not:\n${output}`
+  )
   assert.strictEqual(config.read().verified, null, 'the preflight exit left the old record standing')
 })
 
@@ -601,9 +626,9 @@ check('a passing re-verify of a finished install leaves it finished', () => {
   config.recordVerified('2026-08-18T00:00:00Z')
   config.complete()
 
-  const status = runVerify(writeReadback('good.json', provenReadback()))
+  const { status, output } = runVerify(writeReadback('good.json', provenReadback()))
 
-  assert.strictEqual(status, 0, 'a correct readback should verify')
+  assert.strictEqual(status, 0, `a correct readback should verify:\n${output}`)
   const after = config.read()
   assert.strictEqual(after.state, 'complete', 'a passing re-verify un-completed the install')
   assert.notStrictEqual(after.verifiedAt, '2026-08-18T00:00:00Z', 'it should record the new verify, not the old one')
@@ -613,9 +638,63 @@ check('a passing verify does not finish an install that was never finished', () 
   // And the fix for that must not become an auto-complete. An install still
   // being built is not complete because a check passed.
   setUpConfig()
-  const status = runVerify(writeReadback('good-2.json', provenReadback()))
-  assert.strictEqual(status, 0)
+  const { status, output } = runVerify(writeReadback('good-2.json', provenReadback()))
+  assert.strictEqual(status, 0, output)
   assert.strictEqual(config.read().state, 'creating')
+})
+
+check('verify with no readback argument does not destroy an existing proof', () => {
+  // Clearing runs before the command is dispatched, so the argument has to be
+  // checked before the clearing. Without that, `install.js verify` on its own
+  // demoted a complete install and erased its record with no check attempted:
+  // the clearing causing the fault it was added to prevent.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
+
+  const { execFileSync } = require('child_process')
+  let status = 0
+  try {
+    execFileSync('node', [path.join(ROOT, 'plugins/setup/scripts/install.js'), 'verify'], {
+      env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
+      encoding: 'utf8',
+      stdio: 'pipe'
+    })
+  } catch (error) {
+    status = error.status === undefined ? 1 : error.status
+  }
+
+  assert.notStrictEqual(status, 0, 'it should still refuse without a readback')
+  const after = config.read()
+  assert.strictEqual(after.state, 'complete', 'a usage error demoted a complete install')
+  assert.ok(after.verified, 'a usage error erased the proof')
+})
+
+check('a proof taken against different definitions is refused', () => {
+  // `state: complete` claims the workspace matches THIS manifest. Nothing tied
+  // the proof to the manifest, so one taken before a relation was added or
+  // removed stayed usable afterwards, and what was checked was not what would
+  // be built.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+
+  const tampered = config.read()
+  assert.ok(tampered.verified.manifest, 'the proof should record which definitions it checked')
+  tampered.verified.manifest = 'definitely-not-the-current-one'
+  config.write(tampered)
+
+  assert.throws(() => config.complete(), /different set of definitions/)
+})
+
+check('a proof with no recorded definitions is refused too', () => {
+  // An older config or a hand-edited one. Absent is not a match.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  const stripped = config.read()
+  delete stripped.verified.manifest
+  config.write(stripped)
+
+  assert.throws(() => config.complete(), /different set of definitions/)
 })
 
 check('a withdrawn proof takes the completion claim with it', () => {

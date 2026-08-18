@@ -481,7 +481,7 @@ it **exactly as the relation manifest defines it**, one-way or two-way, then
 updates config.
 
 **Not "in both directions", which was the wording here until 2026-08-17 and was
-wrong twice over.** One of the thirteen relations is deliberately one-way, so
+wrong twice over.** One relation in the design is deliberately one-way, so
 building both sides would add a property the schemas do not have. And a two-way
 relation in Notion is **one relation with a synced property**, not two relations,
 so building it twice produces duplicates. `add` must produce a schema identical to
@@ -516,7 +516,7 @@ Phase A   create six databases, non-relation properties, option order set
           5. Software
           6. Calendar
 
-Phase B   add all thirteen relations, using the ids returned by phase A
+Phase B   add every relation, using the ids returned by phase A     
 ```
 
 **The count lives in one place and this is not it.** The relation map below is the

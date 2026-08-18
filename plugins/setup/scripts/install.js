@@ -287,6 +287,11 @@ if (require.main === module) {
     // fix the definitions, and the old proof is usable again without anything
     // having been checked. Same fault as the one this call was added for, one
     // exit earlier.
+    // The argument is checked BEFORE the proof is cleared. `install.js verify`
+    // with nothing after it used to demote a complete install and erase its
+    // record without a single check having been attempted, which is the fault
+    // clearing exists to prevent, caused by the clearing itself.
+    if (command === 'verify' && !rest[0]) throw new Error('Usage: install.js verify <readback.json>')
     const cleared = command === 'verify' ? config.clearVerified() : null
 
     const problems = [...manifest.validate(), ...views.validate()]

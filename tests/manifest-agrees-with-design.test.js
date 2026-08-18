@@ -151,6 +151,22 @@ check('the manifest is internally consistent', () => {
  *    A stale count inside a .js comment will not be caught. Every count that
  *    went stale across three review rounds was in a document or a description,
  *    where a number means how many there are.
+ *
+ * 3. IT READS `plugins/` AND NOT THE ROOT DESIGN DOCUMENTS. This one has a
+ *    known cost: `SKILLS-setup.md` said "add all thirteen relations" for a
+ *    whole review round after the manifest dropped to twelve, and this check
+ *    stayed green.
+ *
+ *    Extending it was tried on 2026-08-18 and abandoned, because the root
+ *    documents discuss subsets constantly and the same regex cannot tell a
+ *    total from a local quantity. Reading every root document produced 33 hits,
+ *    of which one was real. Narrowing to phrasings that read as totals, "all
+ *    four", "the two", still produced 10 false positives against 0 real ones,
+ *    because "all four databases" means all four of the ones being discussed.
+ *
+ *    A check firing 32 times wrongly is a check somebody turns off, and then
+ *    the one real hit is lost too. So the root documents are read by people,
+ *    and the cost is written down here rather than hidden behind a green tick.
  */
 const NUMBER_WORDS = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,

@@ -20,7 +20,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const { DATABASES } = require('./manifest')
+const { DATABASES, fingerprint } = require('./manifest')
 
 /**
  * Bumped when the shape below changes in a way that would make an older reader
@@ -231,7 +231,10 @@ function recordVerified (at) {
   const config = read()
   if (!config) throw new Error('There is no config to record a verify against.')
   if (!at) throw new Error('recordVerified needs the time the verify passed.')
-  config.verified = { at }
+  // Which manifest it was checked against, not only when. A proof says a
+  // workspace matches THIS manifest, and without recording which one it stayed
+  // usable after the manifest changed underneath it.
+  config.verified = { at, manifest: fingerprint() }
   config.verifiedAt = at
   write(config)
   return config
@@ -271,6 +274,16 @@ function complete () {
     throw new Error(
       'Not complete: no verify has passed against this config. ' +
       'Run `install.js verify <readback.json>` first. It records the result itself, and it records nothing when anything is unproved.'
+    )
+  }
+  // A proof taken against a different manifest is not a proof of this one. It
+  // is refused rather than ignored: an absent fingerprint is an older config or
+  // a hand-edited one, and neither is evidence.
+  if (config.verified.manifest !== fingerprint()) {
+    throw new Error(
+      `Not complete: the verify that passed was run against a different set of definitions ` +
+      `(${config.verified.manifest || 'none recorded'}, and this is ${fingerprint()}). ` +
+      `What was checked is not what would be built now. Run the verify again.`
     )
   }
   config.state = 'complete'
