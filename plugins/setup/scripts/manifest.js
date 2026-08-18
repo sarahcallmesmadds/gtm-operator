@@ -314,8 +314,28 @@ function validate () {
  * cried wolf on every reworded comment is a check somebody switches off.
  */
 function fingerprint () {
+  // schema.js is required here rather than at the top of the file, because
+  // schema.js requires this one. The cycle is real and this is the only place
+  // that needs the other direction.
+  const { DATABASES: SCHEMAS } = require('./schema')
+
   const shape = {
     databases: DATABASES.map(d => ({ key: d.key, title: d.title })),
+    // The properties as they are SENT, and nothing else. `note` is left out on
+    // purpose: it exists for whoever reads schema.js and never reaches Notion,
+    // so changing one must not throw away a real proof. Everything here does
+    // reach Notion, so changing any of it means the workspace that was checked
+    // is not the workspace that would be built.
+    schema: Object.entries(SCHEMAS).map(([key, db]) => ({
+      key,
+      title: db.title,
+      properties: db.properties.map(p => ({
+        name: p.name,
+        type: p.type,
+        description: p.description || null,
+        options: p.options ? p.options.map(([name, colour]) => [name, colour]) : null
+      }))
+    })),
     relations: RELATIONS.map(r => ({ n: r.n, from: r.from, to: r.to, property: r.property, reverse: r.reverse, kind: r.kind })),
     views: VIEWS.map(v => ({
       database: v.database, name: v.name, layout: v.layout,

@@ -244,7 +244,11 @@ function propertyNamesFor (key) {
   return names
 }
 
-module.exports = { statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, propertyNamesFor, bare }
+module.exports = {
+  // Exported for a test. Both callers below reach it only after their own
+  // not-recorded guards have fired, so the two-missing case cannot be reached
+  // through verifyRelation and can only be pinned directly.
+  sameDataSource, statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, propertyNamesFor, bare }
 
 if (require.main === module) {
   // Placeholder ids, so the shape of every statement can be read without a

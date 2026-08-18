@@ -425,16 +425,25 @@ check('rows recorded as titles are refused, not proved', () => {
   assert.strictEqual(verified, false)
 })
 
-check('one row is not the same as two rows that spell it', () => {
-  // The rows used to be joined on ' | ' before comparing, so a single row
-  // called "alpha | beta" compared equal to two rows called "alpha" and "beta".
-  // Selecting url did not fix that on its own, because the join survived it.
+check('a row named with the comparison separator is refused before it can collide', () => {
+  // This used to be titled as a test of the row COMPARISON, and it is not one.
+  // A single row called "alpha | beta" did once compare equal to two rows called
+  // "alpha" and "beta", because the two lists were joined on ' | ' first. That
+  // collision is now closed one step earlier, by pageIdentity refusing anything
+  // that is not a page reference, and this test never reaches the comparison at
+  // all: reverting the element-by-element comparison back to a join leaves it
+  // green.
+  //
+  // Kept under a title that says what it proves. The comparison itself cannot be
+  // tested through this path, because every value that survives pageIdentity is
+  // 32 hex characters and none of them can contain a separator. That is recorded
+  // at the comparison in install.js rather than implied by a test name here.
   setUpConfig()
   const readback = goodReadback()
   readback.viewRows = { 'projects::Needs attention': ['alpha | beta'] }
   readback.sqlRows = { 'projects::Needs attention': ['alpha', 'beta'] }
   const { problems, verified } = install.verify(readback)
-  assert.ok(problems.length > 0, 'a row named with the separator must not pass')
+  assert.ok(problems.join('\n').includes('cannot prove which rows came back'), problems.join('\n'))
   assert.strictEqual(verified, false)
 })
 
@@ -679,11 +688,48 @@ check('a proof taken against different definitions is refused', () => {
   config.recordVerified('2026-08-18T00:00:00Z')
 
   const tampered = config.read()
-  assert.ok(tampered.verified.manifest, 'the proof should record which definitions it checked')
-  tampered.verified.manifest = 'definitely-not-the-current-one'
+  assert.ok(tampered.verified.definitions, 'the proof should record which definitions it checked')
+  tampered.verified.definitions = 'definitely-not-the-current-one'
   config.write(tampered)
 
   assert.throws(() => config.complete(), /different set of definitions/)
+})
+
+check('a proof is refused after a schema change, not only a manifest change', () => {
+  // The fingerprint covered the manifest and not schema.js, while the refusal
+  // it powers called itself a check on "definitions". So editing a property,
+  // its type, its description or an option colour left a proof from before the
+  // edit fully usable, which is the reuse the fingerprint exists to stop.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  assert.doesNotThrow(() => config.complete())
+
+  const status = schema.DATABASES.tasks.properties.find(p => p.name === 'Status')
+  const original = status.options
+  status.options = original.map(([name, colour], i) => (i === 0 ? [name, 'purple'] : [name, colour]))
+  try {
+    assert.throws(() => config.complete(), /different set of definitions/)
+  } finally {
+    status.options = original
+  }
+})
+
+check('rewording a note does not throw away a proof', () => {
+  // The other direction. `note` is for whoever reads schema.js and never
+  // reaches Notion, so it is outside the fingerprint: a check that discarded a
+  // real proof every time somebody reworded a comment is one that gets removed.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+
+  const property = schema.DATABASES.tasks.properties.find(p => p.name === 'Description')
+  const original = property.note
+  property.note = 'reworded for whoever reads this'
+  try {
+    assert.doesNotThrow(() => config.complete())
+  } finally {
+    if (original === undefined) delete property.note
+    else property.note = original
+  }
 })
 
 check('a proof with no recorded definitions is refused too', () => {
@@ -691,7 +737,7 @@ check('a proof with no recorded definitions is refused too', () => {
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
   const stripped = config.read()
-  delete stripped.verified.manifest
+  delete stripped.verified.definitions
   config.write(stripped)
 
   assert.throws(() => config.complete(), /different set of definitions/)

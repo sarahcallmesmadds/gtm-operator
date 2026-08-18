@@ -193,6 +193,35 @@ check('no relation is also declared as a phase A property', () => {
   assert.strictEqual(problems.length, 0, problems.join('\n'))
 })
 
+check('an option that came back the wrong colour is caught', () => {
+  // Colour was not compared at all until 2026-08-18, so the right values in the
+  // right order with the wrong colours passed. The colours are not decoration:
+  // the same value carries the same colour in every database that shares it.
+  const wrong = clean()
+  const status = wrong.Status || wrong[Object.keys(wrong).find(k => wrong[k].options)]
+  const first = status.options[0]
+  const was = first.color
+  first.color = first.color === 'purple' ? 'brown' : 'purple'
+  const problems = schema.verify('process', wrong)
+  first.color = was
+  assert.ok(problems.join('\n').includes('was sent as'), problems.join('\n'))
+})
+
+check('the colours a real install returned are accepted', () => {
+  // The guard against the check above being stricter than Notion. All 261
+  // option colours in the recorded install came back exactly as sent, measured
+  // 2026-08-18 before the comparison was added.
+  const fixture = require(path.join(ROOT, 'tests/fixtures/full-install-as-notion-returned-it.json'))
+  const relations = require(path.join(ROOT, 'plugins/setup/scripts/relations.js'))
+  for (const [key, entry] of Object.entries(fixture.databases)) {
+    const problems = schema.verify(key, entry.schema, relations.propertyNamesFor(key))
+    assert.deepStrictEqual(
+      problems.filter(p => p.includes('was sent as')), [],
+      `${key}: a colour the live install returned was rejected`
+    )
+  }
+})
+
 console.log('\nproperty descriptions\n')
 
 check('a description is emitted as a COMMENT, which is what Notion stores', () => {

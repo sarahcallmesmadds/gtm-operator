@@ -544,6 +544,23 @@ function verify (key, actual, alsoExpected = []) {
       const gotNames = (got.options || []).map(o => o.name)
       const wantNames = want.options.map(([n]) => n)
 
+      // Colour as well as name and order. It was not compared at all until
+      // 2026-08-18, so a select with the right values in the right order and
+      // the wrong colours passed, and the colours are not decoration: the same
+      // value carries the same colour across every database that shares it,
+      // which is the whole reason the option lists were written out per
+      // database rather than defaulted.
+      //
+      // Safe to compare, measured before adding: all 261 option colours in
+      // `tests/fixtures/full-install-as-notion-returned-it.json` came back
+      // exactly as sent, with no normalising of the names.
+      for (const [name, colour] of want.options) {
+        const back = (got.options || []).find(o => o.name === name)
+        if (back && back.color !== colour) {
+          problems.push(`${db.title}.${want.name}: option "${name}" came back ${back.color || 'with no colour'} and was sent as ${colour}`)
+        }
+      }
+
       for (const name of wantNames) {
         if (!gotNames.includes(name)) problems.push(`${db.title}.${want.name}: option "${name}" is missing`)
       }
