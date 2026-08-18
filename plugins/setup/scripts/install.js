@@ -108,9 +108,15 @@ function viewCalls (ids) {
  *       "process": { "schema": { ...data source state schema... },
  *                    "views":  [ ...the <views> entries... ] }
  *     },
- *     "viewRows": { "calendar::Needs attention": ["a title", "another"] },
- *     "sqlRows":  { "calendar::Needs attention": ["a title", "another"] }
+ *     "viewRows": { "calendar::Needs attention": ["https://app.notion.com/p/<id>", "..."] },
+ *     "sqlRows":  { "calendar::Needs attention": ["https://app.notion.com/<id>", "..."] }
  *   }
+ *
+ * **Page urls or page ids, never titles.** The two halves come back in different
+ * url shapes and both are accepted, but a title is refused: titles are not
+ * unique, and two rows sharing one used to compare as the same row. This example
+ * said `["a title", "another"]` until 2026-08-18, which is the shape the
+ * verifier now rejects.
  *
  * `viewRows` and `sqlRows` are the behavioural half, and they are what make a
  * filter proved rather than merely present. See the note on rows below.
@@ -274,14 +280,22 @@ if (require.main === module) {
   const [command, ...rest] = process.argv.slice(2)
   const show = value => console.log(JSON.stringify(value, null, 2))
 
-  const problems = [...manifest.validate(), ...views.validate()]
-  if (problems.length) {
-    console.error('The definitions contradict themselves, and nothing below can be trusted:')
-    for (const p of problems) console.error(`  ${p}`)
-    process.exit(1)
-  }
-
   try {
+    // Before the definition preflight below, not after it. That preflight exits
+    // first when the manifest contradicts itself, and clearing further down
+    // meant a verify that died there left an earlier passing record standing:
+    // fix the definitions, and the old proof is usable again without anything
+    // having been checked. Same fault as the one this call was added for, one
+    // exit earlier.
+    if (command === 'verify') config.clearVerified()
+
+    const problems = [...manifest.validate(), ...views.validate()]
+    if (problems.length) {
+      console.error('The definitions contradict themselves, and nothing below can be trusted:')
+      for (const p of problems) console.error(`  ${p}`)
+      process.exit(1)
+    }
+
     switch (command) {
       case 'plan': {
         const ids = planningIds()
@@ -322,11 +336,6 @@ if (require.main === module) {
       }
       case 'verify': {
         if (!rest[0]) throw new Error('Usage: install.js verify <readback.json>')
-
-        // Before the file is opened, not after the checks run. A verify that
-        // fails, throws, or is handed a file that will not parse must not leave
-        // an earlier passing record behind for `complete` to accept.
-        config.clearVerified()
 
         const readback = JSON.parse(fs.readFileSync(rest[0], 'utf8'))
         const { problems: found, unchecked, verified } = verify(readback)

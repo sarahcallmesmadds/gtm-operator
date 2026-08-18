@@ -98,6 +98,50 @@ check('the install that was run passes verification, apart from one dated gap', 
   )
 })
 
+check('the fixture and the manifest name exactly the same views', () => {
+  // Without this, a view deleted from the manifest vanishes from both sides of
+  // every other check at once: verify only walks the manifest's views, and the
+  // expected-difference count below is derived from the same list, so the
+  // fixture's now-orphaned view is never mentioned by anything. That is a real
+  // difference hiding among the known ones, which is exactly what the tests
+  // here claim cannot happen.
+  const fixture = recorded()
+
+  // Notion creates one view per database by itself and calls it "Default view".
+  // The manifest never asks for those and never should, so they are named as the
+  // one allowed extra rather than the check being loosened to let any extra
+  // through. If Notion renames it, this goes red and says so.
+  const NOTIONS_OWN = 'Default view'
+
+  const inFixture = new Set()
+  const notionsOwn = []
+  for (const [key, entry] of Object.entries(fixture.databases)) {
+    for (const view of entry.views || []) {
+      if (view.name === NOTIONS_OWN) { notionsOwn.push(key); continue }
+      inFixture.add(`${key}::${view.name}`)
+    }
+  }
+  // Not asserted for every database. The transcription only captured views on
+  // the three databases the manifest gives views to, so process, memos and
+  // software record an empty list rather than the default Notion certainly made
+  // for them. That is one more gap in this fixture and not a claim about Notion.
+  assert.ok(notionsOwn.length > 0, 'no Notion default view was recorded at all')
+  assert.ok(!VIEWS.some(v => v.name === NOTIONS_OWN), 'the manifest must not define a view named ' + NOTIONS_OWN)
+
+  const inManifest = new Set(VIEWS.map(v => `${v.database}::${v.name}`))
+
+  const onlyInFixture = [...inFixture].filter(k => !inManifest.has(k)).sort()
+  const onlyInManifest = [...inManifest].filter(k => !inFixture.has(k)).sort()
+
+  assert.deepStrictEqual(onlyInFixture, [], `the fixture records views the manifest no longer defines: ${onlyInFixture.join(', ')}`)
+  assert.deepStrictEqual(onlyInManifest, [], `the manifest defines views the fixture never recorded: ${onlyInManifest.join(', ')}`)
+
+  // And the row evidence covers exactly the filtered views, no more and no less.
+  const filteredKeys = new Set(VIEWS.filter(v => v.filter).map(v => `${v.database}::${v.name}`))
+  assert.deepStrictEqual(Object.keys(fixture.viewRows).sort(), [...filteredKeys].sort())
+  assert.deepStrictEqual(Object.keys(fixture.sqlRows).sort(), [...filteredKeys].sort())
+})
+
 check('row evidence was recorded for every filtered view, and it is no longer usable', () => {
   // Two claims, and the second one is the uncomfortable half.
   //

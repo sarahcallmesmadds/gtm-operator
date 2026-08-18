@@ -108,6 +108,12 @@ function write (config) {
 function invalidateVerification (config) {
   config.verified = null
   config.verifiedAt = null
+  // The completion claim goes with it. `state: 'complete'` is a claim that the
+  // workspace matches the manifest, and it is only ever reachable through a
+  // proof. Clearing the proof and leaving the claim left a config reading
+  // `complete` with `verifiedAt: null`, and every other plugin decides whether
+  // to trust this workspace by reading `state`, not by reading the proof.
+  if (config.state === 'complete') config.state = 'creating'
   return config
 }
 
