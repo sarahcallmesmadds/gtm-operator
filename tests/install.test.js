@@ -1,0 +1,344 @@
+'use strict'
+
+/**
+ * Tests for the config file and for `verify`, the step that decides whether an
+ * install worked.
+ *
+ * THE CONFIG PATH IS OVERRIDDEN BEFORE ANYTHING IS REQUIRED. These tests write
+ * real files, and the file they would otherwise write is the live one holding
+ * the ids of six real databases. A test that writes to the thing it is testing
+ * the writing of is not a test, it is an incident.
+ *
+ * Run: node tests/install.test.js
+ */
+
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const assert = require('assert')
+
+const SANDBOX = fs.mkdtempSync(path.join(os.tmpdir(), 'gtm-operator-test-'))
+process.env.GTM_OPERATOR_CONFIG = path.join(SANDBOX, 'gtm-operator.config.json')
+
+const ROOT = path.join(__dirname, '..')
+const config = require(path.join(ROOT, 'plugins/setup/scripts/config.js'))
+const install = require(path.join(ROOT, 'plugins/setup/scripts/install.js'))
+const { DATABASES, VIEWS, counts } = require(path.join(ROOT, 'plugins/setup/scripts/manifest.js'))
+const schema = require(path.join(ROOT, 'plugins/setup/scripts/schema.js'))
+const relations = require(path.join(ROOT, 'plugins/setup/scripts/relations.js'))
+
+let failures = 0
+const check = (name, fn) => {
+  try {
+    fn()
+    console.log(`  ok    ${name}`)
+  } catch (err) {
+    failures++
+    console.log(`  FAIL  ${name}`)
+    console.log(`        ${err.message.split('\n').join('\n        ')}`)
+  }
+}
+
+const reset = () => { if (fs.existsSync(config.CONFIG_PATH)) fs.unlinkSync(config.CONFIG_PATH) }
+
+console.log('\nthe config file\n')
+
+check('it is not written anywhere near the real one during a test', () => {
+  assert.ok(config.CONFIG_PATH.startsWith(SANDBOX), `tests would have written to ${config.CONFIG_PATH}`)
+})
+
+check('a run starts as creating, not as complete', () => {
+  reset()
+  const started = config.begin('parent-page')
+  assert.strictEqual(started.state, 'creating')
+  assert.strictEqual(started.notion.parentPageId, 'parent-page')
+  assert.strictEqual(started.notion.personId, null)
+})
+
+check('both ids are stored for every database, never just one', () => {
+  reset()
+  config.begin('parent-page')
+  config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
+  const stored = config.read().databases.process
+  assert.strictEqual(stored.databaseId, 'db-1')
+  assert.strictEqual(stored.dataSourceId, 'ds-1')
+})
+
+check('recording one id and not the other is refused', () => {
+  reset()
+  config.begin('parent-page')
+  assert.throws(() => config.recordDatabase('process', { databaseId: 'db-1' }), /data source id/)
+})
+
+check('a database that is not in the manifest is refused', () => {
+  reset()
+  config.begin('parent-page')
+  assert.throws(() => config.recordDatabase('teammates', { databaseId: 'x', dataSourceId: 'y' }), /not a database in the manifest/)
+})
+
+check('a second database for a name already recorded is refused, not overwritten', () => {
+  // This is the one that stops a re-run quietly pointing config at a second
+  // Process Library and orphaning the first, which holds the user's rows.
+  reset()
+  config.begin('parent-page')
+  config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
+  assert.throws(() => config.recordDatabase('process', { databaseId: 'db-2', dataSourceId: 'ds-2' }), /a person has to say which one to keep/)
+})
+
+check('recording the same database twice is fine, so a retry is not punished', () => {
+  reset()
+  config.begin('parent-page')
+  config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
+  config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
+  assert.strictEqual(Object.keys(config.read().databases).length, 1)
+})
+
+check('no person id is recorded as an explicit null, not left absent', () => {
+  reset()
+  config.begin('parent-page')
+  config.recordPerson(null)
+  assert.strictEqual(config.read().notion.personId, null)
+})
+
+check('a config from a future version is refused rather than misread', () => {
+  reset()
+  fs.writeFileSync(config.CONFIG_PATH, JSON.stringify({ configVersion: 99, state: 'complete' }))
+  assert.throws(() => config.read(), /Refusing to read it/)
+})
+
+check('a config that will not parse is never overwritten', () => {
+  reset()
+  fs.writeFileSync(config.CONFIG_PATH, '{ this is not json')
+  assert.throws(() => config.read(), /may hold the only record/)
+  assert.strictEqual(fs.readFileSync(config.CONFIG_PATH, 'utf8'), '{ this is not json')
+})
+
+check('an install is not complete until it has been verified', () => {
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+  assert.throws(() => config.complete(null), /only complete once it has been verified/)
+})
+
+check('an install missing a database cannot be completed', () => {
+  reset()
+  config.begin('parent-page')
+  config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
+  assert.throws(() => config.complete('2026-08-18T00:00:00Z'), /not recorded/)
+})
+
+check('a complete install cannot be started over by accident', () => {
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+  config.complete('2026-08-18T00:00:00Z')
+  assert.throws(() => config.begin('parent-page'), /already complete/)
+})
+
+console.log('\nthe plan\n')
+
+check('phase A creates every database and puts no relation in any of them', () => {
+  const steps = install.phaseA()
+  assert.strictEqual(steps.length, counts.databases)
+  for (const step of steps) assert.ok(!step.arguments.schema.includes('RELATION('), `${step.title} has a relation in its create statement`)
+})
+
+check('phase B refuses to build a statement it has no id for', () => {
+  assert.throws(() => install.phaseB({}), /has no data source id yet/)
+})
+
+check('the plan can still be printed before anything exists, which is when it is shown', () => {
+  // The plan is what the one confirmation gate shows, and the gate is before
+  // anything is created. On a first run there are no ids at all, so this is the
+  // ordinary case rather than an edge one.
+  reset()
+  const ids = install.planningIds()
+  assert.strictEqual(Object.keys(ids).length, counts.databases)
+  assert.doesNotThrow(() => install.phaseA())
+  assert.doesNotThrow(() => install.phaseB(ids))
+  assert.doesNotThrow(() => install.viewCalls(ids))
+})
+
+check('and the command that prints it actually runs, on an empty config', () => {
+  // A text check on the functions above would pass while the CLI wrapping them
+  // threw. This runs the command a person is told to run.
+  reset()
+  const { execFileSync } = require('child_process')
+  const printed = execFileSync('node', [path.join(ROOT, 'plugins/setup/scripts/install.js'), 'plan'], {
+    env: { ...process.env, GTM_OPERATOR_CONFIG: config.CONFIG_PATH },
+    encoding: 'utf8'
+  })
+  assert.ok(printed.includes('Phase A'), printed)
+  assert.ok(printed.includes('Phase B'), printed)
+  for (const d of DATABASES) assert.ok(printed.includes(d.title), `the plan never mentions ${d.title}`)
+  for (const view of VIEWS) assert.ok(printed.includes(view.name), `the plan never mentions the ${view.name} view`)
+})
+
+check('every view call names the database id and the data source id', () => {
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+  const calls = install.viewCalls(config.ids())
+  assert.strictEqual(calls.length, VIEWS.length)
+  for (const call of calls) {
+    assert.ok(call.arguments.database_id.startsWith('db-'), `${call.name} has no database id`)
+    assert.ok(call.arguments.data_source_id.startsWith('ds-'), `${call.name} has no data source id`)
+  }
+})
+
+console.log('\nverify, the only thing that reports success\n')
+
+/** A read-back where the whole install went correctly. */
+function goodReadback () {
+  const databases = {}
+  for (const d of DATABASES) {
+    const properties = {}
+    for (const p of schema.DATABASES[d.key].properties) {
+      const type = p.type === 'text' ? 'text' : p.type === 'person' ? 'person' : p.type
+      properties[p.name] = { name: p.name, type }
+      if (p.options) properties[p.name].options = p.options.map(([name, color]) => ({ name, color }))
+    }
+    databases[d.key] = { schema: properties, views: [] }
+  }
+
+  for (const r of relations.propertyNamesFor('process')) void r
+
+  const { RELATIONS } = require(path.join(ROOT, 'plugins/setup/scripts/manifest.js'))
+  for (const r of RELATIONS) {
+    databases[r.from].schema[r.property] = {
+      name: r.property,
+      type: 'relation',
+      dataSourceUrl: `collection://ds-${r.to}`,
+      ...(r.kind === 'two-way' ? { propertyUrl: `collectionProperty://ds-${r.to}/xxxx` } : {})
+    }
+    if (r.reverse) {
+      databases[r.to].schema[r.reverse] = {
+        name: r.reverse,
+        type: 'relation',
+        dataSourceUrl: `collection://ds-${r.from}`,
+        propertyUrl: `collectionProperty://ds-${r.from}/yyyy`
+      }
+    }
+  }
+
+  const views = require(path.join(ROOT, 'plugins/setup/scripts/views.js'))
+  for (const view of VIEWS) {
+    const filters = []
+    for (const condition of view.filter || []) {
+      const op = views.OPS[condition.op]
+      const values = op.arity === 'many' ? condition.values : op.arity === 'one' ? [condition.value] : [null]
+      for (const value of values) {
+        filters.push({
+          type: 'property',
+          property: condition.property,
+          operator: op.readsBackAs,
+          ...(value === null ? {} : { value: { type: 'exact', value } })
+        })
+      }
+    }
+    databases[view.database].views.push({
+      name: view.name,
+      type: view.layout,
+      ...(view.calendarBy ? { calendarBy: view.calendarBy } : {}),
+      ...(filters.length ? { advancedFilter: { type: 'group', operator: 'and', filters } } : {}),
+      sorts: (view.sort || []).map(s => ({ property: s.property, direction: s.direction === 'DESC' ? 'descending' : 'ascending' }))
+    })
+  }
+
+  return { databases }
+}
+
+const setUpConfig = () => {
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+}
+
+check('a correct install passes', () => {
+  setUpConfig()
+  const { problems } = install.verify(goodReadback())
+  assert.strictEqual(problems.length, 0, problems.join('\n'))
+})
+
+check('the relation properties are not reported as somebody else additions', () => {
+  setUpConfig()
+  const { problems } = install.verify(goodReadback())
+  assert.ok(!problems.join('\n').includes('present in Notion and not in the schema'))
+})
+
+check('a database that was never read back is a failure, not a pass', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  delete readback.databases.calendar
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('nothing was read back for it'))
+})
+
+check('a missing property is caught', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  delete readback.databases.process.schema['Review cadence']
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('Review cadence: missing'))
+})
+
+check('a missing relation is caught', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  delete readback.databases.calendar.schema.Project
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('missing from Calendar'))
+})
+
+check('a missing view is caught', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  readback.databases.tasks.views = []
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('not found on the database'))
+})
+
+check('a view whose filter was discarded is caught', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  const view = readback.databases.projects.views.find(v => v.name === 'Needs attention')
+  view.advancedFilter = { type: 'group', operator: 'and', filters: [] }
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('silently discarded'))
+})
+
+console.log('\nand the half that reading a filter back cannot prove\n')
+
+check('a view whose rows were never checked says so, rather than passing quietly', () => {
+  // The 2026-08-18 measurement: a filter can read back perfectly and match
+  // nothing. Silence here would be the plugin making the same mistake it was
+  // built to catch.
+  setUpConfig()
+  const { problems, notes } = install.verify(goodReadback())
+  assert.strictEqual(problems.length, 0)
+  assert.ok(notes.some(n => n.includes('which rows it returns was not checked')), notes.join('\n'))
+})
+
+check('a view returning different rows from its own rule is caught', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': [] }
+  readback.sqlRows = { 'projects::Needs attention': ['A project with no problem statement'] }
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
+})
+
+check('a view returning the rows its rule returns is proved, and not merely noted', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': ['One', 'Two'] }
+  readback.sqlRows = { 'projects::Needs attention': ['Two', 'One'] }
+  const { problems, notes } = install.verify(readback)
+  assert.strictEqual(problems.length, 0, problems.join('\n'))
+  assert.ok(!notes.some(n => n.includes('projects') && n.includes('Needs attention')))
+})
+
+fs.rmSync(SANDBOX, { recursive: true, force: true })
+
+console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
+process.exit(failures ? 1 : 0)

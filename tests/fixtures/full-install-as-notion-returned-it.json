@@ -1,0 +1,1980 @@
+{
+  "_comment": "A whole install, as Notion returned it, on 2026-08-18. Six databases created, thirteen relations added, seven views built, then every data source and database fetched back and transcribed here. The viewRows and sqlRows are the second half of the proof: each view was queried in view mode, the same rule was run as SQL against the data source, and the two sets of rows are what is recorded. This is a record of what Notion does, not of what the design hoped it would do. Two transcription notes: the propertyUrl values are shortened, because verify only asks whether one is present, that being what separates a two-way relation from a one-way one; and the shared option lists were read back identically in every database that carries them, checked in each fetch rather than assumed. The Notion ids in this file are stand-ins. The real ones point at throwaway databases in a private workspace and this repository is public, so each was replaced with a fixed placeholder, consistently, so that every relation still points where it pointed. Nothing else was altered.",
+  "ids": {
+    "process": {
+      "databaseId": "db00000000000000000000000000pr0c",
+      "dataSourceId": "00000000-0000-4000-8000-00000000pr0c"
+    },
+    "memos": {
+      "databaseId": "db0000000000000000000000000mem0s",
+      "dataSourceId": "00000000-0000-4000-8000-0000000mem0s"
+    },
+    "projects": {
+      "databaseId": "db00000000000000000000000pr0ject",
+      "dataSourceId": "00000000-0000-4000-8000-00000pr0ject"
+    },
+    "tasks": {
+      "databaseId": "db0000000000000000000000000task5",
+      "dataSourceId": "00000000-0000-4000-8000-0000000task5"
+    },
+    "software": {
+      "databaseId": "db00000000000000000000000s0ftwr",
+      "dataSourceId": "00000000-0000-4000-8000-00000s0ftwr"
+    },
+    "calendar": {
+      "databaseId": "db0000000000000000000000calendr",
+      "dataSourceId": "00000000-0000-4000-8000-0000calendr"
+    }
+  },
+  "databases": {
+    "process": {
+      "schema": {
+        "Name": {
+          "name": "Name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Type": {
+          "name": "Type",
+          "type": "select",
+          "options": [
+            {
+              "name": "Strategy Decision",
+              "color": "purple"
+            },
+            {
+              "name": "SOP/ROE",
+              "color": "blue"
+            },
+            {
+              "name": "Enablement",
+              "color": "green"
+            },
+            {
+              "name": "Reporting",
+              "color": "yellow"
+            },
+            {
+              "name": "Technical Reference",
+              "color": "gray"
+            }
+          ]
+        },
+        "Domain": {
+          "name": "Domain",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer Success",
+              "color": "green"
+            },
+            {
+              "name": "Data & Systems",
+              "color": "gray"
+            },
+            {
+              "name": "Deal Execution",
+              "color": "orange"
+            },
+            {
+              "name": "GTM Strategy & ICP",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing & Campaigns",
+              "color": "pink"
+            },
+            {
+              "name": "Partnerships & Agency",
+              "color": "brown"
+            },
+            {
+              "name": "Pipeline & Demand Gen",
+              "color": "yellow"
+            },
+            {
+              "name": "Sales Enablement",
+              "color": "blue"
+            }
+          ]
+        },
+        "Audience": {
+          "name": "Audience",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AE",
+              "color": "blue"
+            },
+            {
+              "name": "Eng",
+              "color": "gray"
+            },
+            {
+              "name": "Everyone",
+              "color": "default"
+            },
+            {
+              "name": "FDE",
+              "color": "gray"
+            },
+            {
+              "name": "Finance",
+              "color": "green"
+            },
+            {
+              "name": "GM",
+              "color": "purple"
+            },
+            {
+              "name": "Leadership",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing",
+              "color": "pink"
+            },
+            {
+              "name": "Partner",
+              "color": "brown"
+            },
+            {
+              "name": "People Ops",
+              "color": "orange"
+            },
+            {
+              "name": "RevOps",
+              "color": "blue"
+            },
+            {
+              "name": "SDR",
+              "color": "blue"
+            },
+            {
+              "name": "Sales",
+              "color": "blue"
+            },
+            {
+              "name": "Solutions",
+              "color": "gray"
+            }
+          ]
+        },
+        "Segment": {
+          "name": "Segment",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "Enterprise",
+              "color": "purple"
+            },
+            {
+              "name": "Mid-Market",
+              "color": "blue"
+            },
+            {
+              "name": "SMB",
+              "color": "green"
+            }
+          ]
+        },
+        "L2C Lifecycle": {
+          "name": "L2C Lifecycle",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "0 - Everywhere all the time",
+              "color": "default"
+            },
+            {
+              "name": "1 - ToFu & Engagement",
+              "color": "pink"
+            },
+            {
+              "name": "2 - Eval & Demo",
+              "color": "orange"
+            },
+            {
+              "name": "3 - Contracting",
+              "color": "yellow"
+            },
+            {
+              "name": "4 - Customer Activation",
+              "color": "green"
+            },
+            {
+              "name": "5 - Onboarding",
+              "color": "blue"
+            },
+            {
+              "name": "6 - Steady State & Expansion",
+              "color": "purple"
+            },
+            {
+              "name": "7 - Contraction",
+              "color": "red"
+            },
+            {
+              "name": "8 - Renewal",
+              "color": "brown"
+            }
+          ]
+        },
+        "Tags": {
+          "name": "Tags",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AI",
+              "color": "blue"
+            },
+            {
+              "name": "Data",
+              "color": "gray"
+            },
+            {
+              "name": "Meetings",
+              "color": "orange"
+            },
+            {
+              "name": "Products",
+              "color": "purple"
+            },
+            {
+              "name": "Sales Messaging",
+              "color": "pink"
+            },
+            {
+              "name": "Tools",
+              "color": "green"
+            },
+            {
+              "name": "Teammate Onboarding",
+              "color": "yellow"
+            },
+            {
+              "name": "Teammate Offboarding",
+              "color": "brown"
+            }
+          ]
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Active",
+              "color": "green"
+            },
+            {
+              "name": "Draft",
+              "color": "yellow"
+            },
+            {
+              "name": "Archive",
+              "color": "gray"
+            }
+          ]
+        },
+        "Owner": {
+          "name": "Owner",
+          "type": "person"
+        },
+        "Last checked for accuracy": {
+          "name": "Last checked for accuracy",
+          "type": "date"
+        },
+        "Review cadence": {
+          "name": "Review cadence",
+          "type": "select",
+          "options": [
+            {
+              "name": "Monthly",
+              "color": "red"
+            },
+            {
+              "name": "Quarterly",
+              "color": "orange"
+            },
+            {
+              "name": "Twice a year",
+              "color": "yellow"
+            },
+            {
+              "name": "Yearly",
+              "color": "green"
+            },
+            {
+              "name": "On change only",
+              "color": "blue"
+            },
+            {
+              "name": "None",
+              "color": "gray"
+            }
+          ]
+        },
+        "Verified by": {
+          "name": "Verified by",
+          "type": "person"
+        },
+        "Verified date": {
+          "name": "Verified date",
+          "type": "date"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Parent": {
+          "name": "Parent",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Supersedes": {
+          "name": "Supersedes",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Child Docs": {
+          "name": "Child Docs",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Superseded By": {
+          "name": "Superseded By",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Memos": {
+          "name": "Memos",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000mem0s",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000mem0s/xxxxxx"
+        },
+        "Projects": {
+          "name": "Projects",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000pr0ject",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000pr0ject/xxxxxx"
+        },
+        "Software": {
+          "name": "Software",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000s0ftwr",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000s0ftwr/xxxxxx"
+        },
+        "Calendar": {
+          "name": "Calendar",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000calendr",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000calendr/xxxxxx"
+        }
+      },
+      "views": []
+    },
+    "memos": {
+      "schema": {
+        "Name": {
+          "name": "Name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Type": {
+          "name": "Type",
+          "type": "select",
+          "options": [
+            {
+              "name": "Memo",
+              "color": "default"
+            },
+            {
+              "name": "Project Update",
+              "color": "blue"
+            },
+            {
+              "name": "Team Update",
+              "color": "purple"
+            },
+            {
+              "name": "Meeting Notes",
+              "color": "gray"
+            },
+            {
+              "name": "Problem Statement",
+              "color": "orange"
+            },
+            {
+              "name": "Release",
+              "color": "green"
+            },
+            {
+              "name": "Incident Report",
+              "color": "red"
+            }
+          ]
+        },
+        "Published date": {
+          "name": "Published date",
+          "type": "date"
+        },
+        "Author": {
+          "name": "Author",
+          "type": "person"
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Draft",
+              "color": "yellow"
+            },
+            {
+              "name": "Published",
+              "color": "green"
+            },
+            {
+              "name": "Canceled",
+              "color": "gray"
+            }
+          ]
+        },
+        "Domain": {
+          "name": "Domain",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer Success",
+              "color": "green"
+            },
+            {
+              "name": "Data & Systems",
+              "color": "gray"
+            },
+            {
+              "name": "Deal Execution",
+              "color": "orange"
+            },
+            {
+              "name": "GTM Strategy & ICP",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing & Campaigns",
+              "color": "pink"
+            },
+            {
+              "name": "Partnerships & Agency",
+              "color": "brown"
+            },
+            {
+              "name": "Pipeline & Demand Gen",
+              "color": "yellow"
+            },
+            {
+              "name": "Sales Enablement",
+              "color": "blue"
+            }
+          ]
+        },
+        "Audience": {
+          "name": "Audience",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AE",
+              "color": "blue"
+            },
+            {
+              "name": "Eng",
+              "color": "gray"
+            },
+            {
+              "name": "Everyone",
+              "color": "default"
+            },
+            {
+              "name": "FDE",
+              "color": "gray"
+            },
+            {
+              "name": "Finance",
+              "color": "green"
+            },
+            {
+              "name": "GM",
+              "color": "purple"
+            },
+            {
+              "name": "Leadership",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing",
+              "color": "pink"
+            },
+            {
+              "name": "Partner",
+              "color": "brown"
+            },
+            {
+              "name": "People Ops",
+              "color": "orange"
+            },
+            {
+              "name": "RevOps",
+              "color": "blue"
+            },
+            {
+              "name": "SDR",
+              "color": "blue"
+            },
+            {
+              "name": "Sales",
+              "color": "blue"
+            },
+            {
+              "name": "Solutions",
+              "color": "gray"
+            }
+          ]
+        },
+        "Segment": {
+          "name": "Segment",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "Enterprise",
+              "color": "purple"
+            },
+            {
+              "name": "Mid-Market",
+              "color": "blue"
+            },
+            {
+              "name": "SMB",
+              "color": "green"
+            }
+          ]
+        },
+        "L2C Lifecycle": {
+          "name": "L2C Lifecycle",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "0 - Everywhere all the time",
+              "color": "default"
+            },
+            {
+              "name": "1 - ToFu & Engagement",
+              "color": "pink"
+            },
+            {
+              "name": "2 - Eval & Demo",
+              "color": "orange"
+            },
+            {
+              "name": "3 - Contracting",
+              "color": "yellow"
+            },
+            {
+              "name": "4 - Customer Activation",
+              "color": "green"
+            },
+            {
+              "name": "5 - Onboarding",
+              "color": "blue"
+            },
+            {
+              "name": "6 - Steady State & Expansion",
+              "color": "purple"
+            },
+            {
+              "name": "7 - Contraction",
+              "color": "red"
+            },
+            {
+              "name": "8 - Renewal",
+              "color": "brown"
+            }
+          ]
+        },
+        "Tags": {
+          "name": "Tags",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AI",
+              "color": "blue"
+            },
+            {
+              "name": "Data",
+              "color": "gray"
+            },
+            {
+              "name": "Meetings",
+              "color": "orange"
+            },
+            {
+              "name": "Products",
+              "color": "purple"
+            },
+            {
+              "name": "Sales Messaging",
+              "color": "pink"
+            },
+            {
+              "name": "Tools",
+              "color": "green"
+            },
+            {
+              "name": "Teammate Onboarding",
+              "color": "yellow"
+            },
+            {
+              "name": "Teammate Offboarding",
+              "color": "brown"
+            }
+          ]
+        },
+        "Period covered": {
+          "name": "Period covered",
+          "type": "date"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Corrects": {
+          "name": "Corrects",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000mem0s",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000mem0s/xxxxxx"
+        },
+        "Corrected by": {
+          "name": "Corrected by",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000mem0s",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000mem0s/xxxxxx"
+        },
+        "Artifacts": {
+          "name": "Artifacts",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Resulting Projects": {
+          "name": "Resulting Projects",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000pr0ject",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000pr0ject/xxxxxx"
+        },
+        "Projects": {
+          "name": "Projects",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000pr0ject",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000pr0ject/xxxxxx"
+        }
+      },
+      "views": []
+    },
+    "projects": {
+      "schema": {
+        "Name": {
+          "name": "Name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Intake",
+              "color": "gray"
+            },
+            {
+              "name": "Scoped",
+              "color": "blue"
+            },
+            {
+              "name": "In progress",
+              "color": "yellow"
+            },
+            {
+              "name": "Done",
+              "color": "green"
+            },
+            {
+              "name": "Canceled",
+              "color": "red"
+            }
+          ]
+        },
+        "Priority": {
+          "name": "Priority",
+          "type": "select",
+          "options": [
+            {
+              "name": "Prio 1",
+              "color": "red"
+            },
+            {
+              "name": "Prio 2",
+              "color": "orange"
+            },
+            {
+              "name": "Prio 3",
+              "color": "yellow"
+            },
+            {
+              "name": "TBD",
+              "color": "gray"
+            }
+          ]
+        },
+        "Level of Effort": {
+          "name": "Level of Effort",
+          "type": "select",
+          "options": [
+            {
+              "name": "Low",
+              "color": "green"
+            },
+            {
+              "name": "Med",
+              "color": "yellow"
+            },
+            {
+              "name": "High",
+              "color": "red"
+            },
+            {
+              "name": "TBD",
+              "color": "gray"
+            }
+          ]
+        },
+        "Owner": {
+          "name": "Owner",
+          "type": "person"
+        },
+        "Stakeholders": {
+          "name": "Stakeholders",
+          "type": "person"
+        },
+        "Domain": {
+          "name": "Domain",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer Success",
+              "color": "green"
+            },
+            {
+              "name": "Data & Systems",
+              "color": "gray"
+            },
+            {
+              "name": "Deal Execution",
+              "color": "orange"
+            },
+            {
+              "name": "GTM Strategy & ICP",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing & Campaigns",
+              "color": "pink"
+            },
+            {
+              "name": "Partnerships & Agency",
+              "color": "brown"
+            },
+            {
+              "name": "Pipeline & Demand Gen",
+              "color": "yellow"
+            },
+            {
+              "name": "Sales Enablement",
+              "color": "blue"
+            }
+          ]
+        },
+        "Segment": {
+          "name": "Segment",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "Enterprise",
+              "color": "purple"
+            },
+            {
+              "name": "Mid-Market",
+              "color": "blue"
+            },
+            {
+              "name": "SMB",
+              "color": "green"
+            }
+          ]
+        },
+        "L2C Lifecycle": {
+          "name": "L2C Lifecycle",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "0 - Everywhere all the time",
+              "color": "default"
+            },
+            {
+              "name": "1 - ToFu & Engagement",
+              "color": "pink"
+            },
+            {
+              "name": "2 - Eval & Demo",
+              "color": "orange"
+            },
+            {
+              "name": "3 - Contracting",
+              "color": "yellow"
+            },
+            {
+              "name": "4 - Customer Activation",
+              "color": "green"
+            },
+            {
+              "name": "5 - Onboarding",
+              "color": "blue"
+            },
+            {
+              "name": "6 - Steady State & Expansion",
+              "color": "purple"
+            },
+            {
+              "name": "7 - Contraction",
+              "color": "red"
+            },
+            {
+              "name": "8 - Renewal",
+              "color": "brown"
+            }
+          ]
+        },
+        "Timeline": {
+          "name": "Timeline",
+          "type": "date"
+        },
+        "Business outcome": {
+          "name": "Business outcome",
+          "type": "text"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Problem Statement": {
+          "name": "Problem Statement",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000mem0s",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000mem0s/xxxxxx"
+        },
+        "Memos": {
+          "name": "Memos",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000mem0s",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000mem0s/xxxxxx"
+        },
+        "Artifacts": {
+          "name": "Artifacts",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Tasks": {
+          "name": "Tasks",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000task5",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000task5/xxxxxx"
+        },
+        "Calendar": {
+          "name": "Calendar",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000calendr",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000calendr/xxxxxx"
+        }
+      },
+      "views": [
+        {
+          "name": "Default view",
+          "type": "table"
+        },
+        {
+          "name": "Needs attention",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "and",
+            "filters": [
+              {
+                "type": "property",
+                "property": "Problem Statement",
+                "propertyType": "relation",
+                "operator": "is_empty"
+              }
+            ]
+          },
+          "sorts": [
+            {
+              "property": "Name",
+              "direction": "ascending"
+            }
+          ]
+        }
+      ]
+    },
+    "tasks": {
+      "schema": {
+        "Task name": {
+          "name": "Task name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Not started",
+              "color": "gray"
+            },
+            {
+              "name": "In progress",
+              "color": "yellow"
+            },
+            {
+              "name": "Blocked",
+              "color": "red"
+            },
+            {
+              "name": "Done",
+              "color": "green"
+            },
+            {
+              "name": "Canceled",
+              "color": "brown"
+            }
+          ]
+        },
+        "Assignee": {
+          "name": "Assignee",
+          "type": "person"
+        },
+        "Due date": {
+          "name": "Due date",
+          "type": "date"
+        },
+        "Order": {
+          "name": "Order",
+          "type": "number"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Parent task": {
+          "name": "Parent task",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000task5",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000task5/xxxxxx"
+        },
+        "Sub-tasks": {
+          "name": "Sub-tasks",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-0000000task5",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-0000000task5/xxxxxx"
+        },
+        "Project": {
+          "name": "Project",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000pr0ject",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000pr0ject/xxxxxx"
+        }
+      },
+      "views": [
+        {
+          "name": "Default view",
+          "type": "table"
+        },
+        {
+          "name": "Needs attention",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "and",
+            "filters": [
+              {
+                "type": "property",
+                "property": "Project",
+                "propertyType": "relation",
+                "operator": "is_empty"
+              }
+            ]
+          },
+          "sorts": [
+            {
+              "property": "Task name",
+              "direction": "ascending"
+            }
+          ]
+        }
+      ]
+    },
+    "software": {
+      "schema": {
+        "Name": {
+          "name": "Name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Evaluating",
+              "color": "yellow"
+            },
+            {
+              "name": "Active",
+              "color": "green"
+            },
+            {
+              "name": "Sunsetting",
+              "color": "orange"
+            },
+            {
+              "name": "Retired",
+              "color": "gray"
+            },
+            {
+              "name": "Rejected",
+              "color": "red"
+            }
+          ]
+        },
+        "Importance": {
+          "name": "Importance",
+          "type": "select",
+          "options": [
+            {
+              "name": "Business critical",
+              "color": "red"
+            },
+            {
+              "name": "Important",
+              "color": "orange"
+            },
+            {
+              "name": "Standard",
+              "color": "gray"
+            }
+          ]
+        },
+        "Domain": {
+          "name": "Domain",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer Success",
+              "color": "green"
+            },
+            {
+              "name": "Data & Systems",
+              "color": "gray"
+            },
+            {
+              "name": "Deal Execution",
+              "color": "orange"
+            },
+            {
+              "name": "GTM Strategy & ICP",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing & Campaigns",
+              "color": "pink"
+            },
+            {
+              "name": "Partnerships & Agency",
+              "color": "brown"
+            },
+            {
+              "name": "Pipeline & Demand Gen",
+              "color": "yellow"
+            },
+            {
+              "name": "Sales Enablement",
+              "color": "blue"
+            }
+          ]
+        },
+        "Audience": {
+          "name": "Audience",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AE",
+              "color": "blue"
+            },
+            {
+              "name": "Eng",
+              "color": "gray"
+            },
+            {
+              "name": "Everyone",
+              "color": "default"
+            },
+            {
+              "name": "FDE",
+              "color": "gray"
+            },
+            {
+              "name": "Finance",
+              "color": "green"
+            },
+            {
+              "name": "GM",
+              "color": "purple"
+            },
+            {
+              "name": "Leadership",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing",
+              "color": "pink"
+            },
+            {
+              "name": "Partner",
+              "color": "brown"
+            },
+            {
+              "name": "People Ops",
+              "color": "orange"
+            },
+            {
+              "name": "RevOps",
+              "color": "blue"
+            },
+            {
+              "name": "SDR",
+              "color": "blue"
+            },
+            {
+              "name": "Sales",
+              "color": "blue"
+            },
+            {
+              "name": "Solutions",
+              "color": "gray"
+            }
+          ]
+        },
+        "Owner": {
+          "name": "Owner",
+          "type": "person"
+        },
+        "Technical owner": {
+          "name": "Technical owner",
+          "type": "person"
+        },
+        "Admins": {
+          "name": "Admins",
+          "type": "person"
+        },
+        "Billing owner": {
+          "name": "Billing owner",
+          "type": "person"
+        },
+        "Contract dates": {
+          "name": "Contract dates",
+          "type": "date"
+        },
+        "Notice deadline": {
+          "name": "Notice deadline",
+          "type": "date"
+        },
+        "Renews": {
+          "name": "Renews",
+          "type": "select",
+          "options": [
+            {
+              "name": "Automatically",
+              "color": "red"
+            },
+            {
+              "name": "Manually",
+              "color": "green"
+            },
+            {
+              "name": "No renewal",
+              "color": "gray"
+            },
+            {
+              "name": "Unknown",
+              "color": "yellow"
+            }
+          ]
+        },
+        "Annual cost": {
+          "name": "Annual cost",
+          "type": "number"
+        },
+        "Contract link": {
+          "name": "Contract link",
+          "type": "url"
+        },
+        "AI access": {
+          "name": "AI access",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "MCP (connected)",
+              "color": "green"
+            },
+            {
+              "name": "MCP (available)",
+              "color": "blue"
+            },
+            {
+              "name": "API",
+              "color": "purple"
+            },
+            {
+              "name": "CLI",
+              "color": "gray"
+            },
+            {
+              "name": "None",
+              "color": "default"
+            },
+            {
+              "name": "Unknown",
+              "color": "yellow"
+            }
+          ]
+        },
+        "Stores PII": {
+          "name": "Stores PII",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer PII",
+              "color": "red"
+            },
+            {
+              "name": "Employee PII",
+              "color": "orange"
+            },
+            {
+              "name": "None",
+              "color": "green"
+            },
+            {
+              "name": "Unknown",
+              "color": "yellow"
+            }
+          ]
+        },
+        "SOC 2": {
+          "name": "SOC 2",
+          "type": "select",
+          "options": [
+            {
+              "name": "Yes",
+              "color": "green"
+            },
+            {
+              "name": "No",
+              "color": "red"
+            },
+            {
+              "name": "Unknown",
+              "color": "yellow"
+            }
+          ]
+        },
+        "SSO": {
+          "name": "SSO",
+          "type": "select",
+          "options": [
+            {
+              "name": "Enforced",
+              "color": "green"
+            },
+            {
+              "name": "Enabled",
+              "color": "blue"
+            },
+            {
+              "name": "Available",
+              "color": "yellow"
+            },
+            {
+              "name": "Not supported",
+              "color": "red"
+            },
+            {
+              "name": "Unknown",
+              "color": "gray"
+            }
+          ]
+        },
+        "Customer facing": {
+          "name": "Customer facing",
+          "type": "checkbox"
+        },
+        "Given to new teammates": {
+          "name": "Given to new teammates",
+          "type": "checkbox"
+        },
+        "Login": {
+          "name": "Login",
+          "type": "url"
+        },
+        "Documentation": {
+          "name": "Documentation",
+          "type": "url"
+        },
+        "Status page": {
+          "name": "Status page",
+          "type": "url"
+        },
+        "Last reviewed": {
+          "name": "Last reviewed",
+          "type": "date"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Artifacts": {
+          "name": "Artifacts",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        },
+        "Integrates with": {
+          "name": "Integrates with",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000s0ftwr"
+        }
+      },
+      "views": []
+    },
+    "calendar": {
+      "schema": {
+        "Name": {
+          "name": "Name",
+          "type": "title"
+        },
+        "Description": {
+          "name": "Description",
+          "type": "text"
+        },
+        "Type": {
+          "name": "Type",
+          "type": "select",
+          "options": [
+            {
+              "name": "Event",
+              "color": "purple"
+            },
+            {
+              "name": "Content",
+              "color": "blue"
+            },
+            {
+              "name": "Social post",
+              "color": "pink"
+            },
+            {
+              "name": "Email send",
+              "color": "orange"
+            },
+            {
+              "name": "Launch",
+              "color": "green"
+            }
+          ]
+        },
+        "Status": {
+          "name": "Status",
+          "type": "select",
+          "options": [
+            {
+              "name": "Idea",
+              "color": "gray"
+            },
+            {
+              "name": "Planned",
+              "color": "yellow"
+            },
+            {
+              "name": "Confirmed",
+              "color": "blue"
+            },
+            {
+              "name": "Done",
+              "color": "green"
+            },
+            {
+              "name": "Canceled",
+              "color": "red"
+            }
+          ]
+        },
+        "Date": {
+          "name": "Date",
+          "type": "date"
+        },
+        "Our role": {
+          "name": "Our role",
+          "type": "select",
+          "options": [
+            {
+              "name": "Hosting",
+              "color": "purple"
+            },
+            {
+              "name": "Sponsoring",
+              "color": "orange"
+            },
+            {
+              "name": "Speaking",
+              "color": "blue"
+            },
+            {
+              "name": "Attending",
+              "color": "gray"
+            }
+          ]
+        },
+        "Format": {
+          "name": "Format",
+          "type": "select",
+          "options": [
+            {
+              "name": "Conference",
+              "color": "purple"
+            },
+            {
+              "name": "Webinar",
+              "color": "blue"
+            },
+            {
+              "name": "Dinner",
+              "color": "orange"
+            },
+            {
+              "name": "Roundtable",
+              "color": "yellow"
+            },
+            {
+              "name": "Workshop",
+              "color": "green"
+            },
+            {
+              "name": "Meetup",
+              "color": "pink"
+            }
+          ]
+        },
+        "Location": {
+          "name": "Location",
+          "type": "text"
+        },
+        "Channel": {
+          "name": "Channel",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "LinkedIn",
+              "color": "blue"
+            },
+            {
+              "name": "X",
+              "color": "gray"
+            },
+            {
+              "name": "Instagram",
+              "color": "pink"
+            },
+            {
+              "name": "TikTok",
+              "color": "red"
+            },
+            {
+              "name": "YouTube",
+              "color": "red"
+            },
+            {
+              "name": "Blog",
+              "color": "green"
+            },
+            {
+              "name": "Newsletter",
+              "color": "orange"
+            },
+            {
+              "name": "Podcast",
+              "color": "purple"
+            },
+            {
+              "name": "Email",
+              "color": "yellow"
+            }
+          ]
+        },
+        "Domain": {
+          "name": "Domain",
+          "type": "select",
+          "options": [
+            {
+              "name": "Customer Success",
+              "color": "green"
+            },
+            {
+              "name": "Data & Systems",
+              "color": "gray"
+            },
+            {
+              "name": "Deal Execution",
+              "color": "orange"
+            },
+            {
+              "name": "GTM Strategy & ICP",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing & Campaigns",
+              "color": "pink"
+            },
+            {
+              "name": "Partnerships & Agency",
+              "color": "brown"
+            },
+            {
+              "name": "Pipeline & Demand Gen",
+              "color": "yellow"
+            },
+            {
+              "name": "Sales Enablement",
+              "color": "blue"
+            }
+          ]
+        },
+        "Audience": {
+          "name": "Audience",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "AE",
+              "color": "blue"
+            },
+            {
+              "name": "Eng",
+              "color": "gray"
+            },
+            {
+              "name": "Everyone",
+              "color": "default"
+            },
+            {
+              "name": "FDE",
+              "color": "gray"
+            },
+            {
+              "name": "Finance",
+              "color": "green"
+            },
+            {
+              "name": "GM",
+              "color": "purple"
+            },
+            {
+              "name": "Leadership",
+              "color": "purple"
+            },
+            {
+              "name": "Marketing",
+              "color": "pink"
+            },
+            {
+              "name": "Partner",
+              "color": "brown"
+            },
+            {
+              "name": "People Ops",
+              "color": "orange"
+            },
+            {
+              "name": "RevOps",
+              "color": "blue"
+            },
+            {
+              "name": "SDR",
+              "color": "blue"
+            },
+            {
+              "name": "Sales",
+              "color": "blue"
+            },
+            {
+              "name": "Solutions",
+              "color": "gray"
+            }
+          ]
+        },
+        "Segment": {
+          "name": "Segment",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "Enterprise",
+              "color": "purple"
+            },
+            {
+              "name": "Mid-Market",
+              "color": "blue"
+            },
+            {
+              "name": "SMB",
+              "color": "green"
+            }
+          ]
+        },
+        "L2C Lifecycle": {
+          "name": "L2C Lifecycle",
+          "type": "multi_select",
+          "options": [
+            {
+              "name": "0 - Everywhere all the time",
+              "color": "default"
+            },
+            {
+              "name": "1 - ToFu & Engagement",
+              "color": "pink"
+            },
+            {
+              "name": "2 - Eval & Demo",
+              "color": "orange"
+            },
+            {
+              "name": "3 - Contracting",
+              "color": "yellow"
+            },
+            {
+              "name": "4 - Customer Activation",
+              "color": "green"
+            },
+            {
+              "name": "5 - Onboarding",
+              "color": "blue"
+            },
+            {
+              "name": "6 - Steady State & Expansion",
+              "color": "purple"
+            },
+            {
+              "name": "7 - Contraction",
+              "color": "red"
+            },
+            {
+              "name": "8 - Renewal",
+              "color": "brown"
+            }
+          ]
+        },
+        "Owner": {
+          "name": "Owner",
+          "type": "person"
+        },
+        "Link": {
+          "name": "Link",
+          "type": "url"
+        },
+        "Created time": {
+          "name": "Created time",
+          "type": "created_time"
+        },
+        "Project": {
+          "name": "Project",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000pr0ject",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000pr0ject/xxxxxx"
+        },
+        "Artifacts": {
+          "name": "Artifacts",
+          "type": "relation",
+          "dataSourceUrl": "collection://00000000-0000-4000-8000-00000000pr0c",
+          "propertyUrl": "collectionProperty://00000000-0000-4000-8000-00000000pr0c/xxxxxx"
+        }
+      },
+      "views": [
+        {
+          "name": "Default view",
+          "type": "table"
+        },
+        {
+          "name": "Calendar",
+          "type": "calendar",
+          "calendarBy": "Date"
+        },
+        {
+          "name": "In market",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "or",
+            "filters": [
+              {
+                "type": "property",
+                "property": "Status",
+                "propertyType": "select",
+                "operator": "enum_is",
+                "value": {
+                  "type": "exact",
+                  "value": "Confirmed"
+                }
+              },
+              {
+                "type": "property",
+                "property": "Status",
+                "propertyType": "select",
+                "operator": "enum_is",
+                "value": {
+                  "type": "exact",
+                  "value": "Done"
+                }
+              }
+            ]
+          },
+          "groupBy": {
+            "property": "Type",
+            "propertyType": "select"
+          },
+          "sorts": [
+            {
+              "property": "Date",
+              "direction": "descending"
+            }
+          ]
+        },
+        {
+          "name": "Upcoming",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "and",
+            "filters": [
+              {
+                "type": "property",
+                "property": "Status",
+                "propertyType": "select",
+                "operator": "enum_is",
+                "value": {
+                  "type": "exact",
+                  "value": "Confirmed"
+                }
+              }
+            ]
+          },
+          "sorts": [
+            {
+              "property": "Date",
+              "direction": "ascending"
+            }
+          ]
+        },
+        {
+          "name": "Undated",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "and",
+            "filters": [
+              {
+                "type": "group",
+                "operator": "or",
+                "filters": [
+                  {
+                    "type": "property",
+                    "property": "Status",
+                    "propertyType": "select",
+                    "operator": "enum_is",
+                    "value": {
+                      "type": "exact",
+                      "value": "Idea"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "property": "Status",
+                    "propertyType": "select",
+                    "operator": "enum_is",
+                    "value": {
+                      "type": "exact",
+                      "value": "Planned"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "operator": "and",
+                "filters": [
+                  {
+                    "type": "property",
+                    "property": "Date",
+                    "propertyType": "date",
+                    "operator": "is_empty"
+                  }
+                ]
+              }
+            ]
+          },
+          "sorts": [
+            {
+              "property": "Name",
+              "direction": "ascending"
+            }
+          ]
+        },
+        {
+          "name": "Needs attention",
+          "type": "table",
+          "advancedFilter": {
+            "type": "group",
+            "operator": "and",
+            "filters": [
+              {
+                "type": "group",
+                "operator": "or",
+                "filters": [
+                  {
+                    "type": "property",
+                    "property": "Status",
+                    "propertyType": "select",
+                    "operator": "enum_is",
+                    "value": {
+                      "type": "exact",
+                      "value": "Confirmed"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "property": "Status",
+                    "propertyType": "select",
+                    "operator": "enum_is",
+                    "value": {
+                      "type": "exact",
+                      "value": "Done"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "operator": "and",
+                "filters": [
+                  {
+                    "type": "property",
+                    "property": "Date",
+                    "propertyType": "date",
+                    "operator": "is_empty"
+                  }
+                ]
+              }
+            ]
+          },
+          "sorts": [
+            {
+              "property": "Name",
+              "direction": "ascending"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "viewRows": {
+    "calendar::Needs attention": [
+      "Confirmed with no date",
+      "Done with no date"
+    ],
+    "projects::Needs attention": [
+      "Unscoped project"
+    ],
+    "tasks::Needs attention": [
+      "Orphan task"
+    ],
+    "calendar::Undated": [
+      "Just an idea"
+    ],
+    "calendar::In market": [
+      "Confirmed and dated",
+      "Confirmed with no date",
+      "Done with no date"
+    ],
+    "calendar::Upcoming": [
+      "Confirmed and dated",
+      "Confirmed with no date"
+    ]
+  },
+  "sqlRows": {
+    "calendar::Needs attention": [
+      "Confirmed with no date",
+      "Done with no date"
+    ],
+    "projects::Needs attention": [
+      "Unscoped project"
+    ],
+    "tasks::Needs attention": [
+      "Orphan task"
+    ],
+    "calendar::Undated": [
+      "Just an idea"
+    ],
+    "calendar::In market": [
+      "Confirmed and dated",
+      "Confirmed with no date",
+      "Done with no date"
+    ],
+    "calendar::Upcoming": [
+      "Confirmed and dated",
+      "Confirmed with no date"
+    ]
+  }
+}

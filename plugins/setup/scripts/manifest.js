@@ -90,21 +90,64 @@ const RELATIONS = [
  * Calendar carries most of them because it is the one database whose default
  * table view is useless. A calendar that opens as a table has failed at the
  * thing it is named after.
+ *
+ * `filter`, `sort`, `groupBy` and `calendarBy` are structured on purpose.
+ * `views.js` compiles them into Notion's view DSL, and nothing anywhere writes
+ * a DSL string by hand. A filter written as text is a filter nothing can check
+ * against the schema, and every property name below is checked against
+ * `schema.js` before it is sent.
+ *
+ * The operators here are deliberately only the ones proved to work against a
+ * live workspace: `=`, `IN`, `IS EMPTY` and `IS NOT EMPTY`. See views.js for
+ * what happens to the ones that are not on that list.
  */
 const VIEWS = [
   { database: 'calendar', name: 'Calendar',   layout: 'calendar',
+    calendarBy: 'Date',
     describe: 'Calendar layout on Date, coloured by Type. The default view' },
+
+  // Both of the next two lost a date clause to measurement. See `reduced`.
   { database: 'calendar', name: 'In market',  layout: 'table',
-    describe: 'Confirmed and Done in the current month, grouped by Type' },
+    filter: [{ property: 'Status', op: 'IN', values: ['Confirmed', 'Done'] }],
+    groupBy: 'Type',
+    sort: [{ property: 'Date', direction: 'DESC' }],
+    reduced: 'The current-month window was dropped. Notion\'s view DSL has no relative date, and a literal one is accepted and matches nothing. Measured 2026-08-18',
+    describe: 'Confirmed and Done, grouped by Type, newest first' },
+
   { database: 'calendar', name: 'Upcoming',   layout: 'table',
-    describe: 'Confirmed with a Date in the future, soonest first' },
+    filter: [{ property: 'Status', op: '=', value: 'Confirmed' }],
+    sort: [{ property: 'Date', direction: 'ASC' }],
+    reduced: 'The in-the-future clause was dropped, for the same reason as In market. A confirmed row whose date has passed now sorts to the top, which is a row worth seeing rather than a row in the wrong place',
+    describe: 'Confirmed, soonest first' },
+
   { database: 'calendar', name: 'Undated',    layout: 'table',
+    filter: [
+      { property: 'Status', op: 'IN', values: ['Idea', 'Planned'] },
+      { property: 'Date', op: 'IS EMPTY' }
+    ],
+    sort: [{ property: 'Name', direction: 'ASC' }],
     describe: 'Idea and Planned with no date. The pile a calendar view cannot show' },
+
   { database: 'calendar', name: 'Needs attention', layout: 'table', rule: 'calendar-date',
+    filter: [
+      // Canceled is deliberately not here. "Confirmed or later" in the design
+      // means the statuses that promise something will happen, and a canceled
+      // row promises nothing, so requiring a date on one would report a row
+      // that is not broken.
+      { property: 'Status', op: 'IN', values: ['Confirmed', 'Done'] },
+      { property: 'Date', op: 'IS EMPTY' }
+    ],
+    sort: [{ property: 'Name', direction: 'ASC' }],
     describe: 'Confirmed or later with no date' },
+
   { database: 'projects', name: 'Needs attention', layout: 'table', rule: 'projects-problem-statement',
+    filter: [{ property: 'Problem Statement', op: 'IS EMPTY' }],
+    sort: [{ property: 'Name', direction: 'ASC' }],
     describe: 'Projects with no Problem Statement' },
+
   { database: 'tasks',    name: 'Needs attention', layout: 'table', rule: 'tasks-project',
+    filter: [{ property: 'Project', op: 'IS EMPTY' }],
+    sort: [{ property: 'Task name', direction: 'ASC' }],
     describe: 'Tasks with no Project' }
 ]
 

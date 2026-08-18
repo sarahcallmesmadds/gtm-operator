@@ -11,7 +11,7 @@ and which were known-open, and asked to find what was missed.
 
 Command: `codex exec --skip-git-repo-check -s read-only`, codex-cli 0.147.0,
 read-only, working from this directory. Session at
-`~/.codex/sessions/2026/08/17/rollout-2026-08-17T15-56-14-01a0114b-c809-7c03-837e-8d8746d9673c.jsonl`.
+`~/.codex/sessions/2026/08/17/rollout-2026-08-17T15-56-14-00000000-0000-0000-0000-000000000000.jsonl`.
 Full output at
 `scratchpad/codex-review-full.md` in the session scratchpad.
 
