@@ -257,15 +257,21 @@ function whyNotRepairable (relation, schemas, names = {}) {
   const to = byKey(relation.to).title
   const source = schemas[relation.from] || {}
 
-  // A property that is there but wrong is not something to add again. Adding it
-  // a second time is how duplicates appear, which is the one failure this whole
-  // file is arranged around.
+  // The name is already taken, so adding it again is how duplicates appear,
+  // which is the one failure this whole file is arranged around.
+  //
+  // It says taken, not wrong. This branch only asks whether something is
+  // sitting at that name. The relation can be in the missing list because the
+  // FAR side is gone while the near side is present and perfectly correct, and
+  // the reason here used to announce the near side as wrong in that case,
+  // pointing a person at the half that was fine. The finding itself is reported
+  // by `verifyRelation`, which does say which half is broken.
   //
   // Asked of the name the property actually has. Asking for the shipped name
   // answers "not there" for every renamed relation, and the answer decides
   // whether a second one gets added.
   if (source[mapped.propertyName(names[relation.from], relation.property)]) {
-    return `${from} already carries "${relation.property}" and it is wrong rather than absent. Adding it again would leave two.`
+    return `${from} already carries "${relation.property}". Adding it again would leave two.`
   }
 
   if (relation.kind !== 'two-way') return null
