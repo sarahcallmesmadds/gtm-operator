@@ -331,9 +331,60 @@ check('a renamed relation that is ALSO wrong is reported and never added a secon
   assert.ok(problems.includes('points at'),
     `the fixture does not reproduce the problem: this relation is supposed to point at the wrong database.\n${problems}`)
 
+  // Exactly what Process should get, not merely "not the Parent statement".
+  // A negative assertion is true of an empty string too, so it passes just as
+  // well if the repair path collapsed and produced nothing for anything, which
+  // is the guard never being consulted rather than the guard working.
+  const supersedes = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS
+    .find(r => r.from === 'process' && r.property === 'Supersedes')
   const repairs = relations.repairStatements(renamed, ids, names)
-  assert.ok(!(repairs.process || '').includes(`DUAL 'Child Docs'`),
-    `a relation that is present, renamed and wrong produced an ADD COLUMN. Adding it again is how one renamed relation becomes two:\n${repairs.process}`)
+  assert.strictEqual(repairs.process, relations.statementFor(supersedes, ids, names),
+    `Process should get the one relation this fixture is genuinely missing, and nothing for the renamed one. Adding the renamed one again is how one relation becomes two:\n${repairs.process}`)
+})
+
+check('a rename on the far side alone is followed by verify', () => {
+  // The near side is untouched and the TARGET renamed the reverse property.
+  // Looked up by its shipped name, the far side reads as a property Notion
+  // never created, which is the near-side bug sitting on the other end of the
+  // same relation.
+  const ids = {}
+  for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
+
+  // Memos.Artifacts points at Process, far side Process."Memos".
+  const relation = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+  const schemas = {
+    memos: { Artifacts: { type: 'relation', dataSourceUrl: 'collection://ds-process', propertyUrl: 'collectionProperty://ds-process/aaa' } },
+    process: { Announcements: { type: 'relation', dataSourceUrl: 'collection://ds-memos', propertyUrl: 'collectionProperty://ds-memos/bbb' } }
+  }
+  const names = { process: { properties: { Memos: 'Announcements' }, values: {} } }
+
+  const withoutMap = relations.verifyRelation(relation, schemas, ids).join('\n')
+  assert.ok(withoutMap.includes('has no "Memos"'),
+    `the fixture does not reproduce the problem: without the map the far side should read as absent.\n${withoutMap}`)
+
+  const withMap = relations.verifyRelation(relation, schemas, ids, names)
+  assert.deepStrictEqual(withMap, [],
+    `a far-side rename was still reported once the map was in play:\n${withMap.join('\n')}`)
+})
+
+check('a one-way relation is followed through the map too', () => {
+  // Software."Integrates with" is the only one-way relation. It creates nothing
+  // on the target, so it has no far side to fall back on: if the near-side
+  // lookup misses, the whole relation reads as absent.
+  const ids = {}
+  for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
+
+  const relation = require(path.join(SCRIPTS, 'manifest.js')).RELATIONS.find(r => r.kind === 'one-way')
+  const schemas = { [relation.from]: { 'Talks to': { type: 'relation', dataSourceUrl: `collection://ds-${relation.to}` } } }
+  const names = { [relation.from]: { properties: { [relation.property]: 'Talks to' }, values: {} } }
+
+  const withoutMap = relations.verifyRelation(relation, schemas, ids).join('\n')
+  assert.ok(withoutMap.includes('missing from'),
+    `the fixture does not reproduce the problem.\n${withoutMap}`)
+
+  const withMap = relations.verifyRelation(relation, schemas, ids, names)
+  assert.deepStrictEqual(withMap, [],
+    `a renamed one-way relation was still reported:\n${withMap.join('\n')}`)
 })
 
 check('a relation that was renamed and then deleted is rebuilt under the name it had', () => {
