@@ -267,8 +267,9 @@ function validate () {
     if (r.n !== i + 1) problems.push(`relation at index ${i} is numbered ${r.n}`)
   })
 
-  // Two relations may run between the same pair, and relations 5 and 6 do.
-  // What they may not do is share a reverse property name on the target, which
+  // Two relations may run between the same pair. None do as of 2026-08-18, when
+  // the second Projects-to-Memos relation was dropped, but the check stays:
+  // what they may not do is share a reverse property name on the target, which
   // is what made a problem statement file as a project update.
   const seen = new Map()
   for (const r of RELATIONS) {

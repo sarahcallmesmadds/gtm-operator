@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * Phase B. The thirteen relations, as statements to send and as something to
+ * Phase B. The twelve relations, as statements to send and as something to
  * check afterwards.
  *
  * `manifest.js` says which relations exist and which way they point. This turns
@@ -173,9 +173,21 @@ function verifyRelation (relation, schemas, ids) {
           if (!sameDataSource(reverse.dataSourceUrl, sourceId.dataSourceId)) {
             problems.push(`${label}: ${to}."${relation.reverse}" points at ${reverse.dataSourceUrl || 'nothing'} rather than back at ${from}`)
           }
-          const back = counterpartDataSource(reverse.propertyUrl)
-          if (reverse.propertyUrl && back && !sameDataSource(back, sourceId.dataSourceId)) {
-            problems.push(`${label}: ${to}."${relation.reverse}" has its counterpart on ${back} rather than back at ${from}`)
+          // The same three branches as the near side, rather than one
+          // condition that passes whenever a piece is missing. The first
+          // version of this read `if (propertyUrl && back && !same)`, so a
+          // reverse property with no counterpart url at all, or one in a shape
+          // this cannot parse, reported nothing. That is the skip-when-absent
+          // fault removed from the near side, rebuilt on the far side.
+          if (!reverse.propertyUrl) {
+            problems.push(`${label}: ${to}."${relation.reverse}" has no synced counterpart, so the far side is not the two-way property Notion should have created`)
+          } else {
+            const back = counterpartDataSource(reverse.propertyUrl)
+            if (!back) {
+              problems.push(`${label}: ${to}."${relation.reverse}" records its counterpart as ${reverse.propertyUrl}, which is not a collectionProperty:// url and cannot be checked`)
+            } else if (!sameDataSource(back, sourceId.dataSourceId)) {
+              problems.push(`${label}: ${to}."${relation.reverse}" has its counterpart on ${back} rather than back at ${from}`)
+            }
           }
         }
       }

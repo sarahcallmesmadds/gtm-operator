@@ -221,14 +221,29 @@ check('a relation is not passed just because the config forgot where it points',
   assert.ok(problems.join('\n').includes('not recorded in the config'), problems.join('\n'))
 })
 
+check('the far side with no synced counterpart at all is caught', () => {
+  // The near side was fixed and the far side kept the old shape:
+  // `if (propertyUrl && back && !same)` reported nothing when propertyUrl was
+  // absent. Reverting that branch fails this.
+  complains(4, s => { delete s.process.Memos.propertyUrl }, 'has no synced counterpart')
+})
+
+check('the far side with a counterpart url this cannot parse is caught', () => {
+  complains(4, s => { s.process.Memos.propertyUrl = 'wrong-shape' }, 'cannot be checked')
+})
+
 check('two missing data source ids do not count as pointing at the same place', () => {
   // sameDataSource returned true when both sides were absent, which is a check
   // answering "I do not know" with "yes".
+  //
+  // Asserted on the destination comparison itself. The earlier version of this
+  // test went through verifyRelation with an empty config id, where the
+  // not-recorded guard reports first, so it passed with sameDataSource
+  // reverted and proved nothing about it.
   const schemas = correctSchemas()
   delete schemas.memos.Artifacts.dataSourceUrl
-  const noTarget = { ...IDS, process: { databaseId: 'db-process', dataSourceId: '' } }
-  const problems = relations.verifyRelation(relation(4), schemas, noTarget)
-  assert.ok(problems.length > 0, 'absent on both sides should not pass')
+  const problems = relations.verifyRelation(relation(4), schemas, IDS)
+  assert.ok(problems.some(p => p.includes('points at nothing')), problems.join('\n'))
 })
 
 check('a synced counterpart living on the wrong database is caught', () => {

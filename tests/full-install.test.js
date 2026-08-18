@@ -82,22 +82,48 @@ check('the install that was run passes verification, apart from one dated gap', 
     // Added to schema.js after this install ran.
     'Software.Contract link: the description does not match'
   ]
+  // Plus one pair per filtered view, because the recorded rows are titles and
+  // titles stopped being evidence on 2026-08-18. Counted rather than listed,
+  // and the count is derived so a view appearing or disappearing moves it.
+  const filtered = VIEWS.filter(v => v.filter).length
+  expected.push(...Array.from({ length: filtered * 2 }, () => 'ROWS'))
   assert.strictEqual(problems.length, expected.length, problems.join('\n'))
-  for (const want of expected) {
+  for (const want of expected.filter(w => w !== 'ROWS')) {
     assert.ok(problems.some(p => p.startsWith(want)), `nothing reported: ${want}\n${problems.join('\n')}`)
   }
+  assert.strictEqual(
+    problems.filter(p => p.includes('cannot prove which rows came back')).length,
+    filtered * 2,
+    problems.join('\n')
+  )
 })
 
-check('every view was proved by the rows it returned, not just by its filter', () => {
+check('row evidence was recorded for every filtered view, and it is no longer usable', () => {
+  // Two claims, and the second one is the uncomfortable half.
+  //
+  // Every filtered view does have both halves recorded, which is what this
+  // originally checked. But they were recorded as page TITLES, and titles were
+  // ruled out on 2026-08-18: two rows can share one, and a title containing the
+  // separator the rows used to be joined on collided with a pair of other rows.
+  // So this fixture no longer proves any view, and pretending otherwise is the
+  // exact false confidence the change removed. It has to be re-recorded from a
+  // live install with page urls or ids on both sides.
   const fixture = recorded()
   withConfig(fixture)
-  const { unchecked } = install.verify(fixture)
-  assert.strictEqual(unchecked.length, 0, `still unchecked:\n${unchecked.join('\n')}`)
+
   for (const view of VIEWS.filter(v => v.filter)) {
     const key = `${view.database}::${view.name}`
     assert.ok(fixture.viewRows[key], `no view rows recorded for ${key}`)
     assert.ok(fixture.sqlRows[key], `no rule rows recorded for ${key}`)
   }
+
+  const { problems, unchecked, verified } = install.verify(fixture)
+  assert.strictEqual(unchecked.length, 0, `nothing should be merely unchecked:\n${unchecked.join('\n')}`)
+  assert.ok(
+    problems.filter(p => p.includes('cannot prove which rows came back')).length > 0,
+    'the recorded titles should be refused as evidence'
+  )
+  assert.strictEqual(verified, false)
 })
 
 check('the one-way relation came back with no synced counterpart', () => {
@@ -157,11 +183,16 @@ check('a relation that lost its far side is caught', () => {
 })
 
 check('a view returning rows its rule does not is caught', () => {
+  // Written with page ids rather than the fixture's titles, because titles are
+  // no longer evidence. Two rows on one side, one on the other.
   const fixture = recorded()
   withConfig(fixture)
-  fixture.viewRows['calendar::Needs attention'] = ['Confirmed and dated']
+  const one = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+  const two = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'
+  fixture.viewRows['calendar::Needs attention'] = [one]
+  fixture.sqlRows['calendar::Needs attention'] = [one, two]
   const { problems } = install.verify(fixture)
-  assert.ok(problems.join('\n').includes('different rows from the rule'))
+  assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
 })
 
 fs.rmSync(SANDBOX, { recursive: true, force: true })
