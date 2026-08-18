@@ -584,16 +584,15 @@ function verify (key, actual, alsoExpected = [], names = null) {
       const wanted = wantNames.filter(n => gotNames.includes(n))
       // Compared element by element rather than by joining on a separator.
       //
-      // NOT because the two forms are equivalent. They agree for every list
-      // this can actually be handed, and the join relied on two things the code
-      // never enforced: that no option name contains the separator, and that
-      // neither list holds a duplicate. Either one makes a join collide two
-      // different lists into one string. This form depends on neither, which is
-      // the reason to prefer it and is a different claim from equivalence.
+      // The two forms agree for every list this can be handed. The join was
+      // correct only while no option name contains the separator, which is true
+      // and which the code never enforced. This form does not rest on it. That
+      // is the reason to prefer it, and it is a smaller claim than equivalence.
       //
       // It used to join on a literal NUL, picked because no option name can
-      // contain one. That cost this file its searchability: two raw NUL bytes make `file` report schema.js as data,
-      // and grep skips a file it reads as binary SILENTLY, exiting 0 with no
+      // contain one. That cost this file its searchability: two raw NUL bytes
+      // make `file` report schema.js as data, and grep skips a file it reads as
+      // binary SILENTLY, exiting 0 with no
       // output. So every repository-wide search here missed 658 lines and said
       // nothing about it. `install.verify` already compares its lists this way
       // and says why; this is the same reason plus that one.
