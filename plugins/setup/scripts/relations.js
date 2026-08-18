@@ -237,19 +237,72 @@ function missing (schemas, ids, names = {}) {
   return RELATIONS.filter(r => verifyRelation(r, schemas, ids, names).length > 0)
 }
 
+/**
+ * Why a missing relation cannot be rebuilt, or null when it can.
+ *
+ * ONE statement builds both halves of a two-way relation, measured 2026-08-18.
+ * So a rebuild is only safe when BOTH halves are gone. Anything else asks
+ * Notion to create a counterpart that already exists.
+ *
+ * This used to look at the near side alone, and the near side alone cannot tell
+ * "both halves are gone" from "the near half was deleted and the far half is
+ * still standing". Run against those two fixtures on 2026-08-18 it produced a
+ * byte-identical statement for both. Whether Notion answers that by leaving two
+ * properties on the far database is not measured and would need a live
+ * workspace to settle, so this takes the safe direction: report it, and let a
+ * person look.
+ */
+function whyNotRepairable (relation, schemas, names = {}) {
+  const from = byKey(relation.from).title
+  const to = byKey(relation.to).title
+  const source = schemas[relation.from] || {}
+
+  // A property that is there but wrong is not something to add again. Adding it
+  // a second time is how duplicates appear, which is the one failure this whole
+  // file is arranged around.
+  //
+  // Asked of the name the property actually has. Asking for the shipped name
+  // answers "not there" for every renamed relation, and the answer decides
+  // whether a second one gets added.
+  if (source[mapped.propertyName(names[relation.from], relation.property)]) {
+    return `${from} already carries "${relation.property}" and it is wrong rather than absent. Adding it again would leave two.`
+  }
+
+  if (relation.kind !== 'two-way') return null
+
+  const far = schemas[relation.to]
+  if (!far) {
+    return `${to} was not read back, so whether it still carries "${relation.reverse}" is unknown. Not knowing is not the same as it being gone.`
+  }
+
+  if (far[mapped.propertyName(names[relation.to], relation.reverse)]) {
+    return `${to} still has "${relation.reverse}", the half Notion syncs. One statement builds both halves, so rebuilding this one would ask for a counterpart that is already there.`
+  }
+
+  return null
+}
+
+/**
+ * Every missing relation that cannot be rebuilt, with the reason.
+ *
+ * Separate from `repairStatements` because a skip nobody reports reads exactly
+ * like nothing being wrong, and three of the four skips here are states a
+ * person has to resolve by hand.
+ */
+function unrepairable (schemas, ids, names = {}) {
+  const out = []
+  for (const relation of missing(schemas, ids, names)) {
+    const reason = whyNotRepairable(relation, schemas, names)
+    if (reason) out.push({ n: relation.n, from: relation.from, property: relation.property, reason })
+  }
+  return out
+}
+
 /** The statements for whatever is still missing, grouped by database. */
 function repairStatements (schemas, ids, names = {}) {
   const out = {}
   for (const relation of missing(schemas, ids, names)) {
-    const source = schemas[relation.from] || {}
-    // A property that is there but wrong is not something to add again. Adding
-    // it a second time is how duplicates appear, which is the one failure this
-    // whole file is arranged around.
-    //
-    // Asked of the name the property actually has. Asking for the shipped name
-    // answers "not there" for every renamed relation, and the answer decides
-    // whether a second one gets added.
-    if (source[mapped.propertyName(names[relation.from], relation.property)]) continue
+    if (whyNotRepairable(relation, schemas, names)) continue
     const statement = statementFor(relation, ids, names)
     out[relation.from] = out[relation.from] ? `${out[relation.from]}; ${statement}` : statement
   }
@@ -279,7 +332,7 @@ module.exports = {
   // Exported for a test. Both callers below reach it only after their own
   // not-recorded guards have fired, so the two-missing case cannot be reached
   // through verifyRelation and can only be pinned directly.
-  sameDataSource, statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, propertyNamesFor, observedPropertyNamesFor, bare }
+  sameDataSource, statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, unrepairable, whyNotRepairable, propertyNamesFor, observedPropertyNamesFor, bare }
 
 if (require.main === module) {
   // Placeholder ids, so the shape of every statement can be read without a

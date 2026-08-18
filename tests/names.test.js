@@ -415,7 +415,13 @@ check('a relation that was renamed and then deleted is rebuilt under the name it
   const ids = {}
   for (const d of require(path.join(SCRIPTS, 'manifest.js')).DATABASES) ids[d.key] = { dataSourceId: `ds-${d.key}` }
 
-  const gone = { process: { 'Child Docs': { type: 'relation', dataSourceUrl: 'collection://ds-process', propertyUrl: 'collectionProperty://ds-process/def' } } }
+  // BOTH halves are gone, which is the only state a two-way relation can be
+  // rebuilt from. This fixture used to leave "Child Docs" standing, which made
+  // it the half-present case as well as the renamed one, and a rebuild there is
+  // now refused for a reason that has nothing to do with names. See
+  // `a self-relation whose far side survived is never re-added` in
+  // tests/relations.test.js, which is where that case is tested on purpose.
+  const gone = { process: {} }
   const names = { process: { properties: { Parent: 'Parent Doc', 'Child Docs': 'Child Docs' }, values: {} } }
 
   const repairs = relations.repairStatements(gone, ids, names)

@@ -193,6 +193,68 @@ check('a repair run adds the missing relation and only that one', () => {
   assert.strictEqual(statements.memos, `ADD COLUMN "Artifacts" RELATION('ds-process', DUAL 'Memos')`)
 })
 
+check('a two-way relation whose far side survived is never re-added', () => {
+  // The near side was deleted and Notion left the synced property standing on
+  // the far database. Re-adding the near side sends the SAME statement that
+  // builds a fresh two-way pair, so it asks for a counterpart that is already
+  // there.
+  //
+  // Measured 2026-08-18: `repairStatements` produced a byte-identical statement
+  // for this fixture and for the one above, where both sides are genuinely
+  // gone. It decides on the near side alone, so it cannot tell them apart.
+  // Whether Notion then leaves two properties on the far side is NOT measured
+  // and would need a live workspace. This takes the safe direction and reports
+  // instead of sending.
+  const relation = RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+  const schemas = correctSchemas()
+  delete schemas.memos.Artifacts
+
+  assert.ok(schemas.process[relation.reverse], 'the fixture is wrong: the far side should still be there')
+  assert.ok(relations.missing(schemas, IDS).some(r => r.n === relation.n), 'the broken relation should be reported')
+  assert.deepStrictEqual(relations.repairStatements(schemas, IDS), {}, 'and it should not be re-added')
+
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said, 'skipping it silently is the same as not noticing it')
+  assert.ok(/still has/.test(said.reason), `the reason should name the surviving far side:\n${said.reason}`)
+})
+
+check('a self-relation whose far side survived is never re-added', () => {
+  // Both halves live on one database, so this is the case a cross-database
+  // fixture cannot reach.
+  const relation = RELATIONS.find(r => r.self && r.kind === 'two-way')
+  const schemas = correctSchemas()
+  delete schemas[relation.from][relation.property]
+
+  assert.ok(schemas[relation.to][relation.reverse], 'the fixture is wrong: the far side should still be there')
+  assert.strictEqual(relations.repairStatements(schemas, IDS)[relation.from], undefined,
+    'a self-relation was rebuilt while its other half was still on the database')
+})
+
+check('a relation whose far side was never read back is not re-added', () => {
+  // Not knowing is not the same as knowing it is absent, and only one of the
+  // two is safe to send a statement about.
+  const relation = RELATIONS.find(r => r.kind === 'two-way' && r.from !== r.to)
+  const schemas = correctSchemas()
+  delete schemas[relation.from][relation.property]
+  delete schemas[relation.to]
+
+  // Its own database only. Removing the far side's schema also makes every
+  // relation that STARTS there read as absent, and those are a different case.
+  assert.strictEqual(relations.repairStatements(schemas, IDS)[relation.from], undefined,
+    'a relation was rebuilt without anybody having looked at the side it syncs to')
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said && /not read back/.test(said.reason), `the reason should say the far side was not read back:\n${said && said.reason}`)
+})
+
+check('a relation that is present but wrong is reported as unrepairable, not dropped', () => {
+  const schemas = correctSchemas()
+  delete schemas.memos.Artifacts.propertyUrl
+  const relation = RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said, 'the existing guard skipped it without saying so, which reads as nothing being wrong')
+  assert.ok(/already carries/.test(said.reason), `the reason should say the property is already there:\n${said.reason}`)
+})
+
 check('a relation that is present but wrong is never added a second time', () => {
   // Adding it again is how duplicates appear, and a duplicate cannot be
   // repaired by this plugin: it does not delete anything, ever.
