@@ -234,6 +234,23 @@ check('an option map for a property with no options is refused', () => {
   assert.throws(() => config.recordNames('process', names), /which has no options/)
 })
 
+check('a name recorded as nothing is refused, not treated as unchanged', () => {
+  // The lookups fall back to the logical name when the mapped value is falsy,
+  // so an entry of "" or null passes as a complete map and then reads the
+  // shipped name. A rename recorded as nothing is a rename silently dropped.
+  fresh()
+  for (const nothing of ['', null, 42, '   ']) {
+    const names = schema.identityNames('process')
+    names.properties.Domain = nothing
+    assert.throws(() => config.recordNames('process', names), /is not a name/,
+      `a property mapped to ${JSON.stringify(nothing)} was accepted`)
+  }
+  const values = schema.identityNames('process')
+  values.values.Type.Reporting = ''
+  assert.throws(() => config.recordNames('process', values), /is not a name/,
+    'an option mapped to an empty string was accepted')
+})
+
 check('a map already on disk is checked before it is kept, not kept because it is there', () => {
   fresh()
   const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))

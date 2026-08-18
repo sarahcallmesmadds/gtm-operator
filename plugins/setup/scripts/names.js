@@ -127,6 +127,15 @@ function oneToOne (map, expectedLogical, what, belongsTo) {
     if (!expectedLogical.includes(logical)) {
       out.push(`"${logical}" is in the map and is not a ${what} ${belongsTo}`)
     }
+    // An entry that is empty, null, or not a string at all is worse than a
+    // missing one. The lookups fall back to the logical name whenever the
+    // mapped value is falsy, so such an entry passes validation and then reads
+    // the shipped name while the map claims to be complete. A rename recorded
+    // as nothing is a rename silently not followed.
+    const observed = map[logical]
+    if (typeof observed !== 'string' || !observed.trim()) {
+      out.push(`"${logical}" maps to ${JSON.stringify(observed)}, which is not a name. A map entry has to be the name this workspace uses`)
+    }
   }
 
   const seen = new Map()
