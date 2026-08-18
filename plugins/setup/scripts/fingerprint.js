@@ -28,6 +28,20 @@
  * table and reaches no statement. Nothing has to be listed as excluded: if it is
  * not sent, it is not here.
  *
+ * ORDER IS PART OF WHAT IS SENT, and that is deliberate. Phase B sends one
+ * statement per database with that database's relations joined in order, so
+ * swapping two of them changes the string Notion receives. The hash moves with
+ * it, which was raised on 2026-08-18 as over-hashing on the grounds that the
+ * same SET of statements is sent. The set is the same and the bytes are not.
+ *
+ * The alternative offered was to sort the relations in both the hash and the
+ * statement builder. That was turned down: it changes what an install sends in
+ * order to hold a hash still, which is the wrong way round, and the sorted order
+ * has never been run against a live workspace. The cost accepted is that
+ * reordering relations on one database asks for a re-verify. Nothing in this
+ * design does that except a person editing the manifest, and a re-verify is
+ * cheap next to a proof that is quietly wrong.
+ *
  * The ids are placeholders on purpose. Real data source ids differ between
  * installs and would make every fingerprint unique to one workspace, which is
  * the opposite of what this is for.
