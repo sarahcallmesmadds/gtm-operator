@@ -243,18 +243,25 @@ check('a description that came back different is caught', () => {
   }
 })
 
-check('a read-back that never recorded descriptions is not complained about', () => {
-  // The full-install fixture was transcribed without them. Reporting a missing
-  // description there would be complaining about the recording, not the row.
-  const partial = clean()
-  for (const p of Object.values(partial)) delete p.description
+check('a read-back with no description key is reported, not passed', () => {
+  // This used to assert the opposite, on the reasoning that the fixtures were
+  // partial transcriptions and complaining would be complaining about the
+  // record. Measured 2026-08-18 against the live test workspace: fetching the
+  // Projects and Software data sources returned a `description` on every one of
+  // their properties, empty string where there is none. So a read-back with the
+  // key absent is not something Notion produces, and treating it as one meant a
+  // description Notion had silently discarded looked exactly like a pass.
+  const missing = clean()
+  delete missing.Description.description
   const want = schema.DATABASES.process.properties.find(p => p.name === 'Description')
+  const had = want.description
   want.description = 'one sentence describing the artifact'
   try {
-    const problems = schema.verify('process', partial)
-    assert.ok(!problems.join('\n').includes('description'), problems.join('\n'))
+    const problems = schema.verify('process', missing)
+    assert.ok(problems.join('\n').includes('the description does not match'), problems.join('\n'))
   } finally {
-    delete want.description
+    if (had === undefined) delete want.description
+    else want.description = had
   }
 })
 

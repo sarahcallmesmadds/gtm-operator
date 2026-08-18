@@ -202,5 +202,42 @@ check('the relation property names include both directions', () => {
   assert.ok(names.includes('Memos'), 'and the ones other databases put on it')
 })
 
+console.log('\nwhat the check used to skip rather than fail\n')
+
+check('a relation is not passed just because the config forgot where it points', () => {
+  // The destination check used to be gated on the target being in the config,
+  // so a workspace read back but never recorded had every relation destination
+  // go unchecked and every relation pass.
+  const withoutTarget = { ...IDS }
+  delete withoutTarget.memos
+  const problems = relations.verifyRelation(relation(4), correctSchemas(), withoutTarget)
+  assert.ok(problems.length > 0, 'an unrecorded target should not be a pass')
+  assert.ok(problems.join('\n').includes('not recorded in the config'), problems.join('\n'))
+})
+
+check('two missing data source ids do not count as pointing at the same place', () => {
+  // sameDataSource returned true when both sides were absent, which is a check
+  // answering "I do not know" with "yes".
+  const schemas = correctSchemas()
+  delete schemas.memos.Artifacts.dataSourceUrl
+  const noTarget = { ...IDS, process: { databaseId: 'db-process', dataSourceId: '' } }
+  const problems = relations.verifyRelation(relation(4), schemas, noTarget)
+  assert.ok(problems.length > 0, 'absent on both sides should not pass')
+})
+
+check('a synced counterpart living on the wrong database is caught', () => {
+  // It used to be enough for propertyUrl to exist. Where it pointed was never
+  // read, which is one bit for the thing that separates two-way from one-way.
+  complains(4, s => { s.memos.Artifacts.propertyUrl = 'collectionProperty://ds-calendar/xxxx' }, 'its synced counterpart sits on')
+})
+
+check('a counterpart url in a shape this cannot read is said out loud', () => {
+  complains(4, s => { s.memos.Artifacts.propertyUrl = 'something-else-entirely' }, 'cannot be checked')
+})
+
+check('the far side pointing at the wrong database is caught by its counterpart too', () => {
+  complains(4, s => { s.process.Memos.propertyUrl = 'collectionProperty://ds-tasks/yyyy' }, 'rather than back at')
+})
+
 console.log(failures ? `\n${failures} failed.\n` : `\nAll checks passed. ${counts.relations} relations.\n`)
 process.exit(failures ? 1 : 0)

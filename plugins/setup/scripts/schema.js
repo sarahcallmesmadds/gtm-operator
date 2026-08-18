@@ -515,11 +515,24 @@ function verify (key, actual, alsoExpected = []) {
       problems.push(`${db.title}.${want.name}: expected type ${expected}, got ${got.type}`)
     }
 
-    // Checked only when the read-back actually carries the field. A real fetch
-    // always does, returning "" where there is none. A partial transcription may
-    // not, and reporting a missing description against a recording that never
-    // captured one would be complaining about the record rather than the row.
-    if (want.description && 'description' in got && got.description !== want.description) {
+    // Checked whenever the manifest asks for a description.
+    //
+    // It used to be checked only when the read-back carried the key at all,
+    // defended as not complaining about a partial transcription. That guard was
+    // the same silent-discard shape this file exists to catch: a description
+    // Notion dropped is indistinguishable from a recording that never captured
+    // one, and the guard answered both with a pass.
+    //
+    // Measured 2026-08-18 against the live test workspace, on Projects and
+    // Software: EVERY property comes back carrying `description`, and it is the
+    // empty string where there is none. So an absent key is not a real fetch,
+    // and treating it as one was the thing hiding a discarded description. The
+    // fixtures in tests/ predate this measurement and do not carry the key,
+    // which is why this looked defensible from inside the repository.
+    //
+    // A property the manifest gives no description is still not required to
+    // have one.
+    if (want.description && got.description !== want.description) {
       problems.push(
         `${db.title}.${want.name}: the description does not match.\n` +
         `    wanted: ${want.description}\n` +

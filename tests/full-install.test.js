@@ -57,18 +57,27 @@ const withConfig = fixture => {
 
 console.log('\na real install, read back from Notion\n')
 
-check('the install that was run passes verification', () => {
+check('the install that was run passes verification, apart from one dated gap', () => {
+  // Not asserted as zero any more, and the difference is worth reading.
+  //
+  // This fixture records an install run before `Contract link` gained its
+  // description in schema.js, so the current manifest asks for a description
+  // that install could not have created. Asserting the exact remaining problem
+  // rather than loosening the check keeps the fixture honest and still goes red
+  // the moment anything ELSE stops matching. Re-record the fixture and this
+  // goes back to zero.
   const fixture = recorded()
   withConfig(fixture)
   const { problems } = install.verify(fixture)
-  assert.strictEqual(problems.length, 0, problems.join('\n'))
+  assert.strictEqual(problems.length, 1, problems.join('\n'))
+  assert.ok(problems[0].startsWith('Software.Contract link: the description does not match'), problems[0])
 })
 
 check('every view was proved by the rows it returned, not just by its filter', () => {
   const fixture = recorded()
   withConfig(fixture)
-  const { notes } = install.verify(fixture)
-  assert.strictEqual(notes.length, 0, `still unchecked:\n${notes.join('\n')}`)
+  const { unchecked } = install.verify(fixture)
+  assert.strictEqual(unchecked.length, 0, `still unchecked:\n${unchecked.join('\n')}`)
   for (const view of VIEWS.filter(v => v.filter)) {
     const key = `${view.database}::${view.name}`
     assert.ok(fixture.viewRows[key], `no view rows recorded for ${key}`)

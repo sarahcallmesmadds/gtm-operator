@@ -251,8 +251,8 @@ second row for the same contract if somebody approves it.
 
 ### Status ships as a select, and the user converts it by hand
 
-**Measured 2026-08-18.** The API creates a status property but cannot create or
-rename its options. Both forms are rejected at the parser:
+**Measured 2026-08-18.** Both DDL forms are rejected at the parser, before
+anything about the options is reached:
 
 - `ALTER COLUMN "Status" SET STATUS('Draft':yellow, ...)` -> 400
 - `ADD COLUMN "X" STATUS('Draft':yellow, ...)` -> 400
@@ -265,9 +265,25 @@ the six databases and it discards values the design chose.
 `POST-INSTALL.md` tells the user to convert each one and where each option goes
 in the three status groups.
 
-**Tasks is the exception and ships as a status property.** `Percent complete` on
-Projects rolls up task status by group, and group rollups exist only for status
-properties. The user adds the two options the default list is missing.
+**All six ship as selects. There is no exception.** This section said until
+2026-08-18 that Tasks was the exception and shipped as a status property, and
+`POST-INSTALL.md` repeated it. It was wrong on both counts. No route to a status
+property exists through this API, so no install could have produced one, and
+`schema.js` has always created the Tasks `Status` as a select like the other
+five. The wording above it, "the API creates a status property but cannot create
+or rename its options", was the premise that made the exception look possible,
+and the two measured 400s directly beneath it already contradicted that premise.
+
+**What it cost.** `Percent complete` on Projects rolls up task status by group
+and group rollups exist only on status properties, so the rollup does not work
+until Tasks is converted by hand like the rest. A user following the old
+`POST-INSTALL.md` would have skipped that conversion and never learned why the
+number stayed blank. Tasks is now the sixth row of the conversion table.
+
+**Still open: whether Tasks should carry a `Paused` option.** The old text told
+the user to add one, which never existed in `schema.js` and so was never in any
+install. Adding it is a schema change and a naming decision, and it has not been
+made.
 
 **The same limit applies to page layout.** Property grouping, tabs and the
 sidebar are UI only. The API reaches the schema and the view configuration and

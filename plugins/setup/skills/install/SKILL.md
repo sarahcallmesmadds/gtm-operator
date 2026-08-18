@@ -1,6 +1,6 @@
 ---
 name: install
-description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is the settings path: it creates nothing and offers to change the five answers.
+description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
 allowed-tools: Read, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
 ---
 
@@ -173,6 +173,11 @@ dies from here on leaves a file that says so.
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" phase-a
 ```
 
+It reads the parent page id out of the config that `begin` just wrote, and puts
+it in every create call. It refuses if `begin` has not run, rather than sending a
+payload with a placeholder where the page id belongs, which is what it did until
+2026-08-18.
+
 Send each one as a create-database call, and after each, record what came back:
 
 ```bash
@@ -242,19 +247,36 @@ rule as SQL against the data source, and compare. `views.js` prints the SQL:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/views.js"
 ```
 
-`verify` compares the two sets for you and says `unchecked` for any view where
-you did not supply both. **Do not treat `unchecked` as a pass.** It is the
-plugin telling you which half of the proof is missing.
+**Rows are compared by page identity, not by title.** The rule query selects
+`url`, so supply page urls or page ids on both sides. Titles are not unique, and
+two rows sharing one used to compare as the same row.
+
+`verify` compares the two sets for you and reports `not proved` for any view
+where you did not supply both, and for any view where the two sides both came
+back empty. **Two empty sets prove nothing**: on a fresh workspace that is what
+every filtered view looks like, and until 2026-08-18 it passed.
+
+**`unchecked` is not a pass, and now it does not read as one.** `verify` exits
+non-zero unless everything matched and everything was proved, and it records the
+result itself. Nothing is recorded when anything is unproved, so `complete` has
+nothing to accept.
 
 ## Step 7. Only then, say it is complete
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" complete <the timestamp of the verify that passed>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" complete
 ```
 
-`complete` refuses if a database is unrecorded, and `state: complete` is a claim
-that the workspace matches the manifest. **The create calls returning without an
-error is a different and much weaker claim.**
+**It takes no timestamp.** It used to take the time of the verify that passed and
+believe it, so any non-empty string stood in for a check that may never have run.
+`verify` now records its own result, and only when it proved everything, and
+`complete` reads that and nothing else.
+
+`complete` refuses if a database is unrecorded, refuses if no verify has passed,
+and `state: complete` is a claim that the workspace matches the manifest. **The
+create calls returning without an error is a different and much weaker claim.**
+Recording a database again after a verify throws the verify away, because the
+proof was taken against what the config said at the time.
 
 ## Step 8. Say what to do next, not that it is done
 

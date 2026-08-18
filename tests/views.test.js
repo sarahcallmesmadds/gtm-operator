@@ -204,5 +204,117 @@ check('a view with no filter has no rule query, rather than a query matching eve
   assert.strictEqual(views.expectedRows(find('calendar', 'Calendar')), null)
 })
 
+console.log('\nthe structure and the grouping, which the flat signature threw away\n')
+
+const fixture = require(path.join(ROOT, 'tests/fixtures/full-install-as-notion-returned-it.json'))
+const asReturned = (database, name) => JSON.parse(JSON.stringify(
+  fixture.databases[database].views.find(v => v.name === name)
+))
+
+check('every filter in the real read-back still passes', () => {
+  // The guard against the new check being stricter than Notion. If this fails,
+  // the verifier is calling a correct install broken, which is how a verifier
+  // gets switched off.
+  for (const view of VIEWS) {
+    const actual = asReturned(view.database, view.name)
+    assert.deepStrictEqual(views.verifyView(view, actual), [], `${view.database} / ${view.name}`)
+  }
+})
+
+check('an OR sitting where an AND was asked for is caught', () => {
+  // It used to pass. The signature was a sorted flat list, so a view showing
+  // rows matching ANY clause was indistinguishable from one showing rows
+  // matching ALL of them.
+  const view = find('calendar', 'Undated')
+  const actual = asReturned('calendar', 'Undated')
+  actual.advancedFilter.operator = 'or'
+  assert.ok(views.verifyView(view, actual).join('\n').includes('not the one that was asked for'))
+})
+
+check('the same filter on a different property type is caught', () => {
+  const view = find('calendar', 'Undated')
+  const actual = asReturned('calendar', 'Undated')
+  actual.advancedFilter.filters[1].filters[0].propertyType = 'rich_text'
+  assert.ok(views.verifyView(view, actual).join('\n').includes('not the one that was asked for'))
+})
+
+check('a silently dropped GROUP BY is caught', () => {
+  // GROUP BY was emitted and never read back, so a view could lose its
+  // grouping the same way a filter can and nothing would say so.
+  const view = find('calendar', 'In market')
+  const actual = asReturned('calendar', 'In market')
+  actual.groupBy = null
+  assert.ok(views.verifyView(view, actual).join('\n').includes('expected it to be grouped by "Type"'))
+})
+
+check('grouping on the right property but the wrong type is caught', () => {
+  const view = find('calendar', 'In market')
+  const actual = asReturned('calendar', 'In market')
+  actual.groupBy.propertyType = 'rich_text'
+  assert.ok(views.verifyView(view, actual).join('\n').includes('grouped by "Type"'))
+})
+
+check('grouping nobody asked for is caught', () => {
+  const view = find('calendar', 'Upcoming')
+  const actual = asReturned('calendar', 'Upcoming')
+  actual.groupBy = { property: 'Status', propertyType: 'select' }
+  assert.ok(views.verifyView(view, actual).join('\n').includes('no grouping was asked for'))
+})
+
+check('an unmeasured operator is not in the whitelist', () => {
+  // IS NOT EMPTY sat in the measured-only list marked "not measured", which is
+  // an assumption inside the one guard whose job is to keep assumptions out.
+  assert.ok(!('IS NOT EMPTY' in views.OPS), Object.keys(views.OPS).join(', '))
+  for (const [name, op] of Object.entries(views.OPS)) {
+    assert.ok(!/not measured/.test(op.measured), `${name} is in the whitelist and says it was not measured`)
+  }
+})
+
+console.log('\nthe rule query proves rows by identity, not by what they are called\n')
+
+check('the rule query selects the page url, not the title', () => {
+  // Titles are not unique, and the separator the caller joins on can appear in
+  // one.
+  const sql = views.expectedRows(find('projects', 'Needs attention'))
+  assert.ok(/^SELECT url FROM/.test(sql), sql)
+})
+
+check('a url, a dashed id and a bare id all name the same row', () => {
+  const bare = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+  assert.strictEqual(views.pageIdentity(`https://www.notion.so/A-Title-${bare}`), bare)
+  assert.strictEqual(views.pageIdentity('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'), bare)
+  assert.strictEqual(views.pageIdentity(bare.toUpperCase()), bare)
+  assert.strictEqual(views.pageIdentity(`https://www.notion.so/A-Title-${bare}?pvs=4`), bare)
+})
+
+check('the two halves of the proof come back in different url shapes, and still match', () => {
+  // Measured 2026-08-18 against the live test workspace, on Calendar / Upcoming.
+  // The SQL half returns https://app.notion.com/<id> and the view half returns
+  // https://app.notion.com/p/<id>. Same three pages, two notations. Comparing
+  // the strings as they arrive would have reported every row as different.
+  const fromSql = [
+    'https://app.notion.com/ca1e0da40000000000000000000000a1',
+    'https://app.notion.com/ca1e0da40000000000000000000000a2',
+    'https://app.notion.com/ca1e0da40000000000000000000000a3'
+  ]
+  const fromView = [
+    'https://app.notion.com/p/ca1e0da40000000000000000000000a3',
+    'https://app.notion.com/p/ca1e0da40000000000000000000000a1',
+    'https://app.notion.com/p/ca1e0da40000000000000000000000a2'
+  ]
+  assert.notStrictEqual(fromSql[0], fromView[1], 'the shapes really do differ')
+  assert.deepStrictEqual(
+    fromSql.map(views.pageIdentity).sort(),
+    fromView.map(views.pageIdentity).sort()
+  )
+})
+
+check('something that is not a page reference is left alone rather than made to match', () => {
+  // A caller that recorded titles by mistake should fail the comparison, not be
+  // quietly normalised into agreeing.
+  assert.strictEqual(views.pageIdentity('Confirmed with no date'), 'Confirmed with no date')
+  assert.strictEqual(views.pageIdentity(''), '')
+})
+
 console.log(failures ? `\n${failures} failed.\n` : `\nAll checks passed. ${VIEWS.length} views.\n`)
 process.exit(failures ? 1 : 0)

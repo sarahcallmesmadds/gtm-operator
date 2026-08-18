@@ -117,28 +117,29 @@ check('an install is not complete until it has been verified', () => {
   reset()
   config.begin('parent-page')
   for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
-  assert.throws(() => config.complete(null), /only complete once it has been verified/)
+  assert.throws(() => config.complete(), /no verify has passed/)
 })
 
 check('an install missing a database cannot be completed', () => {
   reset()
   config.begin('parent-page')
   config.recordDatabase('process', { databaseId: 'db-1', dataSourceId: 'ds-1' })
-  assert.throws(() => config.complete('2026-08-18T00:00:00Z'), /not recorded/)
+  assert.throws(() => config.complete(), /not recorded/)
 })
 
 check('a complete install cannot be started over by accident', () => {
   reset()
   config.begin('parent-page')
   for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
-  config.complete('2026-08-18T00:00:00Z')
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
   assert.throws(() => config.begin('parent-page'), /already complete/)
 })
 
 console.log('\nthe plan\n')
 
 check('phase A creates every database and puts no relation in any of them', () => {
-  const steps = install.phaseA()
+  const steps = install.phaseA('parent-page')
   assert.strictEqual(steps.length, counts.databases)
   for (const step of steps) assert.ok(!step.arguments.schema.includes('RELATION('), `${step.title} has a relation in its create statement`)
 })
@@ -154,7 +155,7 @@ check('the plan can still be printed before anything exists, which is when it is
   reset()
   const ids = install.planningIds()
   assert.strictEqual(Object.keys(ids).length, counts.databases)
-  assert.doesNotThrow(() => install.phaseA())
+  assert.doesNotThrow(() => install.phaseA('<parent page id, from the question above>'))
   assert.doesNotThrow(() => install.phaseB(ids))
   assert.doesNotThrow(() => install.viewCalls(ids))
 })
@@ -195,7 +196,11 @@ function goodReadback () {
     const properties = {}
     for (const p of schema.DATABASES[d.key].properties) {
       const type = p.type === 'text' ? 'text' : p.type === 'person' ? 'person' : p.type
-      properties[p.name] = { name: p.name, type }
+      // Every property carries a description, empty where there is none.
+      // Measured against the live workspace 2026-08-18 on Projects and Software:
+      // Notion returns the key on all of them. This builder omitted it, so the
+      // verifier's description check was never exercised here at all.
+      properties[p.name] = { name: p.name, type, description: p.description || '' }
       if (p.options) properties[p.name].options = p.options.map(([name, color]) => ({ name, color }))
     }
     databases[d.key] = { schema: properties, views: [] }
@@ -208,6 +213,7 @@ function goodReadback () {
     databases[r.from].schema[r.property] = {
       name: r.property,
       type: 'relation',
+      description: '',
       dataSourceUrl: `collection://ds-${r.to}`,
       ...(r.kind === 'two-way' ? { propertyUrl: `collectionProperty://ds-${r.to}/xxxx` } : {})
     }
@@ -215,6 +221,7 @@ function goodReadback () {
       databases[r.to].schema[r.reverse] = {
         name: r.reverse,
         type: 'relation',
+        description: '',
         dataSourceUrl: `collection://ds-${r.from}`,
         propertyUrl: `collectionProperty://ds-${r.from}/yyyy`
       }
@@ -222,25 +229,46 @@ function goodReadback () {
   }
 
   const views = require(path.join(ROOT, 'plugins/setup/scripts/views.js'))
+  const notionType = (database, property) => {
+    const definition = views.propertiesFor(database).get(property)
+    return views.NOTION_PROPERTY_TYPE[definition.type]
+  }
+
+  // Built to match what Notion was measured to return on 2026-08-18, recorded
+  // in tests/fixtures/full-install-as-notion-returned-it.json, rather than to
+  // whatever the verifier happened to accept. Before that fixture was compared
+  // against, this builder emitted one flat AND group with no property types and
+  // no grouping, which is a shape Notion never produces, and the test named "a
+  // correct install passes" was passing against it.
   for (const view of VIEWS) {
-    const filters = []
-    for (const condition of view.filter || []) {
+    const clauses = (view.filter || []).map(condition => {
       const op = views.OPS[condition.op]
-      const values = op.arity === 'many' ? condition.values : op.arity === 'one' ? [condition.value] : [null]
-      for (const value of values) {
-        filters.push({
-          type: 'property',
-          property: condition.property,
-          operator: op.readsBackAs,
-          ...(value === null ? {} : { value: { type: 'exact', value } })
-        })
-      }
-    }
+      const propertyType = notionType(view.database, condition.property)
+      const leaf = value => ({
+        type: 'property',
+        property: condition.property,
+        propertyType,
+        operator: op.readsBackAs,
+        ...(value === null ? {} : { value: { type: 'exact', value } })
+      })
+      if (op.arity === 'many') return { type: 'group', operator: 'or', filters: condition.values.map(leaf) }
+      return { type: 'group', operator: 'and', filters: [leaf(op.arity === 'one' ? condition.value : null)] }
+    })
+
+    // One clause comes back as the top group itself, more than one comes back
+    // as a sub-group each. Both measured.
+    const advancedFilter = !clauses.length
+      ? null
+      : clauses.length === 1
+        ? clauses[0]
+        : { type: 'group', operator: 'and', filters: clauses }
+
     databases[view.database].views.push({
       name: view.name,
       type: view.layout,
       ...(view.calendarBy ? { calendarBy: view.calendarBy } : {}),
-      ...(filters.length ? { advancedFilter: { type: 'group', operator: 'and', filters } } : {}),
+      ...(view.groupBy ? { groupBy: { property: view.groupBy, propertyType: notionType(view.database, view.groupBy) } } : {}),
+      ...(advancedFilter ? { advancedFilter } : {}),
       sorts: (view.sort || []).map(s => ({ property: s.property, direction: s.direction === 'DESC' ? 'descending' : 'ascending' }))
     })
   }
@@ -314,9 +342,11 @@ check('a view whose rows were never checked says so, rather than passing quietly
   // nothing. Silence here would be the plugin making the same mistake it was
   // built to catch.
   setUpConfig()
-  const { problems, notes } = install.verify(goodReadback())
+  const { problems, unchecked, verified } = install.verify(goodReadback())
   assert.strictEqual(problems.length, 0)
-  assert.ok(notes.some(n => n.includes('which rows it returns was not checked')), notes.join('\n'))
+  assert.ok(unchecked.some(n => n.includes('which rows it returns was not checked')), unchecked.join('\n'))
+  // Nothing wrong, and still not verified. That distinction is the fix.
+  assert.strictEqual(verified, false)
 })
 
 check('a view returning different rows from its own rule is caught', () => {
@@ -333,9 +363,104 @@ check('a view returning the rows its rule returns is proved, and not merely note
   const readback = goodReadback()
   readback.viewRows = { 'projects::Needs attention': ['One', 'Two'] }
   readback.sqlRows = { 'projects::Needs attention': ['Two', 'One'] }
-  const { problems, notes } = install.verify(readback)
+  const { problems, unchecked } = install.verify(readback)
   assert.strictEqual(problems.length, 0, problems.join('\n'))
-  assert.ok(!notes.some(n => n.includes('projects') && n.includes('Needs attention')))
+  assert.ok(!unchecked.some(n => n.includes('projects') && n.includes('Needs attention')))
+})
+
+check('two empty row sets prove nothing, and are not a pass', () => {
+  // The whole point. Both sides empty used to compare equal and report the view
+  // as proved, so on a fresh workspace every filtered view "passed" without a
+  // single row ever being looked at.
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': [] }
+  readback.sqlRows = { 'projects::Needs attention': [] }
+  const { problems, unchecked, verified } = install.verify(readback)
+  assert.strictEqual(problems.length, 0, problems.join('\n'))
+  assert.ok(unchecked.some(n => n.includes('neither one proved the other')), unchecked.join('\n'))
+  assert.strictEqual(verified, false)
+})
+
+check('one side empty and the other not is a mismatch, not an unchecked view', () => {
+  // The fix for the line above must not swallow this one with it.
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': [] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
+})
+
+check('rows are compared by page identity, so a url and its id are the same row', () => {
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': ['https://www.notion.so/A-Project-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'] }
+  const { problems } = install.verify(readback)
+  assert.strictEqual(problems.length, 0, problems.join('\n'))
+})
+
+check('two different rows sharing a title are not averaged into one', () => {
+  // Why the rule query selects url and not the title.
+  setUpConfig()
+  const readback = goodReadback()
+  readback.viewRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'] }
+  readback.sqlRows = { 'projects::Needs attention': ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'] }
+  const { problems } = install.verify(readback)
+  assert.ok(problems.join('\n').includes('different rows from the rule'), problems.join('\n'))
+})
+
+console.log('\nwhat complete will accept as proof\n')
+
+check('complete refuses when no verify has passed', () => {
+  setUpConfig()
+  assert.throws(() => config.complete(), /no verify has passed/)
+})
+
+check('complete accepts a verify that was recorded', () => {
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  const done = config.complete()
+  assert.strictEqual(done.state, 'complete')
+  assert.strictEqual(done.verifiedAt, '2026-08-18T00:00:00Z')
+})
+
+check('recording a database after a verify throws the verify away', () => {
+  // Otherwise complete rests on a proof taken against a different workspace.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.recordDatabase('process', { databaseId: 'db-process', dataSourceId: 'ds-process' })
+  assert.throws(() => config.complete(), /no verify has passed/)
+})
+
+check('a database recorded twice with a different database id is refused', () => {
+  // The guard used to compare the data source id alone, so this overwrote.
+  setUpConfig()
+  assert.throws(
+    () => config.recordDatabase('process', { databaseId: 'db-somewhere-else', dataSourceId: 'ds-process' }),
+    /has to say which one to keep/
+  )
+})
+
+check('status still reports on a config holding a key this version does not know', () => {
+  setUpConfig()
+  const current = config.read()
+  current.databases.marketing_ops = { databaseId: 'db-x', dataSourceId: 'ds-x' }
+  config.write(current)
+  const reported = install.status()
+  assert.ok(reported.recorded.some(r => r.includes('marketing_ops')), reported.recorded.join(', '))
+})
+
+check('phase A refuses to build a create call with no parent page id', () => {
+  assert.throws(() => install.phaseA(), /needs the parent page id/)
+})
+
+check('phase A puts the real parent page id in every create call', () => {
+  // It used to send the literal string <parent page id>.
+  for (const step of install.phaseA('a-real-page-id')) {
+    assert.strictEqual(step.arguments.parent.page_id, 'a-real-page-id')
+  }
 })
 
 fs.rmSync(SANDBOX, { recursive: true, force: true })

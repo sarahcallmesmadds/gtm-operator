@@ -10,18 +10,21 @@ survives the terminal scrollback.
 
 ## 1. Convert every Status property to the status property type
 
-**Why it is not automatic.** The API can create a status property, but it cannot
-create or rename its options. Sending options with the type is rejected outright:
+**Why it is not automatic.** The API cannot make a status property at all. Both
+DDL forms were measured on 2026-08-18 and both are refused at the parser, before
+anything about the options is even considered:
 
 ```
 ALTER COLUMN "Status" SET STATUS('Draft':yellow, 'Published':green)
   -> 400 validation_error, "Expected ADD, DROP, RENAME, or ALTER keyword"
+
+ADD COLUMN "Stage" STATUS('Draft':yellow, 'Published':green)
+  -> 400 validation_error, same parser error
 ```
 
-Convert through the API and you get Notion's defaults, Not started / In progress
-/ Done, on every database. That is wrong for four of the six and it silently
-discards the values the design chose. **So the install ships them as selects with
-the right values, and you convert them by hand.**
+There is no route to one through this API, with or without options. **So the
+install ships all six as selects carrying the right values, and you convert them
+by hand.**
 
 **What you gain by converting.** Status properties carry three groups, To-do, In
 progress and Complete. Grouping is what makes a rollup like `Percent complete`
@@ -37,34 +40,32 @@ type to Status, then drag each option into the right group.
 | Memos | Draft, Published, Canceled | Draft | | Published, Canceled |
 | Projects | Intake, Scoped, In progress, Done, Canceled | Intake, Scoped | In progress | Done, Canceled |
 | Calendar | Idea, Planned, Confirmed, Done, Canceled | Idea, Planned | Confirmed | Done, Canceled |
+| Tasks | Not started, In progress, Blocked, Done, Canceled | Not started | In progress, Blocked | Done, Canceled |
 
-**Tasks is already a status property and does not need converting.** It ships
-that way because `Percent complete` on Projects rolls up task status by group,
-and that rollup only exists for status properties.
+**Tasks is on that list, and this document used to say it was not.** Until
+2026-08-18 it said Tasks already shipped as a status property and needed no
+conversion, which was wrong in a way that mattered: anybody following it would
+have skipped the one conversion that something else depends on. `Percent
+complete` on Projects rolls up task status by group, group rollups exist only on
+status properties, and so the rollup stays empty until Tasks is converted.
+`schema.js` has always created it as a select like the other five, and there was
+never any code that could have done otherwise.
 
-**It ships with Notion's three defaults, which are too few. Add these.**
-
-| Option | Group | Why it earns a place |
-|---|---|---|
-| Not started | To-do | Ships by default |
-| In progress | In progress | Ships by default |
-| **Blocked** | In progress | Waiting on someone else. Distinct from not started, because somebody has already tried |
-| **Paused** | In progress | Deliberately stopped by us. Distinct from blocked, because nothing external is holding it |
-| Done | Complete | Ships by default |
-| **Canceled** | Complete | Decided against. Counts as complete so it stops dragging `Percent complete` down forever |
-
-**Blocked and Paused are the pair worth keeping separate.** Blocked is somebody
-else's move, so the action is to chase. Paused is our own decision, so the action
-is to revisit. Collapsing them loses which one it is, and that is the whole
-question anyone asks about a stalled task.
+**Blocked earns its place**, and it is the one option here that is not obvious.
+It is somebody else's move, so the action is to chase, where not started means
+nobody has begun. Collapsing the two loses which it is, and that is the first
+thing anyone asks about a stalled task.
 
 **Canceled belongs in Complete, not in its own limbo.** A cancelled task that
 sits outside Complete holds a project below 100% forever, and the first person to
 notice will close it as Done instead, which loses the record that it was dropped.
 
-**Check it worked.** Open a project with tasks and confirm `Percent complete`
-shows a number. If it is blank, the rollup lost its target during the conversion
-and needs pointing back at `Status` with Percent per group, Complete.
+**Check it worked, and check it in the UI.** Open a project with tasks and
+confirm `Percent complete` shows a number. If it is blank, the rollup lost its
+target during the conversion and needs pointing back at `Status` with Percent per
+group, Complete. This has to be read on the page: rollup and formula values
+cannot be read through the API at all, and on 2026-08-18 two wrong aggregations
+were returned by the API looking correct and were caught only by eye.
 
 ---
 
