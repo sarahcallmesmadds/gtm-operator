@@ -1,16 +1,17 @@
 # gtm-operator
 
 A go-to-market operating system in Notion, built by plugins rather than by a
-consultant. One plugin creates the databases. The rest write to them, and none of
-them calls another.
+consultant. One plugin creates the databases. The others write to them, and by
+design none of them calls another.
 
 By [Sarah Madden](https://github.com/sarahcallmesmadds).
 
 A Notion template hands you a finished workspace and leaves you to keep it true.
-These build the same workspace and then keep working inside it. The skills that
-write a project, a memo or a tool record know the schema, know the rules Notion
-cannot enforce, and check what the workspace returned rather than trusting that
-the write succeeded.
+The intent here is to build the same workspace and then keep working inside it:
+skills that write a project, a memo or a tool record, that know the schema, know
+the rules Notion cannot enforce, and check what the workspace returned rather
+than trusting that a write succeeded. The skill that builds the workspace exists
+and has been run. The ones that write into it are designed and not yet code.
 
 ## Read this before anything else
 
@@ -49,7 +50,7 @@ create**, so `install` checks every capability it uses before it writes anything
 
 Read [`POST-INSTALL.md`](POST-INSTALL.md) when it finishes. Two jobs are left to
 you because the API cannot reach them, and one of them is load-bearing: nothing
-rolls up task progress until the Status properties are converted by hand.
+rolls up task progress until the Tasks status property is converted by hand.
 
 ## What gets created
 
@@ -107,7 +108,7 @@ ships, not alongside it.
 |---|---|
 | [`DECISIONS.md`](DECISIONS.md) | The running record. Decisions, reversals, and what Notion does when measured |
 | [`POST-INSTALL.md`](POST-INSTALL.md) | The two jobs the API cannot do for you |
-| `SCHEMA-*.md` | One per database. Field names, types, values and option order live here and nowhere else |
+| `SCHEMA-*.md` | One per database, except that `SCHEMA-projects.md` covers Projects and Tasks, which are one job. Field names, types, values and option order live here and nowhere else |
 | `SKILLS-*.md` | One per plugin. What each skill does, what it refuses to do, and why |
 | `TESTLOG-*.md` | What was run against a live workspace, and what came back |
 | [`plugins/setup`](plugins/setup) | The one plugin that exists |
