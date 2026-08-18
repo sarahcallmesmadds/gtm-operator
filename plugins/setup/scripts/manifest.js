@@ -63,23 +63,21 @@ const RELATIONS = [
     what: 'A memo to the one it corrects' },
   { n: 4,  from: 'memos',    to: 'process',  property: 'Artifacts',        reverse: 'Memos',             kind: 'two-way', self: false,
     what: 'A memo to what it is about' },
-  { n: 5,  from: 'projects', to: 'memos',    property: 'Problem Statement', reverse: 'Resulting Projects', kind: 'two-way', self: false,
-    what: 'A project to its problem statement' },
-  { n: 6,  from: 'projects', to: 'memos',    property: 'Memos',            reverse: 'Projects',          kind: 'two-way', self: false,
+  { n: 5,  from: 'projects', to: 'memos',    property: 'Memos',            reverse: 'Projects',          kind: 'two-way', self: false,
     what: 'A project to its updates' },
-  { n: 7,  from: 'projects', to: 'process',  property: 'Artifacts',        reverse: 'Projects',          kind: 'two-way', self: false,
+  { n: 6,  from: 'projects', to: 'process',  property: 'Artifacts',        reverse: 'Projects',          kind: 'two-way', self: false,
     what: 'A project to what it produced' },
-  { n: 8,  from: 'projects', to: 'tasks',    property: 'Tasks',            reverse: 'Project',           kind: 'two-way', self: false,
+  { n: 7,  from: 'projects', to: 'tasks',    property: 'Tasks',            reverse: 'Project',           kind: 'two-way', self: false,
     what: 'A project to its tasks' },
-  { n: 9,  from: 'tasks',    to: 'tasks',    property: 'Parent task',      reverse: 'Sub-tasks',         kind: 'two-way', self: true,
+  { n: 8,  from: 'tasks',    to: 'tasks',    property: 'Parent task',      reverse: 'Sub-tasks',         kind: 'two-way', self: true,
     what: 'A task to its parent task' },
-  { n: 10, from: 'software', to: 'process',  property: 'Artifacts',        reverse: 'Software',          kind: 'two-way', self: false,
+  { n: 9,  from: 'software', to: 'process',  property: 'Artifacts',        reverse: 'Software',          kind: 'two-way', self: false,
     what: 'A tool to its documentation' },
-  { n: 11, from: 'software', to: 'software', property: 'Integrates with',  reverse: null,                kind: 'one-way', self: true,
+  { n: 10, from: 'software', to: 'software', property: 'Integrates with',  reverse: null,                kind: 'one-way', self: true,
     what: 'A tool to a tool it connects to' },
-  { n: 12, from: 'calendar', to: 'projects', property: 'Project',          reverse: 'Calendar',          kind: 'two-way', self: false,
+  { n: 11, from: 'calendar', to: 'projects', property: 'Project',          reverse: 'Calendar',          kind: 'two-way', self: false,
     what: 'A calendar row to its project' },
-  { n: 13, from: 'calendar', to: 'process',  property: 'Artifacts',        reverse: 'Calendar',          kind: 'two-way', self: false,
+  { n: 12, from: 'calendar', to: 'process',  property: 'Artifacts',        reverse: 'Calendar',          kind: 'two-way', self: false,
     what: 'A calendar row to its playbook' }
 ]
 
@@ -144,9 +142,10 @@ const VIEWS = [
     describe: 'Confirmed or later with no date' },
 
   { database: 'projects', name: 'Needs attention', layout: 'table', rule: 'projects-problem-statement',
-    filter: [{ property: 'Problem Statement', op: 'IS EMPTY' }],
+    filter: [{ property: 'Memos', op: 'IS EMPTY' }],
     sort: [{ property: 'Name', direction: 'ASC' }],
-    describe: 'Projects with no Problem Statement' },
+    reduced: 'It catches a project with no memo at all, where the rule is a project with no PROBLEM STATEMENT memo. Narrowing it to the memo Type would need a filter that reads through the relation, and a rollup filter was measured on 2026-08-17 to be accepted, reported as created, and read back as filters: []. So this is the widest check that actually works. A project carrying memos of other types and no problem statement is not caught by it',
+    describe: 'Projects with no memos attached, which is where a missing problem statement shows up' },
 
   { database: 'tasks',    name: 'Needs attention', layout: 'table', rule: 'tasks-project',
     filter: [{ property: 'Project', op: 'IS EMPTY' }],
@@ -198,9 +197,9 @@ const VIEWS = [
  */
 const RULES = [
   { key: 'projects-problem-statement', database: 'projects', caughtBy: 'view',
-    rule: 'Problem Statement is required',
-    filter: 'Problem Statement relation is empty',
-    why: 'A project that cannot name its problem statement has not been scoped' },
+    rule: 'A problem statement is required, attached as a memo',
+    filter: 'Memos relation is empty',
+    why: 'A project that cannot name its problem statement has not been scoped. The problem statement is a memo, reached through the one Memos relation, and its Type says which memo it is' },
 
   { key: 'tasks-project', database: 'tasks', caughtBy: 'view',
     rule: 'Project is required',

@@ -30,8 +30,8 @@ maintained and kept true. Every field decision below follows from that one line.
   memo, related to the old one through `Corrects`.
 - **`Status` may move from `Published` to `Canceled` and nowhere else.** That is a
   retraction, it requires a correcting memo saying why, and the memo itself stays.
-- **`Corrected by`, `Projects` and `Resulting Projects` update themselves**, being
-  the far sides of two-way relations. Nothing a person wrote changes when they do.
+- **`Corrected by` and `Projects` update themselves**, being the far sides of
+  two-way relations. Nothing a person wrote changes when they do.
 
 **Narrowed 2026-08-17.** This said "never updated", full stop, while `Status` held
 three values and moving between two of them is an edit after publication. **A rule
@@ -59,7 +59,6 @@ carries the same three lines as a table of what may change and by what.
 | Corrected by | Relation (self) | inverse of Corrects |
 | Artifacts | Relation to Process | what this memo announced, changed, or drew on. **Two-way, decided 2026-08-17.** The artifact carries `Memos` on the other side, so a reader on an artifact page can see what has been said about it |
 | Projects | Relation | inverse of `Memos` on Projects. Updates and releases about a project. **No longer conditional, 2026-08-17.** `setup` creates all six databases before it adds any relation, so the target always exists |
-| Resulting Projects | Relation | inverse of `Problem Statement` on Projects. What was built in response to this problem. **Added 2026-08-17**, see below |
 | Created time | Created time | |
 
 **Every shared field reuses Process's exact value list.** Two
@@ -341,15 +340,28 @@ scoping. A change of situation means a new row, never an edit.
 **Why it helps.** It is the input to `scope`, and scoping something whose stakes
 were never written down is how teams build the wrong thing carefully.
 
-**Related view:** the `Resulting Projects` relation. What was built in response.
+**Related view:** the `Projects` relation. What was built in response.
 
-**Corrected 2026-08-17.** This said "the Projects relation", which is the inverse
-of the updates-and-releases relation and would have been empty on every problem
-statement. `Projects.Problem Statement` was one-way, so nothing on the memo
-pointed back at all, and **the design's defining trace was invisible from the
-problem's side**. Making it two-way with a distinct reverse name fixes it. Two
-relations to the same database is fine when they mean different things, and
-refusing the second one is what caused this.
+**Corrected 2026-08-17, then reversed 2026-08-18.**
+
+On 08-17 this said "the Projects relation", and that was called wrong on the
+grounds that `Projects.Problem Statement` was one-way, so nothing on the memo
+pointed back and **the design's defining trace was invisible from the problem's
+side**. The fix was a second relation, `Problem Statement` / `Resulting
+Projects`, on the reasoning that two relations to the same database are fine when
+they mean different things.
+
+**On 08-18 that second relation was dropped in review, and the reasoning above no
+longer holds.** It rested on the remaining relation being one-way. It is not:
+`Projects.Memos` is two-way and its far side is `Projects` on the memo. So a
+problem statement attached to a project does show that project, from the
+problem's side, through the one relation. The trace the 08-17 correction was
+protecting is intact without a second relation to carry it.
+
+**What the memo's `Type` now carries is which memo it is.** One relation says a
+memo and a project are connected. `Type` says whether the memo is the problem
+statement, an update or a release. That was always true, and it is now the only
+thing distinguishing them.
 
 ### Release
 

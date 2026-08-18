@@ -285,7 +285,7 @@ the design stated them as if they could:
 
 | Rule | Where | What Notion actually does | Caught by |
 |---|---|---|---|
-| `Problem Statement` is required | Projects | Nothing. A project can be saved without one | A `Needs attention` view |
+| A problem statement is required, attached as a memo | Projects | Nothing. A project can be saved with no memos at all | A `Needs attention` view, filtered on `Memos` being empty |
 | `Project` is required | Tasks | Nothing. An orphan task is invisible from every project | A `Needs attention` view |
 | `Date` is required from `Confirmed` onwards | Calendar | Nothing. A confirmed row can have no date | A `Needs attention` view |
 | `Tags` capped at 3 | Process, Memos | Nothing. Multi-select has no maximum | `check`, step 8 |
@@ -537,8 +537,15 @@ visible until somebody opens a grouped view.
 
 ## The relation map
 
-Thirteen relations across all six databases. This is the part most likely to be
+Twelve relations across all six databases. This is the part most likely to be
 built wrong, so it is written out rather than described.
+
+**It was thirteen until 2026-08-18.** Projects carried a second relation to
+Memos, `Problem Statement` / `Resulting Projects`, alongside the `Memos` one. It
+was dropped in review because one relation between two databases is enough: a
+project's problem statement is a memo reached through `Memos`, and the memo's
+`Type` says which memo it is. The decision was applied to the test workspace by
+hand at the time and reached no file here until now.
 
 A Notion relation is either **two-way**, where Notion maintains a matching
 property on the target database, or **one-way**, where only the source database
@@ -551,28 +558,34 @@ view on the target page.
 | 2 | A decision to the one it replaced | Process | `Supersedes` | `Superseded By` | Two-way, self |
 | 3 | A memo to the one it corrects | Memos | `Corrects` | `Corrected by` | Two-way, self |
 | 4 | A memo to what it is about | Memos | `Artifacts` | `Memos` | Two-way |
-| 5 | A project to its problem statement | Projects | `Problem Statement` | `Resulting Projects` | Two-way |
-| 6 | A project to its updates | Projects | `Memos` | `Projects` | Two-way |
-| 7 | A project to what it produced | Projects | `Artifacts` | `Projects` | Two-way |
-| 8 | A project to its tasks | Projects | `Tasks` | `Project` | Two-way |
-| 9 | A task to its parent task | Tasks | `Parent task` | `Sub-tasks` | Two-way, self |
-| 10 | A tool to its documentation | Software | `Artifacts` | `Software` | Two-way |
-| 11 | A tool to a tool it connects to | Software | `Integrates with` | none | One-way, self |
-| 12 | A calendar row to its project | Calendar | `Project` | `Calendar` | Two-way |
-| 13 | A calendar row to its playbook | Calendar | `Artifacts` | `Calendar` | Two-way |
+| 5 | A project to its updates | Projects | `Memos` | `Projects` | Two-way |
+| 6 | A project to what it produced | Projects | `Artifacts` | `Projects` | Two-way |
+| 7 | A project to its tasks | Projects | `Tasks` | `Project` | Two-way |
+| 8 | A task to its parent task | Tasks | `Parent task` | `Sub-tasks` | Two-way, self |
+| 9 | A tool to its documentation | Software | `Artifacts` | `Software` | Two-way |
+| 10 | A tool to a tool it connects to | Software | `Integrates with` | none | One-way, self |
+| 11 | A calendar row to its project | Calendar | `Project` | `Calendar` | Two-way |
+| 12 | A calendar row to its playbook | Calendar | `Artifacts` | `Calendar` | Two-way |
 
-**Relations 5 and 6 both run from Projects to Memos and they are not the same
-relation.** `Problem Statement` holds the one memo making the case that this was
-worth doing. `Memos` holds the updates and releases about the project. **Both are
-two-way, and their reverse properties have different names**, `Resulting Projects`
-and `Projects`, because they mean different things from the memo's side.
+**One relation runs from Projects to Memos, and it carries everything.**
+`Memos` holds every memo about the project: the problem statement making the case
+it was worth doing, the updates, and the releases. **The memo's `Type` says which
+one it is**, and the related view on the project groups by it.
 
-**Corrected 2026-08-17.** Relation 5 was one-way, on the reasoning that Memos
-should not carry two properties pointing back at Projects. That was wrong in a way
-that broke the design's defining trace: the Problem Statement template promises a
-related view of what was built in response, and a one-way relation populates
-nothing on the memo. The only other `Projects` property is the inverse of relation
-6, so using it would file a problem statement as a project update.
+**Corrected 2026-08-17, then reversed 2026-08-18.**
+
+On 08-17 there were two relations here. `Problem Statement` was one-way, on the
+reasoning that Memos should not carry two properties pointing back at Projects,
+and that was called wrong: the Problem Statement template promises a related view
+of what was built in response, and a one-way relation populates nothing on the
+memo. The fix made it two-way with `Resulting Projects` as its far side.
+
+**On 08-18 the second relation was dropped entirely in review.** Two relations
+between the same two databases meant two places to look and two places to get it
+wrong. The concern that produced the 08-17 fix does not survive the removal,
+because the relation that remains is two-way: a problem statement attached
+through `Memos` shows its project under `Projects` on the memo. The trace is
+intact and one relation carries it.
 
 **Two properties pointing at the same database is fine when they mean different
 things.** Refusing the second one cost the trace that a project cannot be scoped

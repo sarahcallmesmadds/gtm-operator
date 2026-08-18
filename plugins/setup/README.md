@@ -106,7 +106,7 @@ They hold the design, the code and Notion together. A count of them is not writt
 - The config file cannot be pointed at a second database for a name it already
   holds, cannot be completed before it has been verified, and is never
   overwritten when it will not parse.
-- **A whole install, as Notion returned it.** Six databases, thirteen relations
+- **A whole install, as Notion returned it.** Six databases, twelve relations
   and seven views, fetched back from a live workspace and compared field by
   field. This is the only test that can catch Notion behaving differently from
   what the code assumed, which it has done three times so far.

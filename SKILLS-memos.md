@@ -90,13 +90,12 @@ ignore the rule.
 | `Status`, Published to Canceled | **Yes, and this is the only permitted transition after publication** | A person, and it requires a correcting memo saying why |
 | `Corrected by` | Yes, automatically | Notion, as the far side of a two-way relation |
 | `Projects` | Yes, automatically | Notion. The far side of `Memos` on Projects |
-| `Resulting Projects` | Yes, automatically | Notion. The far side of `Problem Statement` on Projects |
 | Anything else, after publication | No | |
 
-**The three automatic ones are not exceptions to the rule, they are the rule
-working.** A published problem statement gaining a `Resulting Projects` link a year
-later is the single most expected thing that can happen to it, and it is the trace
-the projects design exists for. Nothing a person wrote changes. **A relation's far
+**The two automatic ones are not exceptions to the rule, they are the rule
+working.** A published problem statement gaining a `Projects` link a year later is
+the single most expected thing that can happen to it, and it is the trace the
+projects design exists for. Nothing a person wrote changes. **A relation's far
 side is not content**, which is why it sits outside the immutability rule rather
 than beside it.
 

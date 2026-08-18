@@ -36,6 +36,12 @@ const check = (name, fn) => {
 
 const relation = n => RELATIONS.find(r => r.n === n)
 
+// Looked up by what it is, not by its number. The numbers shifted on 2026-08-18
+// when relation 5 was dropped, and two tests here silently started exercising a
+// different relation than the one they are named after.
+const numberOf = (from, property) => RELATIONS.find(r => r.from === from && r.property === property).n
+const INTEGRATES_WITH = numberOf('software', 'Integrates with')
+
 const IDS = {
   process:  { databaseId: 'db-process',  dataSourceId: 'ds-process'  },
   memos:    { databaseId: 'db-memos',    dataSourceId: 'ds-memos'    },
@@ -87,7 +93,7 @@ check('a self-relation is also one statement, not the two the tool docs show', (
 
 check('a one-way relation has no DUAL, so nothing is created on the target', () => {
   assert.strictEqual(
-    relations.statementFor(relation(11), IDS),
+    relations.statementFor(relation(INTEGRATES_WITH), IDS),
     `ADD COLUMN "Integrates with" RELATION('ds-software')`
   )
 })
@@ -136,7 +142,7 @@ check('a relation built one-way where the design says two-way is caught', () => 
 })
 
 check('a relation built two-way where the design says one-way is caught', () => {
-  complains(11, s => { s.software['Integrates with'].propertyUrl = 'collectionProperty://ds-software/zzzz' },
+  complains(INTEGRATES_WITH, s => { s.software['Integrates with'].propertyUrl = 'collectionProperty://ds-software/zzzz' },
     'created two-way where the design says one-way')
 })
 
