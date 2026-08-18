@@ -255,7 +255,23 @@ function missing (schemas, ids, names = {}) {
 function whyNotRepairable (relation, schemas, names = {}) {
   const from = byKey(relation.from).title
   const to = byKey(relation.to).title
-  const source = schemas[relation.from] || {}
+
+  // Every name below is the name the property ACTUALLY has, resolved once and
+  // used for the lookup and for the sentence. They used to differ: the lookup
+  // went through the map and the sentence quoted the shipped name, so a renamed
+  // side was refused for a property that is not the one anybody would find.
+  const near = mapped.propertyName(names[relation.from], relation.property)
+  const reverse = relation.reverse ? mapped.propertyName(names[relation.to], relation.reverse) : null
+
+  // Not read back is not the same as absent, and only one of the two is safe to
+  // send a statement about. Asked on BOTH sides. The far side carried this
+  // guard from the start and the near side did not, because `schemas[from] || {}`
+  // turned a database nobody looked at into a database with no properties, and
+  // a rebuild went out on the strength of it.
+  const source = schemas[relation.from]
+  if (!source) {
+    return `${from} was not read back, so whether it still carries "${near}" is unknown. Not knowing is not the same as it being gone.`
+  }
 
   // The name is already taken, so adding it again is how duplicates appear,
   // which is the one failure this whole file is arranged around.
@@ -266,19 +282,15 @@ function whyNotRepairable (relation, schemas, names = {}) {
   // the reason here used to announce the near side as wrong in that case,
   // pointing a person at the half that was fine. The finding itself is reported
   // by `verifyRelation`, which does say which half is broken.
-  //
-  // Asked of the name the property actually has. Asking for the shipped name
-  // answers "not there" for every renamed relation, and the answer decides
-  // whether a second one gets added.
-  if (source[mapped.propertyName(names[relation.from], relation.property)]) {
-    return `${from} already carries "${relation.property}". Adding it again would leave two.`
+  if (source[near]) {
+    return `${from} already carries "${near}". Adding it again would leave two.`
   }
 
   if (relation.kind !== 'two-way') return null
 
   const far = schemas[relation.to]
   if (!far) {
-    return `${to} was not read back, so whether it still carries "${relation.reverse}" is unknown. Not knowing is not the same as it being gone.`
+    return `${to} was not read back, so whether it still carries "${reverse}" is unknown. Not knowing is not the same as it being gone.`
   }
 
   // Said without claiming what the surviving property IS. This used to call it
@@ -286,8 +298,8 @@ function whyNotRepairable (relation, schemas, names = {}) {
   // a synced counterpart. A text property somebody typed into that name is
   // withheld for the same reason and is not that, so the reason described a
   // situation the code had not checked for.
-  if (far[mapped.propertyName(names[relation.to], relation.reverse)]) {
-    return `${to} already has a property called "${relation.reverse}". One statement builds both halves, so rebuilding this one would ask for a counterpart whose name is already taken.`
+  if (far[reverse]) {
+    return `${to} already has a property called "${reverse}". One statement builds both halves, so rebuilding this one would ask for a counterpart whose name is already taken.`
   }
 
   return null
