@@ -160,11 +160,19 @@ function verify (readback) {
     // as missing rather than as renamed, which is the bug the map was built to
     // remove, still live one object along.
     //
+    // The view's NAME is not the only unresolved one. Everything `views.js`
+    // builds reaches for the shipped property name too: the filters, the
+    // GROUP BY, the CALENDAR BY, the sorts, and the SQL each view is proved
+    // against. So a renamed property inside a view is unresolved as well, and
+    // fixing the name here alone would look like the whole gap was closed.
+    //
     // Left deliberately and written down rather than fixed quietly: the map
-    // holds properties and option values, views are a third kind of name, and
-    // adding them is a config shape change that belongs with `check` where a
-    // rename is actually adopted. Until then a renamed view is a false failure,
-    // which is the safe direction to be wrong in.
+    // holds properties and option values, a view name is a third kind of name,
+    // and carrying the map into the view compiler is a change to what gets sent
+    // to Notion rather than to what gets read back. It belongs with `check`,
+    // where a rename is actually adopted. Until then a renamed view or a
+    // renamed property inside one is a false failure, which is the safe
+    // direction to be wrong in.
     const found = ((entry && entry.views) || []).find(v => v && v.name === view.name)
     problems.push(...views.verifyView(view, found))
 
