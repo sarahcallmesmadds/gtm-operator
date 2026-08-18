@@ -587,7 +587,9 @@ function verify (key, actual, alsoExpected = []) {
 
 const defined = () => Object.keys(DATABASES)
 
-module.exports = { DATABASES, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, defined }
+// DDL_TYPE is exported for a test that changes a generator and checks the
+// proof fingerprint moves with it. Nothing else should reach into it.
+module.exports = { DATABASES, DDL_TYPE, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, defined }
 
 if (require.main === module) {
   const key = process.argv[3]
