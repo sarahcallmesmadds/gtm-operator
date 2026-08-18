@@ -479,6 +479,27 @@ check('status still reports on a config holding a key this version does not know
   assert.ok(reported.recorded.some(r => r.includes('marketing_ops')), reported.recorded.join(', '))
 })
 
+/**
+ * A read-back that verifies clean, rows and all.
+ *
+ * `goodReadback` deliberately carries no row evidence, because one of the checks
+ * above is that a view whose rows were never supplied says so. Nothing built on
+ * it can ever pass a whole verify, so anything testing the passing path needs
+ * this instead.
+ */
+const provenReadback = () => {
+  const readback = goodReadback()
+  readback.viewRows = {}
+  readback.sqlRows = {}
+  VIEWS.filter(v => v.filter).forEach((view, index) => {
+    const key = `${view.database}::${view.name}`
+    const id = `${String(index).repeat(2)}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`.slice(0, 32)
+    readback.viewRows[key] = [id]
+    readback.sqlRows[key] = [`https://app.notion.com/p/${id}`]
+  })
+  return readback
+}
+
 // Run the real CLI, because the point of these three is the command and not the
 // helper it calls. The previous versions called recordVerified then
 // clearVerified by hand and passed with the clearVerified call deleted from
@@ -569,6 +590,32 @@ check('a verify that dies on the definitions preflight leaves no usable record',
 
   assert.notStrictEqual(status, 0, 'a contradictory manifest should not exit 0')
   assert.strictEqual(config.read().verified, null, 'the preflight exit left the old record standing')
+})
+
+check('a passing re-verify of a finished install leaves it finished', () => {
+  // The other direction, and the regression the demotion above caused when it
+  // was first written: clearing the proof demoted the state, and a verify that
+  // then PASSED left `creating` sitting beside a fresh verifiedAt. A check
+  // succeeding must not un-finish a finished install.
+  setUpConfig()
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
+
+  const status = runVerify(writeReadback('good.json', provenReadback()))
+
+  assert.strictEqual(status, 0, 'a correct readback should verify')
+  const after = config.read()
+  assert.strictEqual(after.state, 'complete', 'a passing re-verify un-completed the install')
+  assert.notStrictEqual(after.verifiedAt, '2026-08-18T00:00:00Z', 'it should record the new verify, not the old one')
+})
+
+check('a passing verify does not finish an install that was never finished', () => {
+  // And the fix for that must not become an auto-complete. An install still
+  // being built is not complete because a check passed.
+  setUpConfig()
+  const status = runVerify(writeReadback('good-2.json', provenReadback()))
+  assert.strictEqual(status, 0)
+  assert.strictEqual(config.read().state, 'creating')
 })
 
 check('a withdrawn proof takes the completion claim with it', () => {
