@@ -193,6 +193,22 @@ check('a repair run adds the missing relation and only that one', () => {
   assert.strictEqual(statements.memos, `ADD COLUMN "Artifacts" RELATION('ds-process', DUAL 'Memos')`)
 })
 
+check('a near side that is present and correct is not announced as the wrong one', () => {
+  // The relation is missing because the FAR half is gone. The near half is
+  // there and correct, and the reason used to call it wrong, which points a
+  // person at the half that is fine.
+  const relation = RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+  const schemas = correctSchemas()
+  delete schemas.process[relation.reverse]
+
+  const problems = relations.verifyRelation(relation, schemas, IDS).join('\n')
+  assert.ok(problems.includes(relation.reverse), `the fixture is wrong: the far half should be the thing reported:\n${problems}`)
+
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said, 'it was withheld without saying so')
+  assert.ok(!/wrong/.test(said.reason), `the near half is correct and was described as wrong:\n${said.reason}`)
+})
+
 check('a two-way relation whose far side survived is never re-added', () => {
   // The near side was deleted and Notion left the synced property standing on
   // the far database. Re-adding the near side sends the SAME statement that
