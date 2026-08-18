@@ -215,7 +215,8 @@ check('a two-way relation whose far side survived is never re-added', () => {
 
   const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
   assert.ok(said, 'skipping it silently is the same as not noticing it')
-  assert.ok(/still has/.test(said.reason), `the reason should name the surviving far side:\n${said.reason}`)
+  assert.ok(said.reason.includes(relation.reverse) && /already has/.test(said.reason),
+    `the reason should name the surviving far side property:\n${said.reason}`)
 })
 
 check('a self-relation whose far side survived is never re-added', () => {
@@ -226,8 +227,30 @@ check('a self-relation whose far side survived is never re-added', () => {
   delete schemas[relation.from][relation.property]
 
   assert.ok(schemas[relation.to][relation.reverse], 'the fixture is wrong: the far side should still be there')
+  // Asserted before the repair is asked about. Without this the test passes if
+  // the fixture failed to delete the near side, or if `missing` stopped
+  // reporting the relation at all, which are both the thing going wrong rather
+  // than the guard working.
+  assert.ok(relations.missing(schemas, IDS).some(r => r.n === relation.n), 'the broken relation should be reported')
   assert.strictEqual(relations.repairStatements(schemas, IDS)[relation.from], undefined,
     'a self-relation was rebuilt while its other half was still on the database')
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said && /already has/.test(said.reason), `the reason should name the surviving far side:\n${said && said.reason}`)
+})
+
+check('a far side of the wrong type still withholds the repair, and is not called a synced half', () => {
+  // The guard refuses on the NAME being taken, and a property of any type takes
+  // the name. The reason has to be true of all of them.
+  const relation = RELATIONS.find(r => r.from === 'memos' && r.property === 'Artifacts')
+  const schemas = correctSchemas()
+  delete schemas.memos.Artifacts
+  schemas.process[relation.reverse] = { name: relation.reverse, type: 'rich_text' }
+
+  assert.strictEqual(relations.repairStatements(schemas, IDS).memos, undefined,
+    'a relation was rebuilt into a name that was already taken')
+  const said = relations.unrepairable(schemas, IDS).find(u => u.n === relation.n)
+  assert.ok(said, 'it was withheld without saying so')
+  assert.ok(!/syncs/.test(said.reason), `a rich_text property was described as the half Notion syncs:\n${said.reason}`)
 })
 
 check('a relation whose far side was never read back is not re-added', () => {
