@@ -1,5 +1,7 @@
 'use strict'
 
+const mapped = require('./names')
+
 /**
  * The properties of each database, in machine-readable form.
  *
@@ -492,7 +494,7 @@ const READ_BACK_AS = {
  * as a property somebody else added, which would turn a correct install into a
  * page of complaints.
  */
-function verify (key, actual, alsoExpected = []) {
+function verify (key, actual, alsoExpected = [], names = null) {
   const db = DATABASES[key]
   if (!db) throw new Error(`No schema defined for "${key}"`)
 
@@ -502,8 +504,14 @@ function verify (key, actual, alsoExpected = []) {
   }
 
   for (const want of db.properties) {
-    const got = actual[want.name]
-    if (!got) { problems.push(`${db.title}.${want.name}: missing`); continue }
+    // Looked up by the name the property HAS, not the name it shipped with.
+    // Indexing by the shipped name is what made a renamed property read as one
+    // property missing plus one stranger nobody owns, and put the repair path
+    // one approval away from re-adding the thing somebody deliberately renamed.
+    const observed = mapped.propertyName(names, want.name)
+    const where = observed === want.name ? `${db.title}.${want.name}` : `${db.title}.${want.name} (called "${observed}" here)`
+    const got = actual[observed]
+    if (!got) { problems.push(`${where}: missing`); continue }
 
     // The name a type is WRITTEN as in DDL is not the name it is READ back as.
     // Measured 2026-08-17: RICH_TEXT comes back as "text", PEOPLE comes back as
@@ -512,7 +520,7 @@ function verify (key, actual, alsoExpected = []) {
     // switched off.
     const expected = READ_BACK_AS[want.type] || want.type
     if (got.type !== expected) {
-      problems.push(`${db.title}.${want.name}: expected type ${expected}, got ${got.type}`)
+      problems.push(`${where}: expected type ${expected}, got ${got.type}`)
     }
 
     // Checked whenever the manifest asks for a description.
@@ -534,7 +542,7 @@ function verify (key, actual, alsoExpected = []) {
     // have one.
     if (want.description && got.description !== want.description) {
       problems.push(
-        `${db.title}.${want.name}: the description does not match.\n` +
+        `${where}: the description does not match.\n` +
         `    wanted: ${want.description}\n` +
         `    got:    ${got.description || 'nothing'}`
       )
@@ -542,7 +550,11 @@ function verify (key, actual, alsoExpected = []) {
 
     if (want.options) {
       const gotNames = (got.options || []).map(o => o.name)
-      const wantNames = want.options.map(([n]) => n)
+      // The option names this workspace uses, in the order the schema defines.
+      // A renamed value is the same failure as a renamed property one level
+      // down, and it fails harder: a write naming an option that is not there
+      // is a 400 that takes the whole page with it.
+      const wantNames = want.options.map(([n]) => mapped.valueName(names, want.name, n))
 
       // Colour as well as name and order. It was not compared at all until
       // 2026-08-18, so a select with the right values in the right order and
@@ -555,14 +567,15 @@ function verify (key, actual, alsoExpected = []) {
       // `tests/fixtures/full-install-as-notion-returned-it.json` came back
       // exactly as sent, with no normalising of the names.
       for (const [name, colour] of want.options) {
-        const back = (got.options || []).find(o => o.name === name)
+        const observedValue = mapped.valueName(names, want.name, name)
+        const back = (got.options || []).find(o => o.name === observedValue)
         if (back && back.color !== colour) {
-          problems.push(`${db.title}.${want.name}: option "${name}" came back ${back.color || 'with no colour'} and was sent as ${colour}`)
+          problems.push(`${where}: option "${observedValue}" came back ${back.color || 'with no colour'} and was sent as ${colour}`)
         }
       }
 
       for (const name of wantNames) {
-        if (!gotNames.includes(name)) problems.push(`${db.title}.${want.name}: option "${name}" is missing`)
+        if (!gotNames.includes(name)) problems.push(`${where}: option "${name}" is missing`)
       }
       // Order is checked, not just membership. Notion sorts a select by option
       // order, so a correct set in the wrong order is a real defect that is
@@ -570,14 +583,20 @@ function verify (key, actual, alsoExpected = []) {
       const shared = gotNames.filter(n => wantNames.includes(n))
       const wanted = wantNames.filter(n => gotNames.includes(n))
       if (shared.join(' ') !== wanted.join(' ')) {
-        problems.push(`${db.title}.${want.name}: options are in the wrong order.\n    wanted: ${wanted.join(', ')}\n    got:    ${shared.join(', ')}`)
+        problems.push(`${where}: options are in the wrong order.\n    wanted: ${wanted.join(', ')}\n    got:    ${shared.join(', ')}`)
       }
     }
   }
 
   // Extra properties are reported and never removed. They may be the user's,
   // and this plugin repairs what it owns and never touches what the user wrote.
-  const wantedNames = new Set([...db.properties.map(p => p.name), ...alsoExpected])
+  // Observed names on both halves. With the shipped names here, every renamed
+  // property was reported twice: once as missing above, and again as a stranger
+  // in Notion that the plugin does not own.
+  const wantedNames = new Set([
+    ...db.properties.map(p => mapped.propertyName(names, p.name)),
+    ...alsoExpected.map(n => mapped.propertyName(names, n))
+  ])
   for (const name of Object.keys(actual)) {
     if (!wantedNames.has(name)) problems.push(`${db.title}.${name}: present in Notion and not in the schema. Reported, not removed`)
   }
@@ -587,9 +606,39 @@ function verify (key, actual, alsoExpected = []) {
 
 const defined = () => Object.keys(DATABASES)
 
+/**
+ * The map a database starts life with: every logical name pointing at itself.
+ *
+ * Recorded at install, when the plugin has just created these properties and so
+ * knows the names are the shipped ones. Everything after that is somebody
+ * renaming something, which `check` adopts into this map.
+ *
+ * Relation properties are in it too. They are properties on the database like
+ * any other, they can be renamed like any other, and leaving them out would
+ * make a renamed relation look absent and invite a second one being added
+ * beside it.
+ */
+function identityNames (key) {
+  const db = DATABASES[key]
+  if (!db) throw new Error(`No schema defined for "${key}"`)
+
+  const properties = {}
+  for (const p of db.properties) properties[p.name] = p.name
+  for (const name of require('./relations').propertyNamesFor(key)) properties[name] = name
+
+  const values = {}
+  for (const p of db.properties) {
+    if (!p.options) continue
+    values[p.name] = {}
+    for (const [name] of p.options) values[p.name][name] = name
+  }
+
+  return { properties, values }
+}
+
 // DDL_TYPE is exported for a test that changes a generator and checks the
 // proof fingerprint moves with it. Nothing else should reach into it.
-module.exports = { DATABASES, DDL_TYPE, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, defined }
+module.exports = { DATABASES, DDL_TYPE, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, defined, identityNames }
 
 if (require.main === module) {
   const key = process.argv[3]

@@ -31,6 +31,7 @@
  */
 
 const { RELATIONS, byKey, relationsFrom } = require('./manifest')
+const mapped = require('./names')
 
 /**
  * The statement that creates one relation.
@@ -115,7 +116,7 @@ function counterpartDataSource (propertyUrl) {
  * the target is the whole difference between a two-way relation and a one-way
  * one, and it is on the other database.
  */
-function verifyRelation (relation, schemas, ids) {
+function verifyRelation (relation, schemas, ids, names = {}) {
   const from = byKey(relation.from).title
   const to = byKey(relation.to).title
   const label = `relation ${relation.n} (${from}.${relation.property})`
@@ -124,7 +125,12 @@ function verifyRelation (relation, schemas, ids) {
   const source = schemas[relation.from]
   if (!source) return [`${label}: ${from} was not read back, so nothing was verified`]
 
-  const property = source[relation.property]
+  // A relation property can be renamed like any other property. Looked up by
+  // its shipped name, a renamed one reads as absent, and absent is the one
+  // finding this file turns into an ADD COLUMN. That is how a rename becomes a
+  // duplicate relation sitting beside the original.
+  const observed = mapped.propertyName(names[relation.from], relation.property)
+  const property = source[observed]
   if (!property) return [`${label}: missing from ${from}`]
   if (property.type !== 'relation') {
     problems.push(`${label}: expected a relation, got ${property.type}`)
@@ -160,7 +166,7 @@ function verifyRelation (relation, schemas, ids) {
     if (!targetSchema) {
       problems.push(`${label}: ${to} was not read back, so the far side could not be checked`)
     } else {
-      const reverse = targetSchema[relation.reverse]
+      const reverse = targetSchema[mapped.propertyName(names[relation.to], relation.reverse)]
       if (!reverse) {
         problems.push(`${label}: ${to} has no "${relation.reverse}", which is the property Notion should have created on it`)
       } else if (reverse.type !== 'relation') {
@@ -205,8 +211,8 @@ function verifyRelation (relation, schemas, ids) {
 }
 
 /** Every relation, checked. */
-function verifyAll (schemas, ids) {
-  return RELATIONS.flatMap(r => verifyRelation(r, schemas, ids))
+function verifyAll (schemas, ids, names = {}) {
+  return RELATIONS.flatMap(r => verifyRelation(r, schemas, ids, names))
 }
 
 /**
@@ -219,19 +225,23 @@ function verifyAll (schemas, ids) {
  * Nothing here consults a log of which calls returned, because a call
  * returning is not evidence that anything was created.
  */
-function missing (schemas, ids) {
-  return RELATIONS.filter(r => verifyRelation(r, schemas, ids).length > 0)
+function missing (schemas, ids, names = {}) {
+  return RELATIONS.filter(r => verifyRelation(r, schemas, ids, names).length > 0)
 }
 
 /** The statements for whatever is still missing, grouped by database. */
-function repairStatements (schemas, ids) {
+function repairStatements (schemas, ids, names = {}) {
   const out = {}
-  for (const relation of missing(schemas, ids)) {
+  for (const relation of missing(schemas, ids, names)) {
     const source = schemas[relation.from] || {}
     // A property that is there but wrong is not something to add again. Adding
     // it a second time is how duplicates appear, which is the one failure this
     // whole file is arranged around.
-    if (source[relation.property]) continue
+    //
+    // Asked of the name the property actually has. Asking for the shipped name
+    // answers "not there" for every renamed relation, and the answer decides
+    // whether a second one gets added.
+    if (source[mapped.propertyName(names[relation.from], relation.property)]) continue
     out[relation.from] = out[relation.from] ? `${out[relation.from]}; ${statementFor(relation, ids)}` : statementFor(relation, ids)
   }
   return out
@@ -244,11 +254,23 @@ function propertyNamesFor (key) {
   return names
 }
 
+/**
+ * The same list, as the names this workspace actually uses.
+ *
+ * `schema.verify` takes these as the properties that belong on the database
+ * without being in the schema file. Handed the shipped names against a
+ * workspace that renamed one, it reports the renamed relation as a property
+ * nobody owns.
+ */
+function observedPropertyNamesFor (key, names) {
+  return propertyNamesFor(key).map(n => mapped.propertyName(names, n))
+}
+
 module.exports = {
   // Exported for a test. Both callers below reach it only after their own
   // not-recorded guards have fired, so the two-missing case cannot be reached
   // through verifyRelation and can only be pinned directly.
-  sameDataSource, statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, propertyNamesFor, bare }
+  sameDataSource, statementFor, statementsFor, verifyRelation, verifyAll, missing, repairStatements, propertyNamesFor, observedPropertyNamesFor, bare }
 
 if (require.main === module) {
   // Placeholder ids, so the shape of every statement can be read without a

@@ -136,15 +136,21 @@ function verify (readback) {
     schemas[d.key] = entry.schema
   }
 
+  // The names this workspace uses, recorded when each database was created and
+  // updated by `check` when somebody renames something. Absent for a database
+  // recorded before the map existed, and the lookups fall back to the shipped
+  // names, which is what every install that has ever run used.
+  const names = config.allNames()
+
   // Properties, types, option lists and option order. The relation properties
   // are passed in so they are not reported as somebody else's additions.
   for (const d of DATABASES) {
     if (!schemas[d.key]) continue
-    problems.push(...schema.verify(d.key, schemas[d.key], relations.propertyNamesFor(d.key)))
+    problems.push(...schema.verify(d.key, schemas[d.key], relations.observedPropertyNamesFor(d.key, names[d.key]), names[d.key]))
   }
 
   // Every relation, both ends.
-  problems.push(...relations.verifyAll(schemas, config.ids()))
+  problems.push(...relations.verifyAll(schemas, config.ids(), names))
 
   // Every view, and then the rows it actually returns.
   for (const view of VIEWS) {
