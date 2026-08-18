@@ -582,7 +582,17 @@ function verify (key, actual, alsoExpected = [], names = null) {
       // invisible until somebody groups a view by it.
       const shared = gotNames.filter(n => wantNames.includes(n))
       const wanted = wantNames.filter(n => gotNames.includes(n))
-      if (shared.join(' ') !== wanted.join(' ')) {
+      // Compared element by element rather than by joining on a separator.
+      //
+      // It used to join on a literal NUL, picked because no option name can
+      // contain one. That reasoning was sound and it cost this file its
+      // searchability: two raw NUL bytes make `file` report schema.js as data,
+      // and grep skips a file it reads as binary SILENTLY, exiting 0 with no
+      // output. So every repository-wide search here missed 658 lines and said
+      // nothing about it. `install.verify` already compares its lists this way
+      // and says why; this is the same reason plus that one.
+      const sameOrder = shared.length === wanted.length && shared.every((name, index) => name === wanted[index])
+      if (!sameOrder) {
         problems.push(`${where}: options are in the wrong order.\n    wanted: ${wanted.join(', ')}\n    got:    ${shared.join(', ')}`)
       }
     }
