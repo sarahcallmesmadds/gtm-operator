@@ -11,7 +11,7 @@ Written 2026-08-17.
 
 ---
 
-## Rules that apply to all four
+## Rules that apply to every skill in this plugin
 
 The shared rules in `SKILLS-memos.md` apply here unchanged: never invent a select
 value, verify the write landed, a hard confirmation gate, preview in full inline,
@@ -29,7 +29,7 @@ Three more belong to this plugin.
   owner is worse than an empty field, because an empty field asks a question and a
   wrong one answers it.
 - **`Last reviewed` moves only when a review happened.** Not on a rename, not when
-  `renewals` reads the row, not when `backfill` creates it. This is the same
+  `contracts` reads the row, not when `backfill` creates it. This is the same
   correction `process:update` needed on 2026-08-17, where fixing a typo was
   resetting the review clock and suppressing the staleness warning for a whole
   cadence period.
@@ -107,7 +107,7 @@ holds, and whether it is still in use.
 
 ---
 
-## renewals
+## contracts
 
 **What it does.** Tells you what is coming up and what happens if you do nothing.
 
@@ -139,7 +139,7 @@ rather than a saved view.
 2. **Reporting what it cannot see.** **An empty date does not match a "before"
    filter in Notion**, so every row with no contract data is invisible to this
    check. That is the exact trap `process:audit` hit on signal 1, and it is worse
-   here, because a renewals report that silently omits half the directory reads as
+   here, because a contracts report that silently omits half the directory reads as
    "nothing is due".
 
    **So the output always ends with a count of rows it could not assess**, and
@@ -224,7 +224,7 @@ The questions people ask a tool directory (what do we use for this, who owns tha
 which tools have an AI surface and hold customer data) are **view questions**. A
 well-built database with the right fields answers them by filtering, and every
 field needed to do so is in the schema. The one question that needs computation
-rather than filtering is renewals, and it has its own skill.
+rather than filtering is the contract deadlines, and they have their own skill.
 
 **This is also a deliberate stop.** Four near-identical find skills across four
 plugins is four places to fix one bug, and a single search across all six

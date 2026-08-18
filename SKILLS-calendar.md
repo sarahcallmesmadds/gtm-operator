@@ -13,7 +13,7 @@ Written 2026-08-17.
 
 ---
 
-## Rules that apply to all three
+## Rules that apply to every skill in this plugin
 
 The shared rules in `SKILLS-memos.md` apply here unchanged: never invent a select
 value, verify the write landed, a hard confirmation gate, preview in full inline,
@@ -160,7 +160,7 @@ first one was planned and dropped.
 
 ---
 
-## upcoming
+## soon
 
 **What it does.** Answers what is in market and when.
 
@@ -175,7 +175,7 @@ quarter, and any time somebody is about to pick a date.
 - **Never silently drops rows it cannot place.** A row with no date cannot appear
   on a calendar, and a report that omits it reads as "nothing else is happening".
   The output ends with a count of rows it could not place and why, the same rule
-  `software:renewals` follows for rows with no contract data.
+  `software:contracts` follows for rows with no contract data.
 
 **The judgment it carries.** Two things, and they are why this is a skill rather
 than the calendar view `setup` already creates.
@@ -230,7 +230,7 @@ should offer to do halfway.
    judge, which is right for v1, but a real threshold wants tuning against a real
    calendar rather than being invented now. Same position `process:new` took on
    the duplicate check.
-2. **`upcoming` overlaps `memos:team-update`**, which also reads this database for
+2. **`soon` overlaps `memos:team-update`**, which also reads this database for
    what went out. That is fine and probably correct, but if the two produce
    different pictures of the same period, one of them is wrong and nothing would
    catch it.

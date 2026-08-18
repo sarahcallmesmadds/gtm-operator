@@ -223,7 +223,7 @@ last confirmed, which is what stops a stale figure being quoted as current.
 
 #### Who reads this group
 
-`software:renewals`, a skill somebody runs, which lists what is coming up inside a
+`software:contracts`, a skill somebody runs, which lists what is coming up inside a
 window and what the consequence is of doing nothing. **Nothing schedules it**,
 because v1 has no unattended runs anywhere in the marketplace.
 
@@ -319,7 +319,7 @@ accuracy` in the Process Library.
 
 **Its fill events, named now so the skills have to honour them:** set by
 `software:new` when a row is created, and by `software:review` when a row gets a
-full pass. Nothing else moves it, and in particular `software:renewals` does not,
+full pass. Nothing else moves it, and in particular `software:contracts` does not,
 because reading a list is not reviewing a row. That is the same correction
 `update` needed on 2026-08-17, where fixing a typo was resetting the review clock.
 
@@ -428,10 +428,10 @@ ninety-one.
 | Given to new teammates | Whenever it becomes true | a person |
 | Integrates with | An integration is built or torn down | a person, or `software:review` |
 | Artifacts | A doc about this tool is written | `process:new` |
-| Last reviewed | Creation and every full pass. Never by backfill or renewals | `software:new`, `software:review` |
+| Last reviewed | Creation and every full pass. Never by backfill or contracts | `software:new`, `software:review` |
 
 **Four skills are named here and none exist yet.** `software:new`,
-`software:review`, `software:renewals` and `software:backfill`. Writing them is
+`software:review`, `software:contracts` and `software:backfill`. Writing them is
 what makes this schema real rather than aspirational.
 
 ### Dropped from the reference
@@ -580,5 +580,5 @@ reasoning is not lost and the same ground is not re-covered.
    documented that group as its worst filled. `Admins` is the one to drop first if
    real use proves the point.
 4. **Four skills are named and none are designed.** `software:new`,
-   `software:review`, `software:renewals`, `software:backfill`. The last one needs
+   `software:review`, `software:contracts`, `software:backfill`. The last one needs
    the most care, because it reads somebody's mailbox.
