@@ -73,6 +73,109 @@ decide**. Nothing else in the design changed.
 
 ---
 
+## Skill names and shapes, decided 2026-08-18
+
+Sarah's calls, in conversation, after reading the marketplace layout.
+
+### `software` gets `update`, the general path for a row whose facts changed
+
+**Software was the only foundation plugin with no `update`.** That is the hole,
+and retirement was only the case that made it visible.
+
+**It is not a status skill.** The things that change about a tool are ordinary and
+various: the vendor is acquired and the product renamed, a contract is extended or
+shortened, the cost changes at renewal, the owner leaves, the security answers get
+re-checked, access is widened. Any of those is a reason to open the row, and none
+of them is a status change.
+
+Retirement is one case among them: `Status` moves to `Retired` here rather than
+requiring a full `review` sweep, which was friction at the exact moment somebody
+was willing to record something. **Nothing is deleted or archived, unchanged from
+before:** the row stays, and `Retired` and `Rejected` keep the history of what was
+dropped and what was turned down.
+
+**Spec owed**, and it has to answer a question retirement does not raise: **what a
+rename does to the history.** A tool acquired and renamed is the same contract and
+the same spend under a different word, and `Name` is defined as the vendor's own
+spelling. Nothing currently records what it used to be called, so the row stops
+being findable by the name everyone still uses for it.
+
+### `renewals` is now `contracts`
+
+The old name pointed at the wrong event. **The notice deadline is what bites, not
+the renewal date**, and a skill named for renewals reads as if the renewal is the
+thing to watch.
+
+**It also grew a job.** It may read the contract document itself when asked, not
+only the row, so a question the properties cannot answer can be answered from the
+source. It stays read-only and still writes nothing.
+
+**Where the detail comes from is the schema, not a search.** `Contract link` is
+the property that says where the agreement is, and that is the only place this
+skill looks. Two forms have to work: a link to a Google Drive file or folder, and
+a file uploaded onto the row itself.
+
+**That breaks the property as defined.** `Contract link` is a URL, and an upload
+cannot go in a URL property. See the schema consequence below.
+
+### `Contract link` has to change type, and probably name
+
+An upload and a link cannot share a URL property. Notion's Files & media type
+holds both an uploaded file and an external link, so **one property still covers
+both cases, but it has to be Files & media rather than URL.**
+
+**The name then stops being true.** "Contract link" describes one of the two
+things it would hold.
+
+**Open, and hers:** whether the property becomes `Contract` or `Contract file` or
+stays as it is with uploads refused. Nothing has been changed in the schema yet.
+
+**Measured 2026-08-18, and the answer decides the property.**
+
+| Attempted | Result |
+|---|---|
+| Read a PDF stored in Google Drive | **Yes.** Full text came back. Word, Excel, PowerPoint and images are supported the same way |
+| Read a PDF uploaded into Notion | **No.** The download refuses binary files outright, and the page read-back gives a `file://` reference rather than a URL anything can fetch |
+| Read a text file uploaded into Notion | **Yes**, but only plain text formats, only files this same connection uploaded, and only up to 200 KiB |
+| Store a PDF in a Files property at all | **Yes**, but the file has to be uploaded, placed in a page body, and then referenced by the id that appears when the page is read back. Not one call |
+
+**So a contract this skill can read is a Drive link, not a Notion upload.** A
+contract is a PDF, and a PDF sitting in Notion is a file the plugin can see the
+name of and nothing more. Storing one there would produce a row that looks like it
+carries the agreement and cannot answer a single question about it.
+
+**What follows for the property.** Files & media buys the ability to hold an
+upload, and an upload is the one form that cannot be read. Keeping `Contract link`
+as a URL costs nothing that can be used and keeps the name true.
+
+**Recommendation: leave it as `Contract link`, a URL, and point it at Drive.**
+Not decided; hers.
+
+**A separate note if Files & media is ever adopted anyway:** `FILES` in the DDL
+reads back as `file`, another type that does not round-trip under the name it is
+written with, alongside `RICH_TEXT` reading back as `text` and `PEOPLE` as
+`person`.
+
+### `calendar:new` checks for duplicates as well as clashes
+
+It already showed what else was aimed at a similar audience in the same window.
+**That is not the same question as whether this thing is already on the
+calendar.** A clash is two different things colliding; a duplicate is the same
+thing entered twice. Both get checked before anything is written, and for the
+same reason: the only moment to prevent either is while somebody is still
+choosing.
+
+This makes it the same shape as `process:new`, which already checks for
+duplicates.
+
+### `calendar:upcoming` is now `calendar:soon`
+
+`upcoming` reads as a date-sorted list, which is the one thing this skill
+deliberately is not. It groups by who a thing hits rather than by when it
+happens, and separates what is locked from what is only hoped for.
+
+---
+
 ## What we are doing
 
 Building new, shareable plugins for people who do not have Sarah's setup.
