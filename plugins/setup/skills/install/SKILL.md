@@ -133,6 +133,12 @@ run now:
 If either fails, **say exactly what to do about it and stop**, the same as step
 0. Do not offer to continue with a subset.
 
+**Carry the id that fetch returned, not the text the user gave you.** People
+paste a page as a url, and Notion has more url shapes than anything downstream
+should have to know about, including public ones with a custom slug and no id in
+them at all. The fetch turns any of them into the page's own id once, here. Every
+later step, `begin` included, takes that.
+
 **If they took the default and want the page created**, there is nothing to check
 yet and nothing to create yet either, because creating it before the gate would
 break the one rule this skill has about writing. Say that the page will be
@@ -223,8 +229,31 @@ nobody can find, and the literal retry creates a second one.
 proves check 4 on this route. If it fails, stop and say the page exists and is
 recorded, because it does and it is.
 
+**Read the fetch, do not just note that it returned.** It has to be the page you
+just made, and reachable is not the same claim: any id that names a page you can
+see comes back fine, including one copied out of the wrong field or left over
+from an earlier run. Two things say it is the right one, and both are cheap:
+
+- **The title is the name agreed at question 1.**
+- **It has nothing in it.** A page you created one call ago is empty. Anything
+  under it means this is not that page.
+
+If either is wrong, **stop before phase A**. Nothing has been created under it
+yet, which is the whole reason this check sits here. Say that config is naming
+the wrong page and has to be moved aside before another run, and say that a page
+by the agreed name was created and is somewhere at the top level of the
+workspace, because it was and it is.
+
 If they named an existing page in step 2, skip all of this: they have an id, it
 was checked in step 2a, and `begin` takes it directly.
+
+**One gap here does not close, and it is better named than papered over.** The
+create call happens before anything can record it, so a run that dies between
+sending it and `begin` leaves a page nothing here knows about. No ordering fixes
+that, because the two systems cannot be written to at once. What makes it
+survivable is that the page has the name agreed at question 1 and sits at the top
+level of the workspace, so say that name out loud before creating it. Then a
+person who has to go looking knows what they are looking for.
 
 **Phase A. Every database, with no relations in it.**
 

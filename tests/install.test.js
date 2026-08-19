@@ -80,6 +80,28 @@ check('the same page in a different shape is the same page, and is allowed', () 
   assert.strictEqual(again.notion.parentPageId, bare, 'the id given last is the one recorded')
 })
 
+check('the same page as a url and as an id is the same page, which a dash stripper would miss', () => {
+  reset()
+  const bare = '0000000000004000800000000000aaaa'
+  config.begin('https://app.notion.com/p/' + bare)
+  const again = config.begin(bare)
+  assert.strictEqual(
+    again.state,
+    'creating',
+    'the url and the id name one page, and a guard that only strips dashes cannot tell'
+  )
+})
+
+check('two things that are not page references at all are still compared, not waved through', () => {
+  reset()
+  config.begin('parent-page')
+  assert.throws(
+    () => config.begin('some-other-page'),
+    /already records .* as the parent page/,
+    'a value this cannot parse is missing evidence, and a guard that passes what it cannot parse is not a guard'
+  )
+})
+
 check('both ids are stored for every database, never just one', () => {
   reset()
   config.begin('parent-page')
