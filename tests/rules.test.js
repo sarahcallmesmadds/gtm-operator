@@ -10,6 +10,14 @@
  * if a default install still sends those exact strings, so that is the first
  * thing checked here.
  *
+ * WHAT THE MEASUREMENT COVERS, now that the select has changed. Both queries
+ * selected the title when they were measured and select `url` now. The
+ * measurement was of which rows come back, which is the `WHERE` half and the
+ * join, and both are character for character what was sent that day. Which
+ * column comes back was not measured, and these exact strings have never been
+ * sent to Notion. Saying so here rather than letting the word MEASURED cover a
+ * string nobody ran.
+ *
  * Run: node tests/rules.test.js
  */
 
@@ -33,8 +41,8 @@ const check = (name, fn) => {
 }
 
 const MEASURED = {
-  'tags-max-3': 'SELECT "Name" FROM <ds> WHERE json_array_length("Tags") > 3',
-  'process-parent-type': 'SELECT c."Name" FROM <ds> c JOIN <ds> p ON p.url = json_extract(c."Parent", \'$[0]\') WHERE c."Parent" IS NOT NULL AND p."Type" != \'Strategy Decision\''
+  'tags-max-3': 'SELECT url FROM <ds> WHERE json_array_length("Tags") > 3',
+  'process-parent-type': 'SELECT c.url FROM <ds> c JOIN <ds> p ON p.url = json_extract(c."Parent", \'$[0]\') WHERE c."Parent" IS NOT NULL AND p."Type" != \'Strategy Decision\''
 }
 
 const rule = key => RULES.find(r => r.key === key)
@@ -52,6 +60,22 @@ check('the parent query is the string that was proved on real rows', () => {
 check('no placeholder survives compiling', () => {
   for (const q of rules.queries()) {
     assert.ok(!/\{(prop|value):/.test(q.query), `a placeholder was left in ${q.rule}:\n${q.query}`)
+  }
+})
+
+// `check.js` tells the caller to record what comes back as page urls, and
+// `judge` reports those rows as they arrive. A query selecting anything else
+// makes the instruction beside it a lie, which is what it was. Counted as well
+// as tested, because a version of this that only looped would pass by saying
+// nothing once the last rule was deleted.
+check('every rule query selects the url, not the title', () => {
+  const all = rules.queries()
+  assert.ok(all.length >= 3, `expected the three rule queries, got ${all.length}`)
+  for (const q of all) {
+    assert.ok(
+      /^SELECT (?:[a-z]+\.)?url FROM /.test(q.query),
+      `${q.rule} on ${q.database} does not select url, so what check records would not be a url:\n${q.query}`
+    )
   }
 })
 
@@ -79,19 +103,33 @@ check('a renamed property changes the query for that database only', () => {
   assert.strictEqual(process.query, MEASURED['tags-max-3'], 'renaming on Memos changed the Process query')
 })
 
-check('every name in the parent query is resolved, including Name', () => {
-  // Five distinct tokens, renamed separately so that one shared answer cannot
-  // pass for all of them. `Name` is the one an earlier draft of this missed.
+check('every name in the parent query is resolved', () => {
+  // Renamed separately so that one shared answer cannot pass for all of them.
+  // `Name` is renamed here too, and the assertions below say it must NOT appear
+  // under either name: the query selects `url`, a system column, so the title
+  // is not one of the things this query asks about any more.
   const names = { process: { properties: { Name: 'Title', Parent: 'Parent Doc', Type: 'Kind' }, values: { Type: { 'Strategy Decision': 'Strategy Call' } } } }
   const query = rules.compile(rule('process-parent-type'), 'process', names.process)
 
-  assert.ok(query.includes('c."Title"'), `Name was not resolved:\n${query}`)
   assert.ok(query.includes('c."Parent Doc"'), `Parent was not resolved:\n${query}`)
   assert.ok(query.includes('p."Kind"'), `Type was not resolved:\n${query}`)
   assert.ok(query.includes("'Strategy Call'"), `the option value was not resolved:\n${query}`)
-  for (const shipped of ['"Name"', '"Parent"', '"Type"', "'Strategy Decision'"]) {
+  for (const shipped of ['"Parent"', '"Type"', "'Strategy Decision'"]) {
     assert.ok(!query.includes(shipped), `${shipped} survived, so the workspace is asked about a name it does not use:\n${query}`)
   }
+  for (const title of ['"Name"', '"Title"']) {
+    assert.ok(!query.includes(title), `${title} is in the query, so it is selecting the title again rather than the url:\n${query}`)
+  }
+})
+
+check('renaming the title property does not change either query', () => {
+  // The point of selecting `url`. A workspace that renamed its title column
+  // used to get a different query out of this, and the column it got back was
+  // whatever that workspace happened to call the title. `url` is Notion's own
+  // and takes no placeholder, so the rename is now invisible here.
+  const names = { properties: { Name: 'Title' }, values: {} }
+  assert.strictEqual(rules.compile(rule('tags-max-3'), 'process', names), MEASURED['tags-max-3'])
+  assert.strictEqual(rules.compile(rule('process-parent-type'), 'process', names), MEASURED['process-parent-type'])
 })
 
 check('both occurrences of a name are resolved, not just the first', () => {

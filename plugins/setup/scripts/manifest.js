@@ -210,6 +210,21 @@ const VIEWS = [
  * existed and wrong afterwards: a renamed `Tags` would have been queried by the
  * name nobody uses, returning nothing, which reads exactly like a workspace
  * with no rule violations in it.
+ *
+ * **They select `url`, not the title.** `check.js` says to record what comes
+ * back as page urls, `judge` puts those rows straight into what it reports, and
+ * the caller has no way to turn a title into something it can open. Selecting
+ * the title made a caller following the instruction literally record titles and
+ * call them urls. Titles are also not unique, so two rows breaking the same rule
+ * can arrive indistinguishable. This is the same fault the view proofs had, and
+ * `SELECT url FROM <ds>` is the shape that replaced it there, measured on
+ * 2026-08-18. The `url` column is a system column and is never renamed, so it
+ * takes no placeholder.
+ *
+ * What the 2026-08-17 measurement proved was WHICH ROWS come back, and that is
+ * the `WHERE` half, unchanged. Which column comes back is not something that
+ * measurement covers, and these strings in this form have not been sent to
+ * Notion.
  */
 const RULES = [
   { key: 'projects-problem-statement', database: 'projects', caughtBy: 'view',
@@ -232,16 +247,21 @@ const RULES = [
     noFilter: 'A multi-select filter tests contains and does not contain. It cannot count values',
     why: 'Tags stop being a filter once a row carries six of them',
     // Proved on real rows 2026-08-17: returned exactly the 4-tag and 5-tag rows
-    // and correctly excluded the 2-tag one.
-    checkQuery: 'SELECT {prop:Name} FROM <ds> WHERE json_array_length({prop:Tags}) > 3' },
+    // and correctly excluded the 2-tag one. That measurement was of the WHERE
+    // half, which has not changed. The select was the title then and is `url`
+    // now, for the reason above.
+    checkQuery: 'SELECT url FROM <ds> WHERE json_array_length({prop:Tags}) > 3' },
 
   { key: 'process-parent-type', database: 'process', caughtBy: 'check',
     rule: 'Only a Strategy Decision may be a parent',
     noFilter: 'The Type being tested is on the related page, and a filter cannot read across a relation',
     why: 'The hierarchy is the whole navigation model, and any row can parent any row',
     // Proved on real rows 2026-08-17: a self-join through the relation returned
-    // the child of an SOP and not the child of a Strategy Decision.
-    checkQuery: 'SELECT c.{prop:Name} FROM <ds> c JOIN <ds> p ON p.url = json_extract(c.{prop:Parent}, \'$[0]\') WHERE c.{prop:Parent} IS NOT NULL AND p.{prop:Type} != {value:Type:Strategy Decision}' }
+    // the child of an SOP and not the child of a Strategy Decision. As above,
+    // that measurement was of the WHERE half and the join, both unchanged.
+    // `c.url` is qualified because the join puts two `url` columns in scope, and
+    // the offending row is the child.
+    checkQuery: 'SELECT c.url FROM <ds> c JOIN <ds> p ON p.url = json_extract(c.{prop:Parent}, \'$[0]\') WHERE c.{prop:Parent} IS NOT NULL AND p.{prop:Type} != {value:Type:Strategy Decision}' }
 ]
 
 /** Derived. Never write these numbers down anywhere else. */
