@@ -73,6 +73,48 @@ decide**. Nothing else in the design changed.
 
 ---
 
+## Two fixes where the code disagreed with its own documents, 2026-08-19
+
+Both were found by review and neither had bitten a user, because both need a
+second run to show themselves.
+
+**`recordPerson` no longer clears the proof.** It called
+`invalidateVerification`, which exists to drop a verify when the thing verified
+has changed, and which also demotes `state: complete` back to `creating`.
+`begin` reads that state and nothing else to refuse installing over a workspace
+that is already built, so saving a person was a way past the refusal. The proof
+is a statement about the schema and `personId` is not part of the schema:
+`Owner`, `Verified by` and `Author` are created on every install whatever the
+value is, and it decides only whether a later row write fills them. So the
+clearing was throwing away something still true. The two functions that do
+invalidate, `recordDatabase` and `reresolveDataSource`, both change which Notion
+object the config points at, which is what a proof is about.
+
+**The two rule queries select `url` rather than the title.** `check.js` tells
+the caller to record what comes back as page urls, `judge` puts those rows
+straight into what it reports, and `check/SKILL.md` says urls too. Only the
+query templates disagreed, and a caller following the instruction beside them
+recorded titles and called them urls. Titles are also not unique, so two rows
+breaking the same rule could arrive indistinguishable, and a report you cannot
+click through to is most of the value gone.
+
+**This is the same fault as "the row proof was resting on titles", fixed for the
+view proofs on 2026-08-18, one day earlier and one file away.** Worth naming as
+a repeat rather than as two incidents: both places had a measured query written
+before there was any consumer contract, and neither was revisited when the
+contract arrived. The fix in both is `SELECT url FROM <ds>`, and `url` is a
+system column that no rename touches, so it takes no placeholder.
+
+**What the old measurement still covers.** Both queries were proved on real rows
+on 2026-08-17. That measurement was of which rows come back, which is the
+`WHERE` half and the join, and both are unchanged character for character. Which
+column comes back was not part of it. **These exact strings have not been sent to
+Notion**, and the test file says so rather than letting the word MEASURED cover a
+string nobody ran. Re-running them needs a workspace, and the test containers were
+deleted on 2026-08-19.
+
+---
+
 ## Skill names and shapes, decided 2026-08-18
 
 Sarah's calls, in conversation, after reading the marketplace layout.
