@@ -285,9 +285,9 @@ check_('the adopted rename makes the finding go away, on the same read-back', ()
   back.databases.process.schema['Area'] = back.databases.process.schema[want.name]
   delete back.databases.process.schema[want.name]
 
-  check.adopt(back, ['property:process:Domain'])
-  const result = check.provedAdopted(back, ['property:process:Domain'])
+  const result = check.adopt(back, ['property:process:Domain'])
   assert.strictEqual(result.proved, true, `the rename was adopted and the finding survived:\n${result.results.map(r => r.say).join('\n')}`)
+  assert.strictEqual(result.results.length, 1)
 })
 
 check_('an id that was never a finding is not reported as repaired', () => {
@@ -301,7 +301,11 @@ check_('an id that was never a finding is not reported as repaired', () => {
   assert.ok(/nothing for/.test(result.results[0].say), result.results[0].say)
 })
 
-check_('adopting is what proves the finding was there, because proving it later cannot', () => {
+check_('adopting proves itself, because nothing run afterwards could', () => {
+  // Both halves are only in hand inside `adopt`. Afterwards, whether the
+  // finding was ever there needs the config as it was, and that is the thing
+  // that just changed, so a separate proof command answered `proved` to an id
+  // somebody invented.
   installed()
   assert.throws(() => check.adopt(healthy(), ['property:process:Domain']), /not one of the config repairs/)
 })
@@ -470,6 +474,55 @@ check_('a property whose type changed is never offered as a rename', () => {
   assert.ok(has(result.broken, 'type:process:Domain'), `a changed type was not reported: ${JSON.stringify(ids(result.broken))}`)
   const offered = check.repairs(back)
   assert.deepStrictEqual(offered.config, [], 'a property that is present with the wrong type was treated as a rename')
+})
+
+check_('proving a rebuilt relation looks for the relations, not the database', () => {
+  // The repair id names a database because one statement covers every relation
+  // missing from it. The findings name the relations. Asking for the repair id
+  // among the findings answers no every time, so a repair that worked was
+  // reported as one that never had anything to fix.
+  installed()
+  const before = healthy()
+  const relation = RELATIONS.find(r => r.kind === 'two-way' && r.from !== r.to)
+  delete before.databases[relation.from].schema[relation.property]
+  delete before.databases[relation.to].schema[relation.reverse]
+
+  const offered = check.repairs(before)
+  const id = `relation:${relation.from}`
+  assert.ok(has(offered.workspace, id), `the rebuild was not offered: ${JSON.stringify(ids(offered.workspace))}`)
+  assert.ok(check.judge(before).broken.some(b => b.id === `relation:${relation.n}`), 'the fixture did not break the relation')
+
+  const failed = check.proved(before, before, [id])
+  assert.strictEqual(failed.proved, false, 'the same read-back was accepted as proof')
+  assert.ok(/still reported/.test(failed.results[0].say), `it claimed there was nothing to fix:\n${failed.results[0].say}`)
+
+  const worked = check.proved(before, healthy(), [id])
+  assert.strictEqual(worked.proved, true, `a rebuild that landed was not proved:\n${worked.results.map(r => r.say).join('\n')}`)
+})
+
+check_('a proof taken against a different manifest is not a proof', () => {
+  // `config.complete` already refuses one. This asked only whether a proof
+  // existed, so a workspace passed on a check run against an earlier manifest.
+  installed()
+  const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))
+  raw.verified.definitions = 'something-else'
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(raw))
+
+  const result = check.judge(healthy())
+  const said = result.unchecked.find(u => u.id === 'proof')
+  assert.ok(said, `nothing said the proof was stale: ${JSON.stringify(ids(result.unchecked))}`)
+  assert.ok(/different set of definitions/.test(said.say), said.say)
+})
+
+check_('a fetch that did not say whether it resolved is not read as success', () => {
+  installed()
+  const back = healthy()
+  delete back.databases.process.found
+  delete back.databases.memos.title
+
+  const result = check.judge(back)
+  assert.ok(has(result.unchecked, 'database:process'), 'a fetch with no answer was treated as one that resolved')
+  assert.ok(has(result.unchecked, 'title:memos'), 'a missing title passed as a title that matches')
 })
 
 console.log('\nthe name map itself\n')
