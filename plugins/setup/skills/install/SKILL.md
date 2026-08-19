@@ -255,11 +255,19 @@ still fetches the page and still reads it, below, before phase A. Skipping that
 because a previous run got further is proceeding on the returned id alone, which
 is the one thing this step exists to refuse.
 
-**If the gate said a page of that name already exists**, do not create a second
-one. Ask which it is. If it is the one an earlier run left behind, take its id
-and treat it as a page they named: run step 2a's two checks against it and carry
-on from `begin`. If it is somebody else's page that happens to share the name,
-the answer is a different name, agreed with them now, and then the create below.
+**If the gate settled that a page of that name already exists**, act on what was
+settled there and ask nothing further. There are two outcomes it can have
+reached, and neither of them is a question at this point:
+
+- **It is the page an earlier run left behind**, and the gate approved using it.
+  Take its id, run step 2a's two checks against it, and carry on from `begin`.
+- **It is somebody else's page**, and the gate approved a different name. Create
+  that one below.
+
+**Do not reopen it here.** The gate is the only confirmation this skill has, and
+a destination chosen after it is a destination nobody approved. If it turns out
+the gate did not settle this, that is a reason to go back to step 4, not a reason
+to decide it now.
 
 **Otherwise create it, at the top level of the workspace**, with the name they
 agreed.
