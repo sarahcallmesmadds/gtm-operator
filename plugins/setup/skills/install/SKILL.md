@@ -130,6 +130,14 @@ run now:
 5. **Nothing this install would create is already there.** Fetch the parent and
    look. This is the check that stops a second Process appearing.
 
+**What config already records is not a collision.** Run `install.js status`
+alongside this. A half-finished run leaves databases under the parent and a
+config naming them, and reading those back as things that are "already there"
+stops every resume at the door. The rule is the source, not the presence: a
+database this config records is expected, and check 5 is about the ones it does
+not. If `status` records nothing, everything under the parent is somebody else's
+and the check reads as written.
+
 If either fails, **say exactly what to do about it and stop**, the same as step
 0. Do not offer to continue with a subset.
 
@@ -194,7 +202,11 @@ placeholders until phase A fills them in.
 
 **Say where it is all going, and whether that page exists yet.** `plan` does not
 know which answer question 1 got, so name the parent page alongside it, and on
-the default answer say plainly that the page itself gets created first. The yes
+the default answer say plainly that the page itself gets created first, **by that
+exact name, and ask here whether one by that name is already at the top level of
+the workspace.** That is part of the gate rather than a sixth question, and it is
+the only moment it can be asked: a page an earlier run created and never recorded
+is invisible from this side, and identical to the one about to be made. The yes
 has to cover the page as well as what goes under it, because there is no second
 gate to catch it.
 
@@ -211,20 +223,27 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
 ```
 
 **A recorded parent means resume, not create.** If `status` names a
-`parentPageId`, an earlier run already made a page and got that far. Use it and
-skip the rest of this section. Creating another one here is how a retry ends with
-two pages, the second recorded and the first abandoned, and `begin` refusing
-afterwards does not undo the page it refused.
+`parentPageId`, an earlier run already made a page and got that far. Use that id,
+and **skip only the create call and `begin`**. Creating another page here is how a
+retry ends with two, the second recorded and the first abandoned, and `begin`
+refusing afterwards does not undo the page it refused.
 
-**If nothing is recorded, say the name out loud before creating anything**, and
-ask whether a page by that name is already sitting at the top level of the
-workspace. That question is not politeness. A run that died between the create
-call and `begin` left exactly that: an empty page with the agreed name and
-nothing anywhere recording it. Nothing on this side can tell that page from the
-one you are about to make, so the person who can see the workspace is the only
-one who can answer.
+**A resume skips the create, never the proof.** Config records the id an earlier
+run was handed; it does not record that anything was ever read back, and `status`
+cannot tell you otherwise because it does not track it. A run that died between
+`begin` and the fetch leaves exactly that: an id and no evidence. So a resume
+still fetches the page and still reads it, below, before phase A. Skipping that
+because a previous run got further is proceeding on the returned id alone, which
+is the one thing this step exists to refuse.
 
-**Then create it, at the top level of the workspace**, with the name they agreed.
+**If the gate said a page of that name already exists**, do not create a second
+one. Ask which it is. If it is the one an earlier run left behind, take its id
+and treat it as a page they named: run step 2a's two checks against it and carry
+on from `begin`. If it is somebody else's page that happens to share the name,
+the answer is a different name, agreed with them now, and then the create below.
+
+**Otherwise create it, at the top level of the workspace**, with the name they
+agreed.
 Not inside another page: the user who wanted it somewhere in particular answered
 question 1 with that page, and this branch is the one where they did not.
 

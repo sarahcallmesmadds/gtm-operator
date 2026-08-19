@@ -1,6 +1,6 @@
 ---
 name: check
-description: Tell the user whether gtm-operator can still see what it created in Notion, and repair the things it owns. Use when something that worked has stopped working, when another gtm-operator skill fails a Notion call in a way that looks like drift rather than a bad request, or when the user says "check gtm-operator", "is my setup still working", "something is broken in Notion". Reads config and all six databases. Sends nothing to Notion without an explicit yes, and only to repair. It does write one file locally, the read-back its own commands are given.
+description: Tell the user whether gtm-operator can still see what it created in Notion, and repair the things it owns. Use when something that worked has stopped working, when another gtm-operator skill fails a Notion call in a way that looks like drift rather than a bad request, or when the user says "check gtm-operator", "is my setup still working", "something is broken in Notion". Reads config and all six databases. Makes no change in Notion without an explicit yes, and only to repair. It reads and queries freely, which is the whole job. It does write one file locally, the read-back its own commands are given.
 allowed-tools: Read, Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-data-source, mcp__*__notion-get-users
 ---
 
