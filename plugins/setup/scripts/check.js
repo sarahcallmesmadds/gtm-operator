@@ -87,7 +87,10 @@ function plan () {
       // same convention the view proofs use. It is left here rather than
       // substituted because nothing in this repository has measured what that
       // substitution looks like.
-      arguments: { data_source_url: entry.dataSourceId, query: q.query },
+      // The id, not a url. `<ds>` in the query is replaced with the quoted
+      // data source url by whoever sends it, which is the convention the view
+      // proofs use, and nothing here has measured what that url looks like.
+      arguments: { dataSourceId: entry.dataSourceId, query: q.query },
       record: `rules["${q.rule}::${q.database}"]: the rows, as page urls`
     })
   }
