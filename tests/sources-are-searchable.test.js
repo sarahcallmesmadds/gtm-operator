@@ -67,7 +67,7 @@ console.log('\nthe files this walk reads can all be searched\n')
 check('the walk finds the files it is supposed to be checking', () => {
   // Asserted before the NUL check below, because that check passes over an
   // empty list just as well as over a clean repository, and the two mean
-  // opposite things. This is the shape that has been found twelve times here.
+  // opposite things.
   const files = sourceFiles()
   const names = files.map(f => path.relative(ROOT, f))
   if (!names.includes('plugins/setup/scripts/schema.js')) {
