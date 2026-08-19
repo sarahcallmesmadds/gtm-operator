@@ -92,7 +92,7 @@ named for the work it does, and owns no database.
 
 | Plugin | Owns | State |
 |---|---|---|
-| [`setup`](plugins/setup) | Creates every database, wires the relations, writes the config | `install` built and run. `check` and `add` designed |
+| [`setup`](plugins/setup) | Creates every database, wires the relations, writes the config | `install` built and run. `check` built, not yet run against a live workspace. `add` designed |
 | `process` | Process | Schema and skills designed |
 | `memos` | Memos | Schema and skills designed |
 | `projects` | Projects and Tasks | Schema and skills designed |
