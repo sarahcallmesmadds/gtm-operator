@@ -1,6 +1,6 @@
 ---
 name: check
-description: Tell the user whether gtm-operator can still see what it created in Notion, and repair the things it owns. Use when something that worked has stopped working, when another gtm-operator skill fails a Notion call in a way that looks like drift rather than a bad request, or when the user says "check gtm-operator", "is my setup still working", "something is broken in Notion". Reads config and all six databases. Writes only on an explicit yes, and only to repair.
+description: Tell the user whether gtm-operator can still see what it created in Notion, and repair the things it owns. Use when something that worked has stopped working, when another gtm-operator skill fails a Notion call in a way that looks like drift rather than a bad request, or when the user says "check gtm-operator", "is my setup still working", "something is broken in Notion". Reads config and all six databases. Sends nothing to Notion without an explicit yes, and only to repair. It does write one file locally, the read-back its own commands are given.
 allowed-tools: Read, Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-data-source, mcp__*__notion-get-users
 ---
 
@@ -90,8 +90,9 @@ gets skipped.
 
 **One statement here has never been measured.** The one that adds a lost select
 value back is the only thing this plugin sends with no dated proof behind it,
-and `send` labels it. Record what Notion actually does with it in `DECISIONS.md`
-the first time it runs.
+and `send` labels it. The first time it runs, **read `DECISIONS.md`, add the
+dated result, and write the file back**. Read it first: it is a file with other
+people's reasoning in it, and writing it from memory loses whatever was there.
 
 Anything ambiguous is in `withheld` with the reason. Read those out too. They
 are not repaired and they are not nothing.

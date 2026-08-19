@@ -92,13 +92,34 @@ check('the same page as a url and as an id is the same page, which a dash stripp
   )
 })
 
-check('two things that are not page references at all are still compared, not waved through', () => {
+check('two different things that are not page references at all are still refused', () => {
   reset()
   config.begin('parent-page')
   assert.throws(
     () => config.begin('some-other-page'),
     /already records .* as the parent page/,
-    'a value this cannot parse is missing evidence, and a guard that passes what it cannot parse is not a guard'
+    'two values this cannot parse as pages are still two different strings, and a guard that shrugs at what it cannot parse is not a guard'
+  )
+})
+
+check('the same unparseable value twice is one parent, not two', () => {
+  reset()
+  config.begin('parent-page')
+  const again = config.begin('parent-page')
+  assert.strictEqual(
+    again.state,
+    'creating',
+    'the literal fallback refused a value that matched itself, so nothing that is not a page id can ever be retried'
+  )
+})
+
+check('a page id on one side and something unparseable on the other is refused', () => {
+  reset()
+  config.begin('0000000000004000800000000000aaaa')
+  assert.throws(
+    () => config.begin('parent-page'),
+    /already records .* as the parent page/,
+    'one side parsing and the other not is missing evidence, and missing evidence is not a match'
   )
 })
 
