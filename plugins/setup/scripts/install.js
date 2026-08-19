@@ -54,7 +54,14 @@ function phaseA (parentPageId) {
       'If this install has not begun, run `install.js begin <parent page id>` first.'
     )
   }
-  return DATABASES.map(d => ({
+  // Only the ones that are not recorded yet, which is what makes a resume safe.
+  // This used to return all six whatever config held, so a run that died partway
+  // through phase A came back and created a second Process. `recordDatabase`
+  // refuses the duplicate, but it refuses it after the create call has already
+  // been sent, and nothing here can delete what it made. Phase B has always
+  // worked this out by reading rather than remembering; this is the same rule one
+  // phase earlier.
+  return config.missingDatabases().map(d => ({
     key: d.key,
     title: d.title,
     call: 'notion-create-database',
