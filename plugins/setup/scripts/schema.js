@@ -585,9 +585,10 @@ function verify (key, actual, alsoExpected = [], names = null) {
       // Compared element by element rather than by joining on a separator.
       //
       // The two forms agree for every list this can be handed. The join was
-      // correct only while no option name contains the separator, which is true
-      // and which the code never enforced. This form does not rest on it. That
-      // is the reason to prefer it, and it is a smaller claim than equivalence.
+      // correct only while no option name contains the separator, which the
+      // code never enforces: nothing in the map validation or in `valueName`
+      // rejects one. This form does not rest on it, and that is the reason to
+      // prefer it.
       //
       // It used to join on a literal NUL, picked because no option name can
       // contain one. That cost this file its searchability: two raw NUL bytes
