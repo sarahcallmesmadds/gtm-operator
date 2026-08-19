@@ -538,6 +538,21 @@ check_('a map that cannot be read stops that database being checked, and says so
   assert.ok(has(result.unchecked, 'schema:process'), 'its properties were checked through a map that cannot be read')
 })
 
+check_('the usage line names exactly the commands that exist', () => {
+  // It listed a command that had been removed and omitted one that had been
+  // added. A usage line is the only description of this tool most people read.
+  const source = fs.readFileSync(path.join(SCRIPTS, 'check.js'), 'utf8')
+  const implemented = [...source.matchAll(/^      case '([a-z-]+)':/gm)].map(m => m[1]).sort()
+  // The line with the pipes, not the first "Usage:" in the file. Several
+  // commands throw their own single-command usage message, and matching one of
+  // those compared the command list against one command and passed.
+  const usage = source.match(/Usage: check\.js ([a-z-]+(?: \| [a-z-]+)+)'/)
+  assert.ok(usage, 'there is no usage line at all')
+  const listed = usage[1].split('|').map(s => s.trim()).sort()
+  assert.deepStrictEqual(listed, implemented,
+    `the usage line and the commands have drifted.\n  listed:      ${listed.join(', ')}\n  implemented: ${implemented.join(', ')}`)
+})
+
 fs.rmSync(TEMP, { recursive: true, force: true })
 
 if (failures) {
