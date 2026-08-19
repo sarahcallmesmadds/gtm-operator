@@ -83,8 +83,9 @@ types file. Writes no content rows.
 
 ### The order it runs in
 
-**Step 0. Refuse to start without what it needs.** Five checks, and
-**authenticating is only the first of them.**
+**Step 0. Refuse to start without what it needs.** Three checks here and two more
+once there is a parent to check, and **authenticating is only the first of
+them.**
 
 1. **The connection authenticates.**
 2. **The client can actually do views.** Pinning `Notion-Version: 2025-09-03` or
@@ -97,12 +98,35 @@ types file. Writes no content rows.
    Creating databases needs insert. Filling properties needs update. Resolving the
    user needs user information. A connection with read alone authenticates
    perfectly and then fails on the first create.
+If any of them fails, say exactly what to do about it and stop.
+
+**Step 2a. The two parent checks, once question 1 has chosen one.**
+
 4. **The chosen parent page is reachable by this connection.** An unshared parent
    returns not-found rather than forbidden, which reads as a typo and is not one.
 5. **Nothing this install would create is already there**, which is the check that
    stops a second Process appearing.
 
-If any of them fails, say exactly what to do about it and stop.
+**These two are not in step 0, and the reason is the order.** They used to be,
+where they ran before question 1 had chosen a page, and on the default answer
+they ran against a page that did not exist yet. Question 1 has two answers and
+they take different routes: a page the user names is checked here, and a page
+this skill creates is checked in step 5 by reading it back, where only check 4
+means anything because a page one call old is empty by construction.
+
+**Check 5 has one exception, and both halves of it are required.** A database
+under the parent belongs to this install, rather than to somebody else, only when
+`status.parentPageId` is the same page as the parent being checked and the
+database and data source ids match `status.recordedIds`. Without that exception a
+half-finished run's own databases read as a collision and every resume stops at
+the door; without both halves of it, a stale config from an install into a
+different workspace excuses a real one, because a title identifies nothing and
+two workspaces can both hold a Process. Where nothing is recorded, which is the
+ordinary first run, there is no exception and the check reads as written.
+
+**Corrected 2026-08-18.** The order above, the exception, and the split between
+the two routes. What made it necessary: question 1 could offer to create the
+parent page, and nothing in the skill created one.
 
 **Corrected 2026-08-17.** This previously checked authentication and a wire
 version, and claimed to prevent partial installs. It could pass and then fail
