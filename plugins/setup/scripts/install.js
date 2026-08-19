@@ -294,6 +294,16 @@ function status () {
       // anything at all.
       return known ? known.title : `${k} (not in this version's manifest)`
     }),
+    // The ids as well as the titles, because the caller that decides whether a
+    // database under the parent is this install's or somebody else's cannot
+    // answer that from a name. Two workspaces can both hold a Process, and a
+    // stale config from a different one records the same title.
+    recordedIds: Object.fromEntries(
+      Object.entries(current.databases).map(([key, entry]) => [
+        key,
+        { databaseId: entry.databaseId, dataSourceId: entry.dataSourceId }
+      ])
+    ),
     missing: config.missingDatabases().map(d => d.title),
     verifiedAt: current.verifiedAt || null
   }

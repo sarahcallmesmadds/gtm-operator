@@ -130,13 +130,24 @@ run now:
 5. **Nothing this install would create is already there.** Fetch the parent and
    look. This is the check that stops a second Process appearing.
 
-**What config already records is not a collision.** Run `install.js status`
-alongside this. A half-finished run leaves databases under the parent and a
-config naming them, and reading those back as things that are "already there"
-stops every resume at the door. The rule is the source, not the presence: a
-database this config records is expected, and check 5 is about the ones it does
-not. If `status` records nothing, everything under the parent is somebody else's
-and the check reads as written.
+**What config already records for this parent is not a collision.** Run
+`install.js status` alongside this. A half-finished run leaves databases under the
+parent and a config naming them, and reading those back as things that are
+"already there" stops every resume at the door.
+
+**The exception is narrow and both halves are load-bearing.** A database under
+the parent is this install's, rather than somebody else's, only when:
+
+- **`status.parentPageId` is the same page as the parent being checked.** A
+  config from an install into a different workspace records databases too, and
+  without this it would excuse them here.
+- **the id matches.** `status.recordedIds` carries the database and data source
+  id for each one. A title does not identify anything: two workspaces can both
+  hold a Process, and so can one page, and the name is what a collision looks
+  like rather than what rules it out.
+
+Anything failing either half is somebody else's and check 5 reads as written. If
+`status` records nothing, all of it is.
 
 If either fails, **say exactly what to do about it and stop**, the same as step
 0. Do not offer to continue with a subset.
@@ -206,7 +217,13 @@ the default answer say plainly that the page itself gets created first, **by tha
 exact name, and ask here whether one by that name is already at the top level of
 the workspace.** That is part of the gate rather than a sixth question, and it is
 the only moment it can be asked: a page an earlier run created and never recorded
-is invisible from this side, and identical to the one about to be made. The yes
+is invisible from this side, and identical to the one about to be made.
+
+**Settle the answer before asking for the yes, not after it.** If there is
+already a page by that name, find out whose it is here: an earlier run's, which
+this one should use, or somebody else's, which means a different name agreed now.
+The gate then names whichever it ended up with. A yes given to one page and acted
+on against another is not the gate this skill claims to have. The yes
 has to cover the page as well as what goes under it, because there is no second
 gate to catch it.
 
@@ -223,7 +240,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
 ```
 
 **A recorded parent means resume, not create.** If `status` names a
-`parentPageId`, an earlier run already made a page and got that far. Use that id,
+`parentPageId`, an earlier run got as far as recording one. That is a returned id
+that was written down, and not by itself evidence that a page is there, which is
+why the fetch below still happens. Use that id,
 and **skip only the create call and `begin`**. Creating another page here is how a
 retry ends with two, the second recorded and the first abandoned, and `begin`
 refusing afterwards does not undo the page it refused.

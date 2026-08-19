@@ -553,6 +553,17 @@ check('a database recorded twice with a different database id is refused', () =>
   )
 })
 
+check('status hands over the recorded ids, not only the titles', () => {
+  setUpConfig()
+  const reported = install.status()
+  assert.ok(reported.recordedIds, 'status reported no ids at all, so nothing reading it can tell one Process from another')
+  assert.deepStrictEqual(
+    reported.recordedIds.process,
+    { databaseId: 'db-process', dataSourceId: 'ds-process' },
+    'the caller deciding whether a database under the parent belongs to this install has only a title to go on'
+  )
+})
+
 check('status still reports on a config holding a key this version does not know', () => {
   setUpConfig()
   const current = config.read()
