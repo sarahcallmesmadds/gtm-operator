@@ -161,6 +161,8 @@ for a gap in a text-scanning check is a check on behaviour, not a wider pattern.
   across a relation, both rejected with a 400. The workarounds were measured too:
   a counting formula comes back typed as text, and a rollup filter is accepted,
   reported as created, and silently emptied. The two rules stay with `check`, and
-  both `check` queries were proved on real rows.
+  both `check` queries had the half that finds the rows proved on real rows. Both
+  selected the title that day and select `url` now, so which column comes back is
+  not covered by that and the current strings have not been sent to Notion.
 - **Whether the API can create a page template**, as opposed to apply one, is
   unknown.
