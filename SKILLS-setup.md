@@ -402,6 +402,15 @@ one place still to carry the old wording, `SKILLS-projects.md`, was corrected on
 **What it does.** Tells you whether the plugin can still see what it created, and
 offers to repair the things it owns.
 
+**Except the views.** The nine checks below do not include one, so a broken view
+looks exactly like a healthy one from here. That is deliberate: the view name and
+every property name inside a view's filters, grouping, sorts and rule SQL are
+still the shipped ones, and resolving them through the config map changes what
+gets SENT to Notion rather than what gets read back. `check` says this in its own
+output every time it runs, rather than leaving somebody to find out. Views are
+proved by `install`'s verify, which compares each one against the rows its rule
+query returns.
+
 **When it runs.** When something has stopped working. Also the first thing any
 other skill should point at when a Notion call fails in a way that looks like
 drift rather than like a bad request.
