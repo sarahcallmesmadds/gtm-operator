@@ -3,20 +3,22 @@
 /**
  * The rule queries, and the compiler that resolves the names in them.
  *
- * The two strings asserted first are the ones proved against real rows on
- * 2026-08-17: the tags query returned exactly the 4-tag and 5-tag rows and
- * correctly excluded the 2-tag one, and the parent query returned the child of
- * an SOP and not the child of a Strategy Decision. Templating them is only safe
- * if a default install still sends those exact strings, so that is the first
- * thing checked here.
+ * The two strings asserted first are what a default install sends. Templating
+ * the queries is only safe if a default install still sends them character for
+ * character, so that is the first thing checked here.
  *
- * WHAT THE MEASUREMENT COVERS, now that the select has changed. Both queries
- * selected the title when they were measured and select `url` now. The
- * measurement was of which rows come back, which is the `WHERE` half and the
- * join, and both are character for character what was sent that day. Which
- * column comes back was not measured, and these exact strings have never been
- * sent to Notion. Saying so here rather than letting the word MEASURED cover a
- * string nobody ran.
+ * WHICH PART OF THEM WAS MEASURED, and which part was not. On 2026-08-17 both
+ * were run against real rows: the tags query returned exactly the 4-tag and
+ * 5-tag rows and correctly excluded the 2-tag one, and the parent query returned
+ * the child of an SOP and not the child of a Strategy Decision. That measured
+ * WHICH ROWS come back, which is the `WHERE` half and the join, and both are
+ * unchanged since.
+ *
+ * Both selected the title that day and select `url` now, so WHICH COLUMN comes
+ * back is not covered by it and **these exact strings have never been sent to
+ * Notion**. The constant below is called `SENT` for that reason. It was called
+ * `MEASURED`, under which name it would have been the only thing in this
+ * repository claiming a measurement of a string nobody ran.
  *
  * Run: node tests/rules.test.js
  */
@@ -40,21 +42,21 @@ const check = (name, fn) => {
   }
 }
 
-const MEASURED = {
+const SENT = {
   'tags-max-3': 'SELECT url FROM <ds> WHERE json_array_length("Tags") > 3',
   'process-parent-type': 'SELECT c.url FROM <ds> c JOIN <ds> p ON p.url = json_extract(c."Parent", \'$[0]\') WHERE c."Parent" IS NOT NULL AND p."Type" != \'Strategy Decision\''
 }
 
 const rule = key => RULES.find(r => r.key === key)
 
-console.log('\nwhat a default install sends is what was measured\n')
+console.log('\nwhat a default install sends\n')
 
-check('the tags query is the string that was proved on real rows', () => {
-  assert.strictEqual(rules.compile(rule('tags-max-3'), 'process'), MEASURED['tags-max-3'])
+check('templating did not change the tags query a default install sends', () => {
+  assert.strictEqual(rules.compile(rule('tags-max-3'), 'process'), SENT['tags-max-3'])
 })
 
-check('the parent query is the string that was proved on real rows', () => {
-  assert.strictEqual(rules.compile(rule('process-parent-type'), 'process'), MEASURED['process-parent-type'])
+check('templating did not change the parent query a default install sends', () => {
+  assert.strictEqual(rules.compile(rule('process-parent-type'), 'process'), SENT['process-parent-type'])
 })
 
 check('no placeholder survives compiling', () => {
@@ -100,7 +102,7 @@ check('a renamed property changes the query for that database only', () => {
 
   assert.ok(memos.query.includes('"Labels"'), `Memos was asked about a property it does not have:\n${memos.query}`)
   assert.ok(!memos.query.includes('"Tags"'), `the shipped name was asked about as well:\n${memos.query}`)
-  assert.strictEqual(process.query, MEASURED['tags-max-3'], 'renaming on Memos changed the Process query')
+  assert.strictEqual(process.query, SENT['tags-max-3'], 'renaming on Memos changed the Process query')
 })
 
 check('every name in the parent query is resolved', () => {
@@ -128,8 +130,8 @@ check('renaming the title property does not change either query', () => {
   // whatever that workspace happened to call the title. `url` is Notion's own
   // and takes no placeholder, so the rename is now invisible here.
   const names = { properties: { Name: 'Title' }, values: {} }
-  assert.strictEqual(rules.compile(rule('tags-max-3'), 'process', names), MEASURED['tags-max-3'])
-  assert.strictEqual(rules.compile(rule('process-parent-type'), 'process', names), MEASURED['process-parent-type'])
+  assert.strictEqual(rules.compile(rule('tags-max-3'), 'process', names), SENT['tags-max-3'])
+  assert.strictEqual(rules.compile(rule('process-parent-type'), 'process', names), SENT['process-parent-type'])
 })
 
 check('both occurrences of a name are resolved, not just the first', () => {
