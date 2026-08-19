@@ -53,6 +53,14 @@ Getting any of it back is a click in the Notion trash by a person. So read the
 page and confirm what is on it before emptying it, and expect to be able to
 undo nothing yourself.
 
+**The unmeasured statement gets written down here, not by the skill.** `check`
+can send one thing this plugin has never watched run, the statement that adds a
+lost select value back, and it reports what happened rather than recording it.
+Recording it is a job in this repository: put what it did in `DECISIONS.md`,
+dated. The skill deliberately does not, because it ships as a plugin and
+`DECISIONS.md` is a file here, so an installed copy writing to that name would be
+writing into a stranger's working directory.
+
 **No skill is named or created without Sarah's explicit yes.** This covers new
 skills and renames of existing ones.
 

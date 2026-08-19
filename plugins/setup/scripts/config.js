@@ -138,6 +138,23 @@ function sameParentPage (a, b) {
   return String(a) === String(b)
 }
 
+/**
+ * Is this page the parent this install recorded?
+ *
+ * Exposed because the skill has to answer it too, at step 2a, and had no way to.
+ * It held the recorded id from `status` and the id a fetch returned and was told
+ * to decide whether they were "the same page", which is a comparison Notion
+ * makes harder than it sounds: the same page comes back as a bare id, a dashed
+ * id and several url shapes. Left to a literal comparison it says no, and a
+ * legitimate resume reads as somebody else's workspace.
+ */
+function isRecordedParent (candidate) {
+  const current = read()
+  const recorded = current && current.notion && current.notion.parentPageId
+  if (!recorded) return false
+  return sameParentPage(candidate, recorded)
+}
+
 function begin (parentPageId) {
   const current = read()
   if (current && current.state === 'complete') {
@@ -480,5 +497,6 @@ module.exports = {
   recordVerified, clearVerified,
   CONFIG_PATH, CONFIG_VERSION, blank, exists, read, write, begin,
   recordDatabase, recordPerson, reresolveDataSource, ids, missingDatabases, complete,
-  namesFor, allNames, recordNames
+  namesFor, allNames, recordNames,
+  sameParentPage, isRecordedParent
 }

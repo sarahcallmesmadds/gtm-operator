@@ -140,7 +140,13 @@ the parent is this install's, rather than somebody else's, only when:
 
 - **`status.parentPageId` is the same page as the parent being checked.** A
   config from an install into a different workspace records databases too, and
-  without this it would excuse them here.
+  without this it would excuse them here. **Ask rather than eyeballing it**, because
+  the same page comes back as a bare id, a dashed id and several url shapes, and
+  comparing two of those as text says no:
+
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" parent-is <the parent's id>
+  ```
 - **the id matches.** `status.recordedIds` carries the database and data source
   id for each one. A title does not identify anything: two workspaces can both
   hold a Process, and so can one page, and the name is what a collision looks

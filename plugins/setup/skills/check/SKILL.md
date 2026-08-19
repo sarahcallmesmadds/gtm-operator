@@ -1,7 +1,7 @@
 ---
 name: check
 description: Tell the user whether gtm-operator can still see what it created in Notion, and repair the things it owns. Use when something that worked has stopped working, when another gtm-operator skill fails a Notion call in a way that looks like drift rather than a bad request, or when the user says "check gtm-operator", "is my setup still working", "something is broken in Notion". Reads config and all six databases. Makes no change in Notion without an explicit yes, and only to repair. It reads and queries freely, which is the whole job. It does write one file locally, the read-back its own commands are given.
-allowed-tools: Read, Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-data-source, mcp__*__notion-get-users
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-data-source, mcp__*__notion-get-users
 ---
 
 # check
@@ -90,9 +90,15 @@ gets skipped.
 
 **One statement here has never been measured.** The one that adds a lost select
 value back is the only thing this plugin sends with no dated proof behind it,
-and `send` labels it. The first time it runs, **read `DECISIONS.md`, add the
-dated result, and write the file back**. Read it first: it is a file with other
-people's reasoning in it, and writing it from memory loses whatever was there.
+and `send` labels it. **Tell the user what it did, in as many words**: what was
+sent, what came back, and that this was the first time anybody watched it. That
+is the measurement, and it is worth having.
+
+**Do not write it to a file from here.** This skill ships as a plugin, and the
+only thing it can be sure of is the plugin directory. `DECISIONS.md` is a file in
+the repository this was built in, so an installed copy reaching for that name
+writes into whatever working directory somebody happened to start in, which is
+somebody else's file with somebody else's reasoning in it.
 
 Anything ambiguous is in `withheld` with the reason. Read those out too. They
 are not repaired and they are not nothing.
