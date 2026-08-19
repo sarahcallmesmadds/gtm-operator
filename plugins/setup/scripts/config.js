@@ -24,6 +24,7 @@ const { DATABASES } = require('./manifest')
 const { fingerprint } = require('./fingerprint')
 const schema = require('./schema')
 const mapped = require('./names')
+const { pageIdentity } = require('./views')
 
 /**
  * Bumped when the shape below changes in a way that would make an older reader
@@ -121,6 +122,22 @@ function invalidateVerification (config) {
 }
 
 /** Start a run, or refuse to start on top of one that is already complete. */
+/**
+ * Two parent page ids name the same page, or they do not.
+ *
+ * Compared by page identity where both sides are page ids, because Notion hands
+ * the same page back as a bare id, a dashed id and a url, and a retry that
+ * pastes a different shape of the same id is a retry, not a second page.
+ * Anything that is not a page id at all is compared literally: this is a guard,
+ * and a guard that quietly passes what it cannot parse is not one.
+ */
+function sameParentPage (a, b) {
+  const left = pageIdentity(a)
+  const right = pageIdentity(b)
+  if (left && right) return left === right
+  return String(a) === String(b)
+}
+
 function begin (parentPageId) {
   const current = read()
   if (current && current.state === 'complete') {
@@ -128,6 +145,14 @@ function begin (parentPageId) {
       `Config at ${CONFIG_PATH} says an install is already complete, so this refuses to start a second one over the top of it.\n` +
       `There is no settings path yet: nothing here can re-ask the five questions on a complete config. ` +
       `Change a setting by editing that file, and move it aside if you genuinely want to install again.`
+    )
+  }
+  const recorded = current && current.notion && current.notion.parentPageId
+  if (recorded && parentPageId && !sameParentPage(parentPageId, recorded)) {
+    throw new Error(
+      `Config at ${CONFIG_PATH} already records ${recorded} as the parent page, and this run was given ${parentPageId}.\n` +
+      `  Overwriting it would leave anything already created under ${recorded} behind, and this plugin cannot delete it.\n` +
+      `  To continue that install, run begin with the recorded page. To start a different one, move that file aside first.`
     )
   }
   const config = current || blank(parentPageId)

@@ -55,6 +55,31 @@ check('a run starts as creating, not as complete', () => {
   assert.strictEqual(started.notion.personId, null)
 })
 
+check('a second begin with a different parent page is refused, not silently obeyed', () => {
+  reset()
+  config.begin('00000000-0000-4000-8000-00000000aaaa')
+  assert.throws(
+    () => config.begin('00000000-0000-4000-8000-00000000bbbb'),
+    /already records .* as the parent page/,
+    'a retry that created a second page would have moved the install to it, leaving the first page and anything under it behind'
+  )
+  assert.strictEqual(
+    config.read().notion.parentPageId,
+    '00000000-0000-4000-8000-00000000aaaa',
+    'the refused call still changed the recorded parent'
+  )
+})
+
+check('the same page in a different shape is the same page, and is allowed', () => {
+  reset()
+  const dashed = '00000000-0000-4000-8000-00000000aaaa'
+  const bare = '0000000000004000800000000000aaaa'
+  config.begin(dashed)
+  const again = config.begin(bare)
+  assert.strictEqual(again.state, 'creating', 'a retry pasting the same page in its other shape was refused as a different page')
+  assert.strictEqual(again.notion.parentPageId, bare, 'the id given last is the one recorded')
+})
+
 check('both ids are stored for every database, never just one', () => {
   reset()
   config.begin('parent-page')

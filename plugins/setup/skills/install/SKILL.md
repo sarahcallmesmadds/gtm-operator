@@ -1,7 +1,7 @@
 ---
 name: install
 description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
-allowed-tools: Read, Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-pages, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-pages, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
 ---
 
 # install
@@ -136,8 +136,16 @@ If either fails, **say exactly what to do about it and stop**, the same as step
 **If they took the default and want the page created**, there is nothing to check
 yet and nothing to create yet either, because creating it before the gate would
 break the one rule this skill has about writing. Say that the page will be
-created as the first act after the yes, and carry on to step 3. Step 5 runs both
-checks against it there, by reading it back.
+created as the first act after the yes, and carry on to step 3.
+
+**Only one of the two checks survives that route, and pretending otherwise is
+worse than losing it.** Check 4 is proved in step 5 by reading the new page back.
+**Check 5 is vacuous on a page you just created**: it is empty because it is new,
+so it can never fail, and it is not what stops a second Process appearing here.
+What stops that is the page being new, plus `begin` refusing to move an install
+that has already recorded a parent. A retry after a half-finished run must reuse
+the recorded parent rather than create a second page, and `install.js status`
+says which page that is.
 
 ## Step 3. Work out who the user is
 
@@ -192,21 +200,31 @@ account of what exists.
 **First, if question 1 said to create the parent page, create it now.** This is
 the first act after the yes, and it is the only page this skill ever creates.
 
-Create it under the workspace or under the page the user pointed at, with the
-name they agreed, and then **fetch it back before going on**. The fetch is not
-ceremony: it is what makes the two step 2a checks true on this route, because a
-page you just read back is reachable by this connection and is empty. A create
-call that returned is not evidence, here or anywhere else in this plugin.
+**Create it at the top level of the workspace**, with the name they agreed. Not
+inside another page: the user who wanted it somewhere in particular answered
+question 1 with that page, and this branch is the one where they did not.
 
-If they named an existing page in step 2, skip this and use that id.
+Then, **before anything else, hand the id the create call returned to `begin`**:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" begin <parent page id>
 ```
 
 That writes config with `state: creating`, before anything is created. A run that
-dies from here on leaves a file that says so. **The id it takes is the one you
-just read back**, not the one a create call reported.
+dies from here on leaves a file that says so.
+
+**Record first, prove second, and the order matters.** A returned id is not
+evidence the page is right, but it is the only way back to a page that now
+exists and that this plugin cannot delete. Recorded, a run that dies before the
+next line leaves a config naming the page. Unrecorded, it leaves an orphan
+nobody can find, and the literal retry creates a second one.
+
+**Then fetch the page back**, and only then go on to phase A. That fetch is what
+proves check 4 on this route. If it fails, stop and say the page exists and is
+recorded, because it does and it is.
+
+If they named an existing page in step 2, skip all of this: they have an id, it
+was checked in step 2a, and `begin` takes it directly.
 
 **Phase A. Every database, with no relations in it.**
 
