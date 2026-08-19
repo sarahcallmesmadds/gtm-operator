@@ -25,6 +25,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" plan                       # what 
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" judge <readback.json>      # the findings
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" repairs <readback.json>    # what a yes would do
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" adopt <readback.json> <id>...
+node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" send <readback.json> <id>...
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" prove-adopted <readback.json> <id>...
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" prove-sent <before.json> <after.json> <id>...
 ```
@@ -81,6 +82,17 @@ does not look at the saved views, and it says so in its own output every time.
 Each carries an id. Pass the ids the user approved and nothing else. **A missing
 option value gets two repairs, `:renamed` and `:lost`**, because it was either
 renamed or deleted, those need opposite answers, and choosing is the user's job.
+
+**`repairs` does not print the statement for a workspace repair.** Get it with
+`send`, which clears the proof before it hands the statement over, because from
+that moment the workspace is about to stop matching what was verified. There is
+no other way to obtain it, on purpose: a step that can be skipped is a step that
+gets skipped.
+
+**One statement here has never been measured.** The one that adds a lost select
+value back is the only thing this plugin sends with no dated proof behind it,
+and `send` labels it. Record what Notion actually does with it in `DECISIONS.md`
+the first time it runs.
 
 Anything ambiguous is in `withheld` with the reason. Read those out too. They
 are not repaired and they are not nothing.
