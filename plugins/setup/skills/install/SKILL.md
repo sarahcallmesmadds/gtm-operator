@@ -250,10 +250,17 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
 **A recorded parent means resume, not create.** If `status` names a
 `parentPageId`, an earlier run got as far as recording one. That is a returned id
 that was written down, and not by itself evidence that a page is there, which is
-why the fetch below still happens. Use that id,
-and **skip only the create call and `begin`**. Creating another page here is how a
-retry ends with two, the second recorded and the first abandoned, and `begin`
-refusing afterwards does not undo the page it refused.
+why the fetch below still happens. Use that id, and **skip only the create call**.
+Creating another page here is how a retry ends with two, the second recorded and
+the first abandoned, and `begin` refusing afterwards does not undo the page it
+refused.
+
+**Run `begin` on a resume too, with the recorded id.** It is not bookkeeping that
+a second run can skip: it is the only place that refuses a config already marked
+complete, and the only place that refuses a parent that is not the recorded one.
+`phase-a` checks neither. It reads `parentPageId` out of config and sends six
+create calls, so a resume that skipped `begin` could put a second set of databases
+into a finished install and find out from something much later.
 
 **A resume skips the create, never the proof.** Config records the id an earlier
 run was handed; it does not record that anything was ever read back, and `status`
@@ -326,11 +333,19 @@ same name left by an earlier run, because those two are identical from here. Tha
 case is the one the gate hands to the user, and it is the reason it is asked
 before the create rather than after it.
 
-If either is wrong, **stop before phase A**. Nothing has been created under it
-yet, which is the whole reason this check sits here. Say that config is naming a
-page that is not the one this run meant to use and has to be moved aside before
-another run, and say that a create call was sent for a page of the agreed name,
-so there may now be one at the top level of the workspace to look for.
+If either is wrong, **stop before phase A**, and say something different
+depending on which route you are on. Getting this backwards is worse than saying
+nothing, because one of the two answers throws away the way back.
+
+- **On a fresh create**, nothing has been created under the page yet, which is
+  the whole reason this check sits here. Say that config is naming a page that is
+  not the one this run meant to use and has to be moved aside before another run,
+  and say that a create call was sent for a page of the agreed name, so there may
+  now be one at the top level of the workspace to look for.
+- **On a resume, do not touch config.** It records the parent and the databases an
+  earlier run created, and it is the only thing that can find them again. Say
+  what did not match and stop. Moving it aside here does not clear a mistake, it
+  abandons a half-built workspace this plugin cannot delete and cannot rediscover.
 
 If they named an existing page in step 2, skip all of this: they have an id, it
 was checked in step 2a, and `begin` takes it directly.
