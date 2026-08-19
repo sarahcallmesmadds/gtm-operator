@@ -75,9 +75,29 @@ function plan () {
     })
   }
 
-  for (const q of rules.queries(config.allNames())) {
+  // Per database, catching the map error for each. `config.allNames` asks
+  // `namesFor` for every database and lets it throw, so one hand-edited map
+  // made this whole command die before it emitted a single step, which
+  // contradicts the promise at the top of this file that it never refuses to
+  // run. A database whose map cannot be read gets no rule query rather than a
+  // query built from the shipped names, because the shipped names are exactly
+  // what a recorded map means it does not use, and `judge` reports both the
+  // broken map and the query nobody ran.
+  const namesByKey = {}
+  const unreadable = []
+  for (const d of DATABASES) {
+    if (!current.databases[d.key]) continue
+    const { names, problem } = namesFor(d.key)
+    if (problem) unreadable.push(d.key)
+    else if (names) namesByKey[d.key] = names
+  }
+  for (const key of unreadable) {
+    steps.push({ kind: 'skip', database: key, why: `${byKey(key).title}: the name map recorded for it cannot be read, so its rule query is not being built. Judging will say what is wrong with the map.` })
+  }
+
+  for (const q of rules.queries(namesByKey)) {
     const entry = current.databases[q.database]
-    if (!entry) continue
+    if (!entry || unreadable.includes(q.database)) continue
     steps.push({
       kind: 'rule',
       rule: q.rule,
@@ -415,7 +435,7 @@ function repairs (readback) {
   for (const key of Object.keys(statements)) {
     workspace.push({
       id: `relation:${key}`, clears: null, kind: 'relation', database: key,
-      say: `Rebuild the relations missing from ${byKey(key).title}. Both halves of each are gone, which is the only state this is willing to rebuild from.`
+      say: `Rebuild the relations missing from ${byKey(key).title}. Each of these is one this plugin will rebuild: the property on ${byKey(key).title} is gone, and where the relation is two-way the synced half is gone too, which is the only state a two-way one can be rebuilt from.`
     })
   }
   for (const u of relations.unrepairable(schemas, config.ids(), namesByKey)) {
