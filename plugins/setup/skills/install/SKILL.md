@@ -237,7 +237,19 @@ is invisible from this side, and identical to the one about to be made.
 already a page by that name, find out whose it is here: an earlier run's, which
 this one should use, or somebody else's, which means a different name agreed now.
 The gate then names whichever it ended up with. A yes given to one page and acted
-on against another is not the gate this skill claims to have. The yes
+on against another is not the gate this skill claims to have.
+
+**Run `status` here, before the yes, and let what it says reach the gate:**
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
+```
+
+**A recorded `parentPageId` changes the destination, so it has to change the
+question.** An earlier run got as far as recording a page, and step 5 is going to
+use that page rather than create one. Say so here and get the yes for that. Left
+until step 5, it is a destination nobody approved, arrived at after the only
+gate, which is the thing the paragraph above exists to forbid. The yes
 has to cover the page as well as what goes under it, because there is no second
 gate to catch it.
 
@@ -253,8 +265,12 @@ check before creating it.**
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
 ```
 
-**A recorded parent means resume, not create.** If `status` names a
-`parentPageId`, an earlier run got as far as recording one. That is a returned id
+**A recorded parent means resume, not create**, and the gate already said so
+because step 4 ran `status` before asking. Run it again here rather than
+remembering what it said, and if the answer has changed since the gate, go back
+to step 4: something else is writing to this config and the yes no longer covers
+where this is going. If `status` names a `parentPageId`, an earlier run got as
+far as recording one. That is a returned id
 that was written down, and not by itself evidence that a page is there, which is
 why the fetch below still happens. Use that id, and **skip only the create call**.
 Creating another page here is how a retry ends with two, the second recorded and
