@@ -24,7 +24,7 @@ const { DATABASES } = require('./manifest')
 const { fingerprint } = require('./fingerprint')
 const schema = require('./schema')
 const mapped = require('./names')
-const { pageIdentity } = require('./views')
+const { pageIdentity } = require('./page-id')
 
 /**
  * Bumped when the shape below changes in a way that would make an older reader
