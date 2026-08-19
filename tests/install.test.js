@@ -207,9 +207,24 @@ check('a complete install cannot be started over by accident', () => {
 console.log('\nthe plan\n')
 
 check('phase A creates every database and puts no relation in any of them', () => {
+  reset()
   const steps = install.phaseA('parent-page')
   assert.strictEqual(steps.length, counts.databases)
   for (const step of steps) assert.ok(!step.arguments.schema.includes('RELATION('), `${step.title} has a relation in its create statement`)
+})
+
+check('phase A leaves out what config already records, so a resume does not create a second one', () => {
+  reset()
+  config.begin('parent-page')
+  config.recordDatabase('process', { databaseId: 'db-process', dataSourceId: 'ds-process' })
+  config.recordDatabase('memos', { databaseId: 'db-memos', dataSourceId: 'ds-memos' })
+  const steps = install.phaseA('parent-page')
+  assert.strictEqual(
+    steps.length,
+    counts.databases - 2,
+    'phase A offered to create databases that config already records, and record refuses a duplicate only after the create call has been sent'
+  )
+  assert.ok(!steps.some(s => s.key === 'process' || s.key === 'memos'), steps.map(s => s.key).join(', '))
 })
 
 check('phase B refuses to build a statement it has no id for', () => {

@@ -369,6 +369,12 @@ it in every create call. It refuses if `begin` has not run, rather than sending 
 payload with a placeholder where the page id belongs, which is what it did until
 2026-08-18.
 
+**It also leaves out the databases config already records**, so on a resume it
+returns only what is missing and there is nothing to work out by hand. Send what
+it gives you and no more. It used to return all six whatever had already been
+created, and `record` refusing the duplicate afterwards is a refusal that arrives
+one irreversible create call too late.
+
 Send each one as a create-database call, and after each, record what came back:
 
 ```bash
