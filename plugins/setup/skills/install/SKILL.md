@@ -146,8 +146,16 @@ the parent is this install's, rather than somebody else's, only when:
   hold a Process, and so can one page, and the name is what a collision looks
   like rather than what rules it out.
 
-Anything failing either half is somebody else's and check 5 reads as written. If
-`status` records nothing, all of it is.
+**Anything failing either half is somebody else's**, and for it check 5 reads
+exactly as written above: it is already there, and that stops the install.
+
+**When there is nothing to compare against, there is no exception**, and this is
+the ordinary first run rather than an edge case. Before any install has begun,
+`status` reports `state: nothing started` and carries no `parentPageId` and no
+`recordedIds` at all, so do not read them: everything under the parent is
+somebody else's, and check 5 applies to all of it. A config that exists with
+`recordedIds` empty says the same thing, for the same reason. **The exception is
+something a resume earns by having recorded ids that match, never a default.**
 
 If either fails, **say exactly what to do about it and stop**, the same as step
 0. Do not offer to continue with a subset.
