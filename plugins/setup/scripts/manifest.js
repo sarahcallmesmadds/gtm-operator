@@ -195,6 +195,22 @@ const VIEWS = [
  * way and both persist correctly, which is why the three view-backed rules
  * below are sound.
  */
+/**
+ * The two rules no view can watch, and the query that finds each one.
+ *
+ * A `checkQuery` is a TEMPLATE, not a query. `<ds>` is replaced with the quoted
+ * data source url by the caller, the same convention `views.js` uses for the
+ * queries that prove a view. Every property name and option value is a typed
+ * placeholder resolved by `rules.compile`, because a workspace can rename both
+ * and this file ships the names the plugin created rather than the names the
+ * workspace now uses.
+ *
+ * They were written out in full with the names quoted directly, and proved on
+ * real rows on 2026-08-17 in that form. That was correct until the name map
+ * existed and wrong afterwards: a renamed `Tags` would have been queried by the
+ * name nobody uses, returning nothing, which reads exactly like a workspace
+ * with no rule violations in it.
+ */
 const RULES = [
   { key: 'projects-problem-statement', database: 'projects', caughtBy: 'view',
     rule: 'A problem statement is required, attached as a memo',
@@ -217,7 +233,7 @@ const RULES = [
     why: 'Tags stop being a filter once a row carries six of them',
     // Proved on real rows 2026-08-17: returned exactly the 4-tag and 5-tag rows
     // and correctly excluded the 2-tag one.
-    checkQuery: 'SELECT "Name" FROM <ds> WHERE json_array_length("Tags") > 3' },
+    checkQuery: 'SELECT {prop:Name} FROM <ds> WHERE json_array_length({prop:Tags}) > 3' },
 
   { key: 'process-parent-type', database: 'process', caughtBy: 'check',
     rule: 'Only a Strategy Decision may be a parent',
@@ -225,7 +241,7 @@ const RULES = [
     why: 'The hierarchy is the whole navigation model, and any row can parent any row',
     // Proved on real rows 2026-08-17: a self-join through the relation returned
     // the child of an SOP and not the child of a Strategy Decision.
-    checkQuery: 'SELECT c."Name" FROM <ds> c JOIN <ds> p ON p.url = json_extract(c."Parent", \'$[0]\') WHERE c."Parent" IS NOT NULL AND p."Type" != \'Strategy Decision\'' }
+    checkQuery: 'SELECT c.{prop:Name} FROM <ds> c JOIN <ds> p ON p.url = json_extract(c.{prop:Parent}, \'$[0]\') WHERE c.{prop:Parent} IS NOT NULL AND p.{prop:Type} != {value:Type:Strategy Decision}' }
 ]
 
 /** Derived. Never write these numbers down anywhere else. */
