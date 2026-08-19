@@ -26,7 +26,6 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" judge <readback.json>      # the f
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" repairs <readback.json>    # what a yes would do
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" adopt <readback.json> <id>...
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" send <readback.json> <id>...
-node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" prove-adopted <readback.json> <id>...
 node "${CLAUDE_PLUGIN_ROOT}/scripts/check.js" prove-sent <before.json> <after.json> <id>...
 ```
 
@@ -102,9 +101,14 @@ are not repaired and they are not nothing.
 **A call that returned without an error proves nothing here.** Notion accepts
 some things it cannot do and discards them silently.
 
-- After `adopt`, run `prove-adopted` on **the same read-back**. Nothing was
-  sent, so there is nothing new to fetch, and fetching again would let a
-  workspace that changed in between look like a record being corrected.
+- **`adopt` proves itself** and prints the result. It judges the same read-back
+  again through the new record, which is the right proof for a repair that sent
+  nothing, and fetching again would let a workspace that changed in between look
+  like a record being corrected. There is no separate command for this, because
+  a separate command could only ask half the question: whether the finding is
+  gone. Whether it was ever there needs the record as it was, which is what
+  `adopt` just changed, so run afterwards it answered "proved" to an id somebody
+  had invented.
 - After sending a statement yourself, fetch again and run `prove-sent` with both
   files. It passes only when the finding it was meant to clear is gone.
 

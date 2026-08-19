@@ -12,7 +12,6 @@
  *   node check.js repairs <readback.json>     what a yes would do, each with an id
  *   node check.js send <readback.json> <id>…  workspace statements, proof cleared
  *   node check.js adopt <readback.json> <id>… config repairs, on an explicit yes
- *   node check.js prove-adopted <readback.json> <id>…
  *   node check.js prove-sent <before.json> <after.json> <id>…
  *
  * WHAT IT DOES NOT LOOK AT. Views. The nine checks in the specification do not
@@ -36,6 +35,7 @@ const { DATABASES, byKey } = manifest
 const schema = require('./schema')
 const relations = require('./relations')
 const rules = require('./rules')
+const { fingerprint } = require('./fingerprint')
 const views = require('./views')
 
 /**
@@ -155,6 +155,14 @@ function judge (readback) {
       continue
     }
 
+    if (typeof back.found !== 'boolean') {
+      add(unchecked, `database:${d.key}`, `${d.title}: nothing recorded whether ${entry.databaseId} resolved, so everything below about it rests on a fetch that may not have happened.`)
+    }
+
+    if (!back.title) {
+      add(unchecked, `title:${d.key}`, `${d.title}: its title in Notion was not recorded, so whether it has been renamed is unknown.`)
+    }
+
     if (back.found === false) {
       // The judgment this whole command carries. Deleted and renamed-and-
       // unshared look identical from outside and the remedies are opposite, so
@@ -261,10 +269,20 @@ function judge (readback) {
     say: `The saved views were not looked at. This command checks databases, properties, option values, relations, the person id and the two rules, and nothing else. A broken view looks exactly like a healthy one from here.`
   })
 
+  // The proof, and WHICH definitions it was taken against. `config.complete`
+  // already refuses a proof whose fingerprint has moved, and this asked only
+  // whether a proof existed, so a workspace could pass here on a proof taken
+  // against an earlier manifest. What was checked is not what would be built
+  // now, and that is the same claim `complete` refuses to rest on.
   if (!current.verified || !current.verified.at) {
     unchecked.push({
       id: 'proof',
       say: `No verify is standing against this config, so this workspace has never been proved to match the manifest, or something changed since it was. Run \`install.js verify <readback.json>\` and then \`install.js complete\`.`
+    })
+  } else if (current.verified.definitions !== fingerprint()) {
+    unchecked.push({
+      id: 'proof',
+      say: `The verify standing against this config was taken against a different set of definitions (${current.verified.definitions || 'none recorded'}, and this is ${fingerprint()}). What was checked is not what would be built now. Run \`install.js verify <readback.json>\` again.`
     })
   }
 
@@ -485,7 +503,33 @@ function adopt (readback, ids) {
       applied.push(repair.say)
     }
   }
-  return { applied, next: recoveryLines() }
+
+  // Proved here, in the same call, and not by a command somebody runs after.
+  //
+  // The proof for a config repair is the same read-back judged again through
+  // the new record, and only half of it can be asked afterwards: whether the
+  // finding is gone. Whether it was ever there needs the config as it was, and
+  // the config as it was is what this function just changed. A separate
+  // `prove-adopted` command therefore could not tell a real repair from an id
+  // somebody invented, and it answered `proved` to both.
+  //
+  // Here both halves are in hand. `chosen` came from the offered repairs, which
+  // were derived before anything was written, so the finding was there; judging
+  // now says whether it still is.
+  const after = judge(readback)
+  const results = chosen.map(repair => {
+    const clears = repair.clears
+    const still = clears && reported(after, clears)
+    return {
+      id: repair.id,
+      proved: !still,
+      say: still
+        ? `${clears} is still reported after the change was recorded, so the record does not describe this workspace yet.`
+        : `${clears || repair.id} is gone, judged against the same read-back through the new record.`
+    }
+  })
+
+  return { applied, results, proved: results.every(r => r.proved), next: recoveryLines() }
 }
 
 /**
@@ -577,11 +621,26 @@ function send (readback, ids) {
  * has already moved. That is not a shortcut: it is the only way the question
  * can be answered after the thing being proved has happened.
  */
-function clearsOf (id) {
+function clearsOf (id, judged) {
   for (const suffix of [':renamed', ':lost']) {
-    if (id.endsWith(suffix)) return id.slice(0, -suffix.length)
+    if (id.endsWith(suffix)) return [id.slice(0, -suffix.length)]
   }
-  return id
+
+  // One relation repair is one statement covering every relation missing from a
+  // database, so its id names the database and the findings it clears name the
+  // relations. Asking for `relation:process` among the findings answers no
+  // every time, and a repair that worked would have been reported as one that
+  // never had anything to fix.
+  if (id.startsWith('relation:')) {
+    const key = id.slice('relation:'.length)
+    const numbers = manifest.RELATIONS.filter(r => r.from === key).map(r => `relation:${r.n}`)
+    if (numbers.length) {
+      const wanted = numbers.filter(n => reported(judged, n))
+      return wanted.length ? wanted : numbers
+    }
+  }
+
+  return [id]
 }
 
 const reported = (judged, id) => judged.broken.some(b => b.id === id) || judged.warnings.some(w => w.id === id)
@@ -604,44 +663,23 @@ function proved (before, after, ids) {
 
   const results = []
   for (const id of ids) {
-    const clears = clearsOf(id)
-    if (!reported(was, clears)) {
-      results.push({ id, proved: false, say: `${clears} was not reported before this, so there was nothing for ${id} to fix. Check the id against \`repairs\`.` })
-    } else if (reported(now, clears)) {
-      results.push({ id, proved: false, say: `${clears} is still reported. The repair did not take, and a call that returned without an error is exactly what that looks like from here.` })
-    } else {
-      results.push({ id, proved: true, say: `${clears} is gone.` })
+    const clears = clearsOf(id, was)
+    const absentBefore = clears.filter(c => !reported(was, c))
+    if (absentBefore.length === clears.length) {
+      results.push({ id, proved: false, say: `${clears.join(', ')} was not reported before this, so there was nothing for ${id} to fix. Check the id against \`repairs\`.` })
+      continue
     }
+    const stillThere = clears.filter(c => reported(now, c))
+    if (stillThere.length) {
+      results.push({ id, proved: false, say: `${stillThere.join(', ')} is still reported. The repair did not take, and a call that returned without an error is exactly what that looks like from here.` })
+      continue
+    }
+    results.push({ id, proved: true, say: `${clears.join(', ')} is gone.` })
   }
   return { results, proved: results.length > 0 && results.every(r => r.proved), remaining: now.broken.length }
 }
 
-/**
- * Whether a repair that was ADOPTED actually worked.
- *
- * The same read-back, judged again through the new config. Nothing was sent, so
- * there is nothing fresh to fetch, and fetching again would let a workspace
- * that changed in between look like a record being corrected.
- *
- * ONE HALF, NOT TWO, and this is the honest limit. It can show the finding is
- * gone. It cannot show the finding was there beforehand, because that would
- * mean judging against the config as it was, and the config as it was is the
- * thing that has just been changed. The other half is established by `adopt`,
- * which refuses an id it was not offering: an id that was never a finding never
- * reaches this command.
- */
-function provedAdopted (readback, ids) {
-  const now = judge(readback)
-  const results = ids.map(id => {
-    const clears = clearsOf(id)
-    return reported(now, clears)
-      ? { id, proved: false, say: `${clears} is still reported after the change was recorded, so the record does not describe this workspace yet.` }
-      : { id, proved: true, say: `${clears} is gone, judged against the same read-back through the new record.` }
-  })
-  return { results, proved: results.length > 0 && results.every(r => r.proved), remaining: now.broken.length }
-}
-
-module.exports = { plan, judge, repairs, adopt, send, proved, provedAdopted, idFor, clearsOf }
+module.exports = { plan, judge, repairs, adopt, send, proved, idFor, clearsOf }
 
 if (require.main === module) {
   const [command, ...rest] = process.argv.slice(2)
@@ -712,17 +750,10 @@ if (require.main === module) {
 
       case 'adopt': {
         if (!rest[1]) throw new Error('Usage: check.js adopt <readback.json> <id>...')
-        const { applied, next } = adopt(read(rest[0]), rest.slice(1))
-        for (const say of applied) console.log(`  done  ${say}`)
-        console.log(`\n${next.join('\n')}\n`)
-        console.log('Now prove it: check.js prove-adopted <readback.json> <id>...\n')
-        break
-      }
-
-      case 'prove-adopted': {
-        if (!rest[1]) throw new Error('Usage: check.js prove-adopted <readback.json> <id>...')
-        const result = provedAdopted(read(rest[0]), rest.slice(1))
-        for (const r of result.results) console.log(`  ${r.proved ? 'proved ' : 'NOT    '} ${r.say}`)
+        const result = adopt(read(rest[0]), rest.slice(1))
+        for (const say of result.applied) console.log(`  done    ${say}`)
+        for (const r of result.results) console.log(`  ${r.proved ? 'proved  ' : 'NOT     '}${r.say}`)
+        console.log(`\n${result.next.join('\n')}\n`)
         process.exit(result.proved ? 0 : 1)
       }
 
