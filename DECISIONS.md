@@ -21,7 +21,7 @@ were assumptions until this ran.
 | Can a view filter read a property across a relation | **No.** 400, no path syntax exists |
 | Can a formula carry the tag count instead | **No.** It comes back typed as text and `>` is rejected on text |
 | Can a rollup carry the parent's type instead | **No, and it lies.** The view is created, success is reported, and the filter is silently discarded |
-| Can `check` find both violations in SQL | **Yes.** Both queries proved on real rows |
+| Can `check` find both violations in SQL | **Yes.** Both queries found exactly the offending rows. They selected the title that day and select `url` now, see 2026-08-19 below |
 | Can a two-way self-relation be added in a second pass | **Yes** |
 | Do ordinary select and relation `IS EMPTY` filters persist | **Yes**, confirmed by reading the views back |
 
@@ -105,13 +105,14 @@ before there was any consumer contract, and neither was revisited when the
 contract arrived. The fix in both is `SELECT url FROM <ds>`, and `url` is a
 system column that no rename touches, so it takes no placeholder.
 
-**What the old measurement still covers.** Both queries were proved on real rows
-on 2026-08-17. That measurement was of which rows come back, which is the
-`WHERE` half and the join, and both are unchanged character for character. Which
-column comes back was not part of it. **These exact strings have not been sent to
-Notion**, and the test file says so rather than letting the word MEASURED cover a
-string nobody ran. Re-running them needs a workspace, and the test containers were
-deleted on 2026-08-19.
+**What the old measurement still covers.** Both queries were run against real
+rows on 2026-08-17, and what that proved is which rows come back: the `WHERE`
+half and the join, both unchanged character for character since. Which column
+comes back was not part of it, so **these exact strings have not been sent to
+Notion**. The test file's constant is named `SENT` rather than `MEASURED` for
+that reason, because the older name would have been the one thing in this
+repository claiming a measurement of a string nobody ran. Re-running them needs a
+workspace, and the test containers were deleted on 2026-08-19.
 
 ---
 

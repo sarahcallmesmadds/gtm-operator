@@ -371,11 +371,17 @@ carry them:
 Formula and rollup columns are also returned under `notAvailableInQuerySql`, so
 `check` could not read them even if they had worked.
 
-**Both `check` queries were then proved on real rows.** Counting tags with
-`json_array_length` returned exactly the four-tag and five-tag rows and excluded
-the two-tag one. A self-join through the relation returned the child of an SOP
-and not the child of a Strategy Decision. The queries are recorded in
-`scripts/manifest.js`.
+**Both `check` queries then had the half that finds the rows proved on real
+rows.** Counting tags with `json_array_length` returned exactly the four-tag and
+five-tag rows and excluded the two-tag one. A self-join through the relation
+returned the child of an SOP and not the child of a Strategy Decision. The
+queries are recorded in `scripts/manifest.js`.
+
+**What that measurement does not cover.** Both selected the title on the day
+they were run and both select `url` now, so which column comes back was never
+part of it, and the current strings have not been sent to Notion. The `WHERE`
+half and the join are unchanged, which is the half the rows above prove. See
+`DECISIONS.md`, 2026-08-19.
 
 ### An unsupported filter fails in two different ways, and only one is loud
 

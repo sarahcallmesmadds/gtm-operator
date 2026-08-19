@@ -246,21 +246,21 @@ const RULES = [
     rule: 'Tags capped at 3',
     noFilter: 'A multi-select filter tests contains and does not contain. It cannot count values',
     why: 'Tags stop being a filter once a row carries six of them',
-    // Proved on real rows 2026-08-17: returned exactly the 4-tag and 5-tag rows
-    // and correctly excluded the 2-tag one. That measurement was of the WHERE
-    // half, which has not changed. The select was the title then and is `url`
-    // now, for the reason above.
+    // The WHERE half was run against real rows 2026-08-17 and returned exactly
+    // the 4-tag and 5-tag rows, correctly excluding the 2-tag one. It is
+    // unchanged since. The select was the title that day and is `url` now, for
+    // the reason above, so the column is not covered by that run.
     checkQuery: 'SELECT url FROM <ds> WHERE json_array_length({prop:Tags}) > 3' },
 
   { key: 'process-parent-type', database: 'process', caughtBy: 'check',
     rule: 'Only a Strategy Decision may be a parent',
     noFilter: 'The Type being tested is on the related page, and a filter cannot read across a relation',
     why: 'The hierarchy is the whole navigation model, and any row can parent any row',
-    // Proved on real rows 2026-08-17: a self-join through the relation returned
-    // the child of an SOP and not the child of a Strategy Decision. As above,
-    // that measurement was of the WHERE half and the join, both unchanged.
-    // `c.url` is qualified because the join puts two `url` columns in scope, and
-    // the offending row is the child.
+    // The WHERE half and the join were run against real rows 2026-08-17: the
+    // self-join through the relation returned the child of an SOP and not the
+    // child of a Strategy Decision. Both unchanged since, and as above the
+    // column is not covered by that run. `c.url` is qualified because the join
+    // puts two `url` columns in scope, and the offending row is the child.
     checkQuery: 'SELECT c.url FROM <ds> c JOIN <ds> p ON p.url = json_extract(c.{prop:Parent}, \'$[0]\') WHERE c.{prop:Parent} IS NOT NULL AND p.{prop:Type} != {value:Type:Strategy Decision}' }
 ]
 
