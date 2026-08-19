@@ -203,11 +203,29 @@ account of what exists.
 
 ## Step 5. Create, in two phases and then the views
 
-**First, if question 1 said to create the parent page, create it now.** This is
-the first act after the yes, and it is the only page this skill ever creates.
+**First, if question 1 said to create the parent page, there is something to
+check before creating it.**
 
-**Create it at the top level of the workspace**, with the name they agreed. Not
-inside another page: the user who wanted it somewhere in particular answered
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" status
+```
+
+**A recorded parent means resume, not create.** If `status` names a
+`parentPageId`, an earlier run already made a page and got that far. Use it and
+skip the rest of this section. Creating another one here is how a retry ends with
+two pages, the second recorded and the first abandoned, and `begin` refusing
+afterwards does not undo the page it refused.
+
+**If nothing is recorded, say the name out loud before creating anything**, and
+ask whether a page by that name is already sitting at the top level of the
+workspace. That question is not politeness. A run that died between the create
+call and `begin` left exactly that: an empty page with the agreed name and
+nothing anywhere recording it. Nothing on this side can tell that page from the
+one you are about to make, so the person who can see the workspace is the only
+one who can answer.
+
+**Then create it, at the top level of the workspace**, with the name they agreed.
+Not inside another page: the user who wanted it somewhere in particular answered
 question 1 with that page, and this branch is the one where they did not.
 
 Then, **before anything else, hand the id the create call returned to `begin`**:
@@ -220,29 +238,39 @@ That writes config with `state: creating`, before anything is created. A run tha
 dies from here on leaves a file that says so.
 
 **Record first, prove second, and the order matters.** A returned id is not
-evidence the page is right, but it is the only way back to a page that now
-exists and that this plugin cannot delete. Recorded, a run that dies before the
-next line leaves a config naming the page. Unrecorded, it leaves an orphan
-nobody can find, and the literal retry creates a second one.
+evidence the page is right, but it is the only way back to a page that may now
+exist and that this plugin cannot delete. Recorded, a run that dies before the
+next line leaves a config naming it. Unrecorded, it leaves something nobody can
+find, and the literal retry creates a second one.
 
 **Then fetch the page back**, and only then go on to phase A. That fetch is what
-proves check 4 on this route. If it fails, stop and say the page exists and is
-recorded, because it does and it is.
+proves check 4 on this route. If it fails, **stop, and say what is true and no
+more**: a create call was sent, config records the id it returned, and whether a
+page is there is exactly what could not be established. Do not report the page as
+created. A create call returning is not evidence here either, and this is the
+paragraph where it is most tempting to forget that.
 
-**Read the fetch, do not just note that it returned.** It has to be the page you
-just made, and reachable is not the same claim: any id that names a page you can
-see comes back fine, including one copied out of the wrong field or left over
-from an earlier run. Two things say it is the right one, and both are cheap:
+**Read the fetch, do not just note that it returned.** Reachable is a weaker
+claim than right: any id naming a page you can see comes back fine, including one
+copied out of the wrong field. Two things have to hold:
 
 - **The title is the name agreed at question 1.**
-- **It has nothing in it.** A page you created one call ago is empty. Anything
-  under it means this is not that page.
+- **It has nothing in it.** Measured 2026-08-18: a page fetch lists its children,
+  so an empty `content` is the evidence, and this is the same reading step 2a
+  makes on an existing parent.
+
+**Say what that pair proves, because it is less than it looks.** It rules out an
+id that names something else entirely, which is the failure it was put there for.
+It cannot tell the page you just made from an empty page of the same name left by
+an earlier run, because those two are identical from here. That case is the one
+the question above hands to the user, and it is the reason the question is asked
+before the create rather than after it.
 
 If either is wrong, **stop before phase A**. Nothing has been created under it
-yet, which is the whole reason this check sits here. Say that config is naming
-the wrong page and has to be moved aside before another run, and say that a page
-by the agreed name was created and is somewhere at the top level of the
-workspace, because it was and it is.
+yet, which is the whole reason this check sits here. Say that config is naming a
+page that is not the one this run meant to use and has to be moved aside before
+another run, and say that a create call was sent for a page of the agreed name,
+so there may now be one at the top level of the workspace to look for.
 
 If they named an existing page in step 2, skip all of this: they have an id, it
 was checked in step 2a, and `begin` takes it directly.
@@ -251,9 +279,9 @@ was checked in step 2a, and `begin` takes it directly.
 create call happens before anything can record it, so a run that dies between
 sending it and `begin` leaves a page nothing here knows about. No ordering fixes
 that, because the two systems cannot be written to at once. What makes it
-survivable is that the page has the name agreed at question 1 and sits at the top
-level of the workspace, so say that name out loud before creating it. Then a
-person who has to go looking knows what they are looking for.
+survivable is the name: agreed at question 1, said out loud before the call, and
+at the top level of the workspace. That is what `status` and the question above
+are for, and they are the reason a second run does not quietly add a second page.
 
 **Phase A. Every database, with no relations in it.**
 
