@@ -456,7 +456,7 @@ check_('a config it cannot read is one finding, not a crash', () => {
   assert.ok(/999/.test(result.broken[0].say), `the finding does not say which version:\n${result.broken[0].say}`)
 })
 
-check_('a read-back with nothing in it is unchecked, never a clean pass', () => {
+check_('a read-back with nothing in it is entirely unchecked and nothing is broken', () => {
   installed()
   const result = check.judge({})
   assert.strictEqual(result.passed, true, 'this is about the unchecked list, not the broken one')
@@ -536,6 +536,25 @@ check_('a map that cannot be read stops that database being checked, and says so
   const result = check.judge(healthy())
   assert.ok(has(result.broken, 'names:process'), `a broken map was not reported: ${JSON.stringify(ids(result.broken))}`)
   assert.ok(has(result.unchecked, 'schema:process'), 'its properties were checked through a map that cannot be read')
+})
+
+check_('a map that cannot be read does not stop the plan being produced', () => {
+  // `config.allNames` throws on a map it cannot use, so one hand-edited entry
+  // made the whole command die before it emitted a step, which is the opposite
+  // of what this skill promises to do with a broken install.
+  installed()
+  const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))
+  raw.databases.process.properties = { Domain: 'Area' }
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(raw))
+
+  const result = check.plan()
+  assert.ok(Array.isArray(result.steps) && result.steps.length, 'no plan came back at all')
+  assert.ok(result.steps.some(s => s.kind === 'fetch-database' && s.database === 'process'),
+    'the database with the bad map is not even fetched, so nothing would diagnose it')
+  assert.ok(!result.steps.some(s => s.kind === 'rule' && s.database === 'process'),
+    'a rule query was built for a database whose names are not known')
+  assert.ok(result.steps.some(s => s.kind === 'rule' && s.database === 'memos'),
+    'one bad map stopped every other rule query')
 })
 
 check_('the usage line names exactly the commands that exist', () => {
