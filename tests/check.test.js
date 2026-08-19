@@ -392,6 +392,86 @@ check_('adopting nothing is refused rather than reported as done', () => {
   assert.throws(() => check.adopt(healthy(), []), /No repair was named/)
 })
 
+console.log('\ngetting a statement clears the proof\n')
+
+check_('a workspace repair carries no statement until it is asked for', () => {
+  // The statement is the thing that changes the workspace, so handing it over
+  // is the moment the proof stops being true. Leaving it in `repairs` made that
+  // a step somebody could skip.
+  installed()
+  const back = healthy()
+  const want = schema.DATABASES.process.properties.find(p => p.options)
+  const [value] = want.options[1]
+  back.databases.process.schema[want.name].options = back.databases.process.schema[want.name].options.filter(o => o.name !== value)
+
+  const offered = check.repairs(back)
+  for (const repair of offered.workspace) {
+    assert.strictEqual(repair.statement, undefined, `a statement was available without the proof being cleared: ${repair.id}`)
+  }
+})
+
+check_('asking for a statement demotes the install and says how to get back', () => {
+  installed()
+  const back = healthy()
+  const want = schema.DATABASES.process.properties.find(p => p.options)
+  const [value] = want.options[1]
+  back.databases.process.schema[want.name].options = back.databases.process.schema[want.name].options.filter(o => o.name !== value)
+
+  assert.strictEqual(config.read().state, 'complete', 'the fixture never reached complete, so the demotion proves nothing')
+  const { statements, next } = check.send(back, [`option:process:${want.name}:${value}:lost`])
+
+  assert.strictEqual(statements.length, 1)
+  assert.ok(statements[0].statement.includes(value), `the statement does not name the value it adds back:\n${statements[0].statement}`)
+  assert.strictEqual(statements[0].unproved, true, 'a statement nothing here has measured was presented as proved')
+  assert.strictEqual(config.read().state, 'creating', 'the workspace was about to change and the install still claimed to be verified')
+  assert.strictEqual(config.read().verified, null)
+  assert.ok(next.join('\n').includes('install.js verify'), 'the way back was not printed')
+})
+
+check_('a config repair cannot be sent and a workspace repair cannot be adopted', () => {
+  installed()
+  const back = healthy()
+  const want = schema.DATABASES.process.properties.find(p => p.name === 'Domain')
+  back.databases.process.schema['Area'] = back.databases.process.schema[want.name]
+  delete back.databases.process.schema[want.name]
+
+  assert.throws(() => check.send(back, ['property:process:Domain']), /is a config repair/)
+  assert.strictEqual(config.read().state, 'complete', 'the proof was cleared by a call that then refused')
+})
+
+console.log('\nwhat it will not judge\n')
+
+check_('a config it cannot read is one finding, not a crash', () => {
+  installed()
+  const raw = JSON.parse(fs.readFileSync(process.env.GTM_OPERATOR_CONFIG, 'utf8'))
+  raw.configVersion = 999
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(raw))
+
+  const result = check.judge(healthy())
+  assert.ok(has(result.broken, 'config'), 'a config from another version did not come back as a finding')
+  assert.ok(/999/.test(result.broken[0].say), `the finding does not say which version:\n${result.broken[0].say}`)
+})
+
+check_('a read-back with nothing in it is unchecked, never a clean pass', () => {
+  installed()
+  const result = check.judge({})
+  assert.strictEqual(result.passed, true, 'this is about the unchecked list, not the broken one')
+  for (const d of DATABASES) {
+    assert.ok(has(result.unchecked, `database:${d.key}`), `${d.title} was passed over silently`)
+  }
+  assert.ok(result.unchecked.length > DATABASES.length, 'nothing was said about the views or the rules')
+})
+
+check_('a property whose type changed is never offered as a rename', () => {
+  installed()
+  const back = healthy()
+  back.databases.process.schema.Domain.type = 'number'
+  const result = check.judge(back)
+  assert.ok(has(result.broken, 'type:process:Domain'), `a changed type was not reported: ${JSON.stringify(ids(result.broken))}`)
+  const offered = check.repairs(back)
+  assert.deepStrictEqual(offered.config, [], 'a property that is present with the wrong type was treated as a rename')
+})
+
 console.log('\nthe name map itself\n')
 
 check_('a map that cannot be read stops that database being checked, and says so', () => {

@@ -10,6 +10,7 @@
  *   node check.js plan                        what to fetch and query, in order
  *   node check.js judge <readback.json>       the findings
  *   node check.js repairs <readback.json>     what a yes would do, each with an id
+ *   node check.js send <readback.json> <id>…  workspace statements, proof cleared
  *   node check.js adopt <readback.json> <id>… config repairs, on an explicit yes
  *   node check.js prove-adopted <readback.json> <id>…
  *   node check.js prove-sent <before.json> <after.json> <id>…
@@ -205,9 +206,24 @@ function judge (readback) {
     }
   }
 
-  // Relations, both ends, and what could not be repaired if it is broken.
-  for (const problem of relations.verifyAll(schemas, config.ids(), namesByKey)) {
-    add(broken, `relation:${problem.split(' ')[1] || '?'}`, problem)
+  // Relations, both ends, and one at a time.
+  //
+  // NOT `verifyAll`, which reports a database nobody read back as a problem
+  // with the relation. That is right for `install.verify`, where every database
+  // was just created and a gap is a real failure, and wrong here: a database
+  // that was not fetched is a thing this command does not know about, and
+  // calling it broken would report a healthy workspace as broken whenever a
+  // fetch was skipped.
+  for (const relation of manifest.RELATIONS) {
+    const ends = relation.kind === 'two-way' ? [relation.from, relation.to] : [relation.from]
+    const unseen = ends.filter(key => !schemas[key])
+    if (unseen.length) {
+      add(unchecked, `relation:${relation.n}`, `${byKey(relation.from).title}."${relation.property}" was not checked, because ${unseen.map(k => byKey(k).title).join(' and ')} ${unseen.length === 1 ? 'was' : 'were'} not read back.`)
+      continue
+    }
+    for (const problem of relations.verifyRelation(relation, schemas, config.ids(), namesByKey)) {
+      add(broken, `relation:${relation.n}`, problem)
+    }
   }
   for (const withheld of relations.unrepairable(schemas, config.ids(), namesByKey)) {
     add(warnings, `relation-unrepairable:${withheld.n}`, `${byKey(withheld.from).title}."${withheld.property}" cannot be rebuilt automatically: ${withheld.reason}`)
@@ -339,8 +355,7 @@ function repairs (readback) {
 
     workspace.push({
       id: `${clears}:lost`, clears, kind: 'option', database: missing.database,
-      say: `Add "${missing.observedValue}" back to ${where}, on the reading that it was deleted rather than renamed.`,
-      statement: optionStatement(missing)
+      say: `Add "${missing.observedValue}" back to ${where}, on the reading that it was deleted rather than renamed.`
     })
   }
 
@@ -376,11 +391,10 @@ function repairs (readback) {
   const schemas = schemasFrom(readback)
   const namesByKey = namesByKeyFrom()
   const statements = relations.repairStatements(schemas, config.ids(), namesByKey)
-  for (const [key, statement] of Object.entries(statements)) {
+  for (const key of Object.keys(statements)) {
     workspace.push({
       id: `relation:${key}`, clears: null, kind: 'relation', database: key,
-      say: `Rebuild the relations missing from ${byKey(key).title}. Both halves of each are gone, which is the only state this is willing to rebuild from.`,
-      statement
+      say: `Rebuild the relations missing from ${byKey(key).title}. Both halves of each are gone, which is the only state this is willing to rebuild from.`
     })
   }
   for (const u of relations.unrepairable(schemas, config.ids(), namesByKey)) {
@@ -429,6 +443,7 @@ function optionStatement (finding) {
   const db = byKey(finding.database)
   return {
     unproved: true,
+    id: `option:${finding.database}:${finding.logical}:${finding.value}:lost`,
     database: finding.database,
     statement: `ALTER TABLE ${JSON.stringify(db.title)} ALTER COLUMN ${rules.identifier(finding.observed)} ADD OPTION ${rules.literal(finding.observedValue)}`
   }
@@ -502,6 +517,56 @@ const recoveryLines = () => ([
 ])
 
 /**
+ * Hand over the statements for a workspace repair, and clear the proof first.
+ *
+ * WHY THE STATEMENT IS NOT IN `repairs`. Adding an option or rebuilding a
+ * relation changes the workspace, so it changes what the verify was taken
+ * against, so the proof has to go. A config repair does that by itself, because
+ * every config write invalidates the verification on the way past. A statement
+ * sent by hand touches no config at all, so nothing would have cleared it and
+ * an install would keep claiming it matches the manifest while its workspace
+ * moved underneath.
+ *
+ * The proof is therefore cleared HERE, before the statement is handed over, and
+ * the statement is not available any other way. A step that can be skipped is a
+ * step that gets skipped.
+ */
+function send (readback, ids) {
+  const offered = repairs(readback)
+  const chosen = []
+  for (const id of ids) {
+    const found = offered.workspace.find(r => r.id === id)
+    if (!found) {
+      if (offered.config.find(r => r.id === id)) throw new Error(`${id} is a config repair. Use adopt. Nothing has been cleared.`)
+      throw new Error(`${id} is not one of the workspace repairs this read-back offers. Run \`repairs\` again. Nothing has been cleared.`)
+    }
+    chosen.push(found)
+  }
+  if (!chosen.length) throw new Error('No repair was named, so no statement was produced. Pass the ids from `repairs`.')
+
+  const schemas = schemasFrom(readback)
+  const namesByKey = namesByKeyFrom()
+  const relationStatements = relations.repairStatements(schemas, config.ids(), namesByKey)
+  const findings = judge(readback).findings
+
+  const statements = []
+  for (const repair of chosen) {
+    if (repair.kind === 'relation') {
+      statements.push({ id: repair.id, database: repair.database, statement: relationStatements[repair.database], unproved: false })
+      continue
+    }
+    const finding = findings.find(f => f.kind === 'option-missing' && `option:${f.database}:${f.logical}:${f.value}:lost` === repair.id)
+    statements.push(optionStatement(finding))
+  }
+
+  // Before the statements are returned, not after. A caller that reads the
+  // statements and never gets to the end of this function must still have lost
+  // the proof.
+  config.clearVerified()
+  return { statements, next: recoveryLines() }
+}
+
+/**
  * The finding a repair id clears.
  *
  * Worked out from the id rather than by asking `repairs` again, because a
@@ -573,7 +638,7 @@ function provedAdopted (readback, ids) {
   return { results, proved: results.length > 0 && results.every(r => r.proved), remaining: now.broken.length }
 }
 
-module.exports = { plan, judge, repairs, adopt, proved, provedAdopted, idFor, clearsOf }
+module.exports = { plan, judge, repairs, adopt, send, proved, provedAdopted, idFor, clearsOf }
 
 if (require.main === module) {
   const [command, ...rest] = process.argv.slice(2)
@@ -622,10 +687,23 @@ if (require.main === module) {
         lines('Not repaired, and why', offered.withheld)
         console.log(
           `\nAdopt config repairs with:  check.js adopt <readback.json> <id>...\n` +
-          `Send a workspace statement yourself, then prove it with:\n` +
+          `Get a workspace statement with: check.js send <readback.json> <id>...\n` +
+          `That clears the proof before it hands the statement over, then:\n` +
           `  check.js prove-sent <before.json> <after.json> <id>...\n` +
           `Either kind clears the proof this install was verified against.\n`
         )
+        break
+      }
+
+      case 'send': {
+        if (!rest[1]) throw new Error('Usage: check.js send <readback.json> <id>...')
+        const { statements, next } = send(read(rest[0]), rest.slice(1))
+        for (const s of statements) {
+          console.log(`  ${s.database}\n      ${s.statement}`)
+          if (s.unproved) console.log('      NOT MEASURED. No statement of this shape has been run against a live workspace here. Record what comes back in DECISIONS.md.')
+        }
+        console.log(`\n${next.join('\n')}\n`)
+        console.log('Send these, fetch again, then: check.js prove-sent <before.json> <after.json> <id>...\n')
         break
       }
 
