@@ -101,6 +101,20 @@ check('an extra option value is not a problem, only a finding', () => {
   assert.deepStrictEqual(kinds(findings), ['option-extra'])
 })
 
+check('the sentences are exactly the findings that carry one', () => {
+  // Structural rather than by convention. Two lists kept in step by index hold
+  // until one branch pushes to only one of them, and one branch does.
+  const actual = clean()
+  const want = schema.DATABASES[KEY].properties.find(p => p.options)
+  delete actual[schema.DATABASES[KEY].properties.find(p => !p.options).name]
+  actual[want.name].options.push({ name: 'Theirs', color: 'blue' })
+
+  const { problems, findings } = schema.inspect(KEY, actual, RELATION_NAMES)
+  assert.deepStrictEqual(problems, findings.filter(f => f.say).map(f => f.say))
+  assert.ok(findings.length > problems.length, 'the fixture did not produce a finding without a sentence, so this compares two identical lists')
+  assert.deepStrictEqual(findings.filter(f => !f.say).map(f => f.kind), ['option-extra'])
+})
+
 check('verify returns exactly the sentences inspect produces', () => {
   // The two must not drift. `install.verify` and its tests read the sentences,
   // and `check` reads the findings, and they are one pass over one read-back.
