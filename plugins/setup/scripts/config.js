@@ -217,6 +217,65 @@ function recordDatabase (key, { databaseId, dataSourceId, displayName }) {
   return config
 }
 
+/**
+ * Point a database at a data source that replaced the recorded one.
+ *
+ * SEPARATE FROM `recordDatabase` ON PURPOSE. That function refuses a recorded
+ * pair being offered a different data source id, and that guard stays: a
+ * mismatch there is a mangled create response, a hand-edited config or a bug,
+ * and none of the three is safe to resolve by overwriting. This is the one
+ * legitimate case, and it is narrow enough to be written out rather than folded
+ * into the general path.
+ *
+ * WHAT THIS FUNCTION CHECKS. That the database is recorded, that the database
+ * id is unchanged, that the recorded data source is still the one the caller
+ * looked at, and that the move is to a different id.
+ *
+ * WHAT IT CANNOT CHECK, and what the caller must have established first:
+ *
+ *   - that the recorded data source no longer resolves. Adopting while the
+ *     recorded one is healthy is the thing `check` warns about and refuses to
+ *     act on: a second data source appearing is a warning, never a repair.
+ *   - that the new one belongs to this database.
+ *   - that there is exactly one candidate, or that a person picked this one.
+ *
+ * All three are facts about a read-back, and this file has no way to reach
+ * Notion. Saying so here rather than implying the guard is complete.
+ */
+function reresolveDataSource (key, { databaseId, from, to }) {
+  const config = read()
+  const entry = config && config.databases && config.databases[key]
+  if (!entry) {
+    throw new Error(`${key} is not recorded, so there is no data source to re-resolve. Record the database first.`)
+  }
+  if (!databaseId || !from || !to) {
+    throw new Error(`${key}: re-resolving a data source needs the database id, the recorded data source id and the new one.`)
+  }
+  if (entry.databaseId !== databaseId) {
+    throw new Error(
+      `${key} is recorded against database ${entry.databaseId} and this is offering ${databaseId}. ` +
+      `A data source moving between databases is not a re-resolve, and nothing has been written.`
+    )
+  }
+  // The pair that was judged, not merely the pair being offered. Between the
+  // read-back and the approval, anything else writing to config would make this
+  // an adoption of a decision taken about a different workspace.
+  if (entry.dataSourceId !== from) {
+    throw new Error(
+      `${key} was recorded as data source ${from} when this was judged and is now ${entry.dataSourceId}. ` +
+      `Something changed the config in between, so nothing has been written. Run the check again.`
+    )
+  }
+  if (from === to) {
+    throw new Error(`${key} is already recorded as data source ${to}, so there is nothing to change.`)
+  }
+
+  entry.dataSourceId = to
+  invalidateVerification(config)
+  write(config)
+  return config
+}
+
 function recordPerson (personId) {
   const config = read() || blank(null)
   config.notion.personId = personId || null
@@ -395,6 +454,6 @@ function complete () {
 module.exports = {
   recordVerified, clearVerified,
   CONFIG_PATH, CONFIG_VERSION, blank, exists, read, write, begin,
-  recordDatabase, recordPerson, ids, missingDatabases, complete,
+  recordDatabase, recordPerson, reresolveDataSource, ids, missingDatabases, complete,
   namesFor, allNames, recordNames
 }
