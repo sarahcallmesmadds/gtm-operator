@@ -17,6 +17,7 @@
  *   node install.js record <key> <db> <ds>  store what phase A returned
  *   node install.js verify <readback.json>  compare Notion against the manifest
  *   node install.js status                  where this install has got to
+ *   node install.js parent-is <page>        is that page the recorded parent
  *
  * NOTHING HERE TRUSTS A CREATE CALL. `verify` is the only thing that reports
  * success, it reads its evidence out of a file the skill fills from Notion, and
@@ -423,8 +424,13 @@ if (require.main === module) {
         break
       }
       case 'status': show(status()); break
+      case 'parent-is': {
+        if (!rest[0]) throw new Error('Usage: install.js parent-is <page id or url>')
+        show({ page: rest[0], isRecordedParent: config.isRecordedParent(rest[0]) })
+        break
+      }
       default:
-        console.error('Usage: install.js plan | phase-a | phase-b | views | begin | record | person | verify | complete | status')
+        console.error('Usage: install.js plan | phase-a | phase-b | views | begin | record | person | verify | complete | status | parent-is')
         process.exit(2)
     }
   } catch (error) {
