@@ -309,15 +309,21 @@ claim than right: any id naming a page you can see comes back fine, including on
 copied out of the wrong field. Two things have to hold:
 
 - **The title is the name agreed at question 1.**
-- **It has nothing in it.** Measured 2026-08-18: a page fetch lists its children,
-  so an empty `content` is the evidence, and this is the same reading step 2a
-  makes on an existing parent.
+- **What is under it is what belongs there**, and that is a different sentence on
+  each route. Measured 2026-08-18: a page fetch lists its children, so `content`
+  is the evidence either way.
+  - **On a fresh create, nothing belongs there.** The page is one call old, so
+    anything under it means this is not that page.
+  - **On a resume, what config records belongs there.** An earlier run that got
+    into phase A left databases under this page, and demanding an empty page
+    would fail every resume that got furthest. Judge it by step 2a's rule
+    instead: recorded ids are expected, anything else is not.
 
 **Say what that pair proves, because it is less than it looks.** It rules out an
 id that names something else entirely, which is the failure it was put there for.
-It cannot tell the page you just made from an empty page of the same name left by
-an earlier run, because those two are identical from here. That case is the one
-the question above hands to the user, and it is the reason the question is asked
+On a fresh create it cannot tell the page you just made from an empty page of the
+same name left by an earlier run, because those two are identical from here. That
+case is the one the gate hands to the user, and it is the reason it is asked
 before the create rather than after it.
 
 If either is wrong, **stop before phase A**. Nothing has been created under it
