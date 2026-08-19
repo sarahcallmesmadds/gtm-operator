@@ -765,7 +765,7 @@ if (require.main === module) {
       }
 
       default:
-        console.error('Usage: check.js plan | judge | repairs | adopt | prove-adopted | prove-sent')
+        console.error('Usage: check.js plan | judge | repairs | adopt | send | prove-sent')
         process.exit(2)
     }
   } catch (error) {
