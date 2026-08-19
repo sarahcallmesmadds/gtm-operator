@@ -38,7 +38,8 @@ back correctly and matches nothing.
 **It writes to a real Notion workspace.** Creating databases is not reversible
 from here: this plugin never deletes and never archives, on purpose, including
 after a failed run. A half-built workspace is cleaned up by a person who can see
-it.
+it. **On the default answer to question 1 it also creates one page**, the parent
+everything else goes under, and that page is no more reversible than the rest.
 
 So there is exactly one confirmation gate, at step 4, and it covers everything.
 Do not create anything before it. Do not ask for a second yes after it.
@@ -47,10 +48,15 @@ Do not create anything before it. Do not ask for a second yes after it.
 
 ## Step 0. Refuse to start without what it needs
 
-Five checks. **Authenticating is only the first of them**, and this step exists
-because an earlier version checked authentication alone, passed, and then failed
-halfway through creating databases, which is the exact failure it was meant to
-prevent.
+Three checks here and two more in step 2a, once there is a parent to check.
+**Authenticating is only the first of them**, and this step exists because an
+earlier version checked authentication alone, passed, and then failed halfway
+through creating databases, which is the exact failure it was meant to prevent.
+
+**Nothing in this step depends on which page the user picks**, which is why the
+two parent checks are not in it. They used to be, and that order could not work:
+they ran before step 2 asked which page to use, and on the default answer they
+ran against a page that did not exist yet.
 
 1. **The connection authenticates.** Fetch `self`.
 2. **The client can actually do views.** The pinned wire version proves nothing
@@ -61,12 +67,6 @@ prevent.
    Creating databases needs insert. Filling properties needs update. Resolving
    the user needs user information. **A connection with read alone authenticates
    perfectly and then fails on the first create.**
-4. **The chosen parent page is reachable by this connection.** Fetch it. An
-   unshared parent returns not-found rather than forbidden, which reads as a typo
-   and is not one. Say which it is.
-5. **Nothing this install would create is already there.** Fetch the parent and
-   look. This is the check that stops a second Process appearing.
-
 If any fails, **say exactly what to do about it and stop.** Do not offer to
 continue with a subset.
 
@@ -116,6 +116,29 @@ all of them. Not the logical field names, because the plugin owns those.
 **Every addition to this list has to argue against the install that gets
 abandoned at question twelve.**
 
+## Step 2a. Check the parent, now that there is one
+
+**Question 1 has two answers and they take different routes**, so say which one
+you are on before running anything here.
+
+**If they named a page that already exists**, the two remaining preflight checks
+run now:
+
+4. **The parent page is reachable by this connection.** Fetch it. An unshared
+   parent returns not-found rather than forbidden, which reads as a typo and is
+   not one. Say which it is.
+5. **Nothing this install would create is already there.** Fetch the parent and
+   look. This is the check that stops a second Process appearing.
+
+If either fails, **say exactly what to do about it and stop**, the same as step
+0. Do not offer to continue with a subset.
+
+**If they took the default and want the page created**, there is nothing to check
+yet and nothing to create yet either, because creating it before the gate would
+break the one rule this skill has about writing. Say that the page will be
+created as the first act after the yes, and carry on to step 3. Step 5 runs both
+checks against it there, by reading it back.
+
 ## Step 3. Work out who the user is
 
 Harder than it sounds. **There is no "current user" to look up.** A Notion
@@ -155,17 +178,35 @@ That prints every database, every relation and every view, derived. Show it.
 **It runs before anything exists**, which is the point: the ids in it are
 placeholders until phase A fills them in.
 
+**Say where it is all going, and whether that page exists yet.** `plan` does not
+know which answer question 1 got, so name the parent page alongside it, and on
+the default answer say plainly that the page itself gets created first. The yes
+has to cover the page as well as what goes under it, because there is no second
+gate to catch it.
+
 **This is the only gate.** After the yes, run to completion or fail with a clear
 account of what exists.
 
 ## Step 5. Create, in two phases and then the views
+
+**First, if question 1 said to create the parent page, create it now.** This is
+the first act after the yes, and it is the only page this skill ever creates.
+
+Create it under the workspace or under the page the user pointed at, with the
+name they agreed, and then **fetch it back before going on**. The fetch is not
+ceremony: it is what makes the two step 2a checks true on this route, because a
+page you just read back is reachable by this connection and is empty. A create
+call that returned is not evidence, here or anywhere else in this plugin.
+
+If they named an existing page in step 2, skip this and use that id.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" begin <parent page id>
 ```
 
 That writes config with `state: creating`, before anything is created. A run that
-dies from here on leaves a file that says so.
+dies from here on leaves a file that says so. **The id it takes is the one you
+just read back**, not the one a create call reported.
 
 **Phase A. Every database, with no relations in it.**
 
