@@ -29,6 +29,7 @@ const manifest = require('./manifest')
 const schema = require('./schema')
 const relations = require('./relations')
 const views = require('./views')
+const rules = require('./rules')
 const config = require('./config')
 
 const { DATABASES, VIEWS, byKey } = manifest
@@ -318,7 +319,7 @@ if (require.main === module) {
     if (command === 'verify' && !rest[0]) throw new Error('Usage: install.js verify <readback.json>')
     const cleared = command === 'verify' ? config.clearVerified() : null
 
-    const problems = [...manifest.validate(), ...views.validate()]
+    const problems = [...manifest.validate(), ...views.validate(), ...rules.validate()]
     if (problems.length) {
       console.error('The definitions contradict themselves, and nothing below can be trusted:')
       for (const p of problems) console.error(`  ${p}`)
