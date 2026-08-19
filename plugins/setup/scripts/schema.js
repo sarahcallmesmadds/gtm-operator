@@ -494,13 +494,30 @@ const READ_BACK_AS = {
  * as a property somebody else added, which would turn a correct install into a
  * page of complaints.
  */
-function verify (key, actual, alsoExpected = [], names = null) {
+function inspect (key, actual, alsoExpected = [], names = null) {
   const db = DATABASES[key]
   if (!db) throw new Error(`No schema defined for "${key}"`)
 
   const problems = []
+  // The same findings as `problems`, said in a shape a caller can act on.
+  //
+  // `check` has to know WHICH finding it is holding, because a missing property
+  // and a missing option have different repairs and an extra option value is
+  // half of recognising a rename. Reading that back out of the sentences means
+  // a reworded message silently changes what gets repaired, so the categories
+  // are produced here beside the sentence rather than parsed out of it.
+  //
+  // Every sentence has a finding beside it. The reverse does not hold, and
+  // `option-extra` is the one that breaks it: an extra option value is not a
+  // problem and gets no sentence, it is recorded because recognising a renamed
+  // option needs it. So `findings` is the longer list, and a caller counting
+  // one to learn the other would be wrong.
+  const findings = []
+  const say = (sentence, finding) => { problems.push(sentence); findings.push({ database: key, ...finding }) }
+
   if (!actual || typeof actual !== 'object') {
-    return [`${db.title}: no schema came back to check, so nothing was verified`]
+    const sentence = `${db.title}: no schema came back to check, so nothing was verified`
+    return { problems: [sentence], findings: [{ database: key, kind: 'schema-absent' }] }
   }
 
   for (const want of db.properties) {
@@ -511,7 +528,7 @@ function verify (key, actual, alsoExpected = [], names = null) {
     const observed = mapped.propertyName(names, want.name)
     const where = observed === want.name ? `${db.title}.${want.name}` : `${db.title}.${want.name} (called "${observed}" here)`
     const got = actual[observed]
-    if (!got) { problems.push(`${where}: missing`); continue }
+    if (!got) { say(`${where}: missing`, { kind: 'property-missing', logical: want.name, observed, type: READ_BACK_AS[want.type] || want.type }); continue }
 
     // The name a type is WRITTEN as in DDL is not the name it is READ back as.
     // Measured 2026-08-17: RICH_TEXT comes back as "text", PEOPLE comes back as
@@ -520,7 +537,7 @@ function verify (key, actual, alsoExpected = [], names = null) {
     // switched off.
     const expected = READ_BACK_AS[want.type] || want.type
     if (got.type !== expected) {
-      problems.push(`${where}: expected type ${expected}, got ${got.type}`)
+      say(`${where}: expected type ${expected}, got ${got.type}`, { kind: 'property-type', logical: want.name, observed, expected, got: got.type })
     }
 
     // Checked whenever the manifest asks for a description.
@@ -541,10 +558,11 @@ function verify (key, actual, alsoExpected = [], names = null) {
     // A property the manifest gives no description is still not required to
     // have one.
     if (want.description && got.description !== want.description) {
-      problems.push(
+      say(
         `${where}: the description does not match.\n` +
         `    wanted: ${want.description}\n` +
-        `    got:    ${got.description || 'nothing'}`
+        `    got:    ${got.description || 'nothing'}`,
+        { kind: 'description', logical: want.name, observed, expected: want.description, got: got.description || null }
       )
     }
 
@@ -570,12 +588,32 @@ function verify (key, actual, alsoExpected = [], names = null) {
         const observedValue = mapped.valueName(names, want.name, name)
         const back = (got.options || []).find(o => o.name === observedValue)
         if (back && back.color !== colour) {
-          problems.push(`${where}: option "${observedValue}" came back ${back.color || 'with no colour'} and was sent as ${colour}`)
+          say(`${where}: option "${observedValue}" came back ${back.color || 'with no colour'} and was sent as ${colour}`,
+            { kind: 'option-colour', logical: want.name, observed, value: name, observedValue, expected: colour, got: back.color || null })
         }
       }
 
-      for (const name of wantNames) {
-        if (!gotNames.includes(name)) problems.push(`${where}: option "${name}" is missing`)
+      for (const [logicalValue] of want.options) {
+        const observedValue = mapped.valueName(names, want.name, logicalValue)
+        if (!gotNames.includes(observedValue)) {
+          say(`${where}: option "${observedValue}" is missing`,
+            { kind: 'option-missing', logical: want.name, observed, value: logicalValue, observedValue })
+        }
+      }
+
+      // Option values present in Notion and not in the schema. Nothing reported
+      // these until now: the order comparison filters them out and the extra
+      // PROPERTY check below is one level up and does not see them.
+      //
+      // They are not a failure. An extra value is the user's, the same way an
+      // extra property is, and this plugin never removes one. They are here
+      // because recognising a renamed option means pairing a value the schema
+      // expects and cannot find with a value the workspace has and the schema
+      // does not know, and without this half that pairing cannot be made.
+      for (const name of gotNames) {
+        if (!wantNames.includes(name)) {
+          findings.push({ database: key, kind: 'option-extra', logical: want.name, observed, observedValue: name })
+        }
       }
       // Order is checked, not just membership. Notion sorts a select by option
       // order, so a correct set in the wrong order is a real defect that is
@@ -600,7 +638,8 @@ function verify (key, actual, alsoExpected = [], names = null) {
       // and says why; this is the same reason plus that one.
       const sameOrder = shared.length === wanted.length && shared.every((name, index) => name === wanted[index])
       if (!sameOrder) {
-        problems.push(`${where}: options are in the wrong order.\n    wanted: ${wanted.join(', ')}\n    got:    ${shared.join(', ')}`)
+        say(`${where}: options are in the wrong order.\n    wanted: ${wanted.join(', ')}\n    got:    ${shared.join(', ')}`,
+          { kind: 'option-order', logical: want.name, observed, expected: wanted, got: shared })
       }
     }
   }
@@ -615,10 +654,25 @@ function verify (key, actual, alsoExpected = [], names = null) {
     ...alsoExpected.map(n => mapped.propertyName(names, n))
   ])
   for (const name of Object.keys(actual)) {
-    if (!wantedNames.has(name)) problems.push(`${db.title}.${name}: present in Notion and not in the schema. Reported, not removed`)
+    if (!wantedNames.has(name)) {
+      say(`${db.title}.${name}: present in Notion and not in the schema. Reported, not removed`,
+        { kind: 'property-extra', observed: name })
+    }
   }
 
-  return problems
+  return { problems, findings }
+}
+
+/**
+ * The sentences only, which is what everything written before `check` expects.
+ *
+ * A thin wrapper on purpose. `install.verify` spreads this straight into its own
+ * list and tests call `.join()` on it and compare it with `[]`, so returning the
+ * object here would break every one of them, and hanging a property off the
+ * array would break `deepStrictEqual`.
+ */
+function verify (key, actual, alsoExpected = [], names = null) {
+  return inspect(key, actual, alsoExpected, names).problems
 }
 
 const defined = () => Object.keys(DATABASES)
@@ -655,7 +709,7 @@ function identityNames (key) {
 
 // DDL_TYPE is exported for a test that changes a generator and checks the
 // proof fingerprint moves with it. Nothing else should reach into it.
-module.exports = { DATABASES, DDL_TYPE, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, defined, identityNames }
+module.exports = { DATABASES, DDL_TYPE, CADENCE_DAYS, DEFAULT_CADENCE, createStatement, verify, inspect, defined, identityNames }
 
 if (require.main === module) {
   const key = process.argv[3]
