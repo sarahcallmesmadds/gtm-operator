@@ -204,6 +204,44 @@ check('a complete install cannot be started over by accident', () => {
   assert.throws(() => config.begin('parent-page'), /already complete/)
 })
 
+// `recordPerson` used to clear the proof, which demoted state to `creating`,
+// and `creating` is the whole of what the refusal above tests for. Saving a
+// person was therefore a way to get past it. The refusal is asserted here as
+// well as the state, because a fix that kept `state` and dropped the proof
+// would satisfy a state-only check while leaving `complete` unreachable.
+check('recording a person does not demote a finished install', () => {
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
+
+  const after = config.recordPerson('person-1')
+  assert.strictEqual(after.notion.personId, 'person-1')
+  assert.strictEqual(after.state, 'complete', 'saving a person knocked the install back to creating')
+  assert.strictEqual(after.verifiedAt, '2026-08-18T00:00:00Z', 'saving a person threw away a proof it does not affect')
+  assert.throws(
+    () => config.begin('parent-page'),
+    /already complete/,
+    'saving a person opened the door to installing over a finished workspace'
+  )
+})
+
+check('clearing a person does not demote a finished install either', () => {
+  // The null path is the one a tier 3 install takes, so it is the likelier of
+  // the two to run and was equally able to defeat the refusal.
+  reset()
+  config.begin('parent-page')
+  for (const d of DATABASES) config.recordDatabase(d.key, { databaseId: `db-${d.key}`, dataSourceId: `ds-${d.key}` })
+  config.recordVerified('2026-08-18T00:00:00Z')
+  config.complete()
+
+  const after = config.recordPerson(null)
+  assert.strictEqual(after.notion.personId, null)
+  assert.strictEqual(after.state, 'complete')
+  assert.throws(() => config.begin('parent-page'), /already complete/)
+})
+
 console.log('\nthe plan\n')
 
 check('phase A creates every database and puts no relation in any of them', () => {

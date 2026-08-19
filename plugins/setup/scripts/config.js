@@ -318,10 +318,28 @@ function reresolveDataSource (key, { databaseId, from, to }) {
   return config
 }
 
+/**
+ * Record who the user is, without touching the proof.
+ *
+ * DELIBERATELY DOES NOT CALL `invalidateVerification`. It used to, and that made
+ * saving a person demote a finished install: `state` went back to `creating`,
+ * which is the one thing `begin` reads to refuse installing over a workspace
+ * that is already built. Recording a person became a way to get past that
+ * refusal.
+ *
+ * The proof is about the schema, and `personId` is not part of the schema.
+ * `Owner`, `Verified by` and `Author` are created on every install whatever this
+ * value is, and it decides only whether a later ROW write fills them. So a
+ * standing verify still describes the workspace accurately after this runs, and
+ * clearing it threw away something true.
+ *
+ * The two functions that do invalidate, `recordDatabase` and
+ * `reresolveDataSource`, both change which Notion object the config points at,
+ * which is exactly what a proof is a statement about.
+ */
 function recordPerson (personId) {
   const config = read() || blank(null)
   config.notion.personId = personId || null
-  invalidateVerification(config)
   write(config)
   return config
 }
