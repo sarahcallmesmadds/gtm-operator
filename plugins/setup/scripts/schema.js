@@ -507,17 +507,25 @@ function inspect (key, actual, alsoExpected = [], names = null) {
   // a reworded message silently changes what gets repaired, so the categories
   // are produced here beside the sentence rather than parsed out of it.
   //
-  // Every sentence has a finding beside it. The reverse does not hold, and
+  // Every sentence has a finding carrying it. The reverse does not hold, and
   // `option-extra` is the one that breaks it: an extra option value is not a
-  // problem and gets no sentence, it is recorded because recognising a renamed
-  // option needs it. So `findings` is the longer list, and a caller counting
-  // one to learn the other would be wrong.
+  // problem and its finding carries no sentence, it is recorded because
+  // recognising a renamed option needs it. So `findings` is the longer list,
+  // and a caller counting one to learn the other would be wrong.
   const findings = []
-  const say = (sentence, finding) => { problems.push(sentence); findings.push({ database: key, ...finding }) }
+  // The sentence travels ON the finding, rather than in a parallel array kept
+  // in step by convention. Two lists that have to stay aligned by index is a
+  // thing that holds until one branch pushes to one of them, and one branch
+  // does: an extra option value is a finding with no sentence, because it is
+  // not a problem.
+  const say = (sentence, finding) => {
+    problems.push(sentence)
+    findings.push({ database: key, say: sentence, ...finding })
+  }
 
   if (!actual || typeof actual !== 'object') {
     const sentence = `${db.title}: no schema came back to check, so nothing was verified`
-    return { problems: [sentence], findings: [{ database: key, kind: 'schema-absent' }] }
+    return { problems: [sentence], findings: [{ database: key, say: sentence, kind: 'schema-absent' }] }
   }
 
   for (const want of db.properties) {
@@ -612,7 +620,7 @@ function inspect (key, actual, alsoExpected = [], names = null) {
       // does not know, and without this half that pairing cannot be made.
       for (const name of gotNames) {
         if (!wantNames.includes(name)) {
-          findings.push({ database: key, kind: 'option-extra', logical: want.name, observed, observedValue: name })
+          findings.push({ database: key, say: null, kind: 'option-extra', logical: want.name, observed, observedValue: name })
         }
       }
       // Order is checked, not just membership. Notion sorts a select by option
