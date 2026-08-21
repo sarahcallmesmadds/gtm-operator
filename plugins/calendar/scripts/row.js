@@ -19,7 +19,7 @@ const path = require('path')
 const schema = require(path.join(__dirname, 'vendor', 'calendar-schema'))
 
 const { TYPES, STATUSES, EVENT_ONLY, NOT_FOR_EVENTS, DATE_REQUIRED_AT, PERSON_FIELDS,
-  MULTI_SELECT_FIELDS, listProblem } = schema
+  MULTI_SELECT_FIELDS, listProblem, listValues } = schema
 
 /**
  * The tree that decides which type a row is.
@@ -413,11 +413,16 @@ function properties (context, final, { defaultsPerson = true } = {}) {
     if (final[field]) put(field, context.value(field, final[field]))
   }
 
-  for (const field of ['Channel', 'Audience', 'Segment', 'L2C Lifecycle']) {
-    const values = final[field]
-    if (Array.isArray(values) && values.length) {
-      put(field, values.map(v => context.value(field, v)))
-    }
+  // THE SAME CANONICAL FORM THE CLASH CHECK COMPARES, from `listValues`. This
+  // wrote the value exactly as it arrived while `targetingValues` trimmed it, so
+  // `" Enterprise "` matched an existing row in the clash check and then went to
+  // Notion with its spaces on, where it maps to no option.
+  //
+  // The field list is `MULTI_SELECT_FIELDS` rather than a fourth copy of the
+  // same four names. `problems` and the schema already read it from there.
+  for (const field of MULTI_SELECT_FIELDS) {
+    const values = listValues(final[field])
+    if (values.length) put(field, values.map(v => context.value(field, v)))
   }
 
   /**
