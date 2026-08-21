@@ -244,9 +244,26 @@ function listProblem (value) {
   return null
 }
 
+/**
+ * The names in a multi-select, in the one form every path uses.
+ *
+ * TRIMMED, ONCE, HERE. `clash.targetingValues` trimmed each value before
+ * comparing and `row.properties` wrote it untrimmed, so `" Enterprise "` matched
+ * an existing row in the clash check and then went to Notion with its spaces on,
+ * where it maps to no option and comes back a 400. Loud rather than silent, but
+ * it is the same fault as the rest: one value, two paths, two answers.
+ *
+ * Call `listProblem` first. This assumes what that function checks.
+ */
+function listValues (value) {
+  if (!Array.isArray(value)) return []
+  return value.map(entry => entry.trim())
+}
+
 module.exports = {
   MULTI_SELECT_FIELDS,
   listProblem,
+  listValues,
   TYPES,
   IDENTITY,
   IDENTITY_PROPERTIES,

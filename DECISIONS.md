@@ -1847,3 +1847,23 @@ person to read this code will have the same argument with themselves.
   is still a mutation nothing catches. Recorded in the break list as an open gap
   rather than as a proved check.
 - None of today's work has had a live run. It is fixtures and mutation only.
+
+## The last unpaired guard, 2026-08-21
+
+Devin round 4 answered yes to merging and named one thing anyway: the only guard
+still on one side of its pair.
+
+`clash.targetingValues` trimmed each multi-select value before comparing.
+`row.properties` wrote it exactly as it arrived. So `" Enterprise "` matched an
+existing row in the clash check and then went to Notion with its spaces on, where
+it maps to no option. Verified against fixtures: one overlap reported, the
+payload carrying `" Enterprise "`, and `problems` reporting nothing.
+
+**Loud rather than silent**, because Notion answers with a 400, which is why it
+was not a merge blocker. It is fixed anyway: it is the same fault as the rest of
+this round, one value getting two answers from two paths, and the whole point of
+`listProblem` was that the rule should live once.
+
+`listValues` is the canonical form and both paths use it. `row.properties` also
+reads `MULTI_SELECT_FIELDS` now rather than carrying a fourth copy of the same
+four field names.

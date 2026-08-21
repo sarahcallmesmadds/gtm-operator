@@ -40,7 +40,7 @@
 const WINDOW_DAYS = 7
 
 const { pageIdentity } = require(require("path").join(__dirname, "vendor", "page-id"))
-const { listProblem } = require(require("path").join(__dirname, "vendor", "calendar-schema"))
+const { listProblem, listValues } = require(require("path").join(__dirname, "vendor", "calendar-schema"))
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -150,7 +150,7 @@ function inWindow (candidateSpan, proposedSpan, windowDays) {
 function targetingValues (row, field) {
   const raw = row && row[field]
   const wrong = listProblem(raw)
-  if (!wrong) return Array.isArray(raw) ? raw.map(v => v.trim()) : []
+  if (!wrong) return listValues(raw)
   if (wrong.kind === 'not-a-list') {
     throw new Error(
       `${field} is ${JSON.stringify(wrong.value)}, which is not a list. A row reaching the clash check ` +

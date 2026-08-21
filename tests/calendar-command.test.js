@@ -761,6 +761,28 @@ check('a multi-select that is not a list of names is refused rather than dropped
   }
 })
 
+check('a padded value is written in the same form the clash check compared', () => {
+  // DEVIN ROUND 4, the last unpaired guard. `targetingValues` trimmed each value
+  // before comparing and `properties` wrote it exactly as it arrived, so
+  // `" Enterprise "` matched an existing row in the clash check and then went to
+  // Notion with its spaces on, where it maps to no option and comes back a 400.
+  // Verified against fixtures before the fix: clash reported one overlap, the
+  // payload carried `" Enterprise "`, and `problems` reported nothing.
+  const padded = ' Enterprise '
+  const built = row.properties(context, Object.assign({}, ownerRow, { Segment: [padded] }))
+  assert.deepStrictEqual(built.Segment, [context.value('Segment', 'Enterprise')],
+    'the write path sent a value the clash check would not have compared')
+
+  // Both paths, one form. This is the assertion that fails if either side starts
+  // canonicalising for itself again.
+  const candidate = { identity: 'other', date: { start: '2026-09-10' }, Segment: ['Enterprise'] }
+  const result = clash.clashes(
+    { date: { start: '2026-09-10' }, Segment: [padded], url: `https://app.notion.com/${'a'.repeat(32)}` },
+    [candidate]
+  )
+  assert.strictEqual(result.overlapping.length, 1, 'the clash check stopped matching the padded value')
+})
+
 check('an absent or empty multi-select is still legal, and is not a fault', () => {
   // The guard against curing a silent drop by refusing the row that said
   // nothing. Saying nothing is a real answer on these fields.
