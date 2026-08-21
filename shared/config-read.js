@@ -1,0 +1,412 @@
+'use strict'
+
+/**
+ * Reading the shared config, for every plugin that is not `setup`.
+ *
+ * THIS FILE IS THE SOURCE. It is copied into each plugin's `scripts/vendor/`
+ * by `scripts/vendor.js`, and `tests/vendor-copies-current.test.js` fails when
+ * a copy has drifted. Edit this file, run the vendor script, never edit a copy.
+ *
+ * WHY A COPY AND NOT A REQUIRE. Claude Code has no dependency resolution
+ * between plugins, and skills resolve their scripts through
+ * `${CLAUDE_PLUGIN_ROOT}`, which points inside the calling plugin. Once
+ * installed, `calendar` has no path to `setup`'s files and must not have one:
+ * the marketplace is plugins that never call each other. So the choice is
+ * between copies that drift silently and copies a test holds together, and
+ * `SKILLS-setup.md` build risk 3 already decided it is the second.
+ *
+ * WHAT THIS FILE DELIBERATELY CANNOT DO. It cannot write. There is no `begin`,
+ * no `complete`, no `recordDatabase`, no `recordNames`. `setup` is the only
+ * thing that writes config, and the surest way to keep that true is for the
+ * code every other plugin carries to have no way of doing it.
+ *
+ * THE ONE ENTRY POINT IS `contextFor`. Everything else is exported for tests.
+ * An earlier draft of this handed out ids, state and the name map as separate
+ * reads and left each skill to remember which combinations were unsafe. That is
+ * how a writer eventually runs against a half-built install: not by deciding to,
+ * but by a skill that checked two of the three things. `contextFor` returns a
+ * context that is safe to write through, or it refuses and says why.
+ */
+
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+
+/**
+ * The shape of the config file.
+ *
+ * MUST MATCH `plugins/setup/scripts/config.js`. That file is the writer and this
+ * is a reader, they are separate files by necessity, and
+ * `tests/config-contract.test.js` fails when the two numbers disagree.
+ *
+ * A reader that accepts a version it does not understand is worse than one that
+ * refuses, because every id it hands back afterwards is a guess.
+ */
+const CONFIG_VERSION = 3
+
+/**
+ * MUST MATCH the writer, including the environment override, which the tests
+ * use to run against a temporary file rather than the real one.
+ */
+const CONFIG_PATH = process.env.GTM_OPERATOR_CONFIG ||
+  path.join(os.homedir(), '.claude', 'gtm-operator.config.json')
+
+/**
+ * Every reason a read can fail, as a code rather than as prose.
+ *
+ * Skills branch on these. `NO_CONFIG` routes to `setup` and is an ordinary
+ * first-run state rather than an error; the rest are genuine problems and read
+ * differently to a user. Prose gets reworded, and a skill keying off the
+ * wording breaks silently when it is.
+ */
+const REFUSAL = {
+  NO_CONFIG: 'NO_CONFIG',
+  UNREADABLE: 'UNREADABLE',
+  NOT_JSON: 'NOT_JSON',
+  WRONG_VERSION: 'WRONG_VERSION',
+  INSTALL_UNFINISHED: 'INSTALL_UNFINISHED',
+  DATABASE_MISSING: 'DATABASE_MISSING',
+  IDS_INCOMPLETE: 'IDS_INCOMPLETE',
+  NO_NAME_MAP: 'NO_NAME_MAP',
+  BROKEN_NAME_MAP: 'BROKEN_NAME_MAP',
+  // A caller that asked for a context without saying what the map has to
+  // contain. Not a state of the world: a bug in the plugin, reported as one.
+  NO_CONTRACT: 'NO_CONTRACT'
+}
+
+/** A refusal, in the one shape every caller handles. */
+function refuse (code, message, extra) {
+  return Object.assign({ ok: false, code, message }, extra || {})
+}
+
+/**
+ * Read and parse, with each failure kept separate.
+ *
+ * A missing file, an unreadable one and one full of invalid JSON are three
+ * different situations with three different remedies, and collapsing them into
+ * "no config" would send somebody to reinstall over the top of a workspace that
+ * exists. That is the same failure `setup`'s reader was built to avoid, and the
+ * reasoning there is worth repeating here: a config that will not parse may hold
+ * the only record of the database ids.
+ *
+ * NOTHING HERE REPAIRS OR REWRITES. This file cannot write at all, which is the
+ * point, but it is worth saying next to the parse failure specifically, because
+ * overwriting a corrupt config is the tempting wrong move.
+ */
+function readRaw () {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    return refuse(
+      REFUSAL.NO_CONFIG,
+      `No gtm-operator config at ${CONFIG_PATH}. Run the \`setup\` plugin's install first: it creates the databases and writes this file.`
+    )
+  }
+
+  let text
+  try {
+    text = fs.readFileSync(CONFIG_PATH, 'utf8')
+  } catch (error) {
+    return refuse(REFUSAL.UNREADABLE, `Config is at ${CONFIG_PATH} and could not be read: ${error.message}`)
+  }
+
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    return refuse(
+      REFUSAL.NOT_JSON,
+      `Config at ${CONFIG_PATH} is not valid JSON: ${error.message}\n` +
+      `Nothing here rewrites it, because it may hold the only record of what was created. Fix it or move it aside.`
+    )
+  }
+
+  if (parsed.configVersion !== CONFIG_VERSION) {
+    return refuse(
+      REFUSAL.WRONG_VERSION,
+      `Config at ${CONFIG_PATH} is version ${parsed.configVersion} and this plugin reads version ${CONFIG_VERSION}. ` +
+      `Refusing to read it rather than guessing at what changed. Update the plugin that is behind.`,
+      { found: parsed.configVersion, expected: CONFIG_VERSION }
+    )
+  }
+
+  return { ok: true, config: parsed }
+}
+
+/**
+ * Is a name map usable for the thing this plugin is about to write?
+ *
+ * THREE ANSWERS, NOT TWO, and this is the distinction the whole file exists to
+ * carry across the plugin boundary.
+ *
+ *   absent  nothing was ever recorded
+ *   broken  something was recorded and cannot be trusted
+ *   ok      usable
+ *
+ * `setup`'s `names.js` resolves an unmapped logical name to itself, which is
+ * right for `setup`, because on a default install the shipped name IS the name
+ * in Notion. It is dangerous for a writer: on a workspace where somebody renamed
+ * a property, that fallback writes to a property that is not there. So a writer
+ * must be able to tell "no map" from "a map that happens to be empty", and must
+ * refuse rather than fall back.
+ *
+ * `expected` IS REQUIRED AND IS THE POINT. Well formed is not the same as
+ * usable, and until 2026-08-19 this only checked well formed: a map holding
+ * `{Name: "Name"}` and nothing else was reported `ok`, and the first read of any
+ * other property threw a message blaming the caller for a bug the config had.
+ * The quieter half was worse. An option value the map does not mention falls
+ * back to the name this plugin shipped with, so a workspace that renamed a value
+ * is sent the old one. Notion refuses a value the property does not have,
+ * measured against a live workspace on 2026-08-17 and recorded in
+ * `REVIEW-codex-2026-08-17.md`: a hard 400 `validation_error` naming the value
+ * and listing the allowed ones. The failure is all or nothing, so nothing is
+ * saved and the whole write is lost, which is why this is refused at read time
+ * rather than left for Notion to reject.
+ *
+ * The three checks are `setup`'s three, applied to properties and to each set
+ * of option values: nothing missing, nothing invented, and no two logical names
+ * sharing one Notion name. `tests/config-contract.test.js` asserts this agrees
+ * with `names.problems` in `setup` on the same inputs.
+ */
+function inspectNames (entry, expected) {
+  const properties = (entry && entry.properties) || {}
+  const values = (entry && entry.values) || {}
+  const expectedProperties = (expected && expected.properties) || []
+  const expectedValues = (expected && expected.values) || {}
+
+  if (!Object.keys(properties).length) return { state: 'absent' }
+
+  const problems = oneToOne(properties, expectedProperties, 'property', 'this database has')
+
+  const withOptions = Object.keys(expectedValues)
+  if (withOptions.length && !Object.keys(values).length) {
+    problems.push('the map records no option values at all, and this database has properties with options')
+  } else {
+    for (const property of withOptions) {
+      const got = values[property]
+      if (!got || typeof got !== 'object') {
+        problems.push(`"${property}" has options and the map records ${got === undefined ? 'none of them' : 'something that is not a map'}`)
+        continue
+      }
+      problems.push(...oneToOne(got, expectedValues[property], `option of "${property}"`, `"${property}" has`))
+    }
+    for (const property of Object.keys(values)) {
+      if (!withOptions.includes(property)) {
+        problems.push(`the map records options for "${property}", which has no options`)
+      }
+    }
+  }
+
+  if (problems.length) return { state: 'broken', problems }
+  return { state: 'ok', names: { properties, values } }
+}
+
+/**
+ * One half of a map, checked three ways: nothing missing, nothing invented, and
+ * no two logical names sharing one Notion name.
+ *
+ * DELIBERATELY THE SAME THREE AS `oneToOne` IN `setup`'s `names.js`, including
+ * the order they are reported in, because the two run on the same recorded map
+ * and a user who saw one message from `setup` and a different one from a writer
+ * would reasonably conclude the two disagree about the config rather than about
+ * the wording.
+ *
+ * A missing entry is a refusal rather than a warning, and that is the load
+ * bearing choice here. A map records every logical name, including the ones
+ * nobody renamed, which is what makes "not in the map" mean "nobody recorded
+ * this" rather than "nobody changed this". Accept an incomplete map and those
+ * two states collapse into one, and the fallback that follows writes a shipped
+ * name into a workspace that renamed it.
+ */
+function oneToOne (map, expectedLogical, what, belongsTo) {
+  const out = []
+  const wanted = expectedLogical || []
+
+  for (const logical of wanted) {
+    if (!(logical in map)) {
+      out.push(`"${logical}" is not in the map. A map records every logical name, including the ones nobody changed`)
+    }
+  }
+
+  for (const logical of Object.keys(map)) {
+    if (!wanted.includes(logical)) {
+      out.push(`"${logical}" is in the map and is not a ${what} ${belongsTo}`)
+    }
+    const observed = map[logical]
+    if (typeof observed !== 'string' || !observed.trim()) {
+      out.push(`"${logical}" maps to ${JSON.stringify(observed)}, which is not a name. A map entry has to be the name this workspace uses`)
+    }
+  }
+
+  const seen = new Map()
+  for (const [logical, observed] of Object.entries(map)) {
+    if (seen.has(observed)) {
+      out.push(`"${logical}" and "${seen.get(observed)}" both map to "${observed}". Two logical names cannot be one Notion name`)
+    }
+    seen.set(observed, logical)
+  }
+
+  return out
+}
+
+/**
+ * The Notion name for a logical property, through a map that has been checked.
+ *
+ * NO FALLBACK ON PURPOSE, and this is the one place this file knowingly behaves
+ * differently from `setup`'s `names.propertyName`. That function returns the
+ * logical name when there is no mapping, which is correct for a caller that is
+ * creating the property. This throws, because a writer reaching for a property
+ * the map does not describe is a writer about to send a name nothing verified.
+ *
+ * `contextFor` refuses before this can be reached with an unusable map, and
+ * since 2026-08-19 "unusable" includes incomplete, checked against the contract
+ * the plugin passes in. So a throw here means the caller asked for a logical
+ * name that is not in its own contract, which is a bug in the caller rather
+ * than a state of the world. That sentence was in this comment before the
+ * completeness check existed, when it was not true: a map missing a property
+ * reached here and the message blamed the caller for the config's problem.
+ */
+function propertyName (names, logical) {
+  const actual = names && names.properties && names.properties[logical]
+  if (typeof actual !== 'string' || !actual) {
+    throw new Error(
+      `"${logical}" is not in the recorded name map, so there is no property name to write to. ` +
+      `The map was checked for completeness against this plugin's contract before it got here, so "${logical}" is not in that contract either. ` +
+      `That is a bug in the calling plugin rather than a problem with the config.`
+    )
+  }
+  return actual
+}
+
+/**
+ * The Notion name for one option of one property.
+ *
+ * Unmapped falls back to the logical value, and unlike `propertyName` that is
+ * correct, but only because of what `contextFor` now guarantees. Every value in
+ * this plugin's contract is present in the map or the context was refused, so a
+ * value that reaches here unmapped is one the workspace added and this plugin
+ * never shipped. Before the completeness check existed the fallback also fired
+ * for a value nobody had recorded, which sent a shipped name to a workspace that
+ * had renamed it. That produces a hard 400 from Notion, naming the value and
+ * listing the allowed ones, measured 2026-08-17 and recorded in
+ * `REVIEW-codex-2026-08-17.md`.
+ *
+ * IT IS STILL NOT PROOF THE OPTION EXISTS. Nothing in a config file can be. The
+ * shared rule is that live options are fetched before any value is chosen, and
+ * this resolves a name for that fetch to check, rather than standing in for it.
+ */
+function valueName (names, logicalProperty, logicalValue) {
+  const forProperty = names && names.values && names.values[logicalProperty]
+  const actual = forProperty && forProperty[logicalValue]
+  return (typeof actual === 'string' && actual) ? actual : logicalValue
+}
+
+/**
+ * Everything a skill needs to write to one database, or a refusal saying why it
+ * cannot.
+ *
+ * THE CHECKS ARE ORDERED CHEAPEST AND MOST FUNDAMENTAL FIRST, so the message a
+ * user gets names the thing that is actually wrong. Told about a missing name
+ * map when the real problem is that no install ever finished, somebody goes
+ * looking in the wrong place.
+ */
+function contextFor (key, expected) {
+  // A contract is not optional, and the check for it comes before the file is
+  // even read. A plugin that asks for a write-ready context without saying what
+  // the map has to contain is asking for a check that cannot be performed, and
+  // the honest answer is a refusal rather than a context that looks checked.
+  if (!expected || !Array.isArray(expected.properties) || !expected.properties.length) {
+    return refuse(
+      REFUSAL.NO_CONTRACT,
+      `contextFor("${key}") was called without the expected name contract, so the recorded map cannot be checked for completeness. ` +
+      `Pass the plugin's schema identity, for example \`schema.IDENTITY\`. This is a bug in the calling plugin rather than a problem with the config.`
+    )
+  }
+
+  const raw = readRaw()
+  if (!raw.ok) return raw
+  const config = raw.config
+
+  // An install still in flight has databases recorded that a later step may
+  // still move. `setup` records as it goes precisely so a broken run is
+  // recoverable, and the cost of that is a window where the file is honest and
+  // not yet finished. Reading ids out of that window is how a row lands in a
+  // database that gets replaced ten seconds later.
+  if (config.state !== 'complete') {
+    return refuse(
+      REFUSAL.INSTALL_UNFINISHED,
+      `The gtm-operator install has not finished. The config at ${CONFIG_PATH} says "${config.state}". ` +
+      `Run the \`setup\` plugin's install to completion first: it is safe to run again on an unfinished install.`,
+      { state: config.state }
+    )
+  }
+
+  const entry = config.databases && config.databases[key]
+  if (!entry) {
+    return refuse(
+      REFUSAL.DATABASE_MISSING,
+      `The config records no "${key}" database, so there is nowhere to write. ` +
+      `Run the \`setup\` plugin's \`add\` skill, which creates a missing database and wires it to the others.`
+    )
+  }
+
+  if (!entry.databaseId || !entry.dataSourceId) {
+    return refuse(
+      REFUSAL.IDS_INCOMPLETE,
+      `"${key}" is recorded with only ${entry.databaseId ? 'a database id' : 'a data source id'}. ` +
+      `Both are needed: queries and page creates take the data source id, view calls take the database id. ` +
+      `Run the \`setup\` plugin's \`check\` skill.`
+    )
+  }
+
+  const map = inspectNames(entry, expected)
+  if (map.state === 'absent') {
+    return refuse(
+      REFUSAL.NO_NAME_MAP,
+      `"${key}" has no recorded property names, so this cannot tell a renamed property from one that was never there. ` +
+      `It is refusing rather than falling back to the names it shipped with, because on a renamed workspace that writes to a property that does not exist. ` +
+      `Run the \`setup\` plugin's \`check\` skill, which records them.`
+    )
+  }
+  if (map.state === 'broken') {
+    return refuse(
+      REFUSAL.BROKEN_NAME_MAP,
+      `The names recorded for "${key}" cannot be used:\n  ${map.problems.join('\n  ')}\n` +
+      `  They are in ${CONFIG_PATH}. Nothing was read through them, and nothing was written.\n` +
+      `  Run the \`setup\` plugin's \`check\` skill, which records them against the live database.`,
+      { problems: map.problems }
+    )
+  }
+
+  const names = map.names
+
+  return {
+    ok: true,
+    key,
+    databaseId: entry.databaseId,
+    dataSourceId: entry.dataSourceId,
+    displayName: entry.displayName || key,
+
+    /**
+     * Null is a legitimate answer and a working install, not a failure.
+     * `SKILLS-setup.md` tier 3: where no person could be resolved, every person
+     * property is OMITTED rather than written empty, and no skill fails over it.
+     */
+    personId: (config.notion && config.notion.personId) || null,
+
+    property: logical => propertyName(names, logical),
+    value: (logicalProperty, logicalValue) => valueName(names, logicalProperty, logicalValue),
+    names
+  }
+}
+
+module.exports = {
+  CONFIG_VERSION,
+  CONFIG_PATH,
+  REFUSAL,
+  contextFor,
+  // Exported for the contract test and for callers that genuinely need the
+  // pieces. Skills use `contextFor`.
+  readRaw,
+  inspectNames,
+  propertyName,
+  valueName
+}

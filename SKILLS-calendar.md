@@ -21,7 +21,20 @@ route to `setup` on first run, pin the Notion API version and the client floor t
 the two values `SKILLS-setup.md` defines, and record only sources you actually
 opened.
 
-Two belong to this plugin.
+**One is deliberately not inherited: recording sources.** The shared rule says a
+skill records only sources it actually opened, and the Calendar body template has
+no Sources section for them to go in. Review found the two on 2026-08-19 and they
+had been approved separately, each correct on its own.
+
+**The exception stands and the template is unchanged**, on Sarah's call. A
+calendar row is a short entry about your own plans rather than a piece of
+research, and a Sources heading on a Tuesday social post is a field nobody fills.
+Where something was genuinely read to write the row, it goes in the prose of
+`What It Is` where a reader will see it, not under a heading of its own. The rest
+of the shared rule still binds everywhere it applies: **nothing invents a source
+it did not open**, here as anywhere else.
+
+Two more belong to this plugin.
 
 - **Every row has to pass the boundary test before it is written.** Does it happen
   on a date, and does somebody outside the team see it. A skill that quietly
@@ -56,6 +69,42 @@ still choosing the date.
 same reason: a conflict discovered after the work is planned is a conflict
 somebody argues with rather than fixes.
 
+### It also checks for duplicates, which is a different question
+
+**Added 2026-08-19.** `DECISIONS.md` has required this since 2026-08-18 and this
+file never carried it, so a skill built from this file alone would have shipped
+without it. Found by review before the build.
+
+**A clash is two different things colliding. A duplicate is the same thing entered
+twice.** Both are checked before anything is written, and for the same reason: the
+only moment to prevent either is while somebody is still choosing.
+
+**What counts as a duplicate**, on Sarah's call:
+
+| Test | Why |
+|---|---|
+| The same `Link` | Two rows pointing at one url are one thing. This is the strongest signal there is and it needs no judgment |
+| A near-identical `Name` on the same date | The realistic case, which is somebody adding a thing that is already on the calendar |
+
+**Deliberately not "a near-identical name on any date".** A monthly newsletter is
+the same name twelve times a year and every one of them is a real, separate row.
+A name rule with no date attached would flag all twelve and teach people to click
+through the warning, which is worse than not having it.
+
+**It surfaces and does not block**, the same as the clash check. A repeated name
+on one date is usually a duplicate and is sometimes two genuinely different
+things, and the person can see which.
+
+**The duplicate query fetches the table and filters nothing**, added 2026-08-19
+after review. What counts as near-identical is decided in one place, the
+comparator, which ignores the scheme, a leading `www.`, a trailing slash and runs
+of space. A SQL filter that narrowed before the comparator ran was removing the
+pairs the comparator exists to catch, and no filter reproduces those rules without
+constructs nothing in this repository has measured. The clash window is bounded by
+a date and this is not: the same link is the same thing whenever it is, an undated
+row is inside no window, and a duplicate somebody already canceled is still worth
+seeing before it is entered again.
+
 ### What the clash check can and cannot know
 
 **Specified 2026-08-17**, after review found "aimed at the same people" resting on
@@ -74,6 +123,37 @@ The semantics, since a multi-select comparison has three plausible meanings:
 | Either side blank | **Unknown, not universal.** Surfaced separately as "might overlap, nobody said" |
 | Both blank | Not surfaced. Two rows saying nothing is not evidence of anything |
 | Date ranges | Overlap, not equality. A three-day conference clashes with anything inside it |
+
+**"Either side blank" means the whole targeting, not one of the two fields.** A
+row with a `Segment` and no `L2C Lifecycle` has said something about who it is
+aimed at, and it is compared on what it said. A row is only "blank" here when both
+fields are empty. Read the other way, every row missing one of the two would land
+in the "nobody said" pile, which is most rows, and a bucket that holds everything
+tells you nothing.
+
+#### The window is seven days either side
+
+**Specified 2026-08-19**, and the check did not work without it.
+
+The rule above compares date ranges for overlap, and the failure this check exists
+to prevent is three emails to one list in a week. **Two one-day emails on the
+Monday and the Wednesday do not overlap.** So the mechanism as specified could not
+catch its own motivating example, which review found on 2026-08-19 before any of
+it was built.
+
+**So a row is a candidate when its dates fall within seven days either side of the
+proposed date**, and a range is a candidate when any part of it does. Overlap is
+the narrower case inside that, not the test itself.
+
+**Seven either side rather than the calendar week**, on Sarah's call. A Friday and
+the following Monday are two days apart and are obviously the same problem, and a
+week that starts on Monday says they are not. Nothing here depends on which day a
+week begins.
+
+**An undated proposed row has no window and no clash check.** There is no date to
+measure from. The skill says so rather than returning an empty list, because
+nothing found and nothing looked for read identically and only one of them is
+information.
 
 **This is a coarse signal for a person, and the skill says so.** It surfaces
 candidates and the user judges. It was never a collision detector and describing
@@ -182,9 +262,15 @@ than the calendar view `setup` already creates.
 
 1. **Grouping by who it hits, not by when it happens.** The calendar view answers
    what is on Tuesday. The question people actually have is what a given audience
-   is going to receive from us this month, which needs `Segment` and
-   `L2C Lifecycle` read together across every type. Three touches on one segment
-   is visible that way and invisible on a calendar grid.
+   is going to receive from us this month. Three touches on one segment is
+   visible that way and invisible on a calendar grid.
+
+   **As built, `soon` groups by `Segment` only.** `L2C Lifecycle` is read, but
+   only to decide whether a row says anything about who it targets; it is not a
+   grouping dimension, so a row aimed at a lifecycle stage alone lands in the
+   ungrouped set. This paragraph used to say the two were read together, which
+   the code has never done. Grouping on both is still the design intent and is
+   not built.
 2. **Saying what is not real.** `Idea` and `Planned` rows sitting next to
    `Confirmed` ones is how a plan looks fuller than it is. The output separates
    what is locked from what is hoped for, and leads with the locked half.

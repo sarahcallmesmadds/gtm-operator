@@ -1088,3 +1088,762 @@ empty project rows.
 
 **`teammates` is not in this list.** It is a foundation plugin deferred to v2, see
 the tier 2 section above. Filing it here is what created the contradiction.
+
+---
+
+## calendar, plugin two, 2026-08-19
+
+Built after a Codex review of the plan, before any code. That review found the
+plan contradicting decisions already recorded in this repository, in three
+places, and found one hole in the approved design itself. All four are settled
+below.
+
+### The shared code is vendored, not deferred
+
+**The plan proposed that `calendar` carry its own narrow config reader and that
+a real shared source wait until plugin three**, on the reasoning that building
+shared machinery for one consumer is a guess about what the other four want.
+
+**That contradicted a decision already made.** `SKILLS-setup.md` build risk 3
+says the workable version is one source in this repository, copied into each
+plugin at release by a script, with a test that fails when a copy has drifted,
+and says why: hand-maintained copies diverge and the divergence is silent.
+
+So: `shared/` holds the source, `scripts/vendor.js` copies it, and each plugin
+declares what it wants in its own manifest under `gtmOperator.vendor` rather than
+being listed in the script. `tests/vendor-copies-current.test.js` fails on drift
+and was proved by appending a line to a copy.
+
+**Which plugins get what is declared by the plugin, not by the script.** A list
+in the script is a second place to remember, and the plugin that gets forgotten
+is the one that ships without the file it needs.
+
+### The reader is read-only and has one entry point
+
+`shared/config-read.js` cannot write. There is no `begin`, no `complete`, no
+`recordDatabase`. `setup` is the only thing that writes config, and the surest
+way to keep that true is for the code every other plugin carries to have no way
+of doing it.
+
+**`contextFor` is the only production entry point.** `readRaw`, `inspectNames`,
+`propertyName` and `valueName` are still exported, for the contract test and for
+a caller that genuinely needs the pieces. All four are read-only, so they add no
+way to write, but "the only entry point" was wider than the file and review said
+so on 2026-08-19. An earlier draft handed out ids, state
+and the name map separately and left each skill to remember which combinations
+were unsafe. That is how a writer eventually runs against a half-built install:
+not by deciding to, but by a skill that checked two of the three things.
+
+**It keeps three answers about the name map apart**, which is the distinction the
+whole file exists to carry across the plugin boundary: nothing recorded, recorded
+and broken, and usable. `setup`'s `names.propertyName` resolves an unmapped name
+to itself, which is right for `setup` because on a default install the shipped
+name is the name in Notion, and wrong for a writer, because on a renamed
+workspace it writes to a property that is not there.
+
+`tests/config-contract.test.js` pins the reader to the writer on the version, the
+path, the environment override and the three map states. **It proves the two
+files in this checkout agree and cannot prove that an installed `setup` and an
+installed `calendar` agree**, because those are separate releases updated
+separately. `configVersion` is what covers that gap: the reader refuses a version
+it does not know rather than guessing. Said in the test rather than left implied.
+
+### A date is not required at `Canceled`
+
+**Two approved files described different rules.** `SCHEMA-calendar.md` said a
+date was required "from `Confirmed` onwards", which reads as including
+`Canceled`. `plugins/setup/scripts/manifest.js` had already excluded `Canceled`
+from the `Needs attention` filter, with the reasoning written beside it. A skill
+built from either would have been correct and wrong at the same time.
+
+**The manifest's reading wins**, on Sarah's call. The rule catches a row that
+promises something will happen and does not say when. A canceled row promises
+nothing, so demanding a date on one reports a row that is not broken. Five
+statements of the old wording were corrected across two files.
+
+`tests/calendar-schema-agrees.test.js` now asserts the statuses the writer
+requires a date at against the filter on the view that catches them, so the two
+cannot drift again silently.
+
+### The clash check needed a window, and had none
+
+**The specified mechanism could not catch its own motivating example.**
+`SKILLS-calendar.md` gives the failure as three emails to one list in a week, and
+specified the date test as range overlap. Two one-day emails on the Monday and
+the Wednesday do not overlap.
+
+**Seven days either side**, on Sarah's call, rather than the calendar week: a
+Friday and the following Monday are two days apart and obviously the same
+problem, and a week that starts on Monday says they are not. Nothing now depends
+on which day a week begins.
+
+**"Either side blank" means the whole targeting, not one of the two fields.** A
+row with a `Segment` and no `L2C Lifecycle` has said something and is compared on
+what it said. Read the other way, every row missing one field would land in the
+"nobody said" pile, which is most rows, and a bucket holding everything says
+nothing.
+
+**The query and the judge are widened by the same number**, asserted in
+`tests/calendar-command.test.js` against `clash.WINDOW_DAYS` rather than against
+a literal, because a query fetching a narrower window than the judge examines
+would pass cleanly while never seeing the rows it was looking for.
+
+### `calendar:new` checks duplicates, and the skills file never said so
+
+Recorded here since 2026-08-18 and absent from `SKILLS-calendar.md`, so a skill
+built from that file alone would have shipped without it. Now in both.
+
+**What counts as a duplicate**, on Sarah's call: the same `Link`, or a matching
+`Name` on the same date. **Deliberately not a matching name on any date**, which
+would flag a monthly newsletter twelve times a year and teach people to click
+through the warning.
+
+### Calendar has no Sources section, and that is the exception
+
+The shared skill rules say sources get recorded. The Calendar body template has
+nowhere to put them. Both were approved separately.
+
+**Calendar is the exception**, on Sarah's call. A row here is a short entry about
+your own plans rather than research, and a Sources heading on a Tuesday social
+post is a field nobody fills. Anything genuinely read goes in the prose of `What
+It Is`. The rest of the rule still binds: nothing invents a source it did not
+open.
+
+### The client floor is not built, and the gap is written down
+
+`SKILLS-calendar.md` tells every skill here to pin the Notion API version and a
+client floor "to the two values `SKILLS-setup.md` defines". **Only one of the two
+exists anywhere.** The wire version appears in prose at `SKILLS-setup.md` step 0
+and nowhere a program can read it, and **`notion.apiVersion` is documented in the
+config shape and never written by `config.js`'s `blank()`**. The client floor has
+no number anywhere in the repository.
+
+**The plan was to invent a number and label it unmeasured. That was wrong**, and
+Codex was right to refuse both that and the alternative of amending the design to
+match the code. A made-up number inside a safety check is worse than no check,
+because a later reader assumes somebody worked it out.
+
+**So the check is not built and the gap is recorded** in the plugin README and
+here. What it needs is a measurement against a real connection, not a decision.
+**The `setup` defect is real and separate**: the documented config field is never
+written.
+
+### Nothing here has run against a real workspace
+
+**Superseded on 2026-08-19.** A live run happened; see "the first live run
+against a real Notion workspace" later in this file for what it settled. This
+section is kept because it is the state five review rounds were conducted under,
+and because most of the plugin is still proved by tests and reasoning: one run of
+one row did not cover pagination, a page fetch, a renamed property or option, a
+null `personId`, or the debrief.
+
+**As written at the time:** every rule in this plugin is proved by tests and
+reasoning only. The workspace's query allowance was exhausted and the recorded
+parent page had been deleted, so no row has been created, no query has been sent
+and no read-back has been compared.
+
+**`setup` is not a precedent for shipping this way.** Its whole install was run
+and read back live, and the one unproved thing was a single half of a query whose
+other half had been measured. `calendar` would leave its entire create, update
+and query path unmeasured.
+
+**So this plugin is not finished, and it says so in its README.** The live
+acceptance run is a release gate rather than a follow-up. Its minimum contents
+are listed in that README.
+
+### The environment trap that nearly hid a broken file
+
+Worth recording because it defeated a guard rather than a test. `grep` in this
+shell is a function wrapping ugrep with `--ignore-files`, and it reported no
+match on a file that plainly contained the string, printing no count at all.
+The break-and-prove runs use `grep` to assert that a scripted edit landed before
+trusting the red result, and that assertion answered NOMATCH on an edit that had
+in fact applied, aborting the run with the file left broken.
+
+**Verification guards use `/usr/bin/grep`.** A guard answered by a tool that
+filters its input is not a guard.
+
+### What the second review round changed, 2026-08-19
+
+The plan review was one round. This is what reviewing the CODE found, and the
+first two were the same fault wearing two faces: **the tests exercised helpers
+with rows the real query never produces.**
+
+**Dates are not queryable under their own name.** `window` and `soon` asked for
+`c."Date"`. This repository had already measured that Notion exposes a date as
+`date:<name>:start`, and `plugins/setup/scripts/views.js` has applied it since
+2026-08-18. Against a live workspace the queries would have failed or returned
+nothing, and nothing is what a clean calendar looks like. The fix uses both the
+start and the end column, which also closes the long-event gap the README had
+been carrying as a known miss: a conference that began before the window and runs
+into it is now fetched.
+
+**Rows are identified by page, not by an `id` field nobody asked for.** The
+queries select `url`; `clash.js` excluded a row from being judged against itself
+by comparing `row.id`. No query here has ever asked for `id`, so the guard never
+fired on a real row and `update` would have reported every moved date as clashing
+with the row being moved. The tests passed because they manufactured the `id`
+themselves. Now compared through `pageIdentity`. Its shapes are reasoned from
+`setup`'s parser rather than measured, with one exception: the live run on
+2026-08-19 returned urls of the form `https://app.notion.com/<32 hex>`, with no
+`/p/` segment and no dashes, and `pageIdentity` reads that correctly.
+
+**The claim that followed this one was wrong when it was written.** It said the
+tests build rows in the shape the query actually returns. They built the
+normalised shape by hand, with a comment saying the opposite, so nothing on that
+page could go red for a change to how a row is normalised. Corrected later on
+2026-08-19: the candidate rows in `tests/calendar-clash.test.js` are now written
+in the columns the query selects and passed through `normaliseRows`, and the
+suite goes red when `normaliseRows` drops the end of a range. The proposed row is
+still built by hand, which is correct, because it comes from the user and never
+from a query.
+
+**Results are normalised before they are judged.** The query asks for the
+workspace's names and every check downstream reads logical ones. On a renamed
+workspace the judge saw keys it did not recognise and read every row as undated
+and untargeted: a clean result from a check that saw nothing. `normaliseRows`
+does the mapping and the column map travels with the query.
+
+**The duplicate check has its own query.** It was being handed the clash window,
+which is bounded by seven days and excludes canceled rows, so three of its four
+rules could never fire: the same link outside the window, an undated match, a
+canceled duplicate. It is bounded by name or link instead, and canceled rows are
+deliberately included, because a canceled row cannot compete for an audience and
+can absolutely be the row somebody is about to enter again.
+
+**The vendoring mechanism was one-directional.** Removing a name from a
+manifest left the copy on disk, still imported, covered by nothing, with every
+check green. There are now a reverse check and an import check, and the script
+refuses anything but a plain file name, because a `../` in a manifest would have
+let the ordinary vendor command write outside the directories it owns.
+
+**A NUL byte made a source file invisible to grep.** `calendar.js` compared two
+lists by joining them on a NUL. That makes the whole file read as binary, so grep
+and rg skip it silently. It was caught by `tests/sources-are-searchable.test.js`,
+which exists for exactly this, and it had already wasted a verification run: the
+guard asserting that a scripted edit had landed was answered by a grep that could
+not see the file. Compared element by element now.
+
+**Three files still stated the old date rule after it was corrected.** The first
+search used a backtick pattern and could only match the Markdown spellings, so
+`manifest.js` kept the rule record and the view description, and `schema.js` kept
+a comment, all stating "Confirmed onwards" as current. Found by review, not by the
+sweep that claimed to be complete. The lesson is the one already recorded under
+[[scope-words-need-the-search]]: the search has to be as wide as the claim.
+
+**Still open and listed in the plugin README**, not fixed: clearing a property on
+update, setting an explicit owner, the relation properties, read-back proof for
+types other than select, validating the vocabularies that are not Type and
+Status, `soon` dropping `L2C Lifecycle` from its grouping, impossible dates being
+normalised rather than refused, and url comparison lowercasing the path.
+
+## 2026-08-19, calendar: the third review round, and what listing a gap is worth
+
+Codex round 3 answered the question the round before it was asked, whether the
+seven known gaps could ship as a list, with no. Two of them could leave incorrect
+data in a workspace while reporting success, which is not a smaller capability,
+it is a wrong answer. **A gap that lies about itself does not get to be
+documented instead of fixed**, and that is the rule this round settled.
+
+Nine findings, all nine taken.
+
+**The duplicate query filtered out the pairs the duplicate check exists to
+catch.** It fetched an exact link match and a lowercased name match. The
+comparator drops the scheme, a leading `www.`, trailing slashes and runs of space
+inside a name. So `https://example.com/thing` and `http://www.example.com/thing/`
+matched when handed to the comparator directly, which is what every test did, and
+were never fetched by the query that runs for real. The query has no `WHERE` now.
+A narrowing filter is only safe when it is a superset of the comparator, and
+writing one means `LIKE` with escaped wildcards over a SQL surface where nothing
+here has measured whether `ESCAPE` is supported. **Sending unmeasured SQL to make
+a check cheaper is the wrong trade.**
+
+**The config reader called an incomplete name map usable.** It checked that the
+map was well formed and never that it was complete, so a map holding
+`{Name: "Name"}` came back `ok` and the first read of any other property threw a
+message blaming the caller for a bug the config had. The quieter half is worse:
+an option the map does not carry falls back to the name this plugin shipped with,
+so a workspace that renamed a value gets sent the old one. **Notion refuses a
+select value the property does not have.** Measured against a live workspace on
+2026-08-17 and recorded in `REVIEW-codex-2026-08-17.md`: a hard 400
+`validation_error` naming the offending value and listing the allowed ones, for
+`select` and `multi_select` alike. The failure is all or nothing, so the page is
+not created and a drafted artifact is lost at write time. That is the reason to
+refuse a renamed-away value at read time rather than at the moment of writing.
+`contextFor` now takes the plugin's expected contract and
+refuses without one. The checks are `setup`'s own three, moved to the reading
+side: nothing missing, nothing invented, no two logical names on one Notion name.
+
+**A clear is not an omission.** `properties` builds a payload from the fields
+that have values, so a field that lost one was simply absent, and Notion leaves
+an absent property exactly as it was. The `update` skill promised to clear the
+fields a Type change invalidates and nothing in the call did it, then `prove`
+reported clean because it compares what was sent. There is an `update <before>
+<after>` command now, and it needs both files: a merged row cannot say what used
+to be there.
+
+**The read-back proof compared two property types out of nine and announced that
+the properties matched.** A truncated title, an emptied url and a date on the
+wrong day all passed. It compares every type it emits now, and returns `checked`
+and `unchecked` by name, so a report cannot be wider than the check behind it.
+The body text is still not read back, and that is what `unchecked` says every
+time.
+
+**`c."Status" != 'Canceled'` is not false for a row with no status, it is
+unknown**, and SQL keeps only what a test is true for. Every query here dropped
+the half-built rows a clash check and a `soon` report exist to surface, while
+`soon`'s own skill promised it never drops a row it cannot place.
+
+**Four tests passed without testing.** The window-edge test ran the judge and
+never read the SQL, so making every comparison strict left it green. The
+long-event test asserted the string contained "end" and "OR", which the second
+clause also satisfies, so deleting the spanning clause left it green. The
+duplicate tests called the comparator directly, which is how finding one survived
+a suite. And a helper commented "via normaliseRows" built the normalised shape by
+hand. **The comment was the tell in three of the four**, which is the pattern
+already recorded here: the note written to explain a check is where the next bug
+is.
+
+**Two records claimed more than had been run.** `DECISIONS.md` said the tests
+build rows in the shape the query returns, and the plugin README said every check
+in every suite was proved by breaking. Both are corrected in place rather than
+deleted, because what a record claimed is part of what happened.
+
+**An owner can be a person now.** `Owner` only ever took the person the install
+was configured with, so "change the owner to someone else" succeeded and put the
+same person back. It takes an id, or several, or `me`. A name is refused rather
+than sent: nothing here can turn a name into a Notion id, and Notion answers a
+bad one by naming the property rather than the value.
+
+**Every check added in this round was run against a mutation of what it
+watches**, and the mutations are listed in the footer of most test files.
+`calendar-schema-agrees` and `config-contract` have no such list. Two lists were
+written from what the change was expected to break and corrected after running
+it: one named a check that stayed green, and one named fewer checks than actually
+failed. **A break list is a measurement, not a prediction.**
+
+**The lists are still not complete, corrected 2026-08-19 after round 4.** They
+name checks that did go red, but a fourth review found several mutations that
+break more checks than their list names, and at least one mutation, adding
+`LIMIT 1` to the duplicate query, that leaves its tests green while destroying
+what they exist to prove. Until they are regenerated from captured output they
+mean "at least these went red", which is weaker than an earlier version of this
+paragraph claimed.
+
+**Still not run against a real Notion workspace.** The query allowance is
+exhausted, the recorded parent page is deleted, and nothing in this plugin has
+created a row, sent a query or compared a read-back. `calendar` stays at 0.1.0
+and unannounced until it has written one real row and read it back.
+
+## 2026-08-19, the fourth review round: correcting a correction
+
+The third round's answers were reviewed. The round came back **no** again, and
+the finding that mattered most was not about the code.
+
+**The record said a claim had been removed from four files. It had not.** The
+session answering round 3 recorded, under "proved by running", that it had found
+an unmeasured claim about Notion creating an unknown select option and replaced
+it in all four places with a statement that the behaviour is not measured. Two
+things were wrong with that:
+
+1. **`plugins/calendar/README.md` still carried the original claim**, that a
+   value neither shipped nor recorded "reaches Notion, which creates it". Four
+   files were changed; the README was not one of them, and the count was never
+   checked.
+2. **The behaviour had been measured, in this repository, two days earlier.**
+   `REVIEW-codex-2026-08-17.md` records a live test against a real workspace on
+   2026-08-17: Notion returns a hard 400 `validation_error` naming the offending
+   value and listing the allowed ones, confirmed for `select` and
+   `multi_select`, and the failure is all or nothing so the page is not created
+   at all. Replacing a wrong answer with "not measured" was itself a wrong
+   answer, and it buried a measurement the repository already owned.
+
+**Seven places carried some version of this, not four.** The correction touched
+`shared/calendar-schema.js`, `shared/config-read.js` in two separate paragraphs,
+`tests/config-contract.test.js`, `DECISIONS.md`, `plugins/calendar/README.md`,
+and the vendored copies by regeneration. One of the seven was missed by the first
+search because it read "has not been measured" rather than "not measured". **A
+search narrower than the claim is how the previous session arrived at four.**
+
+**Two further claims of measurement were found to have nothing behind them.**
+`plugins/calendar/scripts/calendar.js` said Notion "has been observed" returning
+all three spellings of an absent value through the SQL surface; no run in this
+repository supports that, and it now says the handling is defensive rather than
+measured. `shared/page-id.js` said `tests/config-contract.test.js` holds it
+against `setup`'s copy; that test contains no page-id comparison and never did,
+which made a gap listed as deferred worse than listed.
+
+**The rule this round adds: a claim that something was removed everywhere is a
+claim about a search, and it is only as good as the search.** The previous
+session's own note says the fix was "searched for and removed". The search found
+four of seven, and the count went into the record as fact.
+
+### What the fourth round changed in the code, 2026-08-19
+
+Four findings were about a false success: a path that could report a write or a
+check as having gone well when it had not. They share one shape, which is why
+they are recorded together.
+
+**An update is proved by `prove-update`, and the payload is built once.** `prove`
+rebuilt what was sent by calling `row.properties` on the merged row. That call
+omits an empty value by design, so every property the update was emptying sat
+outside what the proof compared, and a `Location` Notion failed to clear came
+back holding its old value and was reported as a landed write. `updatePayload` is
+now the single definition of what an update sends, used by `update` to build the
+call and by `prove-update` to check it. **A proof that reconstructs the payload
+by a second route is not proving the payload that was sent**, and that is the
+general form of this bug.
+
+**A missing result is refused rather than read as an empty one.** `rowList`
+turned `null` and `undefined` into `[]`, three lines under a comment saying that
+an unrecognised shape is refused because a guess that returns an empty list reads
+exactly like a calendar with nothing on it. A rows file holding `null` therefore
+became a duplicate lookup reported as checked and finding nothing. `report` did
+the same thing with an undated result nobody supplied. Both refuse now, and
+`report` requires both files because `soon` returns two queries and its own
+SKILL.md says both are always sent.
+
+**An envelope holding more than one candidate list is refused rather than
+ranked.** `rowList` returned the first of `results`, `rows` or `data` that held
+an array. An object carrying an empty `results` beside a populated `data` would
+have reported nothing found. Which key a real response uses has not been
+measured, so choosing between them is a guess, and it is refused by name.
+
+**`judge` reports what it compared instead of claiming coverage.** The duplicate
+query selects the whole table, because no measured SQL filter is a superset of
+what the comparator normalises. Nothing here has measured whether a real response
+returns the whole table in one piece, so `checked: true` on its own was wider
+than the query can support. It now carries `complete: "unknown"` and the number
+of rows it compared. **This is the honest shape while the measurement is missing,
+not a fix**: a duplicate sitting in a page that never arrived is still not found.
+
+**The file contracts say what the scripts actually accept.** `update/SKILL.md`
+called `before.json` "the row as you fetched it", while the code expects a flat
+object in this plugin's own logical names. There is no adapter from a Notion
+response to that shape, because no real fetch has been measured, and the page now
+says so rather than implying one exists.
+
+**The command layer had no test at all before this round.** Everything in
+`calendar-command.test.js` called exported functions, and `report` and `judge`
+live only inside the `commands` object. Both were reporting an absent result as
+an empty one, and neither could have been caught. Four checks now run the script
+the way a user runs it.
+
+**Seven mutations were applied one at a time and the failures recorded from the
+run.** One of them, restoring the optional undated file in `report`, turned
+nothing red, and that is written into the footer rather than left out: with the
+new guard above it the fallback is unreachable, so the mutation is equivalent
+code. **A break list that quietly omits the mutation that did nothing is how a
+break list starts lying.** The footers now say "at least these went red".
+
+## 2026-08-19, the first live run against a real Notion workspace
+
+**The shapes below came back from a real workspace.** What each one supports is
+narrower than the run feeling conclusive, and the limits are at the end of this
+section rather than left implied: one row, one table, one of each call. Run under
+the `Plugins testing` page, which was blank beforehand, per the rule in
+`CLAUDE.md`. A `Calendar`
+database was created with the statement `setup` builds, one row was created,
+queried, updated and queried again, and the page was emptied afterwards.
+
+Five review rounds had refused to pass this plugin partly because nothing in it
+had ever touched a real workspace. These are the answers.
+
+### The query response envelope
+
+```
+{"results": [...], "has_more": false, "data_source_ids": ["..."]}
+```
+
+**`results` is the real key.** `rowList` accepted `results`, `rows` and `data`
+because nobody had seen a response. Only `results` has now been seen.
+
+**`has_more` is a completeness signal, and it narrows the duplicate question
+without closing it.** The duplicate query selects the whole table, and rounds 4
+and 5 both found that calling it checked was a wider claim than it could support.
+`has_more: false` is the surface's own statement that nothing was withheld, and
+taking it at its word is reading a contract rather than guessing.
+
+**The field has never been seen true.** One row on one table is not a measurement
+of pagination. No threshold is known, and the SQL mode of this client documents
+no cursor for fetching a next page, so a true is reported as not proved and
+nothing tries to page. What improved is that `completeProved` is now read from
+the response instead of hard-coded to a shrug. `duplicateCoverage`
+reads it, and `judge` returns `completeProved` as a real boolean rather than the
+string `"unknown"` in a field that reads as yes.
+
+### A multi-select comes back as a JSON array inside a string
+
+`Segment` with two values came back as the TEXT `'["Enterprise","Mid-Market"]'`.
+This is what the data source's own SQLite definition says: `"Segment" TEXT, --
+JSON array with zero or more of [...]`.
+
+**This was assumed wrongly for four review rounds and it broke the clash check
+completely.** `normaliseRows` copied the value through, `clash.targetingValues`
+keeps only strings, and the entire JSON string was read as one segment name that
+matched nothing. Measured end to end: a proposed Enterprise webinar on the same
+day as a real Enterprise webinar reported **no clash**, and the row fell into
+`unknown`. With the column parsed it reports the clash and names the shared
+segment. `JSON_ARRAY_COLUMNS` and `parseArrayColumn` are the fix, and the test
+fixture is the real response rather than a shape anybody reasoned toward.
+
+**Devin found this and four Codex rounds did not.** It is the reason a second
+reviewer was worth the cost: the risk it named was a shape mismatch, and the
+mechanism turned out to be different from its guess and worse.
+
+### An emptied property comes back as null
+
+`Location` (rich_text), `Segment` (multi_select) and `Format` (select) were all
+cleared in one update and all three came back as `null`. Not `''`, and not
+`'[]'`.
+
+**Only `null` has ever been observed.** The queries also treat `''` and `'[]'` as
+absence, and those two spellings remain defensive and unmeasured. The comments
+saying so are now correct in both places they appear; an earlier version claimed
+all three had been observed, which nothing supported.
+
+### What the plugin emits is not what the connected client accepts
+
+`create` builds Notion REST API property objects, `{"Type": {"select": {"name":
+"Event"}}}`. The connected client takes SQLite values, `{"Type": "Event"}`, with
+dates split into `date:Date:start`. **The live run had to translate by hand.**
+
+This is a real gap and it is not fixed here. It is recorded rather than fixed
+because fixing it is a design decision about which shape the plugin should speak,
+and that decision belongs with the person who owns the plugin.
+
+### What still has not been measured
+
+- Whether `ESCAPE` is supported on this SQL surface.
+- The `''` and `'[]'` spellings of an absent value.
+- What a page fetch returns, as opposed to a SQL query. `prove` and
+  `prove-update` take `{properties, headings}` and nothing has seen a real fetch
+  in that shape.
+- Pagination itself. `has_more` was only ever seen as `false`, on a table holding
+  one row. That it exists is measured; that it goes true at a particular size is
+  not.
+
+### The live run's identifiers are remapped, 2026-08-19
+
+The real response was copied into `tests/calendar-command.test.js` as a fixture,
+and it arrived carrying the page id and data source id of the row the run
+created. `CLAUDE.md` already says a test fixture is a publishing surface and that
+a captured response has its identifiers remapped before it lands here, and that
+rule was broken by copying the response in whole.
+
+Caught before anything was committed, which is the only reason it was cheap. The
+shapes in the fixture are exactly what came back; the ids are not. The page and
+its database were deleted at the end of the run, so the originals name nothing
+now, but a deleted id is still a real workspace id and the rule does not have an
+exception for that.
+
+**Nothing else leaked.** Checked by searching every tracked and changed file for
+the five real identifiers the run touched: the row, the data source, the
+database, the person, and the `Plugins testing` page. None appears in either set.
+`.devin-review/` holds the raw diff and review transcripts and is gitignored.
+
+## 2026-08-20, the second live run: the plugin now speaks the client's dialect
+
+**The problem this run existed to fix.** The first live run recorded that `create`
+built Notion REST API property objects, `{"Type": {"select": {"name": "Event"}}}`,
+while the connected client takes SQLite values, `{"Type": "Event"}`. The run had
+to translate by hand, which meant **the plugin could not do the thing it exists
+to do without a person in the middle**. It was recorded as a design decision
+rather than fixed.
+
+**It is fixed, and the dialect chosen is the one the client actually speaks.**
+That is not a preference. It is the only one measured to work, it is the same
+dialect `setup` already uses for its `CREATE TABLE` statements, and it is the
+shape a query returns, so a write and a read-back are now comparable without a
+translation layer between them.
+
+### What changed
+
+- `row.properties` emits flat values: a title, text, url and select as plain
+  strings, a multi-select and a person list as arrays of names, and a date
+  through `date:<name>:start` and `:end`, the same two columns a query selects.
+- **`EMPTY_FOR_TYPE` is gone.** It held one empty payload per type, nine of them,
+  written from the REST API and never once sent. Every type now clears with
+  `null`. **Three of those types were measured** on 2026-08-19, a rich_text, a
+  select and a multi-select; title, url, date and people are the client's null
+  convention applied by extension. `clearedProperties` is the one place that knows it and
+  the date split is its only special case.
+- `proveWrite` compares flat values on both sides.
+
+### Two asymmetries, both measured, both of which broke the first proof
+
+**A multi-select is written as a list and read back as a JSON array in a string.**
+Written `["Enterprise","Mid-Market"]`, read `'["Enterprise","Mid-Market"]'`.
+
+**A person is written bare and read back prefixed.** Written
+`["00000000-…"]`, read `'["user://00000000-…"]'`. The first real proof of a
+create reported the owner as not having landed, on a write that was perfect.
+
+Neither could have been reasoned to. Both are now normalised on both sides, and
+a genuinely different value is still caught.
+
+### The round trip, end to end, on a real workspace
+
+Every payload below went to Notion **exactly as the plugin printed it**, with no
+hand translation:
+
+- `create` → sent verbatim → accepted → `prove` reported **16 of 17 matched**,
+  the one unchecked being the body text, which it names.
+- `update` emptying `Location` → sent verbatim → accepted → `prove-update`
+  reported **15 of 16 matched**, and the cleared property was among the compared.
+- A read-back where the clear had not landed: **caught**, `Location: Sent "" and
+  the row came back with "Online"`.
+- A read-back of a different page: **refused**, naming both page ids.
+
+That is the first time this plugin has created, updated and proved a real row
+without a person translating for it.
+
+### A third live run, 2026-08-20: the shortened range
+
+A single-day date writes its end column as an explicit `null`. That came out of
+the seventh review round, after the run above: omitting the end let a shortened
+range keep its old end date and still prove clean.
+
+**Measured, because round 8 pointed out that this exact payload had never been
+sent.** A row was created with a real range, 2026-09-10 to 2026-09-12, the range
+was shortened to the single start day, and the update payload went to Notion
+verbatim including `"date:Date:end": null`. The read-back:
+
+```
+"date:Date:start": "2026-09-10", "date:Date:end": null
+```
+
+The old end is gone rather than left behind. That is the fault the split created,
+closed and now measured rather than reasoned.
+
+### Still not measured
+
+- Pagination. `has_more` has only ever been seen false, on a table of one row.
+- A page fetch as opposed to a SQL query. The read-backs above were built from
+  query results, which is the shape the code expects, but no `retrieve page` call
+  has been made.
+- A renamed property or option against a real workspace. The name map is read in
+  both directions now, and only the identity case has been run.
+- `ESCAPE` support on this SQL surface.
+
+## Three silent failures found by reading the staged diff, 2026-08-21
+
+Found while restaging the branch and reading the staged diff before a commit, by
+running the plugin rather than by reading it. All three are the same shape: a fix
+that guarded one side of a symmetric problem.
+
+### An update that did not carry the owner across died blaming the plugin
+
+`row.properties` defaulted a person field nobody named to the configured person.
+That is right on a create, where there is nothing to leave alone. On an update
+`after` is the merged row, so an absent `Owner` is a field that lost its value:
+`clearing` emptied it while `properties` set it, and `updatePayload` refused a
+payload holding a set and a clear for one property. The whole call died with
+"this is a bug in this plugin, not in the row", which it was.
+
+**Reachable by following the instructions.** `update/SKILL.md` says to build the
+merged row by hand, field by field, and `Owner` is exactly the field a date
+change forgets.
+
+**The cause was `peopleAsked` returning null for both "not mentioned" and "me"**,
+which are not the same request. They are told apart now, and `properties` takes
+`defaultsPerson`, false from `updatePayload`. An absent owner is cleared and
+listed under `clearing`, which the note already tells the skill to show and ask
+about, so removing an owner still takes a confirmation.
+
+Breaking it the easier way, removing the default everywhere, goes red on seven
+checks. Both halves of the rule have to be broken separately or a fix that
+deletes the rule reads as a fix that split it.
+
+### A person was refused in the shape this plugin's own read-back produces
+
+Measured 2026-08-20: a person goes in bare and comes back `user://<id>`.
+`COMPARABLE.people` stripped that prefix on the reading side the day it was
+measured. The writing side did not, so a caller carrying the owner across
+faithfully was told to "search the workspace users for the name and pass the id",
+holding the id already. `personIdFrom` strips the prefix now and still writes
+bare. A prefix on something that is not an id is still refused, so the strip
+cannot turn a name into an id.
+
+### A real clash reported none, on the side nobody guarded
+
+`normaliseRows` parses the candidate rows and `judge` refuses ones parsed twice.
+**Nothing checked the proposed row**, which reaches `clashes` exactly as the
+caller built it, and `targetingValues` returned `[]` for anything that was not an
+array. A proposed row still holding the query's shape therefore read as
+targeting nobody.
+
+Measured through the CLI: a real same-day, same-segment clash came back
+`overlapping: 0`, with the proposed row in `unknown` saying it had not said who
+it was aimed at when it had. That is the same silent false negative the JSON
+string caused on the candidate side, arriving through the other door, and it is
+the fault the live run caught on 2026-08-19 in its second form.
+
+`targetingValues` refuses a non-empty value that is not a list. An absent field
+still returns `[]`, because a row that genuinely said nothing is a real answer,
+and curing the silent drop by refusing that row would be the quieter version of
+the same bug: the failure the round 5 note in `tests/calendar-clash.test.js`
+already warns about.
+
+### What this changes about the review
+
+Nine rounds of reading did not find any of these; running the thing found all
+three in one pass. **That was the CLI against fixtures, not a live run**, and an
+earlier draft of this paragraph called it one, which is the same claim-wider-than
+-the-run fault the entry above is about. Round 9 caught it. No live workspace has
+seen any of today's three fixes. The findings-per-round series was 9, 6, 7, 7, 8,
+8, 9, 7, 5 before this.
+
+## One rule for what a multi-select may hold, 2026-08-21
+
+Round 9's answer. Both reviewers found the same thing from different angles:
+Codex called it a blocking silent-data-loss path, Devin listed it as a standing
+read-and-write asymmetry. **It was the round 9 fix leaving one of its two doors
+open**, which is the fault that round was convened to look for.
+
+**One value was getting three answers.** Verified against fixtures before the
+change:
+
+| `Segment` | read path | clash path | write path |
+|---|---|---|---|
+| `["Enterprise"]` | parsed | compared | written |
+| `"Enterprise"` | n/a | refused | **omitted, no problem reported** |
+| `[{name:"Enterprise"}]` | refused | **read as targeting nobody** | **forwarded as-is** |
+| `[1]` | refused | **read as targeting nobody** | **forwarded as-is** |
+
+The middle two rows are the fault. A real same-day, same-segment clash reported
+`overlapping: 0` for both, and a segment somebody typed left the payload without
+a word. Refusing a non-array closed the door the live run had found and left the
+door next to it open: `.filter(v => typeof v === 'string')` quietly emptied a
+list of its contents, and an emptied list reads exactly like a row that said
+nothing.
+
+**The rule lives once, in `shared/calendar-schema.js` as `listProblem`.** An
+absent value is legal and means the row said nothing. Everything else has to be a
+list of non-empty strings. `row.problems`, `clash.targetingValues` and
+`namesOnly` all consult it, and a drift guard fails if any of them starts
+deciding for itself again.
+
+**The wording is deliberately not shared.** A value that came back from a query
+and a value somebody handed in are different situations to be in, and each caller
+says which. What they may not do is disagree about what is legal.
+
+### The owner question, which the reviewers split on
+
+An `Owner` absent from the merged row is **cleared**, and that is now settled
+rather than open. Codex called it a high blocking fault and wanted absence to
+mean preserve. Devin read the same `update/SKILL.md` line and said clearing is
+the right reading of the merged-row contract, because `update` lists the clear
+and the note tells the skill to show it and ask. **Sarah's call is to keep the
+clearing.** Recorded here because two competent reviewers disagreed, so the next
+person to read this code will have the same argument with themselves.
+
+### What is still open after this
+
+- `Owner: "me"` with no configured person is silently omitted rather than
+  refused with a remedy. Codex raised it, it is real, and it is not fixed.
+- The arity test is still keyed to prose rather than to a structured contract.
+- `FIELD_TYPES` has no assertion against setup's schema, so `Location: 'select'`
+  is still a mutation nothing catches. Recorded in the break list as an open gap
+  rather than as a proved check.
+- None of today's work has had a live run. It is fixtures and mutation only.

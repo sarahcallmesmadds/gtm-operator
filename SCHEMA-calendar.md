@@ -99,7 +99,7 @@ template on a numerous row guarantees blank rows.
 | Description | Text | one sentence |
 | Type | Select | 5 values, see below |
 | Status | Select | 5 values, see below |
-| Date | Date (range) | when it happens or goes out. Time optional, range for anything lasting more than a day. **Optional at `Idea` and `Planned`, required by the skills from `Confirmed` onwards, and surfaced when it is not**, see below |
+| Date | Date (range) | when it happens or goes out. Time optional, range for anything lasting more than a day. **Optional at `Idea`, `Planned` and `Canceled`, required by the skills at `Confirmed` and `Done`, and surfaced when it is not**, see below |
 | Our role | Select | 4 values. **Events only**, see below |
 | Format | Select | 6 values. **Events only** |
 | Location | Text | city, venue, or Online. **Events only** |
@@ -191,8 +191,22 @@ planning for rows without one.
 **A row may have no date at `Idea` or `Planned`.** "We should do a customer dinner
 in Q4" is a real row and pinning it to a made-up Tuesday makes the calendar lie.
 
-**A date is required from `Confirmed` onwards**, and that is what `Confirmed`
-means. Nothing is booked, paid or scheduled without a date.
+**A date is required at `Confirmed` and `Done`**, and at `Confirmed` that is what
+the status means. Nothing is booked, paid or scheduled without a date, and
+nothing has happened without a day it happened on.
+
+**`Canceled` is deliberately outside the rule. Corrected 2026-08-19.** This said
+"from `Confirmed` onwards" until review found it disagreeing with
+`plugins/setup/scripts/manifest.js`, which had already excluded `Canceled` from
+the `Needs attention` filter with the reasoning written out. Both files were
+approved and they described different rules, so a skill built from either one
+would have been correct and wrong at the same time.
+
+**The manifest's reading is the one that survived**, on Sarah's call: the rule
+exists to catch a row that promises something will happen and does not say when.
+A canceled row promises nothing, so demanding a date on one reports a row that is
+not broken. A cancelation that did have a date keeps it, because nothing clears
+the field. This only says the skills stop requiring one.
 
 **Undated rows are invisible on a calendar, so setup builds a fourth view for
 them.** An `Undated` view, filtered to `Idea` and `Planned` with no date, so the
@@ -300,11 +314,11 @@ that afternoon:
 | **In market** | Table, filtered to `Confirmed` and `Done` in the current month, grouped by `Type` |
 | **Upcoming** | Table, filtered to `Confirmed` with a `Date` in the future, sorted soonest first |
 | **Undated** | Table, filtered to `Idea` and `Planned` with no date. The pile a calendar view cannot show |
-| **Needs attention** | Table, filtered to `Confirmed` or later with no date. The rule below, made visible |
+| **Needs attention** | Table, filtered to `Confirmed` and `Done` with no date. The rule below, made visible |
 
 **`Needs attention` exists because Notion cannot require a date.** `Date` is
-optional at `Idea` and `Planned` and required from `Confirmed` onwards, and Notion
-enforces none of that. A confirmed row with no date is invisible on the calendar
+optional at `Idea`, `Planned` and `Canceled`, and required at `Confirmed` and
+`Done`, and Notion enforces none of that. A confirmed row with no date is invisible on the calendar
 view and absent from `Undated`, which filters to the two early statuses, so it
 would sit in exactly the blind spot the `Undated` view was added to remove.
 **Added 2026-08-17**, when review found this rule written the same day as the fix
@@ -353,9 +367,19 @@ gets recorded, deliberately in prose rather than as a metric.
 - How It Went: conditional, written after. What happened, and what you would
   change. **Two sentences is a good length.**
 
+**No Sources section, and that is a decision rather than an omission. Recorded
+2026-08-19.** The shared skill rules say sources get recorded, and this template
+has nowhere to put them. Sarah's call is that Calendar is the exception: a row
+here is a short entry about your own plans, not research, and a Sources heading on
+a Tuesday social post is a field nobody fills. Anything genuinely read goes in the
+prose of `What It Is`. `SKILLS-calendar.md` carries the same exception.
+
 **Hard rules.**
 - **Why We Are Doing It is never blank**, on any type. If it cannot be answered,
   that is the finding.
+- **Why We Are Doing It ends with how you would know it worked.** Not blank is the
+  floor, not the rule. A section that says what this is meant to achieve and stops
+  has not answered the second half.
 - **How It Went is written or the section says why not.** An event with no note is
   an event whose lessons are gone in a fortnight.
 - A `What We Need To Do` list growing past a handful of lines means the tasks
