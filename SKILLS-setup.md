@@ -311,7 +311,7 @@ the design stated them as if they could:
 |---|---|---|---|
 | A problem statement is required, attached as a memo | Projects | Nothing. A project can be saved with no memos at all | A `Needs attention` view, filtered on `Memos` being empty |
 | `Project` is required | Tasks | Nothing. An orphan task is invisible from every project | A `Needs attention` view |
-| `Date` is required from `Confirmed` onwards | Calendar | Nothing. A confirmed row can have no date | A `Needs attention` view |
+| `Date` is required at `Confirmed` and `Done` | Calendar | Nothing. A confirmed row can have no date | A `Needs attention` view |
 | `Tags` capped at 3 | Process, Memos | Nothing. Multi-select has no maximum | `check`, step 8 |
 | Only a Strategy Decision may be a parent | Process | Nothing. Any row can be any row's parent | `check`, step 8 |
 
@@ -680,7 +680,10 @@ Library.
 configVersion      the shape of this file, so check can refuse one it cannot read
 state              creating | complete
 notion
-  apiVersion       pinned, not whatever the client defaults to
+  apiVersion       PLANNED, NOT WRITTEN. `blank()` in `config.js` does not
+                   emit this key and no client floor has a number anywhere in
+                   this repository. It is in this table as the intended shape,
+                   not as something a config will contain.
   parentPageId     where the six databases live
   personId         who the user is, for Owner, Author and Verified by.
                    Nullable. Null means tier 3 of the identity choice, and

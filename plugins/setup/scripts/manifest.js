@@ -131,15 +131,18 @@ const VIEWS = [
 
   { database: 'calendar', name: 'Needs attention', layout: 'table', rule: 'calendar-date',
     filter: [
-      // Canceled is deliberately not here. "Confirmed or later" in the design
-      // means the statuses that promise something will happen, and a canceled
-      // row promises nothing, so requiring a date on one would report a row
-      // that is not broken.
+      // Canceled is deliberately not here: the rule covers the statuses that
+      // promise something will happen, and a canceled row promises nothing, so
+      // requiring a date on one would report a row that is not broken.
+      //
+      // The design said "from Confirmed onwards" until 2026-08-19, which read as
+      // including Canceled and disagreed with this filter. Corrected there, and
+      // tests/calendar-schema-agrees.test.js now holds the two together.
       { property: 'Status', op: 'IN', values: ['Confirmed', 'Done'] },
       { property: 'Date', op: 'IS EMPTY' }
     ],
     sort: [{ property: 'Name', direction: 'ASC' }],
-    describe: 'Confirmed or later with no date' },
+    describe: 'Confirmed or Done with no date' },
 
   { database: 'projects', name: 'Needs attention', layout: 'table', rule: 'projects-problem-statement',
     filter: [{ property: 'Memos', op: 'IS EMPTY' }],
@@ -238,8 +241,8 @@ const RULES = [
     why: 'An orphan task is invisible from every project' },
 
   { key: 'calendar-date', database: 'calendar', caughtBy: 'view',
-    rule: 'Date is required from Confirmed onwards',
-    filter: 'Status is Confirmed or later and Date is empty',
+    rule: 'Date is required at Confirmed and Done',
+    filter: 'Status is Confirmed or Done and Date is empty',
     why: 'A confirmed row with no date is invisible on the calendar and absent from Undated' },
 
   { key: 'tags-max-3', databases: ['process', 'memos'], caughtBy: 'check',

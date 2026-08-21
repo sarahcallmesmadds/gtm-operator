@@ -331,9 +331,9 @@ const DATABASES = {
         ['Email send', 'orange'], ['Launch', 'green']
       ] },
 
-      // Date is optional at Idea and Planned and required by the skills from
-      // Confirmed onwards. Notion enforces none of that, so setup builds a
-      // Needs attention view for it. See manifest.js.
+      // Date is optional at Idea, Planned and Canceled, and required by the
+      // skills at Confirmed and Done. Notion enforces none of that, so setup
+      // builds a Needs attention view for it. See manifest.js.
       { name: 'Status', type: 'select', options: [
         ['Idea', 'gray'], ['Planned', 'yellow'], ['Confirmed', 'blue'],
         ['Done', 'green'], ['Canceled', 'red']

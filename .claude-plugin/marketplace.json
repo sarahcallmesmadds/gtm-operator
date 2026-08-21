@@ -23,6 +23,22 @@
         "revops",
         "setup"
       ]
+    },
+    {
+      "name": "calendar",
+      "source": "./plugins/calendar",
+      "description": "The GTM calendar: what is happening in market, and when. Shows what else is already aimed at the same people before it writes anything, asks how it went when a row is marked done, and answers what an audience is receiving for a window. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sarah Madden"
+      },
+      "category": "productivity",
+      "tags": [
+        "notion",
+        "gtm",
+        "marketing",
+        "calendar"
+      ]
     }
   ]
 }
