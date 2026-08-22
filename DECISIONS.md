@@ -1939,10 +1939,15 @@ install is the first step of any session that needs a live target.
 **What the dead config actually held.** Not a half-finished run. `install.js
 status` reported all six databases recorded and `missing: []`, with
 `verifiedAt: null`. So the run created and recorded everything, then never
-passed `verify` and never reached `complete`. Every id in it pointed at a page
-in the trash, confirmed by fetching the parent and one database and getting
-`deleted` on both, and the earlier install beside it was gone too: the parent
-page now reads blank.
+passed `verify` and never reached `complete`.
+
+**The parent page and one database were fetched and both came back `deleted`.**
+That is the measurement. The other five databases were not fetched individually,
+and the claim that all six are gone is an inference from the parent being in the
+trash rather than something checked one by one. The earlier install beside it is
+gone on the same evidence: its parent page now reads blank. Narrowed on
+2026-08-21 after review pointed out the first wording claimed six confirmations
+and had two.
 
 **A refusal message was wrong because of this, and it is fixed.**
 `config-read.js` refuses a config whose state is not `complete` and used to tell
@@ -1956,14 +1961,53 @@ Telling the two situations apart needs a Notion call, which a config reader does
 not make, so the new message names both rather than guessing at one: it says
 resume picks up a run that stopped partway, and it says that if the recorded
 databases have been deleted then resume creates nothing, fails at `verify`, and
-the way out is a fresh install against a new parent page. It also reports how
-many databases are recorded, derived from the config rather than written beside
-it, and carries that count and `verifiedAt` on the refusal object.
+the way out is to move this config aside first and then install again. That last
+step is not padding: `config.begin` throws when a parent page is already recorded
+and a different one is passed, so "install against a new parent page" on its own
+is advice this repository's own code refuses. Review found that on 2026-08-21 and
+the first wording omitted it.
 
-Two checks in `tests/config-contract.test.js` pin it, and both were proved by
-breaking what they watch: putting the blanket safety claim back turns the first
-red, and hardcoding the count turns the second red. `shared/config-read.js` was
-re-vendored into the calendar plugin, and `vendor.js --check` is clean.
+It also stops naming `verify` as the step that fails, because phase B and the
+view calls read the recorded ids too and can fail before `verify` is reached. And
+it no longer says "nothing verified yet" unconditionally: `recordVerified` writes
+`verifiedAt` while leaving `state` as `creating`, so a config can be unfinished
+and verified at the same time. It reports how many databases are recorded,
+derived from the config rather than written beside it, and carries that count and
+`verifiedAt` on the refusal object.
+
+**The count is of keys, and that is deliberate.** `install.js phaseA` creates the
+databases whose key is absent, so the key count is exactly what predicts how much
+a resume would create. An entry recorded with one id missing is still a key that
+resume skips, and `IDS_INCOMPLETE` names it rather than leaving it inside a
+total. Raised in review as a possible defect and answered rather than changed.
+
+**The first attempt at pinning this was a test that could not fail, and review
+caught it.** Those checks matched three substrings of the message. Codex supplied
+a message that passes all three while saying the opposite: "The recorded
+databases may have been deleted, but it is safe to resume. Do not start a fresh
+one against a new parent page." `/deleted/` matches, the remedy phrase matches
+despite being negated, and the ban on "safe to run again" is dodged by "safe to
+resume". The mutations run at the time went red, which is why they read as
+proof, and they were mutations of the wording rather than of the meaning.
+
+What replaced them asserts the whole message against literals written out by
+hand, across three configs: verified but not complete, nothing verified, and
+three databases recorded. The expected strings are deliberately not built by
+calling what the source calls, because that only proves the file agrees with
+itself.
+
+Five mutations, all red on the right checks:
+
+| Mutation | Checks failed |
+|---|---|
+| The counterexample message above | 3 |
+| The remedy without "move this config aside" | 3 |
+| `nothing verified yet` unconditional again | 2 |
+| Count answers 1 whenever the asked-for database exists | 2 |
+| Count hardcoded inside the message only | 2 |
+
+The last two are the ones the substring checks let through. `shared/config-read.js`
+was re-vendored into the calendar plugin, and `vendor.js --check` is clean.
 
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install

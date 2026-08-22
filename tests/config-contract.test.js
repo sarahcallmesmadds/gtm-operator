@@ -220,45 +220,100 @@ check('an unfinished install is refused', () => {
 // install", which is true of a run that stopped partway and false of one whose
 // databases were deleted afterwards. On 2026-08-21 the shipped config was the
 // second kind: six recorded, six in the trash, so resume created nothing and
-// the advice sent the reader nowhere. These pin the message that replaced it.
-check('the unfinished refusal names the deleted-database dead end, not just the resume', () => {
+// the advice sent the reader nowhere.
+//
+// THESE ASSERT THE WHOLE MESSAGE, ON PURPOSE, AND THE EXPECTED TEXT IS WRITTEN
+// OUT BY HAND. The first attempt at pinning this matched three substrings, and
+// review on 2026-08-21 produced a message that passes all three while saying the
+// opposite of the truth:
+//
+//   "The recorded databases may have been deleted, but it is safe to resume.
+//    Do not start a fresh one against a new parent page."
+//
+// `/deleted/` matches, the remedy phrase matches despite being negated, and the
+// ban on "safe to run again" is dodged by "safe to resume". A substring is the
+// wrong instrument for a claim about direction.
+//
+// The expected strings below are NOT built by calling the same helper the source
+// uses. That would only prove the file agrees with itself. They are literals a
+// person wrote, so changing the message means reconciling three of them by hand
+// and deciding, each time, whether the new wording is still true.
+const unfinishedMessage = (recorded, verified) => [
+  `The gtm-operator install has not finished. The config at ${reader.CONFIG_PATH} says "creating", ` +
+    `with ${recorded} recorded and ${verified}.`,
+  '  Run the `setup` plugin\'s install to finish it. It resumes by creating only the databases that are ' +
+    'not already recorded, so a run that stopped partway picks up where it left off.',
+  '  If the recorded databases have since been deleted, resume creates nothing and the run then fails ' +
+    'against databases that are no longer there. That is not a resumable install: move this config aside ' +
+    'first, then install again, because `begin` refuses a different parent page while one is recorded.'
+].join('\n')
+
+check('the unfinished refusal reads exactly as written, when a verify has already passed', () => {
+  // `completeConfig` carries a verify timestamp, so flipping only `state` builds
+  // the state `install.js verify` leaves behind: verified, not yet complete.
+  // The first version of this message called that "nothing verified yet".
   const config = completeConfig()
   config.state = 'creating'
   writeConfig(config)
   const context = reader.contextFor('calendar', CONTRACT)
-  assert.ok(
-    /deleted/.test(context.message),
-    'the refusal should say what happens when the recorded databases are gone, and it does not: ' + context.message
+  assert.strictEqual(context.code, reader.REFUSAL.INSTALL_UNFINISHED)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('1 database', 'a verify recorded at 2026-08-19T00:00:00Z')
   )
-  assert.ok(
-    /fresh one against a new parent page/.test(context.message),
-    'naming the dead end without naming the way out leaves the reader stuck: ' + context.message
+  assert.strictEqual(context.verifiedAt, '2026-08-19T00:00:00Z')
+})
+
+check('the unfinished refusal reads exactly as written, when nothing has been verified', () => {
+  const config = completeConfig()
+  config.state = 'creating'
+  delete config.verified
+  delete config.verifiedAt
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('1 database', 'nothing verified yet')
   )
-  assert.ok(
-    !/safe to run again/.test(context.message),
-    'the blanket safety claim is the thing being removed, and it is still there: ' + context.message
+  assert.strictEqual(context.verifiedAt, null)
+})
+
+check('the count is derived from every recorded database, not from whether this one exists', () => {
+  // Three entries, so a count that answered 1 whenever the asked-for database is
+  // present would be caught. The single-entry fixture above cannot tell those
+  // apart, which review found on 2026-08-21.
+  const config = completeConfig()
+  config.state = 'creating'
+  config.databases.memos = { databaseId: 'db-2', dataSourceId: 'ds-2' }
+  config.databases.process = { databaseId: 'db-3', dataSourceId: 'ds-3' }
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, 3)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('3 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
   )
 })
 
-check('the unfinished refusal counts the recorded databases rather than asserting how many there are', () => {
+check('an entry recorded with a missing id still counts as recorded, and is named later', () => {
+  // Deliberate, and the comment in `config-read.js` says why: resume creates the
+  // databases whose KEY is absent, so the key count is what predicts a resume.
+  // A half-recorded entry is a key resume skips, and `IDS_INCOMPLETE` names it
+  // once the install is complete rather than burying it inside a total.
   const config = completeConfig()
   config.state = 'creating'
-  const expected = Object.keys(config.databases).length
+  config.databases.memos = {}
   writeConfig(config)
-  const context = reader.contextFor('calendar', CONTRACT)
-  assert.strictEqual(context.recorded, expected)
-  assert.ok(
-    context.message.includes(`${expected} database`),
-    'the count belongs in the message, derived rather than written beside it: ' + context.message
-  )
+  assert.strictEqual(reader.contextFor('calendar', CONTRACT).recorded, 2)
 
-  // Derived, not hardcoded: drop one and the refusal follows.
-  const fewer = completeConfig()
-  fewer.state = 'creating'
-  const dropped = Object.keys(fewer.databases)[0]
-  delete fewer.databases[dropped]
-  writeConfig(fewer)
-  assert.strictEqual(reader.contextFor('calendar', CONTRACT).recorded, expected - 1)
+  // And the shapes that are not keys at all count as zero rather than throwing.
+  const empty = completeConfig()
+  empty.state = 'creating'
+  delete empty.databases
+  writeConfig(empty)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, 0)
+  assert.ok(context.message.includes('0 databases recorded'), context.message)
 })
 
 check('a database the config does not record is refused', () => {

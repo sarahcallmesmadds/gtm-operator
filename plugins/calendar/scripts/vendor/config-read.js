@@ -341,20 +341,42 @@ function contextFor (key, expected) {
     // recorded, which is what makes a run that died partway recoverable. It is
     // also what makes a run whose databases were later DELETED a dead end:
     // everything is recorded, so resume creates nothing, and the run then fails
-    // at `verify` against pages in the trash. Measured on 2026-08-21 against the
-    // 2026-08-19 install, where all six were recorded and all six were gone.
-    // Telling the two apart needs a Notion call, which a config reader does not
-    // make, so it names both rather than guessing at one.
+    // against pages in the trash. Measured on 2026-08-21 against the 2026-08-19
+    // install, where all six were recorded and all six were gone. Telling the
+    // two apart needs a Notion call, which a config reader does not make, so it
+    // names both rather than guessing at one.
+    //
+    // THE REMEDY NAMES MOVING THE CONFIG ASIDE, and that is not padding.
+    // `config.begin` throws when a parent page is already recorded and a
+    // different one is passed, so "install against a new parent page" on its own
+    // is advice this repository's own code refuses. Found by review on
+    // 2026-08-21, and the earlier wording omitted the step.
+    //
+    // IT DOES NOT NAME THE STEP THAT FAILS. An earlier wording said `verify`,
+    // which is narrower than what was measured: phase B and the view calls also
+    // read the recorded ids, so a deleted database can fail before `verify` is
+    // reached. Saying "fails" is the size of the evidence.
     const recorded = Object.keys(config.databases || {}).length
+
+    // COUNTS KEYS, AND THAT IS THE RIGHT NUMBER HERE rather than a count of
+    // entries holding both ids. `install.js phaseA` creates the databases whose
+    // KEY is absent, so the key count is exactly what predicts how much a resume
+    // would create. An entry recorded with one id missing is still a key resume
+    // skips, and it is caught immediately below by `IDS_INCOMPLETE`, which names
+    // the database rather than leaving it inside a total.
+    const verified = config.verifiedAt
+      ? `a verify recorded at ${config.verifiedAt}`
+      : 'nothing verified yet'
     return refuse(
       REFUSAL.INSTALL_UNFINISHED,
       `The gtm-operator install has not finished. The config at ${CONFIG_PATH} says "${config.state}", ` +
-      `with ${recorded} database${recorded === 1 ? '' : 's'} recorded and nothing verified yet.\n` +
+      `with ${recorded} database${recorded === 1 ? '' : 's'} recorded and ${verified}.\n` +
       `  Run the \`setup\` plugin's install to finish it. It resumes by creating only the databases that are ` +
       `not already recorded, so a run that stopped partway picks up where it left off.\n` +
-      `  If the recorded databases have since been deleted, resume creates nothing and then fails at ` +
-      `\`verify\`. That is not a resumable install, and the way out is a fresh one against a new parent page.`,
-      { state: config.state, recorded, verifiedAt: config.verifiedAt || null }
+      `  If the recorded databases have since been deleted, resume creates nothing and the run then fails ` +
+      `against databases that are no longer there. That is not a resumable install: move this config aside ` +
+      `first, then install again, because \`begin\` refuses a different parent page while one is recorded.`,
+      { state: config.state, recorded, verifiedAt: config.verifiedAt ?? null }
     )
   }
 
