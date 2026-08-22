@@ -216,10 +216,12 @@ check('a proposed row still in the query shape is refused, not read as targeting
   // same-day same-segment clash reported `overlapping: 0` with the proposed row
   // in `unknown`, saying it had not said who it was aimed at when it had.
   //
-  // REPRODUCED THROUGH THE CLI AGAINST FIXTURES on 2026-08-21. Nothing here has
-  // been near a workspace: the false negative was reproduced that way and the
-  // refusal that cures it is proved by this fixture and by mutation, not by a
-  // live run.
+  // REPRODUCED THROUGH THE CLI AGAINST FIXTURES on 2026-08-21, and the cure was
+  // then LIVE-PROVED the same day: a real query returned
+  // `Segment: '["Enterprise"]'` and `judge` found a real same-day clash from it,
+  // one overlap sharing `Enterprise`. The refusal in this test stays fixtures
+  // only, because a refusal happens before any call and there is nothing to
+  // send, so a workspace could not see it either way.
   // Built raw rather than through `row`, which normalises: the case under test
   // is a caller who did NOT normalise, and the helper cannot express one.
   const proposed = { Name: 'new', url: urlFor('new'), date: { start: '2026-09-10' }, Segment: '["Enterprise"]' }
