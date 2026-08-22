@@ -83,6 +83,20 @@ function read () {
       `Refusing to read it rather than guessing at what changed.`
     )
   }
+  // EVERY READER GETS A `databases` OBJECT, and this is the only place that is
+  // decided. `blank` always writes the key, so an absent one means a truncated
+  // or hand-edited file. Each consumer used to guard it separately or not at
+  // all: `missingDatabases` guarded an absent CONFIG rather than an absent KEY
+  // and threw out of `Object.keys`, and `recordDatabase` threw one line into
+  // reading `config.databases[key]`.
+  //
+  // Guarding them one at a time is what made this dangerous on 2026-08-22.
+  // Fixing only `missingDatabases` moved the throw from BEFORE the first Notion
+  // call to AFTER it, so phase A created a database and then could not record
+  // it, leaving an orphan that a retry would duplicate. A later throw is not a
+  // smaller bug. One normalisation here means there is no next consumer to
+  // forget.
+  if (!parsed.databases || typeof parsed.databases !== 'object') parsed.databases = {}
   return parsed
 }
 
@@ -392,7 +406,8 @@ function recordVerified (at) {
   if (typeof at !== 'string') {
     throw new Error(
       `recordVerified needs the time as a string, and was given ${typeof at}. ` +
-      'Anything else reaches every reader of this config as "[object Object]".'
+      'An object reaches a reader that interpolates it as "[object Object]"; a number or a Date reaches ' +
+      'one as something that looks like a time and is not the string every other reader expects.'
     )
   }
   // Which manifest it was checked against, not only when. A proof says a
@@ -483,14 +498,10 @@ function ids () {
 }
 
 function missingDatabases () {
-  // The fallback guards a config that is absent, and it used to stop there, so a
-  // config file present WITHOUT a `databases` key threw
-  // "Cannot convert undefined or null to object" out of `Object.keys`. `blank`
-  // always writes the key, so reaching this needs a truncated or hand-edited
-  // file, which is exactly the file most in need of a working resume. Found by
-  // review on 2026-08-22, from the other side: `config-read` tells the reader of
-  // such a config to run the install, and the install threw.
-  const have = new Set(Object.keys((read() || {}).databases || {}))
+  // `read` normalises an absent `databases` key, so this only has to handle the
+  // absent CONFIG. It briefly carried its own guard as well, which passed its
+  // own test while `recordDatabase` still threw on the same file.
+  const have = new Set(Object.keys((read() || { databases: {} }).databases))
   return DATABASES.filter(d => !have.has(d.key))
 }
 
@@ -512,6 +523,19 @@ function complete () {
     throw new Error(
       'Not complete: no verify has passed against this config. ' +
       'Run `install.js verify <readback.json>` first. It records the result itself, and it records nothing when anything is unproved.'
+    )
+  }
+  // THE SAME TYPE CHECK AS `recordVerified`, because this is the second way in.
+  // `recordVerified` is where the timestamp is written and it now refuses a
+  // non-string, but this line copies `verified.at` into `verifiedAt` and only
+  // ever tested it for truthiness, so a hand-edited file carrying a valid
+  // fingerprint and an object could put the object back through a different
+  // exported writer. Guarding one entrance and calling the room secure is what
+  // the previous round did.
+  if (typeof config.verified.at !== 'string') {
+    throw new Error(
+      `Not complete: the recorded verify time is a ${typeof config.verified.at} rather than a string, ` +
+      'so this config has been edited by hand or written by something other than `recordVerified`. Run the verify again.'
     )
   }
   // A proof taken against a different manifest is not a proof of this one. It

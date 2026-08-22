@@ -251,9 +251,10 @@ const unfinishedMessage = (recorded, verified) => [
     `with ${recorded} recorded and ${verified}.`,
   '  Run the `setup` plugin\'s install to finish it. It resumes by creating only the databases that are ' +
     'not already recorded, so a run that stopped partway picks up where it left off.',
-  '  If the recorded databases have since been deleted, resume creates nothing and the run then fails ' +
-    'against databases that are no longer there. That is not a resumable install: move this config aside ' +
-    'first, then install again, because `begin` refuses a different parent page while one is recorded.'
+  '  If the recorded databases have since been deleted, resume creates only whatever is still unrecorded ' +
+    'and the run then fails against the databases that are no longer there. If everything is recorded it ' +
+    'creates nothing at all. That is not a resumable install: move this config aside first, then install ' +
+    'again, because `begin` refuses a different parent page while one is recorded.'
 ].join('\n')
 
 check('the unfinished refusal reads exactly as written, when a verify has already passed', () => {
@@ -315,13 +316,40 @@ check('an entry recorded with a missing id still counts as recorded, and is name
   assert.strictEqual(reader.contextFor('calendar', CONTRACT).recorded, 2)
 
   // And the shapes that are not keys at all count as zero rather than throwing.
+  // The whole message, not a substring of it: asserting the count alone left the
+  // zero case free to report the wrong verification state, which review found on
+  // 2026-08-22.
   const empty = completeConfig()
   empty.state = 'creating'
   delete empty.databases
   writeConfig(empty)
   const context = reader.contextFor('calendar', CONTRACT)
   assert.strictEqual(context.recorded, 0)
-  assert.ok(context.message.includes('0 databases recorded'), context.message)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('0 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
+  )
+})
+
+check('a key this version does not recognise is still counted', () => {
+  // The walk above stops at six because six is what the manifest holds. The
+  // reader deliberately supports a config carrying keys from another version, so
+  // seven is reachable, and `Math.min(count, 6)` passed every check until this.
+  // The count is of what is written down, which is why an unknown key belongs in
+  // it.
+  const config = completeConfig()
+  config.state = 'creating'
+  for (const key of ['memos', 'process', 'projects', 'tasks', 'software']) {
+    config.databases[key] = { databaseId: `db-${key}`, dataSourceId: `ds-${key}` }
+  }
+  config.databases.marketing_ops = { databaseId: 'db-7', dataSourceId: 'ds-7' }
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, 7)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('7 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
+  )
 })
 
 // Round two found three ways the count and the verification sentence could still

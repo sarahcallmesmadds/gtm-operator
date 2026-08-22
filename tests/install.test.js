@@ -797,11 +797,50 @@ check('a resume works on a config that has no databases key at all', () => {
     notion: { parentPageId: 'parent-page', personId: null },
     verified: null
   }))
-  const missing = config.missingDatabases()
   assert.strictEqual(
-    missing.length, DATABASES.length,
+    config.missingDatabases().length, DATABASES.length,
     'with nothing recorded, every database in the manifest is still to create'
   )
+
+  // AND IT RECORDS, which is the half this check was missing. Its first version
+  // called `missingDatabases` alone and passed, while `recordDatabase` still
+  // threw on the same file one line into `config.databases[key]`. That made the
+  // fault worse rather than better: the throw moved from before the first Notion
+  // call to after it, so phase A created a database it could not record and a
+  // retry would have created a second. A check named "a resume works" that only
+  // proves the planning half is how that shipped.
+  config.recordDatabase(DATABASES[0].key, {
+    databaseId: 'db-1', dataSourceId: 'ds-1', displayName: DATABASES[0].displayName
+  })
+  assert.strictEqual(
+    config.missingDatabases().length, DATABASES.length - 1,
+    'the recorded database should drop out of the list phase A still has to create'
+  )
+  assert.deepStrictEqual(
+    config.read().databases[DATABASES[0].key].databaseId, 'db-1',
+    'and it should actually be in the file'
+  )
+})
+
+check('complete refuses a recorded verify time that is not a string', () => {
+  // The second way in. `recordVerified` is where the timestamp is written and it
+  // refuses a non-string, but `complete` copies `verified.at` into `verifiedAt`
+  // and only tested it for truthiness. A hand-edited file carrying a valid
+  // fingerprint and an object put the object back through a different exported
+  // writer. Found on 2026-08-22, one round after the first guard was added and
+  // called sufficient.
+  reset()
+  const dbs = {}
+  for (const d of DATABASES) dbs[d.key] = { databaseId: 'db', dataSourceId: 'ds' }
+  fs.writeFileSync(config.CONFIG_PATH, JSON.stringify({
+    configVersion: config.CONFIG_VERSION,
+    state: 'creating',
+    notion: { parentPageId: 'parent-page', personId: null },
+    databases: dbs,
+    verified: { at: {}, definitions: require(path.join(ROOT, 'plugins/setup/scripts/fingerprint.js')).fingerprint() }
+  }))
+  assert.throws(() => config.complete(), /rather than a string/)
+  assert.notStrictEqual(config.read().state, 'complete', 'nothing should have been completed')
 })
 
 check('the writer refuses a verify timestamp that is not a string', () => {

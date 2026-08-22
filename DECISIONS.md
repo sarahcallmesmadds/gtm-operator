@@ -1979,10 +1979,20 @@ derived from the config rather than written beside it, and carries that count an
 `verifiedAt` on the refusal object.
 
 **The count is of keys, and that is deliberate.** `install.js phaseA` creates the
-databases whose key is absent, so the key count is exactly what predicts how much
-a resume would create. An entry recorded with one id missing is still a key that
-resume skips, and `IDS_INCOMPLETE` names it rather than leaving it inside a
-total. Raised in review as a possible defect and answered rather than changed.
+manifest databases whose key is absent here, so for a config holding only keys
+this version recognises, the count is what a resume would create. An entry
+recorded with one id missing is still a key that resume skips. Raised in review
+as a possible defect and answered rather than changed.
+
+Two sentences that used to sit in this paragraph were retracted by later rounds
+and are removed rather than left standing with a correction underneath them. It
+did not say "for a config holding only keys this version recognises", it said the
+count is EXACTLY what predicts a resume, which is false for an unrecognised key.
+And it said such an entry is named by `IDS_INCOMPLETE`, which this branch never
+reaches and which only ever inspects the one key being asked for. Both were
+corrected in the code in earlier rounds while this paragraph kept the original
+wording, which is the third time in four rounds that a claim was fixed where it
+was noticed rather than everywhere it was written.
 
 **The first attempt at pinning this was a test that could not fail, and review
 caught it.** Those checks matched three substrings of the message. Codex supplied
@@ -2068,13 +2078,53 @@ install reported three. The fixtures had covered 0, 1, 2, 3 and 6, which are the
 sizes that were convenient rather than the sizes that occur. The check now walks
 1 to 6 and asserts the whole message at each.
 
-**One finding was rejected rather than fixed.** Round three read the mutation
-table above and said "Two treated as singular | 2" was unsupported, because only
-one check exercises `"2 databases"` and the second failure was probably vendor
-drift. Running the mutation says otherwise: it fails two behavioural checks, the
-plural one and the zero-database one, because `0 <= 2` also renders as singular.
-The table is right and the reasoning offered against it was wrong. Recorded here
-because a rejected finding that is not written down comes back.
+**One finding was rejected, and the rejection was itself too wide.** Round three
+read the mutation table above and said "Two treated as singular | 2" was
+unsupported, because only one check exercises `"2 databases"`. The rejection said
+the second failure is the zero-database check, because `0 <= 2` also renders as
+singular. Round four then pointed out that this holds only for the mutation
+actually run, `recorded <= 2`, and that the table never said which mutation that
+was. The minimal alternative, `recorded === 2`, leaves zero plural and fails a
+different pair.
+
+So the measurement was real and the record of it was ambiguous. **The mutation
+run was `recorded <= 2 ? '' : 's'`**, now written down, and against that mutation
+the two failing checks are the plural one and the zero-database one. A table of
+results with no statement of what was done to get them invites exactly this.
+
+**Round four found the round-three fix had made things worse, which is the
+sharpest version of the pattern in this whole sequence.** Round three fixed
+`missingDatabases` so a config with no `databases` key could be planned against.
+It could. The next call could not: `recordDatabase` reads `config.databases[key]`
+and threw on the same file. So the throw moved from BEFORE the first Notion call
+to AFTER it, which means phase A would have created a database it could not
+record, leaving an orphan in the workspace that a retry would duplicate. A later
+throw is not a smaller bug.
+
+The check written for it passed throughout, because it was named "a resume works"
+and only called `missingDatabases`. It now records as well, and the fix moved to
+`read`, which normalises the key once for every consumer instead of each one
+guarding it separately. Guarding them one at a time is what produced this.
+
+**The same shape appeared again in the same round.** `recordVerified` was given a
+type check in round three and that was called sufficient. `complete` copies
+`verified.at` into `verifiedAt` and tested only truthiness, so a hand-edited file
+carrying a valid fingerprint put the object back through a different exported
+writer. Both entrances are guarded now, and both have a check that goes red when
+the guard is removed.
+
+**Two more claims were wider than their evidence.** The refusal said a resume
+"creates nothing" when the recorded databases are deleted, which holds only when
+every manifest key is recorded; in a partial state it creates the unrecorded ones
+first and then fails. And the new diagnostic said any non-string reaches every
+reader as `[object Object]`, which is true of an object and not of a number, a
+`Date` or a reader that serialises rather than interpolates.
+
+**And the zero case and the seventh key were unpinned.** The zero-database check
+asserted the count and one substring, so it was free to report the wrong
+verification state. The count walk stopped at six, while the reader deliberately
+supports keys this version does not recognise, so `Math.min(count, 6)` passed
+everything. Both are whole-message checks now.
 
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install

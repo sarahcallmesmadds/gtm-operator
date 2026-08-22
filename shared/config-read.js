@@ -387,9 +387,10 @@ function contextFor (key, expected) {
       `with ${recorded} database${recorded === 1 ? '' : 's'} recorded and ${verified}.\n` +
       `  Run the \`setup\` plugin's install to finish it. It resumes by creating only the databases that are ` +
       `not already recorded, so a run that stopped partway picks up where it left off.\n` +
-      `  If the recorded databases have since been deleted, resume creates nothing and the run then fails ` +
-      `against databases that are no longer there. That is not a resumable install: move this config aside ` +
-      `first, then install again, because \`begin\` refuses a different parent page while one is recorded.`,
+      `  If the recorded databases have since been deleted, resume creates only whatever is still unrecorded ` +
+      `and the run then fails against the databases that are no longer there. If everything is recorded it ` +
+      `creates nothing at all. That is not a resumable install: move this config aside first, then install ` +
+      `again, because \`begin\` refuses a different parent page while one is recorded.`,
       { state: config.state, recorded, verifiedAt: config.verifiedAt ?? null }
     )
   }
