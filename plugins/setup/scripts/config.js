@@ -83,21 +83,42 @@ function read () {
       `Refusing to read it rather than guessing at what changed.`
     )
   }
-  // EVERY READER GETS A `databases` OBJECT, and this is the only place that is
-  // decided. `blank` always writes the key, so an absent one means a truncated
-  // or hand-edited file. Each consumer used to guard it separately or not at
-  // all: `missingDatabases` guarded an absent CONFIG rather than an absent KEY
-  // and threw out of `Object.keys`, and `recordDatabase` threw one line into
-  // reading `config.databases[key]`.
+  // A DAMAGED `databases` MAP IS REFUSED, NOT REPAIRED, for the same reason the
+  // JSON above is: this file may hold the only record of what was created in a
+  // real workspace, and `blank` always writes this key, so its absence is damage
+  // rather than a config where nothing has been made yet.
   //
-  // Guarding them one at a time is what made this dangerous on 2026-08-22.
-  // Fixing only `missingDatabases` moved the throw from BEFORE the first Notion
-  // call to AFTER it, so phase A created a database and then could not record
-  // it, leaving an orphan that a retry would duplicate. A later throw is not a
-  // smaller bug. One normalisation here means there is no next consumer to
-  // forget.
-  if (!parsed.databases || typeof parsed.databases !== 'object') parsed.databases = {}
+  // THIS WAS NORMALISED TO `{}` FOR ONE ROUND AND THAT WAS WRONG. Turning damage
+  // into "nothing recorded" tells a resume to create six databases that may
+  // already exist, which is duplication in someone's workspace rather than a
+  // crash in a script. Worse, `typeof [] === 'object'`, so `"databases": []`
+  // survived the normalisation: phase A planned six creates, `recordDatabase`
+  // attached a named property to an array, and `write` serialised it straight
+  // back to `[]`. The record was silently dropped and every retry recreated all
+  // six. Measured on 2026-08-22.
+  //
+  // The fault that started this is still fixed, and better: a reader of an
+  // unfinished config is told to run the install, and the install now refuses
+  // with a sentence naming the problem instead of throwing
+  // "Cannot convert undefined or null to object" out of `Object.keys`.
+  const databases = parsed.databases
+  const usable = databases && typeof databases === 'object' && !Array.isArray(databases)
+  if (!usable) {
+    throw new Error(
+      `Config at ${CONFIG_PATH} has a "databases" entry that is ${describeDatabases(databases)}, and it should be an object keyed by database name.\n` +
+      `  It is not being repaired, because treating damage as "nothing was created" would tell an install to build databases that may already exist.\n` +
+      `  Fix that entry or move the file aside and install again.`
+    )
+  }
   return parsed
+}
+
+/** What the damaged value actually is, so the message names it. */
+function describeDatabases (value) {
+  if (value === undefined) return 'missing'
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'an array'
+  return `a ${typeof value}`
 }
 
 /**
@@ -106,6 +127,19 @@ function read () {
  * config: it reads as a workspace that does not exist and invites a second one.
  */
 function write (config) {
+  // THE BACKSTOP FOR THE TIMESTAMP, because `write` is the one place everything
+  // on disk goes through and it is exported. `recordVerified` and `complete`
+  // both guard this and both give a better message for their own situation, and
+  // both were added a round apart because guarding one entrance and calling the
+  // room secure is how this kept coming back. `write` is where that stops being
+  // a game of finding the next caller: `recordPerson`, a direct `write`, or
+  // anything added later cannot put a non-string time on disk.
+  if (config && config.verifiedAt != null && typeof config.verifiedAt !== 'string') {
+    throw new Error(
+      `Refusing to write a config whose verifiedAt is a ${typeof config.verifiedAt} rather than a string or null. ` +
+      'Every reader that interpolates it would render it as "[object Object]" or similar.'
+    )
+  }
   const directory = path.dirname(CONFIG_PATH)
   fs.mkdirSync(directory, { recursive: true })
   const temporary = path.join(directory, `.gtm-operator.config.${process.pid}.tmp`)
@@ -398,7 +432,7 @@ function recordVerified (at) {
   if (!config) throw new Error('There is no config to record a verify against.')
   if (!at) throw new Error('recordVerified needs the time the verify passed.')
   // A TYPE CHECK, BECAUSE TRUTHINESS IS NOT ENOUGH. `recordVerified({})` passed
-  // the check above and wrote an object into `verifiedAt`, which every reader
+  // the check above and wrote an object into `verifiedAt`, which any reader
   // then rendered as "[object Object]". This was first written down as a gap
   // that needed a hand-edited config to reach, and review on 2026-08-22 showed
   // the exported writer reaches it on its own. Guarding the writer is the fix;

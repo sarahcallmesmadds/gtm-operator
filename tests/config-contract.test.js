@@ -304,11 +304,19 @@ check('the count is derived from every recorded database, not from whether this 
   )
 })
 
-check('an entry recorded with a missing id still counts as recorded, and is named later', () => {
+check('an entry recorded with a missing id still counts as recorded', () => {
   // Deliberate, and the comment in `config-read.js` says why: resume creates the
-  // databases whose KEY is absent, so the key count is what predicts a resume.
-  // A half-recorded entry is a key resume skips, and `IDS_INCOMPLETE` names it
-  // once the install is complete rather than burying it inside a total.
+  // databases whose KEY is absent, so a half-recorded entry is a key resume
+  // skips and belongs in the count.
+  //
+  // THIS CHECK USED TO SAY "and is named later", claiming `IDS_INCOMPLETE` would
+  // name the broken entry. It does not, and this check never showed that it
+  // would: the damaged entry here is `memos` while the request is for
+  // `calendar`, and `IDS_INCOMPLETE` only ever inspects the key being asked for.
+  // Nothing names another database's missing id. That is the same overclaim this
+  // file removed from `config-read.js` two rounds ago, left standing in a test
+  // name, and review found it on 2026-08-22. `IDS_INCOMPLETE` for the requested
+  // key is covered separately, further up.
   const config = completeConfig()
   config.state = 'creating'
   config.databases.memos = {}
@@ -426,7 +434,7 @@ check('a present but empty verifiedAt is kept as it was written, not flattened t
 // THIS USED TO BE A STATED GAP, AND THE REASON GIVEN FOR LEAVING IT WAS FALSE.
 // The comment said a `verifiedAt` holding an object needs a hand-edited file,
 // because `recordVerified` writes the string it was given. It does not: its only
-// guard was truthiness, so `recordVerified({})` wrote an object and every reader
+// guard was truthiness, so `recordVerified({})` wrote an object and any reader
 // rendered "[object Object]". Review found it on 2026-08-22 by calling the
 // exported writer rather than by reading the claim. `recordVerified` now refuses
 // a non-string, which is the writer-side fix the old comment said would be the
@@ -436,7 +444,7 @@ check('the writer refuses a timestamp that is not a string', () => {
   assert.throws(
     () => writer.recordVerified({}),
     /needs the time as a string/,
-    'an object timestamp reaches every reader as "[object Object]"'
+    'an object timestamp reaches any reader that interpolates it as "[object Object]"'
   )
   assert.throws(() => writer.recordVerified(42), /needs the time as a string/)
 })

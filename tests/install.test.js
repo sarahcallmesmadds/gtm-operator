@@ -781,71 +781,79 @@ check('a passing re-verify of a finished install leaves it finished', () => {
   assert.notStrictEqual(after.verifiedAt, '2026-08-18T00:00:00Z', 'it should record the new verify, not the old one')
 })
 
-check('a resume works on a config that has no databases key at all', () => {
-  // `blank` always writes the key, so this is a truncated or hand-edited file.
-  // It is also the file most in need of a working resume, and it threw
-  // "Cannot convert undefined or null to object" out of `Object.keys` because
-  // the fallback guarded an absent CONFIG rather than an absent KEY.
+check('a damaged databases map is refused rather than repaired', () => {
+  // THE OPPOSITE OF WHAT THIS CHECK ASSERTED ONE ROUND AGO, deliberately.
+  // `read` normalised a missing or malformed `databases` to `{}` so that a
+  // resume could plan against it. That turns damage into "nothing was created",
+  // which tells an install to build six databases that may already exist in a
+  // real workspace. `read` already refuses to repair unparseable JSON for
+  // exactly that reason, and this is the same situation.
   //
-  // Found from the other side on 2026-08-22: `shared/config-read.js` tells the
-  // reader of an unfinished config to run the install, and for this config the
-  // install threw. The message was right and the code it pointed at was wrong.
-  reset()
-  fs.writeFileSync(config.CONFIG_PATH, JSON.stringify({
-    configVersion: config.CONFIG_VERSION,
-    state: 'creating',
-    notion: { parentPageId: 'parent-page', personId: null },
-    verified: null
-  }))
-  assert.strictEqual(
-    config.missingDatabases().length, DATABASES.length,
-    'with nothing recorded, every database in the manifest is still to create'
-  )
+  // The array case is why "malformed" is not just "missing": `typeof [] ===
+  // "object"`, so `"databases": []` passed the normalisation, phase A planned
+  // six creates, `recordDatabase` attached a named property to an array, and
+  // `write` serialised it back to `[]`. The record vanished and every retry
+  // recreated all six. Measured 2026-08-22.
+  const shapes = [
+    ['no databases key', undefined],
+    ['an array', []],
+    ['null', null],
+    ['a string', 'process']
+  ]
+  for (const [label, value] of shapes) {
+    reset()
+    const body = {
+      configVersion: config.CONFIG_VERSION,
+      state: 'creating',
+      notion: { parentPageId: 'parent-page', personId: null },
+      verified: null
+    }
+    if (value !== undefined) body.databases = value
+    fs.writeFileSync(config.CONFIG_PATH, JSON.stringify(body))
+    assert.throws(
+      () => config.missingDatabases(),
+      /should be an object keyed by database name/,
+      `${label} should be refused rather than treated as nothing recorded`
+    )
+    assert.throws(
+      () => config.recordDatabase(DATABASES[0].key, {
+        databaseId: 'db-1', dataSourceId: 'ds-1', displayName: DATABASES[0].displayName
+      }),
+      /should be an object keyed by database name/,
+      `${label} should be refused on the recording path too, not only the planning one`
+    )
+  }
+})
 
-  // AND IT RECORDS, which is the half this check was missing. Its first version
-  // called `missingDatabases` alone and passed, while `recordDatabase` still
-  // threw on the same file one line into `config.databases[key]`. That made the
-  // fault worse rather than better: the throw moved from before the first Notion
-  // call to after it, so phase A created a database it could not record and a
-  // retry would have created a second. A check named "a resume works" that only
-  // proves the planning half is how that shipped.
+check('a config that has actually recorded nothing still plans and records', () => {
+  // The healthy neighbour of the check above, so refusing damage cannot quietly
+  // become refusing a legitimate first run. `blank` writes `databases: {}`.
+  reset()
+  config.begin('parent-page')
+  assert.strictEqual(config.missingDatabases().length, DATABASES.length)
   config.recordDatabase(DATABASES[0].key, {
     databaseId: 'db-1', dataSourceId: 'ds-1', displayName: DATABASES[0].displayName
   })
-  assert.strictEqual(
-    config.missingDatabases().length, DATABASES.length - 1,
-    'the recorded database should drop out of the list phase A still has to create'
-  )
-  assert.deepStrictEqual(
-    config.read().databases[DATABASES[0].key].databaseId, 'db-1',
-    'and it should actually be in the file'
-  )
+  assert.strictEqual(config.missingDatabases().length, DATABASES.length - 1)
+  assert.strictEqual(config.read().databases[DATABASES[0].key].databaseId, 'db-1')
 })
 
-check('complete refuses a recorded verify time that is not a string', () => {
-  // The second way in. `recordVerified` is where the timestamp is written and it
-  // refuses a non-string, but `complete` copies `verified.at` into `verifiedAt`
-  // and only tested it for truthiness. A hand-edited file carrying a valid
-  // fingerprint and an object put the object back through a different exported
-  // writer. Found on 2026-08-22, one round after the first guard was added and
-  // called sufficient.
+check('write refuses a non-string verifiedAt whatever route reaches it', () => {
+  // The third entrance. `recordVerified` and `complete` are guarded, and both
+  // were added a round apart. `write` is exported, so a direct call or a future
+  // writer could still put an object on disk. Guarding the one place everything
+  // passes through is what stops this being a hunt for the next caller.
   reset()
-  const dbs = {}
-  for (const d of DATABASES) dbs[d.key] = { databaseId: 'db', dataSourceId: 'ds' }
-  fs.writeFileSync(config.CONFIG_PATH, JSON.stringify({
-    configVersion: config.CONFIG_VERSION,
-    state: 'creating',
-    notion: { parentPageId: 'parent-page', personId: null },
-    databases: dbs,
-    verified: { at: {}, definitions: require(path.join(ROOT, 'plugins/setup/scripts/fingerprint.js')).fingerprint() }
-  }))
-  assert.throws(() => config.complete(), /rather than a string/)
-  assert.notStrictEqual(config.read().state, 'complete', 'nothing should have been completed')
+  const started = config.begin('parent-page')
+  started.verifiedAt = {}
+  assert.throws(() => config.write(started), /rather than a string or null/)
+  started.verifiedAt = null
+  assert.doesNotThrow(() => config.write(started), 'null is how an unverified config is written')
 })
 
 check('the writer refuses a verify timestamp that is not a string', () => {
   // Truthiness was the only guard, so `recordVerified({})` wrote an object and
-  // every reader of the config rendered it as "[object Object]". This was
+  // any reader of the config that interpolates it rendered as "[object Object]". This was
   // written down as a gap needing a hand-edited file, and review on 2026-08-22
   // reached it through the exported writer in one call.
   reset()

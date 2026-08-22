@@ -2055,7 +2055,7 @@ twice it did not.
 present without a `databases` key, because its fallback guarded an absent config
 rather than an absent key. So the message advised a resume that crashed. And
 `recordVerified` guarded only truthiness, so `recordVerified({})` wrote an object
-that every reader rendered as `[object Object]`. That last one had been written
+that any reader interpolating it rendered as `[object Object]`. That last one had been written
 down here as a gap needing a hand-edited file. The exported writer reaches it in
 one call, which review demonstrated rather than argued.
 
@@ -2110,8 +2110,15 @@ guarding it separately. Guarding them one at a time is what produced this.
 type check in round three and that was called sufficient. `complete` copies
 `verified.at` into `verifiedAt` and tested only truthiness, so a hand-edited file
 carrying a valid fingerprint put the object back through a different exported
-writer. Both entrances are guarded now, and both have a check that goes red when
-the guard is removed.
+writer.
+
+Round five then found a third: `write` is exported, so a direct call, or
+`recordPerson` rewriting a config that already held a bad value, reaches the disk
+past both guards. Saying "both entrances are guarded" after fixing the second one
+was the same mistake as saying it after the first. The guard now also sits in
+`write`, which is the one place everything on disk passes through, so this stops
+being a hunt for the next caller. The two specific guards stay because they fail
+earlier and say more about the situation they are in.
 
 **Two more claims were wider than their evidence.** The refusal said a resume
 "creates nothing" when the recorded databases are deleted, which holds only when
@@ -2125,6 +2132,39 @@ asserted the count and one substring, so it was free to report the wrong
 verification state. The count walk stopped at six, while the reader deliberately
 supports keys this version does not recognise, so `Math.min(count, 6)` passed
 everything. Both are whole-message checks now.
+
+**Round five reversed the round-four fix, and the argument for reversing it was
+already written in the file.** `read` had been made to normalise a missing or
+malformed `databases` key to `{}`, so a resume could plan against it. That turns
+damage into "nothing was created", which tells an install to build six databases
+that may already exist in a real workspace. Twenty lines above it, `read` refuses
+to repair unparseable JSON, and the comment there gives the reason: the file may
+hold the only record of what was made. Same situation, opposite treatment.
+
+**The array case is why "malformed" is not just "missing".** `typeof [] ===
+'object'`, so `"databases": []` passed the normalisation. Phase A planned six
+creates, `recordDatabase` attached a named property to an array, and `write`
+serialised it back to `[]`. The record was silently dropped and every retry
+recreated all six. Measured on 2026-08-22, and it is unbounded duplication in
+someone's workspace rather than a crash in a script.
+
+A damaged map is now refused with a sentence naming what the value actually is,
+and the original fault is still fixed and better for it: a reader of an unfinished
+config is told to run the install, and the install refuses with that sentence
+instead of throwing `Cannot convert undefined or null to object`.
+
+**A claim was left standing in five places, and this is the fourth round in which
+that has happened.** The `recordVerified` diagnostic was narrowed from "every
+reader" to a reader that interpolates, and the unqualified wording stayed in a
+comment in `config.js`, two places in `tests/config-contract.test.js`, a comment
+in `tests/install.test.js` and a paragraph here. Corrected by searching for the
+phrase rather than by fixing the copy that was pointed at.
+
+**And a test name claimed behaviour the test never exercised.** "an entry recorded
+with a missing id still counts as recorded, and is named later" damaged `memos`
+while asking for `calendar`, and `IDS_INCOMPLETE` only ever inspects the key being
+asked for, so nothing was named. That is the same overclaim removed from
+`config-read.js` two rounds earlier, surviving in a test name.
 
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install
