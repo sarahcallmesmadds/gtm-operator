@@ -138,8 +138,13 @@ function inWindow (candidateSpan, proposedSpan, windowDays) {
  * exactly as the caller built it. REPRODUCED THROUGH THE CLI AGAINST FIXTURES
  * on 2026-08-21, not against a workspace: a same-day, same-segment clash came
  * back with `overlapping: 0` and the proposed row in `unknown`, saying it had
- * not said who it was aimed at when it had. The refusal below has had no live
- * run at all. That is
+ * not said who it was aimed at when it had.
+ *
+ * THE CURE IS NOW LIVE-PROVED, 2026-08-21. A real query returned
+ * `Segment: '["Enterprise"]'`, `judge` normalised it and found a real same-day
+ * clash against a proposed row: one overlap, nothing unknown, sharing
+ * `Enterprise`. The refusal itself is still fixtures only, because a refusal
+ * happens before any call and there is nothing to send. That is
  * the same silent false negative the JSON string caused on the candidate side,
  * arriving through the door nobody guarded. A loud refusal is the cure, because
  * the answer this produced was indistinguishable from a clean calendar.

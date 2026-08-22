@@ -1846,7 +1846,8 @@ person to read this code will have the same argument with themselves.
 - `FIELD_TYPES` has no assertion against setup's schema, so `Location: 'select'`
   is still a mutation nothing catches. Recorded in the break list as an open gap
   rather than as a proved check.
-- None of today's work has had a live run. It is fixtures and mutation only.
+- ~~None of today's work has had a live run.~~ **Closed the same day.** See the
+  live run recorded below.
 
 ## The last unpaired guard, 2026-08-21
 
@@ -1867,3 +1868,55 @@ this round, one value getting two answers from two paths, and the whole point of
 `listValues` is the canonical form and both paths use it. `row.properties` also
 reads `MULTI_SELECT_FIELDS` now rather than carrying a fourth copy of the same
 four field names.
+
+## The fourth live run, 2026-08-21
+
+The round 9 and round 10 fixes had been proved by fixtures and by mutation only.
+This closes that gap. A throwaway page under `Plugins testing`, one Calendar
+database built from `schema.js --ddl calendar`, one row, then deleted and the
+page read back blank.
+
+**The config that shipped could not be used.** `~/.claude/gtm-operator.config.json`
+says `state: creating` and points at the 2026-08-19 install, whose page and all
+six databases are in the trash. The calendar plugin refuses a config in that
+state, which is correct, and it is worth knowing before the next live run that
+setting one up means building a database rather than reusing what is recorded.
+
+### What the run proved
+
+**The trim fix.** `Segment: ["  Enterprise  "]` went in. The payload the plugin
+printed carried `["Enterprise"]`, that payload went to Notion verbatim, and the
+read-back was `'["Enterprise"]'`. `prove` reported 10 of 11 matched, the
+unchecked one being body text.
+
+**The `user://` prefix, both directions.** The owner was written bare and came
+back `'["user://8cfd...c2c"]'`, exactly the shape measured on 2026-08-20, and the
+comparison treated it as a match rather than as a difference. The `before` row
+for the update then carried the owner in that prefixed form, which the write path
+accepted, which is the round 9 fix working on real data.
+
+**The owner clearing on an update.** The merged row left `Owner` out. The plugin
+emitted `Owner: null` and listed the clear rather than dying, which is the whole
+round 9 fix. The clear landed: the read-back came back `Owner: null`. `prove-update`
+reported 10 of 11.
+
+**And that a failed clear would have been caught.** The same proof was re-run
+against a read-back holding the old owner, and it failed with
+`Sent "[]" and the row came back with "[...]"` and exit 1. A proof that only ever
+passes proves nothing, so both directions were run.
+
+**The clash check, which is the fault that started all of this.** A real query
+returned `Segment: '["Enterprise"]'`. `judge` normalised it and found a real
+same-day clash against a proposed row: one overlap, nothing unknown, sharing
+`Enterprise`. On 2026-08-19 this same shape reported no clash at all.
+
+### What it did not prove
+
+- **The refusals.** A malformed multi-select is refused before any call, so there
+  is nothing to send and a workspace could not see it either way. Those stay
+  fixtures and mutation only.
+- **Pagination.** `has_more` came back false again, on a table of one row. It has
+  still never been seen true.
+- **A renamed property or option**, again. The identity case is all that has run.
+- **A page fetch** as opposed to a SQL query. Both read-backs were built from
+  query results.

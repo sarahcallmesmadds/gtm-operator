@@ -128,6 +128,11 @@ about itself does not get to be documented instead of fixed.
   already being emptied by `clearing`. The payload then held a set and a clear
   for one property and the call refused itself, blaming the plugin. It was the
   plugin. An absent owner is now cleared and listed, and `me` still resolves.
+- **Live-proved on 2026-08-21, a fourth run.** The trim fix, the `user://`
+  prefix in both directions, the owner clearing on an update, a failed clear
+  being caught, and the clash check finding a real same-day clash from a real
+  query. Recorded in `DECISIONS.md` under "the fourth live run", including the
+  four things it did not prove.
 - **Fixed on 2026-08-21: a proposed row in the query's shape reported no clash.**
   A multi-select comes back as a JSON array inside a string. The candidate rows
   are parsed and guarded; the proposed row was not, and read as targeting nobody,
