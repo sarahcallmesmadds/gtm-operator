@@ -2035,6 +2035,47 @@ untouched, because the first correction was made where the sentence was noticed
 rather than everywhere it had been written. `shared/config-read.js`
 was re-vendored into the calendar plugin, and `vendor.js --check` is clean.
 
+**Round three found four more, and two of them were in `setup` rather than in
+the reader.** Both were reached from the reader's side: the message tells a
+person with an unfinished config to run the install, so "does the install
+actually work for every config this message is shown to" became a question, and
+twice it did not.
+
+`missingDatabases` threw `Cannot convert undefined or null to object` on a config
+present without a `databases` key, because its fallback guarded an absent config
+rather than an absent key. So the message advised a resume that crashed. And
+`recordVerified` guarded only truthiness, so `recordVerified({})` wrote an object
+that every reader rendered as `[object Object]`. That last one had been written
+down here as a gap needing a hand-edited file. The exported writer reaches it in
+one call, which review demonstrated rather than argued.
+
+Both are fixed in `plugins/setup/scripts/config.js` and both now have a check
+that goes red when the fix is reverted. The second one was missing at first:
+reverting `missingDatabases` broke nothing, because the fix had been made without
+anything watching it.
+
+**The claim that the key count "exactly" predicts a resume was false, and it was
+the thing defended in round one rather than changed.** `missingDatabases` filters
+the manifest, so a key this version does not recognise is counted by the reader
+and ignored by the installer: a config holding only `marketing_ops` reports one
+database recorded while a resume creates all six. The repository supports
+carrying unrecognised keys, so this is reachable. The count is unchanged and the
+prose around it now says what it does and does not promise.
+
+**Counts four and five were unpinned**, and the mutation that exploits it is
+`n === 6 ? 6 : Math.min(n, 3)`, which every check passed while a five-database
+install reported three. The fixtures had covered 0, 1, 2, 3 and 6, which are the
+sizes that were convenient rather than the sizes that occur. The check now walks
+1 to 6 and asserts the whole message at each.
+
+**One finding was rejected rather than fixed.** Round three read the mutation
+table above and said "Two treated as singular | 2" was unsupported, because only
+one check exercises `"2 databases"` and the second failure was probably vendor
+drift. Running the mutation says otherwise: it fails two behavioural checks, the
+plural one and the zero-database one, because `0 <= 2` also renders as singular.
+The table is right and the reasoning offered against it was wrong. Recorded here
+because a rejected finding that is not written down comes back.
+
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install
 the routine start of a live session is the only way it keeps getting exercised.

@@ -357,11 +357,20 @@ function contextFor (key, expected) {
     // reached. Saying "fails" is the size of the evidence.
     const recorded = Object.keys(config.databases || {}).length
 
-    // COUNTS KEYS, AND THAT IS THE RIGHT NUMBER HERE rather than a count of
-    // entries holding both ids. `install.js phaseA` creates the databases whose
-    // KEY is absent, so the key count is exactly what predicts how much a resume
-    // would create. An entry recorded with one id missing is still a key that
-    // resume skips, which is what the reader of this message needs to know.
+    // COUNTS KEYS, AND WHAT THAT DOES AND DOES NOT TELL YOU. `install.js phaseA`
+    // creates the manifest databases whose KEY is absent here, so for a config
+    // holding only keys this version recognises, the count is what predicts how
+    // much a resume would create. An entry recorded with one id missing is still
+    // a key that resume skips, which is what the reader needs to know.
+    //
+    // IT IS NOT AN EXACT PREDICTION, and this comment claimed it was until
+    // review on 2026-08-22. `missingDatabases` filters the MANIFEST, so a key
+    // this version does not recognise is counted here and ignored there: a
+    // config holding only `marketing_ops` reports one database recorded while a
+    // resume goes on to create all six. The repository supports carrying such
+    // keys, so this is reachable rather than theoretical. The count is honest
+    // about what is written down, and a reader should not read it as a promise
+    // about what install will do.
     //
     // AN EARLIER VERSION OF THIS COMMENT SAID the half-recorded entry is "caught
     // immediately below by `IDS_INCOMPLETE`". That is wrong twice over and review

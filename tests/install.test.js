@@ -781,6 +781,41 @@ check('a passing re-verify of a finished install leaves it finished', () => {
   assert.notStrictEqual(after.verifiedAt, '2026-08-18T00:00:00Z', 'it should record the new verify, not the old one')
 })
 
+check('a resume works on a config that has no databases key at all', () => {
+  // `blank` always writes the key, so this is a truncated or hand-edited file.
+  // It is also the file most in need of a working resume, and it threw
+  // "Cannot convert undefined or null to object" out of `Object.keys` because
+  // the fallback guarded an absent CONFIG rather than an absent KEY.
+  //
+  // Found from the other side on 2026-08-22: `shared/config-read.js` tells the
+  // reader of an unfinished config to run the install, and for this config the
+  // install threw. The message was right and the code it pointed at was wrong.
+  reset()
+  fs.writeFileSync(config.CONFIG_PATH, JSON.stringify({
+    configVersion: config.CONFIG_VERSION,
+    state: 'creating',
+    notion: { parentPageId: 'parent-page', personId: null },
+    verified: null
+  }))
+  const missing = config.missingDatabases()
+  assert.strictEqual(
+    missing.length, DATABASES.length,
+    'with nothing recorded, every database in the manifest is still to create'
+  )
+})
+
+check('the writer refuses a verify timestamp that is not a string', () => {
+  // Truthiness was the only guard, so `recordVerified({})` wrote an object and
+  // every reader of the config rendered it as "[object Object]". This was
+  // written down as a gap needing a hand-edited file, and review on 2026-08-22
+  // reached it through the exported writer in one call.
+  reset()
+  config.begin('parent-page')
+  assert.throws(() => config.recordVerified({}), /needs the time as a string/)
+  assert.throws(() => config.recordVerified(42), /needs the time as a string/)
+  assert.strictEqual(config.read().verifiedAt, null, 'a refused timestamp should leave the config untouched')
+})
+
 check('a passing verify does not finish an install that was never finished', () => {
   // And the fix for that must not become an auto-complete. An install still
   // being built is not complete because a check passed.

@@ -330,21 +330,35 @@ check('an entry recorded with a missing id still counts as recorded, and is name
 // two-key case never looked at the message, and `??` could go back to `||`
 // unnoticed because no fixture held a falsy-but-present timestamp.
 
-check('the count is pinned at a real install size, not only at the fixture sizes', () => {
-  // Six is what `setup` actually creates. A count capped below that, or one that
-  // stops being derived past the fixture size, is green without this.
-  const config = completeConfig()
-  config.state = 'creating'
-  for (const key of ['memos', 'process', 'projects', 'tasks', 'software']) {
-    config.databases[key] = { databaseId: `db-${key}`, dataSourceId: `ds-${key}` }
+check('the count is derived at every size a real install passes through', () => {
+  // WALKS 1 TO 6 rather than sampling. A fixture set that happened to cover
+  // 0, 1, 2, 3 and 6 left 4 and 5 unpinned, and review on 2026-08-22 supplied
+  // the mutation that exploits exactly that gap:
+  //
+  //   const recorded = n === 6 ? 6 : Math.min(n, 3)
+  //
+  // Every earlier check stayed green on it while a five-database install
+  // reported three. Sampling the sizes that were convenient is how that
+  // happened, so this stops choosing.
+  const extras = ['memos', 'process', 'projects', 'tasks', 'software']
+  for (let n = 1; n <= 6; n++) {
+    const config = completeConfig()
+    config.state = 'creating'
+    for (const key of extras.slice(0, n - 1)) {
+      config.databases[key] = { databaseId: `db-${key}`, dataSourceId: `ds-${key}` }
+    }
+    writeConfig(config)
+    const context = reader.contextFor('calendar', CONTRACT)
+    assert.strictEqual(context.recorded, n, `${n} recorded should count as ${n}`)
+    assert.strictEqual(
+      context.message,
+      unfinishedMessage(
+        `${n} database${n === 1 ? '' : 's'}`,
+        'a verify recorded at 2026-08-19T00:00:00Z'
+      ),
+      `the message is wrong at ${n} databases`
+    )
   }
-  writeConfig(config)
-  const context = reader.contextFor('calendar', CONTRACT)
-  assert.strictEqual(context.recorded, 6)
-  assert.strictEqual(
-    context.message,
-    unfinishedMessage('6 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
-  )
 })
 
 check('two databases read as plural in the message, not only in the count', () => {
@@ -381,11 +395,23 @@ check('a present but empty verifiedAt is kept as it was written, not flattened t
   )
 })
 
-// A KNOWN GAP, STATED RATHER THAN LEFT TO BE FOUND. A `verifiedAt` holding an
-// object reaches the message as "a verify recorded at [object Object]". Nothing
-// refuses it and nothing here pins it. It is left because `recordVerified` is
-// the only writer and it writes the string it was given, so reaching this needs
-// a hand-edited file, and a type check here would be guarding the wrong place.
+// THIS USED TO BE A STATED GAP, AND THE REASON GIVEN FOR LEAVING IT WAS FALSE.
+// The comment said a `verifiedAt` holding an object needs a hand-edited file,
+// because `recordVerified` writes the string it was given. It does not: its only
+// guard was truthiness, so `recordVerified({})` wrote an object and every reader
+// rendered "[object Object]". Review found it on 2026-08-22 by calling the
+// exported writer rather than by reading the claim. `recordVerified` now refuses
+// a non-string, which is the writer-side fix the old comment said would be the
+// wrong place, and the check below holds it.
+check('the writer refuses a timestamp that is not a string', () => {
+  writeConfig(completeConfig())
+  assert.throws(
+    () => writer.recordVerified({}),
+    /needs the time as a string/,
+    'an object timestamp reaches every reader as "[object Object]"'
+  )
+  assert.throws(() => writer.recordVerified(42), /needs the time as a string/)
+})
 
 check('a database the config does not record is refused', () => {
   const config = completeConfig()

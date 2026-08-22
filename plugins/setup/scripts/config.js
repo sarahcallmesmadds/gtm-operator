@@ -383,6 +383,18 @@ function recordVerified (at) {
   const config = read()
   if (!config) throw new Error('There is no config to record a verify against.')
   if (!at) throw new Error('recordVerified needs the time the verify passed.')
+  // A TYPE CHECK, BECAUSE TRUTHINESS IS NOT ENOUGH. `recordVerified({})` passed
+  // the check above and wrote an object into `verifiedAt`, which every reader
+  // then rendered as "[object Object]". This was first written down as a gap
+  // that needed a hand-edited config to reach, and review on 2026-08-22 showed
+  // the exported writer reaches it on its own. Guarding the writer is the fix;
+  // guarding each reader would be the wrong place.
+  if (typeof at !== 'string') {
+    throw new Error(
+      `recordVerified needs the time as a string, and was given ${typeof at}. ` +
+      'Anything else reaches every reader of this config as "[object Object]".'
+    )
+  }
   // Which manifest it was checked against, not only when. A proof says a
   // workspace matches THIS manifest, and without recording which one it stayed
   // usable after the manifest changed underneath it.
@@ -471,7 +483,14 @@ function ids () {
 }
 
 function missingDatabases () {
-  const have = new Set(Object.keys((read() || { databases: {} }).databases))
+  // The fallback guards a config that is absent, and it used to stop there, so a
+  // config file present WITHOUT a `databases` key threw
+  // "Cannot convert undefined or null to object" out of `Object.keys`. `blank`
+  // always writes the key, so reaching this needs a truncated or hand-edited
+  // file, which is exactly the file most in need of a working resume. Found by
+  // review on 2026-08-22, from the other side: `config-read` tells the reader of
+  // such a config to run the install, and the install threw.
+  const have = new Set(Object.keys((read() || {}).databases || {}))
   return DATABASES.filter(d => !have.has(d.key))
 }
 
