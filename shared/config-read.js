@@ -337,10 +337,13 @@ function contextFor (key, expected) {
     // recorded, which is what makes a run that died partway recoverable. It is
     // also what makes a run whose databases were later DELETED a dead end:
     // everything is recorded, so resume creates nothing, and the run then fails
-    // against pages in the trash. Measured on 2026-08-21 against the 2026-08-19
-    // install, where all six were recorded and all six were gone. Telling the
-    // two apart needs a Notion call, which a config reader does not make, so it
-    // names both rather than guessing at one.
+    // against pages in the trash. Met on 2026-08-21 with the 2026-08-19 install:
+    // six recorded, and the parent page plus one database fetched and both
+    // `deleted`. The other five were not fetched, so their being gone is an
+    // inference from the parent rather than a measurement, and this comment used
+    // to claim all six had been checked. Telling the two situations apart needs
+    // a Notion call, which a config reader does not make, so it names both
+    // rather than guessing at one.
     //
     // THE REMEDY NAMES MOVING THE CONFIG ASIDE, and that is not padding.
     // `config.begin` throws when a parent page is already recorded and a
@@ -357,9 +360,15 @@ function contextFor (key, expected) {
     // COUNTS KEYS, AND THAT IS THE RIGHT NUMBER HERE rather than a count of
     // entries holding both ids. `install.js phaseA` creates the databases whose
     // KEY is absent, so the key count is exactly what predicts how much a resume
-    // would create. An entry recorded with one id missing is still a key resume
-    // skips, and it is caught immediately below by `IDS_INCOMPLETE`, which names
-    // the database rather than leaving it inside a total.
+    // would create. An entry recorded with one id missing is still a key that
+    // resume skips, which is what the reader of this message needs to know.
+    //
+    // AN EARLIER VERSION OF THIS COMMENT SAID the half-recorded entry is "caught
+    // immediately below by `IDS_INCOMPLETE`". That is wrong twice over and review
+    // found it: this branch returns before `IDS_INCOMPLETE` is ever reached, and
+    // that check only ever looks at the one key being asked for, never the rest.
+    // Nothing here names which entry is short an id. That is a real gap in what
+    // this message can tell you, and it is stated rather than papered over.
     const verified = config.verifiedAt
       ? `a verify recorded at ${config.verifiedAt}`
       : 'nothing verified yet'

@@ -219,8 +219,9 @@ check('an unfinished install is refused', () => {
 // The refusal above used to end "it is safe to run again on an unfinished
 // install", which is true of a run that stopped partway and false of one whose
 // databases were deleted afterwards. On 2026-08-21 the shipped config was the
-// second kind: six recorded, six in the trash, so resume created nothing and
-// the advice sent the reader nowhere.
+// second kind: six recorded, and the parent page plus one database fetched and
+// both `deleted`, so resume created nothing and the advice sent the reader
+// nowhere. The other five were inferred from the parent, not fetched.
 //
 // THESE ASSERT THE WHOLE MESSAGE, ON PURPOSE, AND THE EXPECTED TEXT IS WRITTEN
 // OUT BY HAND. The first attempt at pinning this matched three substrings, and
@@ -234,10 +235,17 @@ check('an unfinished install is refused', () => {
 // ban on "safe to run again" is dodged by "safe to resume". A substring is the
 // wrong instrument for a claim about direction.
 //
-// The expected strings below are NOT built by calling the same helper the source
-// uses. That would only prove the file agrees with itself. They are literals a
-// person wrote, so changing the message means reconciling three of them by hand
-// and deciding, each time, whether the new wording is still true.
+// The expected message below is NOT built by calling what the source calls. That
+// would only prove the file agrees with itself. The fixed prose is written out
+// here by hand, so changing the message in `config-read.js` fails every check
+// below until somebody edits this text and decides whether it is still true.
+//
+// IT IS ONE BUILDER, NOT THREE INDEPENDENT LITERALS, and an earlier version of
+// this comment claimed otherwise. Review caught it. What the single builder
+// buys is independence from the production string; what it does not buy is
+// three-way reconciliation, because editing the prose here is one edit. The
+// varying parts are passed in, so each state below still pins its own count and
+// its own verification sentence.
 const unfinishedMessage = (recorded, verified) => [
   `The gtm-operator install has not finished. The config at ${reader.CONFIG_PATH} says "creating", ` +
     `with ${recorded} recorded and ${verified}.`,
@@ -315,6 +323,69 @@ check('an entry recorded with a missing id still counts as recorded, and is name
   assert.strictEqual(context.recorded, 0)
   assert.ok(context.message.includes('0 databases recorded'), context.message)
 })
+
+// Round two found three ways the count and the verification sentence could still
+// be broken with every check green: a count capped at three passed because no
+// fixture had more than three keys, treating two as singular passed because the
+// two-key case never looked at the message, and `??` could go back to `||`
+// unnoticed because no fixture held a falsy-but-present timestamp.
+
+check('the count is pinned at a real install size, not only at the fixture sizes', () => {
+  // Six is what `setup` actually creates. A count capped below that, or one that
+  // stops being derived past the fixture size, is green without this.
+  const config = completeConfig()
+  config.state = 'creating'
+  for (const key of ['memos', 'process', 'projects', 'tasks', 'software']) {
+    config.databases[key] = { databaseId: `db-${key}`, dataSourceId: `ds-${key}` }
+  }
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, 6)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('6 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
+  )
+})
+
+check('two databases read as plural in the message, not only in the count', () => {
+  // One is the only singular, so every other count has to reach the message as a
+  // plural. Asserting the number alone left "2 database recorded" green.
+  const config = completeConfig()
+  config.state = 'creating'
+  config.databases.memos = { databaseId: 'db-2', dataSourceId: 'ds-2' }
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, 2)
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('2 databases', 'a verify recorded at 2026-08-19T00:00:00Z')
+  )
+})
+
+check('a present but empty verifiedAt is kept as it was written, not flattened to null', () => {
+  // This is what pins `??` against `||`. Both behave the same on a real
+  // timestamp and on a missing key, so neither of the checks above can tell them
+  // apart. An empty string is not something the writer produces; it is what a
+  // truncated or hand-edited config looks like, and a reader that reports it as
+  // `null` has destroyed the one clue that the file was damaged.
+  const config = completeConfig()
+  config.state = 'creating'
+  config.verifiedAt = ''
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.verifiedAt, '')
+  assert.strictEqual(
+    context.message,
+    unfinishedMessage('1 database', 'nothing verified yet'),
+    'an empty timestamp is not a verification, so the prose is right to say nothing was verified'
+  )
+})
+
+// A KNOWN GAP, STATED RATHER THAN LEFT TO BE FOUND. A `verifiedAt` holding an
+// object reaches the message as "a verify recorded at [object Object]". Nothing
+// refuses it and nothing here pins it. It is left because `recordVerified` is
+// the only writer and it writes the string it was given, so reaching this needs
+// a hand-edited file, and a type check here would be guarding the wrong place.
 
 check('a database the config does not record is refused', () => {
   const config = completeConfig()

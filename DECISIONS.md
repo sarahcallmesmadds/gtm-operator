@@ -1954,14 +1954,17 @@ and had two.
 the reader that `setup` install "is safe to run again on an unfinished install".
 That is true of a run that died partway. It was false of this one. Resume only
 creates databases that are not already recorded, and all six were, so a rerun
-creates nothing and then fails at `verify` against databases that no longer
-exist. The message sent a reader down a path that cannot work and did not say so.
+creates nothing and then fails against databases that no longer exist. Which
+step fails first was never measured: `phaseB` and the view calls read the
+recorded ids too, so a deleted database can stop the run before `verify` is
+reached. An earlier wording here named `verify`, which was narrower than the
+evidence and outlived the message that had already been corrected. The message sent a reader down a path that cannot work and did not say so.
 
 Telling the two situations apart needs a Notion call, which a config reader does
 not make, so the new message names both rather than guessing at one: it says
 resume picks up a run that stopped partway, and it says that if the recorded
-databases have been deleted then resume creates nothing, fails at `verify`, and
-the way out is to move this config aside first and then install again. That last
+databases have been deleted then resume creates nothing, fails against databases
+that are no longer there, and the way out is to move this config aside first and then install again. That last
 step is not padding: `config.begin` throws when a parent page is already recorded
 and a different one is passed, so "install against a new parent page" on its own
 is advice this repository's own code refuses. Review found that on 2026-08-21 and
@@ -2006,7 +2009,30 @@ Five mutations, all red on the right checks:
 | Count answers 1 whenever the asked-for database exists | 2 |
 | Count hardcoded inside the message only | 2 |
 
-The last two are the ones the substring checks let through. `shared/config-read.js`
+The last two are the ones the substring checks let through.
+
+**Round two then found three more that were still green**, all of them counts and
+verification states no fixture reached. A count capped at three passed because
+nothing tested more than three databases, treating two as singular passed because
+the two-database case only asserted the number and never the sentence, and `??`
+could go back to `||` unnoticed because no fixture held a timestamp that was
+present but empty. Three checks were added and all three mutations now go red:
+
+| Mutation | Checks failed |
+|---|---|
+| Count capped at three | 1 |
+| Two treated as singular | 2 |
+| `??` reverted to `||` | 1 |
+
+**Round two also found three claims that were wrong rather than unproven**, and
+all three were text written to explain a fix. A comment said a half-recorded
+entry is "caught immediately below by `IDS_INCOMPLETE`", which this branch never
+reaches and which only ever inspects the one key being asked for. A comment said
+the expected messages were three literals written by hand when they are one
+builder called three times. And the narrowed evidence claim was corrected here
+while the same overclaim sat in the source comment and the test comment,
+untouched, because the first correction was made where the sentence was noticed
+rather than everywhere it had been written. `shared/config-read.js`
 was re-vendored into the calendar plugin, and `vendor.js --check` is clean.
 
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
