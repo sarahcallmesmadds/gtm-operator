@@ -1920,3 +1920,40 @@ same-day clash against a proposed row: one overlap, nothing unknown, sharing
 - **A renamed property or option**, again. The identity case is all that has run.
 - **A page fetch** as opposed to a SQL query. Both read-backs were built from
   query results.
+
+## There is no standing install, and that is the decision, 2026-08-21
+
+The shipped config was moved aside to `gtm-operator.config.json.dead-2026-08-19`
+and this repository now assumes a live run begins by building a workspace.
+
+**The reason is that a standing install and the cleanup rule are the same
+decision pointing opposite ways.** `CLAUDE.md` says Notion testing happens under
+the `Plugins testing` page and nowhere else, that everything created there is
+deleted afterwards, and that the page is read back to confirm it is empty. That
+rule was followed on 2026-08-19, which is why the install recorded in the config
+is gone. Keeping a working install on hand means keeping test data standing,
+which is the thing the rule forbids. So the answer is not to rebuild the config
+and protect it. The answer is that there is nothing to protect, and `setup`
+install is the first step of any session that needs a live target.
+
+**What the dead config actually held.** Not a half-finished run. `install.js
+status` reported all six databases recorded and `missing: []`, with
+`verifiedAt: null`. So the run created and recorded everything, then never
+passed `verify` and never reached `complete`. Every id in it pointed at a page
+in the trash, confirmed by fetching the parent and one database and getting
+`deleted` on both, and the earlier install beside it was gone too: the parent
+page now reads blank.
+
+**A refusal message is wrong because of this, and it is not fixed here.**
+`config-read.js` refuses a config whose state is not `complete` and tells the
+reader that `setup` install "is safe to run again on an unfinished install".
+That is true of a run that died partway. It is false of this one. Resume only
+creates databases that are not already recorded, and all six were, so a rerun
+creates nothing and then fails at `verify` against databases that no longer
+exist. The message sends a reader down a path that cannot work and does not say
+so. Recorded rather than fixed, because the file is vendored into the calendar
+plugin and changing it means re-vendoring.
+
+**Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
+only live evidence was two runs that have both been deleted. Making the install
+the routine start of a live session is the only way it keeps getting exercised.
