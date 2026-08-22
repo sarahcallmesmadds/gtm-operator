@@ -1944,15 +1944,26 @@ in the trash, confirmed by fetching the parent and one database and getting
 `deleted` on both, and the earlier install beside it was gone too: the parent
 page now reads blank.
 
-**A refusal message is wrong because of this, and it is not fixed here.**
-`config-read.js` refuses a config whose state is not `complete` and tells the
-reader that `setup` install "is safe to run again on an unfinished install".
-That is true of a run that died partway. It is false of this one. Resume only
+**A refusal message was wrong because of this, and it is fixed.**
+`config-read.js` refuses a config whose state is not `complete` and used to tell
+the reader that `setup` install "is safe to run again on an unfinished install".
+That is true of a run that died partway. It was false of this one. Resume only
 creates databases that are not already recorded, and all six were, so a rerun
 creates nothing and then fails at `verify` against databases that no longer
-exist. The message sends a reader down a path that cannot work and does not say
-so. Recorded rather than fixed, because the file is vendored into the calendar
-plugin and changing it means re-vendoring.
+exist. The message sent a reader down a path that cannot work and did not say so.
+
+Telling the two situations apart needs a Notion call, which a config reader does
+not make, so the new message names both rather than guessing at one: it says
+resume picks up a run that stopped partway, and it says that if the recorded
+databases have been deleted then resume creates nothing, fails at `verify`, and
+the way out is a fresh install against a new parent page. It also reports how
+many databases are recorded, derived from the config rather than written beside
+it, and carries that count and `verifiedAt` on the refusal object.
+
+Two checks in `tests/config-contract.test.js` pin it, and both were proved by
+breaking what they watch: putting the blanket safety claim back turns the first
+red, and hardcoding the count turns the second red. `shared/config-read.js` was
+re-vendored into the calendar plugin, and `vendor.js --check` is clean.
 
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install

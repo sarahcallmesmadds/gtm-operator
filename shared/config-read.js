@@ -331,11 +331,26 @@ function contextFor (key, expected) {
   // not yet finished. Reading ids out of that window is how a row lands in a
   // database that gets replaced ten seconds later.
   if (config.state !== 'complete') {
+    // WHY THIS DOES NOT SIMPLY SAY "RUN IT AGAIN, IT IS SAFE". It used to, and
+    // that sentence is true of one situation and false of another this cannot
+    // tell apart from here. Resume creates only databases that are not already
+    // recorded, which is what makes a run that died partway recoverable. It is
+    // also what makes a run whose databases were later DELETED a dead end:
+    // everything is recorded, so resume creates nothing, and the run then fails
+    // at `verify` against pages in the trash. Measured on 2026-08-21 against the
+    // 2026-08-19 install, where all six were recorded and all six were gone.
+    // Telling the two apart needs a Notion call, which a config reader does not
+    // make, so it names both rather than guessing at one.
+    const recorded = Object.keys(config.databases || {}).length
     return refuse(
       REFUSAL.INSTALL_UNFINISHED,
-      `The gtm-operator install has not finished. The config at ${CONFIG_PATH} says "${config.state}". ` +
-      `Run the \`setup\` plugin's install to completion first: it is safe to run again on an unfinished install.`,
-      { state: config.state }
+      `The gtm-operator install has not finished. The config at ${CONFIG_PATH} says "${config.state}", ` +
+      `with ${recorded} database${recorded === 1 ? '' : 's'} recorded and nothing verified yet.\n` +
+      `  Run the \`setup\` plugin's install to finish it. It resumes by creating only the databases that are ` +
+      `not already recorded, so a run that stopped partway picks up where it left off.\n` +
+      `  If the recorded databases have since been deleted, resume creates nothing and then fails at ` +
+      `\`verify\`. That is not a resumable install, and the way out is a fresh one against a new parent page.`,
+      { state: config.state, recorded, verifiedAt: config.verifiedAt || null }
     )
   }
 

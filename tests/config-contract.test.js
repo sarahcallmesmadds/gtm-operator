@@ -216,6 +216,51 @@ check('an unfinished install is refused', () => {
   assert.strictEqual(context.code, reader.REFUSAL.INSTALL_UNFINISHED)
 })
 
+// The refusal above used to end "it is safe to run again on an unfinished
+// install", which is true of a run that stopped partway and false of one whose
+// databases were deleted afterwards. On 2026-08-21 the shipped config was the
+// second kind: six recorded, six in the trash, so resume created nothing and
+// the advice sent the reader nowhere. These pin the message that replaced it.
+check('the unfinished refusal names the deleted-database dead end, not just the resume', () => {
+  const config = completeConfig()
+  config.state = 'creating'
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.ok(
+    /deleted/.test(context.message),
+    'the refusal should say what happens when the recorded databases are gone, and it does not: ' + context.message
+  )
+  assert.ok(
+    /fresh one against a new parent page/.test(context.message),
+    'naming the dead end without naming the way out leaves the reader stuck: ' + context.message
+  )
+  assert.ok(
+    !/safe to run again/.test(context.message),
+    'the blanket safety claim is the thing being removed, and it is still there: ' + context.message
+  )
+})
+
+check('the unfinished refusal counts the recorded databases rather than asserting how many there are', () => {
+  const config = completeConfig()
+  config.state = 'creating'
+  const expected = Object.keys(config.databases).length
+  writeConfig(config)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.recorded, expected)
+  assert.ok(
+    context.message.includes(`${expected} database`),
+    'the count belongs in the message, derived rather than written beside it: ' + context.message
+  )
+
+  // Derived, not hardcoded: drop one and the refusal follows.
+  const fewer = completeConfig()
+  fewer.state = 'creating'
+  const dropped = Object.keys(fewer.databases)[0]
+  delete fewer.databases[dropped]
+  writeConfig(fewer)
+  assert.strictEqual(reader.contextFor('calendar', CONTRACT).recorded, expected - 1)
+})
+
 check('a database the config does not record is refused', () => {
   const config = completeConfig()
   delete config.databases.calendar
