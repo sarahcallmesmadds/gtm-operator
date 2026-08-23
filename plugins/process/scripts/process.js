@@ -69,6 +69,150 @@ function contextOrExit () {
   return context
 }
 
+/**
+ * The two Memos property names `audit` needs, read straight from the recorded
+ * map rather than through `contextFor`.
+ *
+ * WHY NOT `contextFor`. It validates the recorded map against a full identity
+ * for that database, both ways: a name in the map that the identity does not
+ * list is an error. This plugin does not carry the Memos schema and should not,
+ * so any identity it could offer would be a subset, and every Memos property it
+ * never looks at would be reported as a fault in the user's config. That is a
+ * refusal invented here, over a workspace that is fine.
+ *
+ * WHAT IS GIVEN UP, SAID PLAINLY. The one-to-one check does not run over Memos,
+ * so two Memos properties mapped to one Notion name would not be caught here.
+ * That check exists to protect writes, and `audit` writes nothing: signal 2
+ * reads Memos and this plugin never edits it. `SKILLS-process.md` is explicit
+ * that Memos is append-only and a correction there is a new memo. `setup`'s
+ * `check` is what validates the Memos map as a whole, and it owns that job.
+ *
+ * Both names are required rather than defaulted. Falling back to the names this
+ * plugin shipped with would query a renamed workspace for properties that do not
+ * exist, return nothing, and read as an artifact with no memos, which is exactly
+ * what a healthy artifact looks like.
+ */
+const MEMOS_PROPERTIES = ['Artifacts', 'Published date']
+
+function memosContextOrExit () {
+  const raw = config.readRaw()
+  if (!raw.ok) {
+    console.error(raw.message)
+    process.exit(1)
+  }
+  const entry = (raw.config && raw.config.databases && raw.config.databases.memos) || null
+  if (!entry) {
+    console.error(
+      'The config records no "memos" database, and `audit` reads it for the newer-related-memo signal, ' +
+      'which is the strongest of the four. Run the `setup` plugin\'s `add` skill for Memos, ' +
+      'or accept that signal 2 cannot run. Nothing here writes to Memos.'
+    )
+    process.exit(1)
+  }
+  const recorded = entry.properties || {}
+  const missing = MEMOS_PROPERTIES.filter(name => !recorded[name])
+  if (missing.length) {
+    console.error(
+      `The Memos map records no name for ${missing.map(m => `"${m}"`).join(' or ')}, so the newer-related-memo signal ` +
+      'cannot be built. It is refusing rather than falling back to the names this plugin shipped with: on a renamed ' +
+      'workspace that queries properties which do not exist, returns nothing, and reads as an artifact nobody has ' +
+      'written about. Run the `setup` plugin\'s `check` skill, which records them.'
+    )
+    process.exit(1)
+  }
+  return { property: name => recorded[name] }
+}
+
+/**
+ * A Notion page reference reduced to the id inside it, so the same page written
+ * three ways compares equal.
+ *
+ * A relation and a row's own `url` do not come back in one shape. Matching them
+ * as raw strings meant a memo pointing at an artifact by a dashed id never lined
+ * up with the artifact's own url, and signal 2 found nothing while looking
+ * right.
+ */
+function pageKey (value) {
+  if (typeof value !== 'string') return null
+  const hex = value.replace(/[^0-9a-fA-F]/g, '')
+  if (hex.length < 32) return null
+  return hex.slice(-32).toLowerCase()
+}
+
+/** The pages a relation column names, however the surface encoded them. */
+function relatedUrls (value) {
+  if (value === null || value === undefined || value === '') return []
+  let entries = value
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!text || text === '[]') return []
+    if (text.startsWith('[')) {
+      try { entries = JSON.parse(text) } catch (_) { entries = [text] }
+    } else {
+      entries = [text]
+    }
+  }
+  if (!Array.isArray(entries)) entries = [entries]
+  return entries.map(entry => pageKey(typeof entry === 'string' ? entry : (entry && entry.url))).filter(Boolean)
+}
+
+/**
+ * The empty value a property has to be sent to actually clear it.
+ *
+ * A multi-select clears with an empty list and everything else with null. Sent
+ * the wrong one, Notion accepts the write and the old value stays, which reads
+ * as a clean update that changed nothing.
+ */
+/**
+ * Every property `update` can change.
+ *
+ * NOT `SELECTED`, WHICH IS A READING LIST. `SELECTED` is what queries fetch, and
+ * it leaves out properties no judgment reads: `Tags`, `Segment`,
+ * `L2C Lifecycle` and `Owner` are none of `find`'s business. Reusing it here
+ * meant `update` silently could not change any of those four. It reported
+ * "nothing changed" for an edit that changed something, which is the quietest
+ * way to lose a person's work: they are told it was saved and it was not.
+ *
+ * `Created time` is not here because Notion writes it. The three verification
+ * fields are not here because they move as a group under `reviewed`, and letting
+ * them be edited one at a time is the rule this plugin exists to enforce.
+ */
+const UPDATABLE_FIELDS = [
+  'Name',
+  'Description',
+  'Type',
+  'Domain',
+  'Audience',
+  'Segment',
+  'L2C Lifecycle',
+  'Tags',
+  'Status',
+  'Owner',
+  'Review cadence'
+]
+
+function emptyValueFor (logical) {
+  return schema.MULTI_SELECT_FIELDS.includes(logical) ? [] : null
+}
+
+/**
+ * Whether two logical values are the same, for deciding what changed.
+ *
+ * ORDER IN A MULTI-SELECT IS NOT A CHANGE. Comparing the lists as written made
+ * reordering the same three tags look like an edit, which then went into the
+ * payload and, on a `reviewed` update, dragged the verification stamp with it.
+ * An absent value and an empty one are also the same thing here: a property that
+ * was never set and one set to nothing are both nothing.
+ */
+function sameValue (a, b) {
+  const norm = value => {
+    if (value === null || value === undefined || value === '') return null
+    if (Array.isArray(value)) return value.length ? value.map(String).slice().sort().join('\u0000') : null
+    return String(value)
+  }
+  return norm(a) === norm(b)
+}
+
 function readJson (file, what) {
   let raw
   try {
@@ -145,6 +289,46 @@ function columnMap (context) {
   const map = { url: 'url' }
   for (const logical of SELECTED) map[logical] = columnFor(context, logical)
   return map
+}
+
+/**
+ * What `audit` selects, which is `SELECTED` plus `Verified by`.
+ *
+ * `Verified by` is signal 4 and nothing else reads it, so it is not in
+ * `SELECTED`: `find` would carry a person column it never looks at. It is a
+ * person property, which this surface returns as a name or an id rather than a
+ * date, so it needs no `date:` prefix.
+ */
+const AUDIT_SELECTED = SELECTED.concat(['Verified by'])
+
+function auditSelectList (context) {
+  return ['c.url']
+    .concat(AUDIT_SELECTED.map(logical => `c.${identifier(columnFor(context, logical))}`))
+    .join(', ')
+}
+
+function auditColumnMap (context) {
+  const map = { url: 'url' }
+  for (const logical of AUDIT_SELECTED) map[logical] = columnFor(context, logical)
+  return map
+}
+
+/** Rows for `audit`, which needs one column more than `normaliseRows` carries. */
+function normaliseAuditRows (context, rows) {
+  const map = auditColumnMap(context)
+  const back = logicalValues(context)
+  const toLogical = (logical, value) => {
+    const options = back[logical]
+    if (!options) return value
+    if (Array.isArray(value)) return value.map(entry => (entry in options ? options[entry] : entry))
+    return value in options ? options[value] : value
+  }
+  return rowList(rows).map(row => {
+    const out = {}
+    for (const [logical, actual] of Object.entries(map)) out[logical] = toLogical(logical, row[actual])
+    out._raw = row
+    return out
+  })
 }
 
 /**
@@ -580,6 +764,357 @@ const commands = {
         'and which artifact actually answers the question is the skill\'s judgment. ' +
         'Pass what comes back to `trust` before answering from any of it.'
     }, null, 2))
+  },
+
+  /**
+   * THE QUERIES `audit` NEEDS, AND IT WRITES NOTHING. `SKILLS-process.md` is
+   * explicit: audit reads only, produces a list, and hands it to `update`.
+   *
+   * Two queries, because signal 2 cannot be answered from the artifacts table.
+   * The memo query goes through the REVERSE relation, from Memos, sorted by
+   * `Published date` descending. Reading the artifact's own relation property
+   * returns at most 25 references and a relation value caps at 100 pages, so on
+   * any long-lived artifact the newest memo becomes invisible and the strongest
+   * of the four signals silently degrades to nothing.
+   *
+   * Archived artifacts are excluded. An archived document going stale is not
+   * something for a person to look at.
+   */
+  audit () {
+    const context = contextOrExit()
+    const memos = memosContextOrExit()
+
+    console.log(JSON.stringify({
+      artifactColumns: auditColumnMap(context),
+      artifactSql:
+        `SELECT ${auditSelectList(context)}\n` +
+        'FROM <process-ds> AS c\n' +
+        `WHERE (c.${identifier(context.property('Status'))} IS NULL ` +
+        `OR c.${identifier(context.property('Status'))} != ${literal(context.value('Status', 'Archive'))})`,
+      memoColumns: {
+        url: 'url',
+        Artifacts: memos.property('Artifacts'),
+        'Published date': `date:${memos.property('Published date')}:start`
+      },
+      memoSql:
+        `SELECT m.url, m.${identifier(memos.property('Artifacts'))}, ` +
+        `m.${identifier(`date:${memos.property('Published date')}:start`)}\n` +
+        'FROM <memos-ds> AS m\n' +
+        `WHERE m.${identifier(memos.property('Artifacts'))} IS NOT NULL\n` +
+        `ORDER BY m.${identifier(`date:${memos.property('Published date')}:start`)} DESC`,
+      note:
+        'Replace <process-ds> and <memos-ds> with the quoted data source urls. Run both, then pass what came back to ' +
+        '`flags`. THE MEMO QUERY IS NOT OPTIONAL: run it and pass an empty list only if it genuinely returned nothing, ' +
+        'because skipping it turns the strongest signal off without saying so. This command writes nothing and never will.'
+    }, null, 2))
+  },
+
+  /**
+   * The four signals, judged over what those two queries returned.
+   *
+   * IT REPORTS DOCUMENTS THAT NEED A PERSON, NEVER A DECISION. Signal 3 in
+   * particular is a candidate and not a verdict: getting a supersede wrong
+   * archives a live document.
+   */
+  flags (artifactsFile, memosFile, todayArg) {
+    if (!artifactsFile) {
+      throw new Error('Usage: node process.js flags <artifacts.json> <memos.json> [YYYY-MM-DD]')
+    }
+    if (!memosFile) {
+      throw new Error(
+        'The memo rows are missing. Pass them, or pass a file holding [] if the memo query genuinely returned nothing. ' +
+        'Defaulting to none would turn signal 2 off silently, and it is the strongest of the four.'
+      )
+    }
+    const context = contextOrExit()
+    const memosCtx = memosContextOrExit()
+    const today = todayArg || new Date().toISOString().slice(0, 10)
+
+    const artifacts = normaliseAuditRows(context, readJson(artifactsFile, 'the artifact rows'))
+    const memoRows = rowList(readJson(memosFile, 'the memo rows'))
+
+    // Newest published memo per artifact url. The rows arrive sorted, and this
+    // does not trust that: a re-sorted export would otherwise take the first row
+    // it saw as the newest.
+    const memoProperty = memosCtx.property('Artifacts')
+    const publishedColumn = `date:${memosCtx.property('Published date')}:start`
+    const newestMemo = new Map()
+    for (const memo of memoRows) {
+      const published = memo[publishedColumn]
+      if (!published) continue
+      for (const target of relatedUrls(memo[memoProperty])) {
+        const held = newestMemo.get(target)
+        if (!held || String(published) > String(held.published)) {
+          newestMemo.set(target, { published: String(published), url: memo.url })
+        }
+      }
+    }
+
+    const flagged = []
+    const flag = (row, signal, why) => flagged.push({
+      url: row.url, name: row.Name, type: row.Type, signal, why
+    })
+
+    for (const row of artifacts) {
+      // 1. Past its review cadence.
+      const state = staleness(row, today)
+      if (state.state === 'due') flag(row, 'past-cadence', state.why)
+
+      // 2. A memo newer than the last check. THE STRONGEST OF THE FOUR.
+      const memo = newestMemo.get(pageKey(row.url))
+      const checked = row['Last checked for accuracy']
+      if (memo && (!checked || String(memo.published) > String(checked))) {
+        flag(
+          row,
+          'memo-newer',
+          checked
+            ? `A memo published ${memo.published} is newer than the last check on ${checked}. Something was announced about this and nobody folded it in.`
+            : `A memo published ${memo.published} relates to this and it has never been checked.`
+        )
+      }
+
+      // 4. Backfilled and never verified. Signal 1 cannot catch these: an empty
+      // date does not match a "before" filter in Notion, so they escape it
+      // entirely, which is why this signal exists.
+      if (!row['Verified by']) {
+        flag(row, 'never-verified', 'Verified by is empty, so nobody is recorded as having read this. Signal 1 cannot catch it: an empty date matches no "before" filter.')
+      }
+    }
+
+    // 3. Two Active Strategy Decisions that may answer the same question
+    // differently. CANDIDATES, NEVER ACTED ON.
+    const decisions = artifacts.filter(
+      row => row.Type === schema.PARENT_TYPE && row.Status === 'Active'
+    )
+    const supersedeCandidates = []
+    for (let i = 0; i < decisions.length; i++) {
+      for (let j = i + 1; j < decisions.length; j++) {
+        const a = decisions[i]
+        const b = decisions[j]
+        const score = Number(similarity(
+          `${a.Name || ''} ${a.Description || ''}`,
+          `${b.Name || ''} ${b.Description || ''}`
+        ).toFixed(3))
+        if (score >= DEFAULT_THRESHOLD) {
+          supersedeCandidates.push({
+            score,
+            a: { url: a.url, name: a.Name },
+            b: { url: b.url, name: b.Name }
+          })
+        }
+      }
+    }
+
+    console.log(JSON.stringify({
+      today,
+      considered: artifacts.length,
+      memosRead: memoRows.length,
+      flagged,
+      supersedeCandidates,
+      thresholdIsMeasured: THRESHOLD_IS_MEASURED,
+      supersedeNote: supersedeCandidates.length
+        ? 'CANDIDATES, NOT A VERDICT. Two Active Strategy Decisions look alike. Whether one supersedes the other is a ' +
+          'person\'s call: getting it wrong archives a live document. Show both and ask.'
+        : null,
+      memoSignalNote: memoRows.length
+        ? null
+        : 'NO MEMOS WERE READ, so signal 2 found nothing because it had nothing to look at, not because nothing is stale. ' +
+          'Say which of the two it was when reporting.',
+      note:
+        'This wrote nothing. Every line above is a document for a person to look at. `update` is what changes one, ' +
+        'and it asks separately whether the edit counts as having re-read the artifact.'
+    }, null, 2))
+  },
+
+  /**
+   * Change an artifact that already exists.
+   *
+   * ONLY WHAT CHANGED GOES IN THE PAYLOAD. `SKILLS-process.md`: does not rewrite
+   * a body wholesale when a section is what changed. Sending an unchanged
+   * property back is not harmless either, because `Last checked for accuracy` is
+   * in that set and rewriting it is the fault the whole verification rule exists
+   * to prevent.
+   *
+   * THE THREE VERIFICATION FIELDS MOVE TOGETHER OR NONE OF THEM DO, and which
+   * it is comes from an explicit `reviewed` on the after row. Not from whether
+   * the edit looks substantial, and not from a default. `Last checked for
+   * accuracy` drives the staleness check, so setting it on an edit that was not
+   * a review makes a stale document look fresh, which is worse than leaving it
+   * flagged. An absent `reviewed` is refused rather than read as false: a
+   * missing answer and "no I did not re-read it" are different, and only one of
+   * them is a decision somebody made.
+   */
+  update (beforeFile, afterFile, todayArg) {
+    if (!beforeFile || !afterFile) {
+      throw new Error('update needs the artifact as it is now and as it would be: node process.js update before.json after.json [YYYY-MM-DD]')
+    }
+    const context = contextOrExit()
+    const before = readJson(beforeFile, 'the artifact as it is now')
+    const after = readJson(afterFile, 'the artifact as it would be')
+
+    const target = pageKey(before.url)
+    if (!target) {
+      throw new Error(
+        'The before artifact has no usable `url`, so this update cannot say which page it is for. ' +
+        'Keep the url on the row you fetched: without it nothing can prove the write landed on the right artifact.'
+      )
+    }
+
+    if (after.reviewed !== true && after.reviewed !== false) {
+      throw new Error(
+        'The after artifact does not say whether this edit counts as having re-read the artifact for accuracy. ' +
+        'Set `reviewed` to true or false and ask the person first. It is refused rather than assumed because ' +
+        '`Last checked for accuracy` drives the staleness check: assuming true makes a stale document look fresh, ' +
+        'and assuming false silently discards a real review somebody did.'
+      )
+    }
+
+    const problems = artifact.problems(after, { parentType: after.parentType })
+    if (problems.length) {
+      throw new Error(`This artifact cannot be written yet:\n  ${problems.map(one => one.message).join('\n  ')}`)
+    }
+
+    const full = artifact.properties(context, after, { parentType: after.parentType, today: todayArg })
+
+    // Which logical fields actually differ. Compared logically, before the
+    // workspace's names are put back on, so a rename cannot read as a change.
+    const changedFields = []
+    const unchangedFields = []
+    for (const logical of UPDATABLE_FIELDS) {
+      if (schema.VERIFICATION_FIELDS.includes(logical)) continue
+      if (sameValue(before[logical], after[logical])) unchangedFields.push(logical)
+      else changedFields.push(logical)
+    }
+
+    const properties = {}
+    const cleared = []
+    for (const logical of changedFields) {
+      const name = context.property(logical)
+      if (!(name in full)) {
+        // The field was emptied. It has to go as an explicit empty value, or the
+        // write is a no-op and the old value silently survives a change the
+        // person asked for and was told had happened.
+        properties[name] = emptyValueFor(logical)
+        cleared.push(logical)
+        continue
+      }
+      properties[name] = full[name]
+    }
+
+    // The three, together or not at all.
+    const verification = []
+    if (after.reviewed === true) {
+      for (const logical of schema.VERIFICATION_FIELDS) {
+        const name = context.property(logical)
+        if (name in full) {
+          properties[name] = full[name]
+          verification.push(logical)
+        }
+      }
+    }
+
+    const archiving = before.Status !== 'Archive' && after.Status === 'Archive'
+
+    console.log(JSON.stringify({
+      target,
+      url: before.url,
+      properties,
+      changed: changedFields,
+      unchanged: unchangedFields,
+      clearing: cleared,
+      reviewed: after.reviewed,
+      verificationFields: verification,
+      verificationNote: after.reviewed === true
+        ? `Recorded as a review, so ${verification.join(', ')} all move together to today's stamp.`
+        : 'NOT recorded as a review, so Last checked for accuracy, Verified by and Verified date are all left where they are. ' +
+          'This edit does not make the artifact look freshly checked.',
+      archiving,
+      archiveNote: archiving
+        ? 'THIS ARCHIVES THE ARTIFACT. Ask before sending it. Nothing here archives without a yes.'
+        : null,
+      body: after.body ? artifact.body(after) : null,
+      headings: after.body ? artifact.expectedHeadings(after) : null,
+      bodyNote: after.body
+        ? 'The body is included because one was passed. Send only the sections that changed. Rewriting a body ' +
+          'wholesale when one section changed loses the wording of everything else.'
+        : 'No body was passed, so nothing about the body is being changed.',
+      parentRelation: null,
+      parentRelationNote: 'This version writes no Parent or Supersedes relation. Both are still unbuilt.',
+      note:
+        'Send these properties as an update to the page named by `target`. Then re-fetch it, keeping its url, and pass ' +
+        'THIS OUTPUT and the re-fetched page to `prove-update`. Not the two files this command was given: rebuilding ' +
+        'the payload from a merged row cannot see an emptied property, so it would report a failed clear as a clean write.'
+    }, null, 2))
+  },
+
+  /**
+   * Prove the update landed, INCLUDING WHAT IT EMPTIED.
+   *
+   * It takes this command's own output rather than the before and after files,
+   * because a payload rebuilt from a merged row has no record of what was
+   * cleared, and a clear that silently failed is indistinguishable from one that
+   * worked.
+   */
+  'prove-update' (updateFile, readbackFile) {
+    if (!updateFile || !readbackFile) {
+      throw new Error("prove-update needs the update output and the page as it came back: node process.js prove-update update.json readback.json")
+    }
+    const intended = readJson(updateFile, 'the update that was sent')
+    const readback = readJson(readbackFile, 'the page as it came back')
+
+    const problems = []
+    const checked = []
+    const unchecked = []
+
+    const gotUrl = readback.url || (readback.page && readback.page.url)
+    const got = pageKey(gotUrl)
+    if (!got) {
+      problems.push('The page that came back carries no usable url, so nothing can say it is the page that was written.')
+    } else if (intended.target && got !== intended.target) {
+      problems.push(
+        `The page that came back is not the one that was updated. Sent to ${intended.target}, read back ${got}. ` +
+        'Nothing below was checked, because checking a different page would report a clean write on the wrong artifact.'
+      )
+    }
+
+    if (!problems.length) {
+      const back = (readback.properties && typeof readback.properties === 'object') ? readback.properties : null
+      if (!back) {
+        problems.push('The page came back with no properties, so nothing could be compared. Save the whole page, not a summary of it.')
+      } else {
+        for (const [name, sent] of Object.entries(intended.properties || {})) {
+          if (!(name in back)) {
+            problems.push(`"${name}" was sent and is not in what came back, so the write did not land.`)
+            continue
+          }
+          if (JSON.stringify(back[name]) !== JSON.stringify(sent)) {
+            problems.push(`"${name}" came back as ${JSON.stringify(back[name])} and was sent as ${JSON.stringify(sent)}.`)
+            continue
+          }
+          checked.push(name)
+        }
+      }
+    }
+
+    // WHAT WAS NOT CHECKED, EVERY TIME, INCLUDING ON A PASS. A report wider than
+    // the check behind it is the thing this plugin refuses in other people's
+    // data, so it does not do it in its own output.
+    if (intended.body) unchecked.push('the body sections, which are not compared here')
+    if ((intended.clearing || []).length) {
+      unchecked.push(`whether ${intended.clearing.join(', ')} read as empty for the right reason rather than never having been set`)
+    }
+
+    console.log(JSON.stringify({
+      proved: problems.length === 0,
+      target: intended.target || null,
+      problems,
+      checked,
+      unchecked,
+      note: problems.length
+        ? 'The update did not land as sent. Do not report it as done.'
+        : 'Every property sent came back matching. The list above says what was not looked at.'
+    }, null, 2))
+    if (problems.length) process.exitCode = 1
   },
 
   trust (rowsFile, todayArg) {

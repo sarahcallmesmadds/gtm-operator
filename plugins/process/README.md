@@ -34,12 +34,12 @@ off it. That is what makes the library navigable instead of a pile.
 |---|---|
 | `new` | Writes one artifact from free-form notes, in the template its type calls for, after checking for a near match |
 | `find` | Finds the artifact that answers a question and says whether it is still worth trusting. Reads only |
+| `update` | Changes an artifact that already exists. Moves the three verification fields together or not at all, and only on an explicit yes |
+| `audit` | Says what has gone stale, contradicts something else, or was never verified. Reads only and writes nothing |
 
-**Three more are designed and not built yet:** `update`, which changes an
-artifact and moves the three verification fields together or not at all;
-`backfill`, which proposes candidates from material you already have, one
-approval at a time; and `audit`, which says what has gone stale or was never
-verified. `SKILLS-process.md` in the repository root defines all five.
+**One more is designed and not built:** `backfill`, which proposes candidates
+from material you already have, one approval at a time. `SKILLS-process.md` in
+the repository root defines all five.
 
 ## What is not built in this version
 
@@ -48,7 +48,8 @@ Said here so it is not discovered by a user hitting it:
 - **The embedded related view.** Every type calls for one, `new` names which one
   belongs on the page it wrote, and building it needs the Views API. The skill
   says the view is missing rather than leaving it to be noticed.
-- **The newer-related-memo staleness signal.** `find` checks the review cadence
+- **The newer-related-memo signal inside `find`.** `audit` has it, querying
+  Memos through the reverse relation. `find` checks the review cadence
   and does not query Memos, and it says so rather than reporting a complete trust
   judgment.
 - **A calibrated duplicate threshold.** `SKILLS-process.md` says in as many words
