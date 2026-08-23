@@ -1,0 +1,26 @@
+{
+  "name": "process",
+  "version": "0.1.0",
+  "description": "Writes and reads the Process database that the gtm-operator setup plugin created: the living reference of how and why things are done. Writes one artifact from free-form notes, in the body template its type calls for, after checking for a near duplicate. Finds the artifact that answers a question and says whether it is still worth trusting. Creates no database and writes no config.",
+  "author": {
+    "name": "Sarah Madden",
+    "url": "https://github.com/sarahcallmesmadds"
+  },
+  "homepage": "https://github.com/sarahcallmesmadds/gtm-operator/tree/main/plugins/process",
+  "repository": "https://github.com/sarahcallmesmadds/gtm-operator",
+  "license": "MIT",
+  "keywords": [
+    "notion",
+    "gtm",
+    "documentation",
+    "sop",
+    "knowledge-base"
+  ],
+  "gtmOperator": {
+    "vendor": [
+      "config-read.js",
+      "process-schema.js",
+      "page-id.js"
+    ]
+  }
+}

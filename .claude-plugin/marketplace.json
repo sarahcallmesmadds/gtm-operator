@@ -39,6 +39,22 @@
         "marketing",
         "calendar"
       ]
+    },
+    {
+      "name": "process",
+      "source": "./plugins/process",
+      "description": "The Process library: the living reference of how and why things are done. Writes one artifact from free-form notes in the body template its type calls for, after checking whether the library already has it. Finds the artifact that answers a question and says whether it is still worth trusting. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sarah Madden"
+      },
+      "category": "productivity",
+      "tags": [
+        "notion",
+        "gtm",
+        "revops",
+        "documentation"
+      ]
     }
   ]
 }

@@ -1,0 +1,78 @@
+# process
+
+The Process library: the living reference of how and why things are done.
+
+Plugin three of the `gtm-operator` marketplace. It writes to the `Process`
+database that the `setup` plugin created. **It creates no database, adds no
+property and writes no config.** `setup` owns all of that, and this plugin never
+calls it.
+
+## What it is for
+
+Process is the living reference, maintained and kept true. That is the line
+everything else follows from, and the counterpart is Memos, which is time-stamped
+communication and append-only. A thing that is meant to stay correct belongs
+here. A thing that was true on the day it was sent belongs there.
+
+Every row is an **artifact**, and its `Type` says which of five it is:
+
+| Type | What it records |
+|---|---|
+| Strategy Decision | A choice and its reasoning, so nobody relitigates it |
+| SOP/ROE | How a recurring process runs, step by step |
+| Enablement | Teaches someone who has not done it before |
+| Reporting | What a report means, and how to read it without drawing the wrong conclusion |
+| Technical Reference | How a system is wired, for whoever maintains it |
+
+**Only a Strategy Decision may be the parent of anything.** Every other type
+describes *how* to do something and this one describes *why*, so the others hang
+off it. That is what makes the library navigable instead of a pile.
+
+## The skills
+
+| Skill | What it is for |
+|---|---|
+| `new` | Writes one artifact from free-form notes, in the template its type calls for, after checking for a near match |
+| `find` | Finds the artifact that answers a question and says whether it is still worth trusting. Reads only |
+
+**Three more are designed and not built yet:** `update`, which changes an
+artifact and moves the three verification fields together or not at all;
+`backfill`, which proposes candidates from material you already have, one
+approval at a time; and `audit`, which says what has gone stale or was never
+verified. `SKILLS-process.md` in the repository root defines all five.
+
+## What is not built in this version
+
+Said here so it is not discovered by a user hitting it:
+
+- **The embedded related view.** Every type calls for one, `new` names which one
+  belongs on the page it wrote, and building it needs the Views API. The skill
+  says the view is missing rather than leaving it to be noticed.
+- **The newer-related-memo staleness signal.** `find` checks the review cadence
+  and does not query Memos, and it says so rather than reporting a complete trust
+  judgment.
+- **A calibrated duplicate threshold.** `SKILLS-process.md` says in as many words
+  to pick this against real artifacts rather than inheriting the reference's 70%.
+  The number in the code is uncalibrated, every result says so, and the skill
+  shows candidates for a person to judge rather than deciding alone.
+
+## Installing
+
+Install `setup` first and run its `install` skill. Both skills here refuse with a
+message pointing at `setup` when config is absent or the install is unfinished,
+so nothing here depends on reading this file.
+
+## How it is built
+
+`scripts/process.js` decides what to send and the skill sends it. The Notion
+calls go through the connected client, which a script cannot reach, so every
+query is built in the script, every value is checked there, and the model makes
+the calls in between. That is the same shape `setup` and `calendar` use.
+
+`scripts/artifact.js` holds every rule Notion cannot enforce: the tags cap, the
+parent-type rule, the body templates and the two sections that can never be
+blank. None of them can be a view filter, which is measured rather than assumed
+and recorded in `DECISIONS.md`.
+
+`scripts/vendor/` is copied from `shared/` by `scripts/vendor.js` at the
+repository root. Do not edit it there.
