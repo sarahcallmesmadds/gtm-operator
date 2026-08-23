@@ -204,5 +204,72 @@ check('an unrecognised cadence is not quietly read as exempt', () => {
   assert.strictEqual(command.staleness(row('None', '2020-01-01'), '2026-08-23').state, 'exempt')
 })
 
+// ----------------------------------------------------------------- find query
+
+/**
+ * `find` prints and returns nothing, so the only way to assert on it is to
+ * capture what it printed. The question arrives as a file, which is also how the
+ * skill calls it.
+ */
+const runFind = (question, map = identity) => {
+  const ctx = contextFor(map)
+  assert.strictEqual(ctx.ok, true, ctx.message)
+  const file = path.join(SANDBOX, 'question.json')
+  fs.writeFileSync(file, JSON.stringify(question))
+  const printed = []
+  const real = console.log
+  console.log = (...args) => printed.push(args.join(' '))
+  try { command.commands.find(file) } finally { console.log = real }
+  return JSON.parse(printed.join('\n'))
+}
+
+check('find narrows on Type and Domain, under the workspace\'s own names', () => {
+  const out = runFind({ Type: 'SOP/ROE', Domain: 'Deal Execution' }, renamed)
+  assert.ok(out.sql.includes('"R Type" = \'R SOP/ROE\''), `Type missing from the query:\n${out.sql}`)
+  assert.ok(out.sql.includes('"R Domain" = \'R Deal Execution\''), `Domain missing from the query:\n${out.sql}`)
+})
+
+check('AUDIENCE NEVER REACHES THE SQL, and the query is byte-identical with and without it', () => {
+  // The finding this pins: an Audience in the question changed nothing and said
+  // nothing, so a narrowed question came back wide and read as a clean answer.
+  const without = runFind({ Type: 'SOP/ROE' })
+  const with_ = runFind({ Type: 'SOP/ROE', Audience: ['Sales'] })
+  assert.strictEqual(with_.sql, without.sql, 'Audience changed the query, so this test is asserting the wrong thing')
+  // Audience IS in the SELECT list, as a column that comes back for the judgment
+  // to be made on. The WHERE clause is the only place it must not appear, so the
+  // assertion is scoped to it rather than to the whole statement.
+  const whereOf = sql => (sql.split(/\nWHERE /)[1] || '')
+  assert.ok(whereOf(with_.sql), 'no WHERE clause to check')
+  assert.ok(!/Audience/i.test(whereOf(with_.sql)), `Audience reached the WHERE clause:\n${whereOf(with_.sql)}`)
+})
+
+check('an Audience that was asked for is read back and called out as not filtered', () => {
+  const out = runFind({ Type: 'SOP/ROE', Audience: ['Sales', 'Marketing'] })
+  assert.deepStrictEqual(out.audience, ['Sales', 'Marketing'], 'the Audience asked for was not read back')
+  assert.ok(/NOT IN THE SQL/.test(out.audienceNote), `nothing said Audience was not applied:\n${out.audienceNote}`)
+  assert.ok(/wider/.test(out.audienceNote), 'the note did not say the rows are wider than the question')
+})
+
+check('a question with no Audience says so rather than leaving the field absent', () => {
+  const out = runFind({ Type: 'SOP/ROE' })
+  assert.strictEqual(out.audience, null, 'an absent Audience must be an explicit null, not a missing key')
+  assert.ok(/No Audience was asked for/.test(out.audienceNote), out.audienceNote)
+  assert.ok(!/NOT IN THE SQL/.test(out.audienceNote), 'the warning fired when nothing was asked for')
+})
+
+check('the printed note no longer claims Audience narrows the query', () => {
+  // The note is what the model reads back before answering, so a stale sentence
+  // here is the same defect as the missing filter, one layer up.
+  const out = runFind({ Type: 'SOP/ROE' })
+  assert.ok(!/Type, Domain and Audience narrow/.test(out.note), `the note still claims Audience narrows:\n${out.note}`)
+  assert.ok(/Type and Domain narrow it/.test(out.note), out.note)
+})
+
+check('excluding archived still happens, and is not disturbed by the Audience path', () => {
+  const out = runFind({ Audience: ['Sales'] })
+  assert.strictEqual(out.includeArchived, false)
+  assert.ok(/!=/.test(out.sql), `the archived exclusion left the query:\n${out.sql}`)
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll passed.\n')
 process.exit(failures ? 1 : 0)

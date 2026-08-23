@@ -2290,3 +2290,63 @@ assumed to cover it, and in the output where a user would form the wrong
 impression.
 
 ---
+
+## process, review round 1 on pull request 14
+
+### Audience is a filter the reader applies, not one the query applies
+
+Devin found that `find` iterated `['Type', 'Domain']` while the comment above
+that loop, the note printed with every result, and `find/SKILL.md` all said
+Audience was a filter. An Audience in the question changed nothing and said
+nothing, so a narrowed question came back wide and read as a clean answer.
+
+Three ways out were considered and the third was taken:
+
+1. Build the filter. Rejected. Audience is multi-select, and no multi-value
+   predicate has been proved against this workspace. `plugins/setup/scripts/views.js`
+   records three Notion filters that were accepted and then did not work, one of
+   them a multi-select count filter rejected with a 400. No SQL this plugin
+   builds has ever been sent to Notion. Adding an unproved multi-value predicate
+   to unproved SQL is the failure that file exists to warn against.
+2. Delete Audience from the three places that claim it. Rejected: `SKILLS-process.md`
+   does give this skill Type, Domain and Audience as its judgment, and deleting
+   the word would make the code right and the design wrong.
+3. **Taken: keep Audience, and make `find` say plainly that it did not filter.**
+   The output now carries `audience`, reading back what was asked for, and
+   `audienceNote`, which says in as many words that the rows are wider than the
+   question and that narrowing them is the reader's job. This is what the rest of
+   the plugin already does. Archived rows are excluded and the output says so. A
+   parent named without its type is refused rather than assumed. Nothing here
+   drops something in silence, which was the whole of the finding.
+
+`audience` is an explicit `null` when none was asked for, rather than an absent
+key, because a missing key and a key meaning "none" are the same read at the far
+end.
+
+### `find` had no tests at all, because it was not reachable from one
+
+The command lives on the `commands` object and `commands` is exported, but no
+test had ever called through it, so the query builder shipped unexercised. Six
+checks now cover it, and the defect Devin found sat in the part with no coverage.
+
+The load-bearing one asserts the query is byte-identical with and without an
+Audience. It is scoped to the WHERE clause rather than the whole statement, since
+Audience is legitimately in the SELECT list as a column the judgment is made on.
+The first version of that check was not scoped, and failed correctly for a reason
+that was not the one it was written for.
+
+### What was proved by breaking it
+
+All seven checks were mutated and confirmed red: the note reverted to its old
+claim, `audienceNote` pinned to each of its two branches in turn, Audience added
+to the WHERE loop, the read-back forced to null, Domain dropped from the loop,
+and the archived exclusion removed. Each mutation was confirmed to have changed
+the file before the suite was run, per the lesson from the previous round.
+
+### Not done, and deliberately
+
+An Audience value is not validated against `IDENTITY_VALUES.Audience`, so a typo
+is read back and offered to the judgment as though it were real. Type and Domain
+are validated, because a wrong value there returns no rows and reads as no
+answer. The same argument does not carry: a wrong Audience misleads a person
+rather than emptying a result. Left alone rather than decided quietly.
