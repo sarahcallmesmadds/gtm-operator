@@ -447,8 +447,13 @@ const commands = {
     const context = contextOrExit()
 
     const where = []
-    // Type, Domain and Audience rather than text matching alone, which is the
-    // judgment `SKILLS-process.md` gives this skill.
+    // ONLY Type AND Domain GO INTO THE SQL. `SKILLS-process.md` gives this skill
+    // Type, Domain and Audience as its judgment, but Audience holds several
+    // values at once and no multi-value predicate on this surface has been
+    // proved: `plugins/setup/scripts/views.js` records a multi-select filter
+    // rejected with a 400, alongside two more Notion filters that were accepted
+    // and then did not work. So Audience is answered below rather than queried,
+    // and the one thing it must never do is vanish without a word.
     for (const field of ['Type', 'Domain']) {
       if (!question[field]) continue
       if (!schema.IDENTITY_VALUES[field].includes(question[field])) {
@@ -475,9 +480,14 @@ const commands = {
       archivedNote: includeArchived
         ? 'Archived artifacts are included, because the question asked for them.'
         : 'Archived artifacts are excluded. Say so when reporting, rather than letting their absence read as nothing existing.',
+      audience: question.Audience === undefined ? null : question.Audience,
+      audienceNote: question.Audience === undefined
+        ? 'No Audience was asked for. Type and Domain are the only filters in the SQL.'
+        : 'AUDIENCE IS NOT IN THE SQL. It was asked for and it did not narrow this query, so these rows are wider than the question. Weigh it yourself over the rows that come back, and say you did.',
       note:
         'Replace <ds> with the quoted data source url. Text matching is not in the SQL: ' +
-        'Type, Domain and Audience narrow it, and which artifact actually answers the question is the skill\'s judgment. ' +
+        'Type and Domain narrow it, Audience does not and is read back to you above, ' +
+        'and which artifact actually answers the question is the skill\'s judgment. ' +
         'Pass what comes back to `trust` before answering from any of it.'
     }, null, 2))
   },

@@ -55,10 +55,16 @@ Then:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" find question.json
 ```
 
-**Type, Domain and Audience are the filters, not text matching.** Which artifact
-actually answers the question is your judgment, made over the rows that come
-back. Text matching alone finds the document that uses the same words, which is
-not the same as the one that answers the question.
+**Type and Domain are the filters, not text matching.** Which artifact actually
+answers the question is your judgment, made over the rows that come back. Text
+matching alone finds the document that uses the same words, which is not the same
+as the one that answers the question.
+
+**Audience is a filter you apply, not one the query applies.** You may put it in
+the question file and it is read straight back to you under `audience`, but it
+does not narrow the SQL, because no multi-value filter has been proved against
+this workspace. When you send one, the rows that come back are wider than you
+asked for. Narrow them yourself, and say in your answer that you did.
 
 **Working out the Type from the question is half the job:**
 
