@@ -449,12 +449,30 @@ const commands = {
       today: final.today
     })
 
+    // A NAMED PARENT IS CHECKED AND THEN NOT WRITTEN, AND THAT HAS TO BE SAID.
+    // `problems` refuses a parent of the wrong type, because the rule cannot be
+    // enforced anywhere else, so the plugin takes a parent seriously enough to
+    // reject a bad one. It then builds no relation at all. Left unsaid, a user
+    // who named a valid parent has every reason to believe it was set, and the
+    // page reads as filed when it is loose. `Parent` and `Supersedes` both
+    // arrive with `update`.
+    //
+    // `parent` below is the DATABASE the page is created in, which is a
+    // different thing from the Parent relation and is named the same by Notion.
+    const parentNamed = final.parent !== undefined && final.parent !== null && final.parent !== ''
+
     console.log(JSON.stringify({
       parent: { data_source_id: context.dataSourceId },
       properties,
       body: artifact.body(final),
       headings: artifact.expectedHeadings(final),
       relatedView: schema.RELATED_VIEW[final.Type],
+      parentRelation: parentNamed ? final.parent : null,
+      parentRelationNote: parentNamed
+        ? 'THE PARENT WAS CHECKED AND IS NOT BEING WRITTEN. This version builds no relation, so the page will be ' +
+          'created unlinked however valid the parent is. Say so when reporting, and set it by hand or wait for `update`. ' +
+          'Reporting the page as filed under it would be wrong.'
+        : 'No parent was named. This version writes no Parent or Supersedes relation either way; both arrive with `update`.',
       note:
         'Create the page, then read it back and run `prove`. A Notion page can be created with an empty body ' +
         'on a silent partial failure, and a create call that returned without an error proves nothing.'
