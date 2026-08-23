@@ -305,6 +305,52 @@ check('an unrecognised cadence is not quietly read as exempt', () => {
   assert.strictEqual(command.staleness(row('None', '2020-01-01'), '2026-08-23').state, 'exempt')
 })
 
+// --------------------------------------------------------------- create parent
+
+/** `create` prints, like `find`, so the assertion is on what it printed. */
+const runCreate = artifactRow => {
+  contextFor(identity)
+  const file = path.join(SANDBOX, 'artifact.json')
+  fs.writeFileSync(file, JSON.stringify(artifactRow))
+  const printed = []
+  const real = console.log
+  console.log = (...args) => printed.push(args.join(' '))
+  try { command.commands.create(file) } finally { console.log = real }
+  return JSON.parse(printed.join('\n'))
+}
+
+const SOP_WITH_PARENT = {
+  Name: 'Lead routing', Type: 'SOP/ROE',
+  parent: 'https://notion.so/pg', parentType: 'Strategy Decision',
+  body: { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'none known' }
+}
+
+check('A CHECKED PARENT THAT IS NOT WRITTEN SAYS SO, rather than reading as filed', () => {
+  // The parent passes validation and never reaches the payload. Unsaid, a user
+  // who named a valid parent has every reason to think the page was filed under
+  // it, and it is loose.
+  const out = runCreate(SOP_WITH_PARENT)
+  assert.strictEqual(out.parentRelation, 'https://notion.so/pg', 'the named parent was not reported back')
+  assert.ok(/NOT BEING WRITTEN/.test(out.parentRelationNote), `nothing said the parent is unwritten:\n${out.parentRelationNote}`)
+  assert.ok(!('Parent' in out.properties), 'a Parent relation reached the payload, so this test is asserting the wrong thing')
+  assert.ok(!('Supersedes' in out.properties), 'a Supersedes relation reached the payload')
+})
+
+check('with no parent named, it still says relations are not written', () => {
+  const { parent, parentType, ...noParent } = SOP_WITH_PARENT
+  const out = runCreate(noParent)
+  assert.strictEqual(out.parentRelation, null, 'an unnamed parent must be an explicit null, not a missing key')
+  assert.ok(/No parent was named/.test(out.parentRelationNote), out.parentRelationNote)
+  assert.ok(!/NOT BEING WRITTEN/.test(out.parentRelationNote), 'the warning fired when no parent was named')
+})
+
+check('the database it is created in is still sent, and is not the relation', () => {
+  // Notion calls both of these "parent". Losing the first would stop the page
+  // being created at all, so the two are asserted apart.
+  const out = runCreate(SOP_WITH_PARENT)
+  assert.strictEqual(out.parent.data_source_id, 'ds', 'the data source was dropped')
+})
+
 // ----------------------------------------------------------------- find query
 
 /**

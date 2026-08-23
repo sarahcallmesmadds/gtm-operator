@@ -2468,3 +2468,53 @@ every column, wrapping the shipped name instead of the workspace's, applied in
 `properties` builds Notion API properties rather than SQL, so it uses the plain
 property name and is right as it stands. The prefix belongs to the query surface
 alone.
+
+## process, review round 5 on pull request 14
+
+### The parent was checked and then thrown away, and the skill banned its own remedy
+
+Devin asked whether the missing `Parent` and `Supersedes` relations were deferred
+to `update` on purpose. They were not. Three things disagreed:
+
+- `problems` refuses a parent of the wrong type. The rule cannot be enforced
+  anywhere else, so the plugin takes a parent seriously enough to reject a bad
+  one.
+- `properties` then drops a good one. Run with a valid parent it returns
+  `Name, Type, Status, Review cadence, Last checked for accuracy, Verified date`
+  and no relation at all.
+- `new/SKILL.md` forbids building a property payload by hand, and then told the
+  model to set `Supersedes` on the new artifact and archive the old one. It
+  instructed something and banned the only route to it. Archiving an existing
+  page is an edit, which the same file says is `update`'s job.
+
+**The third instance of one shape in this pull request.** Audience was checked
+against the documentation and dropped from the query; a parent is checked against
+the rules and dropped from the payload. Something is validated, and its absence
+afterwards is silent.
+
+### Taken: say it, rather than build it
+
+Building the relation here would pull `update`'s work forward, because
+`Supersedes` is half a feature without archiving the old page.
+
+So `new/SKILL.md` no longer instructs either, and says both arrive with `update`.
+`create` now returns `parentRelation` and `parentRelationNote`, which state that
+a named parent was checked and is not being written and that the page will be
+created unlinked. **This is how the same file already handles the embedded
+related view**: name what is missing rather than leave the user to notice.
+
+`problems` still refuses a wrong parent type. That check is the only enforcement
+of the rule anywhere and stays useful for `update`.
+
+### One thing kept deliberately apart
+
+Notion calls two different things "parent": the data source a page is created in,
+and the `Parent` relation. `create` sends the first and not the second, and a
+test asserts them separately, because losing the first stops the page being
+created at all.
+
+### What was proved by breaking it
+
+Four mutations, each confirmed to have landed: the warning removed, which is a
+return to the original silence, the warning fired when no parent was named, the
+named parent not read back, and the data source dropped from the payload.

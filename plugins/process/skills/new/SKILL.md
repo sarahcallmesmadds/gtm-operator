@@ -141,8 +141,12 @@ wrong threshold is survivable here: a bad candidate costs one "no".
   say so plainly rather than offering it.
 - **A replacement.** Both this and the match are Strategy Decisions, and the
   existing one reaches a *different* decision on the *same* problem. **Show both
-  decisions side by side and ask.** Only on a yes: set `Supersedes` on the new
-  one and set the old one's `Status` to `Archive`. Never archive without that yes.
+  decisions side by side and say so.** **Do not set `Supersedes` and do not
+  archive the old one.** Neither is built in this version: `create` writes no
+  relation, and archiving the old artifact is an edit, which is `update`'s job.
+  Say plainly that the link has to be made by hand for now, and name both
+  artifacts so it can be. Writing the relation yourself is the one thing this
+  skill forbids, so an instruction to do it would ban its own remedy.
 
 ---
 
@@ -268,6 +272,11 @@ rather than written empty, and nothing fails over it.
   yet. Say so rather than offering it.
 - **Does not silently create a parent.** It offers an existing Strategy Decision,
   or proposes creating one first, and says which it is doing.
+- **Does not write the `Parent` or `Supersedes` relation.** `check` still refuses
+  a parent of the wrong type, because that is the only place the rule can be
+  enforced, but `create` builds no relation and the named parent does not reach
+  Notion. `create` says so in its output. Both relations arrive with `update`.
+  Report it as unlinked rather than letting the user assume it was set.
 - **Does not let an SOP, Enablement, Reporting or Technical Reference be a
   parent.** The script refuses it. Only a Strategy Decision can be a parent,
   because every other type describes how and this one describes why, which is
