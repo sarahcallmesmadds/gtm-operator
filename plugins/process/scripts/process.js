@@ -147,12 +147,58 @@ function rowList (rows) {
   )
 }
 
-/** Rows keyed by logical name rather than by whatever the workspace calls them. */
+/**
+ * The workspace's option names, mapped back to the logical ones. Deliberately
+ * the same shape as `logicalValues` in `plugins/calendar/scripts/calendar.js`,
+ * because it is the same problem.
+ *
+ * A value the map does not carry is passed through unchanged rather than
+ * dropped. It is a value the workspace added and this plugin never shipped, and
+ * reporting it as itself is better than reporting it as nothing.
+ */
+function logicalValues (context) {
+  const values = (context.names && context.names.values) || {}
+  const reverse = {}
+  for (const [property, options] of Object.entries(values)) {
+    reverse[property] = {}
+    for (const [logical, workspace] of Object.entries(options || {})) {
+      reverse[property][workspace] = logical
+    }
+  }
+  return reverse
+}
+
+/**
+ * Rows keyed by logical name rather than by whatever the workspace calls them,
+ * AND carrying logical option values rather than the workspace's.
+ *
+ * BOTH HALVES ARE NEEDED AND ONLY ONE USED TO BE DONE. Queries go out carrying
+ * the workspace's own value names, through `context.value`, so what comes back
+ * is renamed on both axes. Every judgment downstream compares against the
+ * logical constants: `staleness` looks the cadence up in `CADENCES`, and `judge`
+ * compares the type against `PARENT_TYPE`. With the names mapped and the values
+ * left raw, a renamed workspace read every artifact's cadence as unrecognised,
+ * so every trust judgment came back "unknown" and no Strategy Decision was ever
+ * recognised as one. Both failures are silent, and "unknown" is the answer this
+ * plugin gives for a cadence it has genuinely never seen, so nothing about the
+ * output said the map was the cause.
+ *
+ * `_raw` still carries the row exactly as it arrived, for anything that needs
+ * what the workspace actually said.
+ */
 function normaliseRows (context, rows) {
   const map = columnMap(context)
+  const back = logicalValues(context)
+  const toLogical = (logical, value) => {
+    const options = back[logical]
+    if (!options) return value
+    if (Array.isArray(value)) return value.map(entry => (entry in options ? options[entry] : entry))
+    return value in options ? options[value] : value
+  }
+
   return rowList(rows).map(row => {
     const out = {}
-    for (const [logical, actual] of Object.entries(map)) out[logical] = row[actual]
+    for (const [logical, actual] of Object.entries(map)) out[logical] = toLogical(logical, row[actual])
     out._raw = row
     return out
   })
