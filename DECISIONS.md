@@ -2405,3 +2405,27 @@ entirely against the end-to-end supersede check.
 normalised row: `scored` rebuilds each row with lower-case keys just above it, so
 the reference is correct. Checked because Devin's note quoted the line and the
 casing looked wrong out of context.
+
+## process, review round 3 on pull request 14
+
+### Asking what is wrong with a row returned a stack trace instead of the answer
+
+The tags cap counted `row.Tags` without first asking whether it was a list of
+value names. `Tags` is in `MULTI_SELECT_FIELDS`, so the loop above had already
+recorded the right refusal for a list holding a number, and then the cap check
+crashed trying to trim it. `problems({ Tags: [42] })` threw
+`entry.trim is not a function`, which is a function failing at the one job it
+exists to do: say what is wrong rather than fall over on it.
+
+Reproduced before it was changed, not read.
+
+**One fix covered both paths.** `properties` runs `problems` itself, so the write
+path crashed the same way, one level down. It now refuses with the tag named. The
+other two `listValues` calls in the pair, at `artifact.js` and `calendar/row.js`,
+sit behind that same validation and need no guard of their own. Checked rather
+than assumed, because faults in this repository have been arriving as symmetric
+pairs and fixing one side has twice been the whole of the bug.
+
+Both new checks were mutated and confirmed red: the guard removed, which is the
+original defect, and the guard inverted, which would let a well formed list skip
+the cap entirely.

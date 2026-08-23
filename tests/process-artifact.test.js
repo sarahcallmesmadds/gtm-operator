@@ -162,6 +162,29 @@ check('a tag with spaces round it is the same tag', () => {
   assert.deepStrictEqual(artifact.problems({ ...SOP(), Tags: ['  AI  '] }), [])
 })
 
+check('A BADLY SHAPED TAG IS REFUSED, NOT THROWN OVER', () => {
+  // The cap check used to count the list without asking whether it was a list of
+  // value names first, so a number in it made `problems` throw while trying to
+  // report the problem it had already found. Asking what is wrong with a row
+  // returned a stack trace instead of the answer.
+  const row = { ...SOP(), Tags: [42] }
+  let found
+  assert.doesNotThrow(() => { found = artifact.problems(row) }, 'problems threw rather than reporting')
+  const problem = about(found, 'Tags')[0]
+  assert.ok(problem, 'the badly shaped tag was not reported at all')
+  assert.ok(/42/.test(problem.message), problem.message)
+})
+
+check('and the write path refuses it too, rather than crashing on the way', () => {
+  // `properties` runs `problems` itself, so the same fault reached it one level
+  // down. The refusal has to name the tag rather than arriving as a type error.
+  assert.throws(
+    () => artifact.properties(plainContext(), { ...SOP(), Tags: [42] }),
+    err => /not a value name/.test(err.message) && !/is not a function/.test(err.message),
+    'the write path crashed instead of refusing'
+  )
+})
+
 // -------------------------------------------------------------------- parents
 
 check('a parent named without its type is refused rather than assumed', () => {
