@@ -2691,3 +2691,29 @@ clean proof having looked at nothing. It now refuses anything that is not
 Five mutations, each confirmed to have landed: raw comparison restored, the
 person prefix left on, an unknown type passed instead of reported unchecked, the
 comparison forgiving values as well as shapes, and the input guard removed.
+
+### Review round 3 on pull request 15
+
+**A partial body would have wiped every section nobody touched.** Round 1 made an
+absent section legal to validate. It did not make it absent from what gets
+written, so `body()` still emitted every required section with empty text, and
+sending that blanks them on the page, `Exceptions` included, which can never be
+blank.
+
+**This is the fix that creates a worse bug than it cured, and it destroys
+content.** The refusal it replaced was merely annoying. `body()` and
+`expectedHeadings()` both take `partialBody` now, derived from one call so the
+two cannot disagree about which sections are being written.
+
+**And a second fixture that could not fail, caught by mutation rather than by
+reading.** The check that a create still writes every section used a complete
+body, so it passed whichever way the default went. Flipping the default to true
+turned nothing red. It uses a body with a section missing now, and asserts that
+section comes back present and empty. Two of these in two rounds, both found the
+same way, which is the argument for mutating every new assertion rather than the
+ones that look risky.
+
+Four mutations, each confirmed to have landed: the section filter removed, the
+flag dropped on the way to `body`, the flag dropped on the way to
+`expectedHeadings` so the headings drift from the body, and the default flipped
+so partial leaks into the create path.

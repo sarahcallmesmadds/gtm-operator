@@ -437,7 +437,7 @@ function properties (context, final, { defaultsPerson = true, parentType, today,
  * it. A required section with nothing in it never reaches here, because
  * `problems` refuses it.
  */
-function body (final) {
+function body (final, { partialBody = false } = {}) {
   const sections = sectionsFor(final && final.Type)
   if (!sections) {
     throw new Error(`No template for "${final && final.Type}", so there is no body to build.`)
@@ -449,6 +449,21 @@ function body (final) {
   for (const section of sections) {
     const text = content[section.heading]
     const filled = typeof text === 'string' && text.trim()
+
+    // PARTIAL BODY: A SECTION NOT SUPPLIED IS NOT WRITTEN AT ALL.
+    //
+    // On a create every section is emitted, empty ones included, because a
+    // section left out has to appear as considered-and-empty rather than
+    // vanish. On an update only the changed sections are sent, and everything
+    // else stays as it is on the page.
+    //
+    // Emitting the full set here would send an empty string for every section
+    // the person did not touch, and writing that wipes them, `Exceptions`
+    // included, which can never be blank. This is the second half of the
+    // `partialBody` change in `problems`: making an absent section legal to
+    // validate while still emitting it to write is a fix that creates a worse
+    // bug than the one it cured, because this one destroys content.
+    if (partialBody && text === undefined) continue
 
     if (!filled && section.conditional) continue
     out.push({ heading: section.heading, text: filled ? text.trim() : '' })
@@ -465,8 +480,11 @@ function body (final) {
  * so the skill re-fetches and confirms each heading is present. That check needs
  * the list in one place rather than derived twice.
  */
-function expectedHeadings (final) {
-  return body(final).map(section => section.heading)
+function expectedHeadings (final, options) {
+  // Derived from `body` with the same options, so the two cannot disagree about
+  // which sections are being written. Proving against a heading that was never
+  // sent reports a clean write as a failure.
+  return body(final, options).map(section => section.heading)
 }
 
 module.exports = {

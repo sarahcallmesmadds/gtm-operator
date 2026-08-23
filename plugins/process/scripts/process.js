@@ -1087,8 +1087,8 @@ const commands = {
       archiveNote: archiving
         ? 'THIS ARCHIVES THE ARTIFACT. Ask before sending it. Nothing here archives without a yes.'
         : null,
-      body: after.body ? artifact.body(after) : null,
-      headings: after.body ? artifact.expectedHeadings(after) : null,
+      body: after.body ? artifact.body(after, { partialBody: true }) : null,
+      headings: after.body ? artifact.expectedHeadings(after, { partialBody: true }) : null,
       bodyNote: after.body
         ? 'The body is included because one was passed. Send only the sections that changed. Rewriting a body ' +
           'wholesale when one section changed loses the wording of everything else.'
