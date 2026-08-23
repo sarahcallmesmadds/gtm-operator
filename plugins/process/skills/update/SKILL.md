@@ -63,6 +63,14 @@ see and fix.
 `after.json` is the artifact as it would be, plus `reviewed`. Only fields that
 actually differ are sent.
 
+**A property-only edit needs no body.** Leave `body` out entirely when changing a
+status, a tag or an owner. Anything you do not send stays as it is on the page.
+A section you DO send has to be filled, because a heading sent with nothing under
+it is how a section gets emptied by accident.
+
+**Clearing a person clears it.** Set `Owner` to null to empty it. It will not
+quietly become whoever installed the plugin.
+
 Then show the person, before anything is written:
 
 - **`changed`** and the values either side.

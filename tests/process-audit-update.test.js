@@ -260,7 +260,8 @@ const BODY = { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavio
 const BEFORE = {
   url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Status: 'Active',
   Domain: 'Deal Execution', Tags: ['AI', 'Data'], 'Review cadence': 'Quarterly',
-  'Last checked for accuracy': '2026-01-01'
+  'Last checked for accuracy': '2026-01-01',
+  Owner: '11111111-2222-3333-4444-555555555555'
 }
 const runUpdate = after =>
   capture(() => command.commands.update(write('before.json', BEFORE), write('after.json', after), '2026-08-23'))
@@ -355,6 +356,56 @@ check('an artifact with no url is refused', () => {
     () => capture(() => command.commands.update(write('b2.json', noUrl), write('a2.json', { ...noUrl, Description: 'x', body: BODY, reviewed: false }), '2026-08-23')),
     /which page it is for/
   )
+})
+
+check('A PROPERTY-ONLY EDIT NEEDS NO BODY AT ALL', () => {
+  // `update` sends only the sections that changed, so an absent section is one
+  // that stays as it is on the page. Judging those as empty made this refuse any
+  // edit that did not carry the whole body, which is most edits: changing a
+  // Status or a tag meant reconstructing every section first.
+  const out = runUpdate({ ...BEFORE, Status: 'Archive', reviewed: false })
+  assert.deepStrictEqual(out.changed, ['Status'])
+  assert.strictEqual(out.body, null, 'a body was invented for an edit that passed none')
+})
+
+check('a section that IS sent still has to be filled', () => {
+  // The other half. A heading sent with nothing under it is how a section gets
+  // emptied by accident, and that is the case the check was written for.
+  assert.throws(
+    () => runUpdate({ ...BEFORE, body: { ...BODY, Steps: '   ' }, reviewed: false }),
+    /Steps section is empty/,
+    'a section sent blank was accepted'
+  )
+})
+
+check('CLEARING THE OWNER EMPTIES IT, and does not hand it to the config person', () => {
+  // `properties` fills an absent person field with the config person, which is
+  // right on a create and silent reassignment on an edit. The changed-field loop
+  // found the name present and never reached the clear branch, so an artifact
+  // was quietly reassigned to whoever installed the plugin.
+  const out = runUpdate({ ...BEFORE, Owner: null, reviewed: false })
+  assert.deepStrictEqual(out.clearing, ['Owner'], 'the owner was not treated as cleared')
+  assert.deepStrictEqual(out.properties.Owner, [], `the owner came back as ${JSON.stringify(out.properties.Owner)}`)
+  assert.ok(!JSON.stringify(out.properties).includes('person-1'), 'the config person was written into the payload')
+})
+
+check('a person field clears with a list, not a null', () => {
+  const out = runUpdate({ ...BEFORE, Owner: null, reviewed: false })
+  assert.ok(Array.isArray(out.properties.Owner), 'a null would be accepted by Notion and leave the old owner in place')
+})
+
+check('AND THE REVIEW STAMP STILL RECORDS WHO READ IT', () => {
+  // Turning the person default off outright would have broken this: `Verified
+  // by` is a person field too and depends on that default.
+  const out = runUpdate({ ...BEFORE, Description: 'new text', reviewed: true })
+  assert.ok(out.verificationFields.includes('Verified by'), 'the review recorded nobody')
+  assert.deepStrictEqual(out.properties['Verified by'], ['person-1'], JSON.stringify(out.properties['Verified by']))
+})
+
+check('clearing the owner and reviewing at once keeps both straight', () => {
+  const out = runUpdate({ ...BEFORE, Owner: null, reviewed: true })
+  assert.deepStrictEqual(out.properties.Owner, [], 'the owner was refilled by the review stamp')
+  assert.deepStrictEqual(out.properties['Verified by'], ['person-1'], 'the review stamp lost its person')
 })
 
 // ------------------------------------------------------------ prove-update
