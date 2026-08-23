@@ -2350,3 +2350,58 @@ is read back and offered to the judgment as though it were real. Type and Domain
 are validated, because a wrong value there returns no rows and reads as no
 answer. The same argument does not carry: a wrong Audience misleads a person
 rather than emptying a result. Left alone rather than decided quietly.
+
+## process, review round 2 on pull request 14
+
+### Rows came back half translated, and the half that was missing was the one every judgment used
+
+`normaliseRows` mapped column names from the workspace's back to the logical
+ones and copied option values straight through. Queries go out carrying the
+workspace's own value names, through `context.value`, so what came back was
+renamed on both axes and only one axis was undone.
+
+Everything downstream compares against logical constants. `staleness` looks the
+cadence up in `CADENCES`; `judge` compares the type against `PARENT_TYPE`. On a
+workspace that renamed its options, every artifact's cadence read as
+unrecognised, so every trust judgment came back `unknown`, and no Strategy
+Decision was ever recognised as one, so the supersede prompt could not fire.
+
+Proved by running before it was changed, not by reading: a row with a renamed
+`Quarterly` cadence and a January check date came back `unknown`. After the fix
+the same row reads `due`, 234 days against a 90 day cadence.
+
+**Both failures are silent, and worse than silent.** `unknown` is also the honest
+answer for a cadence this version has genuinely never seen, so the broken state
+and the working one are the same output. That is the same shape as the
+relative-date view in `views.js`, which read back correctly and matched nothing.
+
+`logicalValues` is ported from `plugins/calendar/scripts/calendar.js`, which had
+solved this already, including its rule that a value the map does not carry is
+passed through as itself rather than dropped. `_raw` still carries the row
+exactly as it arrived.
+
+### A test was pinning the bug in place
+
+`rows come back keyed logically` asserted `row.Type === 'R SOP/ROE'`, the renamed
+value, so the suite would have gone red if anyone fixed this. It is split in two
+now: one check that column names come back logical, and one that option values do.
+
+**Asserting the map is not asserting the behaviour.** Two checks run the whole
+path instead: staleness on a renamed cadence, and `judge` end to end on a renamed
+workspace confirming a supersede is actually detected. The second was written
+because a supersede that never fires looks exactly like two artifacts that were
+not similar enough.
+
+### What was proved by breaking it
+
+Six mutations, each confirmed to have changed the file first: the reverse map
+removed, built the wrong way round, the unmapped-value pass-through turned into a
+drop, `_raw` emptied, the map skipped for `Type` alone, and the map disabled
+entirely against the end-to-end supersede check.
+
+### Checked and not a defect
+
+`judge` reads `row.type` in lower case at the replacement filter. That is not the
+normalised row: `scored` rebuilds each row with lower-case keys just above it, so
+the reference is correct. Checked because Devin's note quoted the line and the
+casing looked wrong out of context.

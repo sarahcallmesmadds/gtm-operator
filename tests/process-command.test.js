@@ -119,8 +119,70 @@ check('rows come back keyed logically, whatever the workspace calls them', () =>
   const [row] = command.normaliseRows(renamedContext, raw)
 
   assert.strictEqual(row.Name, 'Routing', 'the renamed column did not come back under its logical name')
-  assert.strictEqual(row.Type, 'R SOP/ROE')
   assert.strictEqual(row.url, 'u')
+})
+
+check('OPTION VALUES COME BACK LOGICAL TOO, not just the column names', () => {
+  // This assertion used to read `row.Type === 'R SOP/ROE'`, pinning the bug in
+  // place: names were mapped back and values were not, so every judgment
+  // downstream compared a renamed value against a logical constant and quietly
+  // lost. A free-text column is checked alongside, because the reverse map must
+  // not touch one.
+  const renamedContext = contextFor(renamed)
+  const raw = [{ url: 'u', 'R Name': 'Routing', 'R Type': 'R SOP/ROE', 'R Status': 'R Active' }]
+  const [row] = command.normaliseRows(renamedContext, raw)
+
+  assert.strictEqual(row.Type, 'SOP/ROE', 'the renamed option value did not come back logical')
+  assert.strictEqual(row.Status, 'Active', 'the renamed status did not come back logical')
+  assert.strictEqual(row.Name, 'Routing', 'a free-text value was rewritten by the option map')
+  assert.strictEqual(row._raw['R Type'], 'R SOP/ROE', 'the row as the workspace sent it was not kept')
+})
+
+check('a value the workspace added itself is passed through, not dropped', () => {
+  const renamedContext = contextFor(renamed)
+  const raw = [{ url: 'u', 'R Type': 'Something they invented' }]
+  const [row] = command.normaliseRows(renamedContext, raw)
+  assert.strictEqual(row.Type, 'Something they invented', 'an unmapped value was lost rather than reported as itself')
+})
+
+check('THE FAILURE THIS FIXES: staleness reads a renamed cadence, end to end', () => {
+  // The break was silent and its symptom was indistinguishable from the honest
+  // answer: "unknown" is also what this gives for a cadence it has never seen.
+  // So the check runs the whole path rather than asserting on the map.
+  const renamedContext = contextFor(renamed)
+  const raw = [{ url: 'u', 'R Review cadence': 'R Quarterly', 'R Last checked for accuracy': '2026-01-01' }]
+  const [row] = command.normaliseRows(renamedContext, raw)
+  const answer = command.staleness(row, '2026-08-23')
+  assert.strictEqual(answer.state, 'due', `a renamed workspace read its cadence as "${answer.state}": ${answer.why}`)
+})
+
+check('THE OTHER HALF: a renamed Strategy Decision is still recognised as one', () => {
+  const renamedContext = contextFor(renamed)
+  const raw = [{ url: 'u', 'R Type': `R ${schema.PARENT_TYPE}` }]
+  const [row] = command.normaliseRows(renamedContext, raw)
+  assert.strictEqual(row.Type, schema.PARENT_TYPE, 'the parent type did not survive the rename, so no supersede prompt would fire')
+})
+
+check('and the supersede prompt actually fires, run the way a user runs it', () => {
+  // Asserting the map is not asserting the behaviour. This runs judge end to end
+  // on a renamed workspace, because a supersede that never fires is silent and
+  // looks exactly like two artifacts that were not similar enough.
+  const proposedFile = path.join(SANDBOX, 'proposed.json')
+  const rowsFile = path.join(SANDBOX, 'rows.json')
+  fs.writeFileSync(proposedFile, JSON.stringify({
+    Name: 'Lead routing rules', Description: 'how inbound leads are routed', Type: schema.PARENT_TYPE
+  }))
+  fs.writeFileSync(rowsFile, JSON.stringify([{
+    url: 'u', 'R Name': 'Lead routing rules', 'R Description': 'how inbound leads are routed',
+    'R Type': `R ${schema.PARENT_TYPE}`, 'R Status': 'R Active'
+  }]))
+  contextFor(renamed)
+  const printed = []
+  const real = console.log
+  console.log = (...args) => printed.push(args.join(' '))
+  try { command.commands.judge(proposedFile, rowsFile) } finally { console.log = real }
+  const out = JSON.parse(printed.join('\n'))
+  assert.strictEqual(out.possibleReplacements.length, 1, `no supersede was detected on a renamed workspace: ${JSON.stringify(out.possibleReplacements)}`)
 })
 
 // ------------------------------------------------------------------ similarity
