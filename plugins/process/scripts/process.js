@@ -109,15 +109,41 @@ const SELECTED = [
   'Verified date'
 ]
 
+/**
+ * The two date properties, which cannot be selected the way the others are.
+ *
+ * A DATE PROPERTY IS NOT QUERYABLE UNDER ITS OWN NAME. Notion exposes it as
+ * `date:<name>:start`, which is what the SQLite table definition shows. Measured
+ * in this repository, applied by `plugins/setup/scripts/views.js` and by
+ * `dateColumns` in `plugins/calendar/scripts/calendar.js`, and missed here:
+ * asking for `c."Last checked for accuracy"` returns nothing, `staleness` then
+ * sees no check date, and every artifact reads `unknown`.
+ *
+ * THAT IS THE SAME SYMPTOM THE VALUE MAP FIX ADDRESSED, from a second and
+ * unrelated cause, which is why the end-to-end checks matter more than the
+ * unit ones. Only `:start` is taken. These hold a day, not a range, and nothing
+ * reads an end.
+ *
+ * The name inside the prefix is the workspace's name for the property, not the
+ * one this plugin shipped with.
+ */
+const DATE_FIELDS = new Set(['Last checked for accuracy', 'Verified date'])
+
+/** The column a logical field is actually selectable through. */
+function columnFor (context, logical) {
+  const name = context.property(logical)
+  return DATE_FIELDS.has(logical) ? `date:${name}:start` : name
+}
+
 function selectList (context) {
   return ['c.url']
-    .concat(SELECTED.map(logical => `c.${identifier(context.property(logical))}`))
+    .concat(SELECTED.map(logical => `c.${identifier(columnFor(context, logical))}`))
     .join(', ')
 }
 
 function columnMap (context) {
   const map = { url: 'url' }
-  for (const logical of SELECTED) map[logical] = context.property(logical)
+  for (const logical of SELECTED) map[logical] = columnFor(context, logical)
   return map
 }
 
