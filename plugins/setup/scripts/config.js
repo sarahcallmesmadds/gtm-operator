@@ -107,7 +107,7 @@ function read () {
     throw new Error(
       `Config at ${CONFIG_PATH} has a "databases" entry that is ${describeDatabases(databases)}, and it should be an object keyed by database name.\n` +
       `  It is not being repaired, because treating damage as "nothing was created" would tell an install to build databases that may already exist.\n` +
-      `  Fix that entry or move the file aside and install again.`
+      `  Fix that entry, or move the file aside and run this plugin's install again.`
     )
   }
   return parsed
