@@ -476,9 +476,17 @@ check('a damaged databases value is refused, and never counted', () => {
       `${label} should be refused as damage, not read`
     )
     assert.strictEqual(context.databases, described)
-    assert.ok(
-      !/database[s]? recorded/.test(context.message),
-      `${label} must not be counted: ${context.message}`
+
+    // The whole message, for the same reason every other message in this file
+    // is asserted whole: a substring check passes on a message that has been
+    // reworded into saying something else. This one has to keep naming what the
+    // value is, keep refusing to count it, and keep naming the plugin to run.
+    assert.strictEqual(
+      context.message,
+      `Config at ${reader.CONFIG_PATH} has a "databases" entry that is ${described}, and it should be an object keyed by database name.\n` +
+      '  Nothing is read through it and nothing counts it, because a damaged map read as "nothing was recorded" invites an install that builds databases which may already exist.\n' +
+      "  Fix that entry, or move the file aside and run the `setup` plugin's install again.",
+      `the message is wrong for ${label}`
     )
   }
 

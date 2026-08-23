@@ -156,7 +156,7 @@ function readRaw () {
       REFUSAL.DATABASES_DAMAGED,
       `Config at ${CONFIG_PATH} has a "databases" entry that is ${describeDatabases(databases)}, and it should be an object keyed by database name.\n` +
       `  Nothing is read through it and nothing counts it, because a damaged map read as "nothing was recorded" invites an install that builds databases which may already exist.\n` +
-      `  Fix that entry or move the file aside and install again.`,
+      `  Fix that entry, or move the file aside and run the \`setup\` plugin's install again.`,
       { databases: describeDatabases(databases) }
     )
   }
