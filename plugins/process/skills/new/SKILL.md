@@ -137,8 +137,8 @@ wrong threshold is survivable here: a bad candidate costs one "no".
 
 - **No match.** Carry on to step 4.
 - **A duplicate.** Say which artifact it is, link it, and ask whether to update
-  that one instead. `update` is the skill for that, and it is not built yet, so
-  say so plainly rather than offering it.
+  that one instead. `update` is the skill for that, so hand over rather than
+  writing a second artifact.
 - **A replacement.** Both this and the match are Strategy Decisions, and the
   existing one reaches a *different* decision on the *same* problem. **Show both
   decisions side by side and say so.** **Do not set `Supersedes` and do not
@@ -268,8 +268,8 @@ rather than written empty, and nothing fails over it.
 
 ## What this skill does not do
 
-- **Does not edit an existing artifact.** That is `update`, which is not built
-  yet. Say so rather than offering it.
+- **Does not edit an existing artifact.** That is `update`. Hand over to it
+  rather than editing here.
 - **Does not silently create a parent.** It offers an existing Strategy Decision,
   or proposes creating one first, and says which it is doing.
 - **Does not write the `Parent` or `Supersedes` relation.** `check` still refuses

@@ -2518,3 +2518,99 @@ created at all.
 Four mutations, each confirmed to have landed: the warning removed, which is a
 return to the original silence, the warning fired when no parent was named, the
 named parent not read back, and the data source dropped from the payload.
+
+## process, plugin three: `update` and `audit`
+
+The second of the three pull requests. `new` and `find` shipped in #14;
+`backfill` is still the third.
+
+### `audit` writes nothing, and the memo query is the whole reason it is careful
+
+`SKILLS-process.md` is explicit that audit reads only and hands a list to
+`update`. Two queries, because signal 2 cannot be answered from the artifacts
+table. The memo query goes through the reverse relation from Memos, sorted by
+`Published date` descending, and never reads the artifact's own relation
+property: a page's relation returns at most 25 references and a relation value
+caps at 100 pages, so on any long-lived artifact the newest memo is invisible and
+the strongest signal degrades to nothing while looking healthy.
+
+`flags` refuses to run without the memo rows rather than defaulting them to none,
+and says out loud when it read no memos. Both exist so "nothing was announced"
+and "nobody looked" cannot be confused, which is the same distinction `staleness`
+already makes between exempt and unknown.
+
+**Signal 4 is not redundant with signal 1.** An empty date matches no "before"
+filter in Notion, so a backfilled artifact escapes the staleness signal
+completely. That is why `Verified by` is checked separately, and it is why
+`audit` selects one column more than `find` does.
+
+**Supersede candidates are candidates.** Getting one wrong archives a live
+document, so signal 3 is reported apart from the flags, carries the uncalibrated
+threshold note, and is never acted on.
+
+### Reading Memos without carrying the Memos schema
+
+`contextFor` validates a recorded name map against a full identity in both
+directions, so a name in the map the identity does not list is an error. This
+plugin does not carry the Memos schema and should not, so any identity it offered
+would be a subset and every Memos property it never looks at would be reported as
+a fault in a healthy config.
+
+So the two names `audit` needs are read from the recorded map directly, and both
+are required rather than defaulted. **What is given up is written into the
+code**: the one-to-one check does not run over Memos here. That check protects
+writes, and nothing in this plugin writes to Memos. `setup`'s `check` owns
+validating that map.
+
+### `update` and the one question that cannot be inferred
+
+The three verification fields move together or none of them do, and which it is
+comes from an explicit `reviewed` on the after row. A missing `reviewed` is
+refused rather than read as false, because a missing answer and "no I did not
+re-read it" are different and only one is a decision somebody made.
+
+`Last checked for accuracy` drives the staleness check. Stamping it on an edit
+that was not a review makes a stale document look freshly checked and nothing
+downstream can tell. Leaving it alone on a real review only leaves the artifact
+flagged, which a person can see.
+
+### The field list that is not `SELECTED`
+
+`update` iterates `UPDATABLE_FIELDS`, not `SELECTED`. `SELECTED` is a reading
+list and deliberately omits `Tags`, `Segment`, `L2C Lifecycle` and `Owner`,
+which no judgment reads. The first version of `update` reused it and therefore
+could not change any of those four, reporting "nothing changed" for a real edit.
+**Caught by a test that was passing for the wrong reason**: the reordering check
+asserted no change on a Tags edit, and Tags was simply invisible.
+
+Reordering a multi-select is not a change, and an absent value and an empty one
+are the same thing. Without that, reordering three tags looked like an edit and,
+on a review, dragged the verification stamp with it.
+
+An emptied field goes as an explicit empty value, a list for a multi-select and
+null for everything else. Left out of the payload the write is a no-op, the old
+value survives, and the person is told the change was saved.
+
+### `prove-update` takes the update's own output
+
+Not the two files it was given. A payload rebuilt from a merged row has no record
+of what was emptied, so a clear that silently failed would read as a clean write.
+It binds to the page it was sent to, and it says what it did not check every
+time, including on a pass.
+
+### What was proved by breaking it
+
+Fourteen mutations, each confirmed to have changed the file before the suite ran:
+the verification stamp moving on a non-review, one of the three moving alone, a
+cleared field left out of the payload, a multi-select cleared with null, the
+field loop driven from `SELECTED` again, multi-select order read as a change,
+`prove-update` unbound from its page, archiving no longer called out, memo
+matching by raw string, the newest memo becoming the first-seen memo, archived
+decisions offered as supersede candidates, signal 4 silenced, the memo query
+pointed at the artifacts table, and `flags` defaulting the memo rows to none.
+
+### Not run against Notion
+
+No SQL here has been sent. The queries are asserted as strings. Whether this
+surface accepts them is a live-run question the suite cannot answer, and the same
+caveat that stood for `new` and `find` stands here.

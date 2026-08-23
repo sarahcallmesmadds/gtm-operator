@@ -136,8 +136,7 @@ this skill exists to save them.
 ## What this skill does not do
 
 - **Does not edit and does not create.** Reads only. If the answer is wrong or
-  missing, `new` writes one and `update` fixes one, and `update` is not built
-  yet.
+  missing, `new` writes one and `update` fixes one.
 - **Does not query Memos**, so the newer-related-memo signal is unavailable. Say
   so rather than reporting a complete trust judgment.
 - **Does not rank by text similarity.** The rows come back and the judgment is
