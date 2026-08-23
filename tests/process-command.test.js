@@ -150,10 +150,49 @@ check('THE FAILURE THIS FIXES: staleness reads a renamed cadence, end to end', (
   // answer: "unknown" is also what this gives for a cadence it has never seen.
   // So the check runs the whole path rather than asserting on the map.
   const renamedContext = contextFor(renamed)
-  const raw = [{ url: 'u', 'R Review cadence': 'R Quarterly', 'R Last checked for accuracy': '2026-01-01' }]
+  // The date arrives under the prefixed column, which is the only shape Notion
+  // sends it in. Written under its plain name this check passed while the real
+  // query returned nothing, which is the second cause of the same symptom.
+  const raw = [{
+    url: 'u',
+    'R Review cadence': 'R Quarterly',
+    'date:R Last checked for accuracy:start': '2026-01-01'
+  }]
   const [row] = command.normaliseRows(renamedContext, raw)
   const answer = command.staleness(row, '2026-08-23')
   assert.strictEqual(answer.state, 'due', `a renamed workspace read its cadence as "${answer.state}": ${answer.why}`)
+})
+
+// ------------------------------------------------------------- date columns
+
+check('A DATE IS SELECTED THROUGH ITS date: COLUMN, never under its own name', () => {
+  // Measured convention in this repository: Notion does not expose a date
+  // property under its own name. views.js and calendar both do this and process
+  // did not, so the check date never arrived and every artifact read unknown.
+  const sql = command.selectList(context)
+  assert.ok(sql.includes('"date:Last checked for accuracy:start"'), `the check date is not selected through its date column:\n${sql}`)
+  assert.ok(sql.includes('"date:Verified date:start"'), `the verified date is not selected through its date column:\n${sql}`)
+  assert.ok(!/c\."Last checked for accuracy"/.test(sql), `the check date is still selected by its bare name:\n${sql}`)
+  assert.ok(!/c\."Verified date"/.test(sql), `the verified date is still selected by its bare name:\n${sql}`)
+})
+
+check('the date column carries the workspace\'s name, not the shipped one', () => {
+  const sql = command.selectList(contextFor(renamed))
+  assert.ok(sql.includes('"date:R Last checked for accuracy:start"'), `the prefix wrapped the wrong name:\n${sql}`)
+  contextFor(identity)
+})
+
+check('only the dates are prefixed, and the plain columns are left alone', () => {
+  const sql = command.selectList(context)
+  assert.ok(sql.includes('c."Name"'), sql)
+  assert.ok(sql.includes('c."Review cadence"'), 'a non-date column was given a date prefix')
+  assert.ok(!/date:Name/.test(sql), 'a text column was prefixed as a date')
+})
+
+check('the row map reads the date back under its logical name', () => {
+  const map = command.columnMap(context)
+  assert.strictEqual(map['Last checked for accuracy'], 'date:Last checked for accuracy:start')
+  assert.strictEqual(map.Name, 'Name', 'a plain column was rewritten')
 })
 
 check('THE OTHER HALF: a renamed Strategy Decision is still recognised as one', () => {

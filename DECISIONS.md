@@ -2429,3 +2429,42 @@ pairs and fixing one side has twice been the whole of the bug.
 Both new checks were mutated and confirmed red: the guard removed, which is the
 original defect, and the guard inverted, which would let a well formed list skip
 the cap entirely.
+
+## process, review round 4 on pull request 14
+
+### The check date never arrived, because dates are not selectable by name
+
+`selectList` asked for `c."Last checked for accuracy"` and `c."Verified date"`.
+A date property is not queryable under its own name on this surface. Notion
+exposes it as `date:<name>:start`, which is measured in this repository, written
+into `plugins/setup/scripts/views.js`, and applied by `dateColumns` in
+`plugins/calendar/scripts/calendar.js`. Process was the one place that did not.
+
+So the column came back empty, `staleness` saw no check date, and every artifact
+read `unknown`.
+
+**That is the same symptom round 2 fixed, from a second and unrelated cause.**
+Two independent faults, one output. Round 2's end-to-end check passed throughout,
+because it fed the date under its plain name, which is the shape that never
+arrives. The check has been corrected to use the real column, and it is the
+reason to prefer checks that run the whole path over checks that assert on a map:
+this one was end to end and still wrong, because it invented its input.
+
+Only `:start` is taken. Both properties hold a day rather than a range and
+nothing reads an end. The name inside the prefix is the workspace's, not the one
+this plugin shipped with, which is its own check.
+
+`columnMap` and `selectList` now derive the column from one function, so they
+cannot drift. A mutation that prefixes one and not the other is caught.
+
+### What was proved by breaking it
+
+Five mutations, each confirmed to have landed: the prefix removed, applied to
+every column, wrapping the shipped name instead of the workspace's, applied in
+`selectList` but not `columnMap`, and applied to one of the two dates only.
+
+### The writing side is unaffected and was checked
+
+`properties` builds Notion API properties rather than SQL, so it uses the plain
+property name and is right as it stands. The prefix belongs to the query surface
+alone.
