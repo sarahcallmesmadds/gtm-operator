@@ -2614,3 +2614,39 @@ pointed at the artifacts table, and `flags` defaulting the memo rows to none.
 No SQL here has been sent. The queries are asserted as strings. Whether this
 surface accepts them is a live-run question the suite cannot answer, and the same
 caveat that stood for `new` and `find` stands here.
+
+### Review round 1 on pull request 15
+
+Both findings arrived only through the hidden-findings line. The GitHub review
+body said "No Issues Found", the check was green, and there were no inline
+comments at all. **Both were real.**
+
+**`update` refused any edit that did not carry the whole body.** It validated the
+after row through `problems`, which records a missing section for every required
+one absent from the body. Changing a Status or a tag meant reconstructing every
+section first, which is most edits. `problems` and `properties` both take
+`partialBody` now: an absent section is one that stays as it is on the page, and
+a section that IS sent still has to be filled, which is the case that check was
+written for.
+
+The fix needed two edits, not one. `properties` runs `problems` itself, so
+scoping the check in `update` alone left the unscoped refusal coming from a line
+that had already been satisfied.
+
+**Clearing an owner reassigned it to the config person.** `properties` fills an
+absent person field with the config person, which is right on a create and silent
+reassignment on an edit: the changed-field loop found the name present and never
+reached the clear branch, so an artifact was quietly handed to whoever installed
+the plugin, with nothing in the output saying so.
+
+Turning the person default off outright was not the fix, and the finding said so
+before the code did: `Verified by` is a person field too and the review stamp
+depends on that default. So `update` builds two payloads, one without the default
+for the fields being edited and one with it for the verification stamp, and each
+is used only for what it is right for. A test covers clearing the owner and
+reviewing in the same update, since that is where the two meet.
+
+A person property also clears with an empty list rather than a null, the same as
+a multi-select. Sent a null the write is accepted and the old owner stays.
+
+Six mutations, each confirmed to have landed.

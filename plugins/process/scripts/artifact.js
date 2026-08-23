@@ -149,7 +149,7 @@ function saysNoneKnown (text) {
  * a refusal rather than an assumption: the whole rule exists because Notion
  * cannot check it, so guessing here would remove the only check there is.
  */
-function problems (final, { parentType } = {}) {
+function problems (final, { parentType, partialBody = false } = {}) {
   const found = []
   const add = (field, kind, message) => found.push({ field, kind, message })
 
@@ -251,6 +251,20 @@ function problems (final, { parentType } = {}) {
     for (const section of sections) {
       const text = body[section.heading]
       const filled = typeof text === 'string' && text.trim()
+
+      // PARTIAL BODY: AN ABSENT SECTION IS NOT A MISSING ONE.
+      //
+      // On a create the whole artifact is written at once, so a section left
+      // out was left out and the refusal is right. `update` sends only the
+      // sections that changed, and everything it does not send stays exactly as
+      // it is on the page. Judging those as empty made `update` refuse any edit
+      // that did not carry the entire body, including a change to one property,
+      // which is most edits.
+      //
+      // A section that IS supplied still has to be filled. Sending a heading
+      // with nothing under it is how a section gets emptied by accident, and
+      // that is the case this check was written for.
+      if (partialBody && text === undefined) continue
 
       if (!filled) {
         if (section.conditional) continue
@@ -354,8 +368,11 @@ function concerns (final) {
  * skill that has raised one and been told to go ahead must still be able to
  * write.
  */
-function properties (context, final, { defaultsPerson = true, parentType, today } = {}) {
-  const found = problems(final, { parentType })
+function properties (context, final, { defaultsPerson = true, parentType, today, partialBody = false } = {}) {
+  // `partialBody` is forwarded rather than left at its default. This runs
+  // `problems` itself, so a caller that scoped its own check and then called
+  // here got the unscoped refusal anyway, from a line it had already satisfied.
+  const found = problems(final, { parentType, partialBody })
   if (found.length) {
     throw new Error(
       `This artifact cannot be written yet:\n  ${found.map(p => p.message).join('\n  ')}`

@@ -192,7 +192,11 @@ const UPDATABLE_FIELDS = [
 ]
 
 function emptyValueFor (logical) {
-  return schema.MULTI_SELECT_FIELDS.includes(logical) ? [] : null
+  // A person property clears with an empty list, the same as a multi-select:
+  // both hold several values and Notion returns and takes them as arrays. Sent
+  // a null, the write is accepted and the old owner stays.
+  const listShaped = schema.MULTI_SELECT_FIELDS.includes(logical) || schema.PERSON_FIELDS.includes(logical)
+  return listShaped ? [] : null
 }
 
 /**
@@ -969,12 +973,35 @@ const commands = {
       )
     }
 
-    const problems = artifact.problems(after, { parentType: after.parentType })
+    // `partialBody` because `update` sends only the sections that changed.
+    // Everything it does not send stays as it is on the page, so judging an
+    // absent section as an empty one made this refuse any edit that did not
+    // carry the whole body, which is most edits.
+    const problems = artifact.problems(after, { parentType: after.parentType, partialBody: true })
     if (problems.length) {
       throw new Error(`This artifact cannot be written yet:\n  ${problems.map(one => one.message).join('\n  ')}`)
     }
 
-    const full = artifact.properties(context, after, { parentType: after.parentType, today: todayArg })
+    // TWO PAYLOADS, AND THE PERSON DEFAULT IS WHY.
+    //
+    // `properties` fills an absent person field with the config person, which is
+    // right on a create: somebody wrote this and there is a sensible owner. On
+    // an edit it is wrong and silently so. Clearing an owner leaves `Owner`
+    // absent from the after row, the default puts the config person back, the
+    // changed-field loop finds the name present and never reaches the clear
+    // branch, and the artifact is quietly reassigned to whoever installed the
+    // plugin. Nothing in the output said so.
+    //
+    // Turning the default off outright is not the fix either: `Verified by` is a
+    // person field too, and the review stamp depends on that default to record
+    // who read the artifact. So the editable payload is built without it and the
+    // verification stamp with it, and each is used only for what it is right for.
+    const editable = artifact.properties(context, after, {
+      defaultsPerson: false, parentType: after.parentType, today: todayArg, partialBody: true
+    })
+    const stamped = artifact.properties(context, after, {
+      defaultsPerson: true, parentType: after.parentType, today: todayArg, partialBody: true
+    })
 
     // Which logical fields actually differ. Compared logically, before the
     // workspace's names are put back on, so a rename cannot read as a change.
@@ -990,7 +1017,7 @@ const commands = {
     const cleared = []
     for (const logical of changedFields) {
       const name = context.property(logical)
-      if (!(name in full)) {
+      if (!(name in editable)) {
         // The field was emptied. It has to go as an explicit empty value, or the
         // write is a no-op and the old value silently survives a change the
         // person asked for and was told had happened.
@@ -998,7 +1025,7 @@ const commands = {
         cleared.push(logical)
         continue
       }
-      properties[name] = full[name]
+      properties[name] = editable[name]
     }
 
     // The three, together or not at all.
@@ -1006,8 +1033,8 @@ const commands = {
     if (after.reviewed === true) {
       for (const logical of schema.VERIFICATION_FIELDS) {
         const name = context.property(logical)
-        if (name in full) {
-          properties[name] = full[name]
+        if (name in stamped) {
+          properties[name] = stamped[name]
           verification.push(logical)
         }
       }
