@@ -23,6 +23,7 @@ const SANDBOX = fs.mkdtempSync(path.join(os.tmpdir(), 'gtm-audit-update-'))
 process.env.GTM_OPERATOR_CONFIG = path.join(SANDBOX, 'gtm-operator.config.json')
 
 const setupSchema = require('../plugins/setup/scripts/schema')
+const artifact = require('../plugins/process/scripts/artifact')
 const processNames = setupSchema.identityNames('process')
 const memoNames = setupSchema.identityNames('memos')
 
@@ -366,6 +367,37 @@ check('A PROPERTY-ONLY EDIT NEEDS NO BODY AT ALL', () => {
   const out = runUpdate({ ...BEFORE, Status: 'Archive', reviewed: false })
   assert.deepStrictEqual(out.changed, ['Status'])
   assert.strictEqual(out.body, null, 'a body was invented for an edit that passed none')
+})
+
+check('A PARTIAL BODY WRITES ONLY THE SECTIONS IT WAS GIVEN', () => {
+  // The other half of making a partial body legal. Validating an absent section
+  // as fine while still emitting it to write sends an empty string for every
+  // section nobody touched, and writing that wipes them, Exceptions included,
+  // which can never be blank. A fix that creates a worse bug than it cured.
+  const out = runUpdate({ ...BEFORE, body: { Steps: 'new text' }, reviewed: false })
+  assert.deepStrictEqual(out.body.map(s => s.heading), ['Steps'], JSON.stringify(out.body))
+  assert.deepStrictEqual(out.headings, ['Steps'], 'the headings disagree with the body being sent')
+})
+
+check('and no untouched section is sent as empty text', () => {
+  const out = runUpdate({ ...BEFORE, body: { Steps: 'new text' }, reviewed: false })
+  assert.ok(!out.body.some(s => s.text === ''), `an empty section was in the payload: ${JSON.stringify(out.body)}`)
+})
+
+check('a create still writes every section, empty ones included', () => {
+  // The create contract is the opposite and must not move: a section left out
+  // has to appear as considered-and-empty rather than vanish.
+  //
+  // THE BODY HERE IS DELIBERATELY INCOMPLETE. Written with a full body this
+  // check passed whatever the default was, because every section was present
+  // either way. That is the same fixture-that-cannot-fail as the read-back one,
+  // caught by mutating the default and seeing nothing go red.
+  const { Steps, ...missingSteps } = BODY
+  const full = artifact.body({ Name: 'x', Type: 'SOP/ROE', body: missingSteps })
+  assert.strictEqual(full.length, 5, `a create dropped a section: ${JSON.stringify(full.map(s => s.heading))}`)
+  const steps = full.find(s => s.heading === 'Steps')
+  assert.ok(steps, 'the absent section vanished instead of being written empty')
+  assert.strictEqual(steps.text, '', 'the absent section was not written as empty')
 })
 
 check('a section that IS sent still has to be filled', () => {
