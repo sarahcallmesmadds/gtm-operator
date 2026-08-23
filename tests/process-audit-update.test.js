@@ -419,6 +419,67 @@ check('a write that landed is proved', () => {
   assert.strictEqual(out.proved, true, JSON.stringify(out.problems))
 })
 
+check('A REAL NOTION READ-BACK PROVES CLEAN, not just the payload handed back', () => {
+  // The first version compared raw strings, so every real read-back mismatched
+  // and a landed update reported itself as failed. Its test passed only because
+  // the fixture fed the flat payload back instead of a page, which is a fixture
+  // that cannot fail. These shapes are the measured ones: a person comes back
+  // prefixed, a list as a string holding a JSON array, a date with a time.
+  const sent = runUpdate({
+    ...BEFORE, Owner: '99999999-8888-7777-6666-555555555555', Tags: ['Data', 'AI', 'Tools'], reviewed: true
+  })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', {
+      url: URL_A,
+      properties: {
+        Owner: JSON.stringify(['user://99999999-8888-7777-6666-555555555555']),
+        Tags: JSON.stringify(['Tools', 'AI', 'Data']),
+        'Last checked for accuracy': '2026-08-23T09:00:00.000Z',
+        'Verified date': '2026-08-23T09:00:00.000Z',
+        'Verified by': JSON.stringify(['user://person-1'])
+      }
+    })
+  ))
+  assert.strictEqual(out.proved, true, `a landed update reported as failed: ${JSON.stringify(out.problems)}`)
+  assert.ok(out.checked.includes('Owner'), 'the owner was not actually compared')
+})
+
+check('AND A REAL CHANGE IS STILL CAUGHT through the same readers', () => {
+  // The risk of teaching a comparison to forgive shapes is that it forgives
+  // values too.
+  const sent = runUpdate({ ...BEFORE, Tags: ['AI'], reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: { Tags: JSON.stringify(['AI', 'Data']) } })
+  ))
+  assert.strictEqual(out.proved, false, 'a tag that did not come off passed as a clean write')
+})
+
+check('A PROPERTY WHOSE TYPE IS UNKNOWN IS UNCHECKED, never quietly passed', () => {
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  sent.properties['Some Rollup'] = 'whatever'
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: { ...sent.properties, 'Some Rollup': 'something else' } })
+  ))
+  assert.ok(out.unchecked.some(u => /Some Rollup/.test(u)), JSON.stringify(out.unchecked))
+  assert.ok(!out.checked.includes('Some Rollup'), 'an uncomparable property was reported as checked')
+})
+
+check('THE WRONG FILE IS REFUSED, rather than proving nothing cleanly', () => {
+  // Given a before row, the binding check found no target and the property loop
+  // found no properties, so it printed a clean proof having looked at nothing.
+  assert.throws(
+    () => capture(() => command.commands['prove-update'](
+      write('wrong.json', BEFORE),
+      write('back.json', { url: URL_A, properties: {} })
+    )),
+    /not the output of `update`/,
+    'a before row passed as an update to prove'
+  )
+})
+
 check('A READ-BACK OF A DIFFERENT PAGE IS CAUGHT', () => {
   const sent = runUpdate({ ...BEFORE, Description: 'new text', body: BODY, reviewed: false })
   const out = capture(() => command.commands['prove-update'](
