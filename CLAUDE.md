@@ -2,7 +2,7 @@
 
 A Claude Code marketplace that builds a go-to-market operating system in Notion.
 The design is one plugin per foundation object under `plugins/`, built from the
-design documents at the root. Only `setup` is built so far.
+design documents at the root. `setup`, `calendar` and `process` are built.
 
 **The design lives in the root documents, not in this file.** `DECISIONS.md`
 holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
@@ -12,9 +12,16 @@ would be a copy, and copies drift.
 
 ## Layout
 
-- `plugins/setup/`: the only plugin that exists. Creates every database, wires
-  the relations, writes the one config file the others read
+- `plugins/setup/`: creates every database, wires the relations, writes the one
+  config file the others read. The only plugin that creates anything or writes
+  config
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
+- `plugins/calendar/`, `plugins/process/`: writing plugins. Each reads config
+  through its vendored copy of `shared/config-read.js` and creates nothing
+- `shared/`: the source of every vendored file. `node scripts/vendor.js` copies
+  it into each plugin, which declares what it wants in its own manifest under
+  `gtmOperator.vendor`. **Re-vendor after touching `shared/`**, or a plugin runs
+  against a copy that is one edit behind
 - `SCHEMA-*.md`: one per database, except `SCHEMA-projects.md`, which covers
   Projects and Tasks because they are one job
 - `SKILLS-*.md`: one per plugin

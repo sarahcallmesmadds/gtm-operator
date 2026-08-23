@@ -2188,3 +2188,105 @@ code rather than the comments, which is the more expensive version.
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install
 the routine start of a live session is the only way it keeps getting exercised.
+
+## process, plugin three, 2026-08-23
+
+Built as the first of three pull requests rather than in one piece. `calendar`
+shipped three skills as roughly 2,250 lines of script; `process` has five skills,
+a larger schema, a body template per artifact type and an embedded related view
+per type. Built as one change it would be a pull request too large to review
+well, and the pattern through the seven rounds on 2026-08-22 was each fix
+creating the next bug. So this is `new` and `find`, and `update`, `audit` and
+`backfill` follow.
+
+### Two kinds of finding, because the ceiling cannot be a refusal
+
+`artifact.js` returns `problems` and `concerns` separately. A problem is a
+refusal and `properties` throws rather than sending it. A concern is a question
+for a person.
+
+**The word ceiling is why the split exists.** `SCHEMA-process.md` says the skill
+asks rather than trims at the ceiling, because running long almost never means a
+wording problem, it means the artifact is covering more than one thing. Refusing
+it outright would make the skill trim to get past the gate, which is the exact
+behaviour the design argues against. A gate that produces the behaviour its own
+rationale rejects is a gate in the wrong place.
+
+### The duplicate threshold ships uncalibrated and says so
+
+`SKILLS-process.md` says to pick this against real artifacts rather than
+inheriting the reference's 70%, because a similarity threshold set blind ends up
+either silent or unusable. So the number is 0.5, `thresholdIsMeasured` is false,
+every result carries both, and the skill shows candidates rather than deciding.
+
+**That is survivable where a wrong schema value is not.** A bad candidate costs
+one "no". Nothing is written on the strength of the score.
+
+### Staleness has five answers and three of them are not "fine"
+
+`fresh`, `due`, `exempt`, `unknown`, and no cadence at all. The one that matters
+is `unknown`, which covers an artifact never checked, a cadence this version does
+not recognise, and a date that will not parse.
+
+**Collapsing any of those into `fresh` is how a library serves a stale document
+silently**, which `SKILLS-process.md` calls worse than having no answer. It is
+also why `cadenceDays` returns `undefined` for an unrecognised cadence and `null`
+for one that opts out: `None` and `On change only` share a null in the day table
+and mean something different from a cadence nobody here knows, and a caller that
+reads both as "no check needed" reports an unrecognised value as deliberately
+exempt.
+
+### A parent named without its type is refused rather than assumed
+
+`problems` cannot fetch the parent, so the caller passes its type. Where it does
+not, the check refuses.
+
+**Assuming would remove the only check there is.** Notion cannot enforce the
+parent rule: a view filter cannot read the parent's `Type` across a relation,
+measured 2026-08-17, and a rollup filter is created, reported as created and
+silently discarded. So the refusal in this file is the whole enforcement, and a
+default here would be a rule that exists in three documents and nowhere in the
+running code.
+
+### The list helpers are a second copy, and the copy is tested
+
+`listProblem` and `listValues` are in both `shared/calendar-schema.js` and
+`shared/process-schema.js`. The two plugins are separate releases and neither can
+require the other, so the choice was a copy or a fourth vendored file for eleven
+lines.
+
+`tests/list-values-agree.test.js` runs both over the same inputs and asserts they
+answer identically, including outside the documented contract, where both throw.
+The trim inside `listValues` is the part worth pinning: a value compared trimmed
+on one path and written untrimmed on another has already caused a 400 here once.
+
+### The word ceiling now has a check, and it did not before
+
+`shared/calendar-schema.js` carries `WORD_CEILING = 400` and nothing anywhere
+compares it to the design document. The same gap existed here and was found by
+mutation: moving the number to 900 left every test green.
+
+`tests/process-schema-agrees.test.js` now reads the number out of
+`SCHEMA-process.md`. A rewording of that sentence fails the test rather than
+passing silently, which is the right direction to fail in. **The calendar copy
+still has no such check**, and that is a gap this pull request did not close.
+
+### What was proved by breaking it
+
+Eight of the schema checks and seven of the artifact gates were mutated and
+confirmed red. Two mutations did not apply on the first attempt, which is worth
+recording because a mutation that silently fails to apply reports the test as
+proved when nothing was tested: the first targeted a line that does not exist,
+because the cadence list is derived rather than written out, and the second used
+a grep pattern that did not match. Both were caught by asserting the mutation
+landed before running the suite.
+
+### What is not built, and is said in the plugin rather than discovered
+
+The embedded related view, which needs the Views API. The newer-related-memo
+staleness signal, which needs the Memos database queried. A calibrated duplicate
+threshold. Each is stated in the README, in the skill that would otherwise be
+assumed to cover it, and in the output where a user would form the wrong
+impression.
+
+---
