@@ -35,6 +35,7 @@ const path = require('path')
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
 const artifact = require(path.join(__dirname, 'artifact'))
+const { compareProperty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const KEY = 'process'
 
@@ -177,6 +178,33 @@ function relatedUrls (value) {
  * fields are not here because they move as a group under `reviewed`, and letting
  * them be edited one at a time is the rule this plugin exists to enforce.
  */
+/**
+ * What kind of property each logical field is, which is what decides how a value
+ * read back compares to the value that was sent.
+ *
+ * A person comes back prefixed, a list comes back as a string holding a JSON
+ * array, a date can come back carrying a time. Compared raw every one of those
+ * reads as a failed write, so the type has to be known before the comparison
+ * means anything. `shared/notion-compare.js` holds the readers and where each
+ * difference was measured.
+ */
+const PROPERTY_TYPES = {
+  Name: 'title',
+  Description: 'rich_text',
+  Type: 'select',
+  Domain: 'select',
+  Audience: 'multi_select',
+  Segment: 'multi_select',
+  'L2C Lifecycle': 'multi_select',
+  Tags: 'multi_select',
+  Status: 'select',
+  Owner: 'people',
+  'Review cadence': 'select',
+  'Last checked for accuracy': 'date',
+  'Verified by': 'people',
+  'Verified date': 'date'
+}
+
 const UPDATABLE_FIELDS = [
   'Name',
   'Description',
@@ -1083,11 +1111,24 @@ const commands = {
    * worked.
    */
   'prove-update' (updateFile, readbackFile) {
+    const context = contextOrExit()
     if (!updateFile || !readbackFile) {
       throw new Error("prove-update needs the update output and the page as it came back: node process.js prove-update update.json readback.json")
     }
     const intended = readJson(updateFile, 'the update that was sent')
     const readback = readJson(readbackFile, 'the page as it came back')
+
+    // IT HAS TO BE `update`'s OUTPUT, AND THAT IS CHECKED. Given anything else,
+    // the page-binding check found no target to compare and the property loop
+    // found no properties to walk, so it printed a clean proof having looked at
+    // nothing. A proof that passes on the wrong input is worse than no proof.
+    if (!intended || typeof intended !== 'object' || !intended.target || !intended.properties) {
+      throw new Error(
+        'That file is not the output of `update`. It needs the `target` and `properties` that `update` printed. ' +
+        'Passing the before or after row here would rebuild a payload with no record of what was cleared, ' +
+        'and a clear that silently failed would read as a clean write.'
+      )
+    }
 
     const problems = []
     const checked = []
@@ -1109,16 +1150,35 @@ const commands = {
       if (!back) {
         problems.push('The page came back with no properties, so nothing could be compared. Save the whole page, not a summary of it.')
       } else {
-        for (const [name, sent] of Object.entries(intended.properties || {})) {
+        // COMPARED THROUGH THE TYPE, NOT AS STRINGS. A property does not come
+        // back in the shape it went out in: a person is read back prefixed, a
+        // list arrives as a string holding a JSON array, a date can carry a
+        // time. Compared raw every one of those reads as a failed write, so a
+        // perfect update reported itself as not landed. The first version of
+        // this did exactly that, and its test passed only because the fixture
+        // fed the flat payload back instead of a page.
+        //
+        // The workspace's name is what comes back, so the type is looked up
+        // through the logical name that name belongs to.
+        const logicalOf = {}
+        for (const logical of Object.keys(PROPERTY_TYPES)) logicalOf[context.property(logical)] = logical
+
+        for (const [name, sent] of Object.entries(intended.properties)) {
           if (!(name in back)) {
             problems.push(`"${name}" was sent and is not in what came back, so the write did not land.`)
             continue
           }
-          if (JSON.stringify(back[name]) !== JSON.stringify(sent)) {
-            problems.push(`"${name}" came back as ${JSON.stringify(back[name])} and was sent as ${JSON.stringify(sent)}.`)
+          const logical = logicalOf[name]
+          const verdict = compareProperty(PROPERTY_TYPES[logical], sent, back[name])
+          if (verdict.state === 'same') {
+            checked.push(name)
             continue
           }
-          checked.push(name)
+          if (verdict.state === 'unchecked') {
+            unchecked.push(`"${name}": ${verdict.why}`)
+            continue
+          }
+          problems.push(`"${name}" came back as ${JSON.stringify(verdict.back)} and was sent as ${JSON.stringify(verdict.sent)}.`)
         }
       }
     }

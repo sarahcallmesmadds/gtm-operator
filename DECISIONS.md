@@ -2650,3 +2650,44 @@ A person property also clears with an empty list rather than a null, the same as
 a multi-select. Sent a null the write is accepted and the old owner stays.
 
 Six mutations, each confirmed to have landed.
+
+### Review round 2 on pull request 15
+
+Two more, again both real.
+
+**`prove-update` would have failed on every real read-back.** It compared the
+sent payload against the re-fetched page with raw string equality. A property
+does not come back in the shape it went out in: a person is written bare and
+read back prefixed, a list arrives as a string holding a JSON array, a date can
+carry a time. Every one of those reads as a failed write, so a perfect update
+would have reported itself as not landed, and the next person would learn to
+ignore the proof.
+
+**Its test passed only because the fixture handed the flat payload back instead
+of a page.** That is a fixture that cannot fail, and it is the fourth time in
+this repository. The replacement fixtures use the measured shapes.
+
+Presence-only, which the create `prove` in the same file does, was the other
+option offered and was rejected: catching a clear that did not land is the whole
+reason `prove-update` exists, and presence-only passes a clear that silently
+failed, because the key is there either way.
+
+So the readers moved to `shared/notion-compare.js`, vendored into `process`. It
+returns one of three answers, `same`, `different` or `unchecked`, rather than a
+boolean, because "could not compare" is a third answer and folding it into either
+of the others is how a proof reports something it never looked at.
+
+**`plugins/calendar/scripts/calendar.js` still carries its own inline copy**,
+written first and measured there. Retiring it into the shared file is written at
+the top of that file as the thing to do the next time calendar is opened. Two
+copies of a measured fact is how the measurement gets lost, and doing it in this
+pull request would have meant rewriting a plugin this one does not touch.
+
+**And `prove-update` accepted any file at all.** Given a before row, the binding
+check found no target and the property loop found no properties, so it printed a
+clean proof having looked at nothing. It now refuses anything that is not
+`update`'s own output.
+
+Five mutations, each confirmed to have landed: raw comparison restored, the
+person prefix left on, an unknown type passed instead of reported unchecked, the
+comparison forgiving values as well as shapes, and the input guard removed.

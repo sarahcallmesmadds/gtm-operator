@@ -20,7 +20,8 @@
     "vendor": [
       "config-read.js",
       "process-schema.js",
-      "page-id.js"
+      "page-id.js",
+      "notion-compare.js"
     ]
   }
 }
