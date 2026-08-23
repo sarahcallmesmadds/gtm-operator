@@ -2166,6 +2166,25 @@ while asking for `calendar`, and `IDS_INCOMPLETE` only ever inspects the key bei
 asked for, so nothing was named. That is the same overclaim removed from
 `config-read.js` two rounds earlier, surviving in a test name.
 
+**Round six: the guard was in one of the two files that needed it.** `setup`
+refuses a `databases` value that is not a map. `shared/config-read.js` was left
+counting one, so a config holding an array or a string produced a refusal
+reporting how many databases were recorded, counting array indices or string
+characters, and told the reader to run the install, which then refused the file
+outright. One damaged config, two files, two different stories, and the number in
+the first one was meaningless.
+
+The reader now makes the same refusal, as `DATABASES_DAMAGED`, and names what the
+value actually is. The one shape that legitimately means zero is an empty map,
+which is what `blank` writes on a first run; an absent key is damage. A check had
+been conflating those two, deleting the key and calling the result zero, which is
+precisely the confusion the refusal exists to prevent.
+
+**This is the fifth round in which a rule was put where the problem was noticed
+rather than everywhere it applies.** The four before it were a claim corrected in
+one file and left standing in another. This one is the same habit reaching the
+code rather than the comments, which is the more expensive version.
+
 **Per-session install is coverage, not overhead.** `setup` is at 1.0.0 and its
 only live evidence was two runs that have both been deleted. Making the install
 the routine start of a live session is the only way it keeps getting exercised.

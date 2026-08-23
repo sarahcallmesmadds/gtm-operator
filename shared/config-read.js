@@ -69,9 +69,20 @@ const REFUSAL = {
   IDS_INCOMPLETE: 'IDS_INCOMPLETE',
   NO_NAME_MAP: 'NO_NAME_MAP',
   BROKEN_NAME_MAP: 'BROKEN_NAME_MAP',
+  // The `databases` value is not a map at all. Separate from a database being
+  // missing from that map, which is `DATABASE_MISSING` and an ordinary state.
+  DATABASES_DAMAGED: 'DATABASES_DAMAGED',
   // A caller that asked for a context without saying what the map has to
   // contain. Not a state of the world: a bug in the plugin, reported as one.
   NO_CONTRACT: 'NO_CONTRACT'
+}
+
+/** What the damaged value actually is, so the message names it. */
+function describeDatabases (value) {
+  if (value === undefined) return 'missing'
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'an array'
+  return `a ${typeof value}`
 }
 
 /** A refusal, in the one shape every caller handles. */
@@ -125,6 +136,28 @@ function readRaw () {
       `Config at ${CONFIG_PATH} is version ${parsed.configVersion} and this plugin reads version ${CONFIG_VERSION}. ` +
       `Refusing to read it rather than guessing at what changed. Update the plugin that is behind.`,
       { found: parsed.configVersion, expected: CONFIG_VERSION }
+    )
+  }
+
+  // THE SAME REFUSAL `setup`'s OWN READER MAKES, and it is here because the two
+  // disagreeing is worse than either answer. `setup` refuses a `databases` value
+  // that is not a map. This file was left counting one, so a config holding an
+  // array or a string produced a refusal saying how many databases were recorded,
+  // counting array indices or string characters, and told the reader to run the
+  // install, which then refused the file outright. Two files, one damaged config,
+  // two different stories.
+  //
+  // Found in review on 2026-08-23. The guard had been added to `setup` alone,
+  // which is the fifth time in this branch that a rule was put where the problem
+  // was noticed rather than everywhere it applies.
+  const databases = parsed.databases
+  if (!databases || typeof databases !== 'object' || Array.isArray(databases)) {
+    return refuse(
+      REFUSAL.DATABASES_DAMAGED,
+      `Config at ${CONFIG_PATH} has a "databases" entry that is ${describeDatabases(databases)}, and it should be an object keyed by database name.\n` +
+      `  Nothing is read through it and nothing counts it, because a damaged map read as "nothing was recorded" invites an install that builds databases which may already exist.\n` +
+      `  Fix that entry or move the file aside and install again.`,
+      { databases: describeDatabases(databases) }
     )
   }
 

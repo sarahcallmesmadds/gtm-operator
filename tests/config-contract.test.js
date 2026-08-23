@@ -323,13 +323,16 @@ check('an entry recorded with a missing id still counts as recorded', () => {
   writeConfig(config)
   assert.strictEqual(reader.contextFor('calendar', CONTRACT).recorded, 2)
 
-  // And the shapes that are not keys at all count as zero rather than throwing.
-  // The whole message, not a substring of it: asserting the count alone left the
-  // zero case free to report the wrong verification state, which review found on
-  // 2026-08-22.
+  // AN EMPTY MAP IS THE ONE SHAPE THAT LEGITIMATELY MEANS ZERO, and it is what
+  // `blank` writes on a first run. An ABSENT key is damage and is refused, which
+  // is checked separately below; this used to delete the key and call the result
+  // zero, which is the conflation the refusal exists to stop.
+  //
+  // The whole message, not a substring: asserting the count alone left the zero
+  // case free to report the wrong verification state, found on 2026-08-22.
   const empty = completeConfig()
   empty.state = 'creating'
-  delete empty.databases
+  empty.databases = {}
   writeConfig(empty)
   const context = reader.contextFor('calendar', CONTRACT)
   assert.strictEqual(context.recorded, 0)
@@ -447,6 +450,46 @@ check('the writer refuses a timestamp that is not a string', () => {
     'an object timestamp reaches any reader that interpolates it as "[object Object]"'
   )
   assert.throws(() => writer.recordVerified(42), /needs the time as a string/)
+})
+
+check('a damaged databases value is refused, and never counted', () => {
+  // THE READER AND THE INSTALLER HAVE TO AGREE ABOUT A DAMAGED FILE. `setup`
+  // refuses a `databases` value that is not a map. This reader was left counting
+  // one, so an array or a string produced a refusal reporting how many databases
+  // were recorded, counting indices or characters, and told the reader to run
+  // the install, which then refused the file outright. Two files, one config,
+  // two stories. Found in review on 2026-08-23.
+  const shapes = [
+    ['an array', [], 'an array'],
+    ['null', null, 'null'],
+    ['a string', 'process', 'a string'],
+    ['a number', 3, 'a number']
+  ]
+  for (const [label, value, described] of shapes) {
+    const config = completeConfig()
+    config.state = 'creating'
+    config.databases = value
+    writeConfig(config)
+    const context = reader.contextFor('calendar', CONTRACT)
+    assert.strictEqual(
+      context.code, reader.REFUSAL.DATABASES_DAMAGED,
+      `${label} should be refused as damage, not read`
+    )
+    assert.strictEqual(context.databases, described)
+    assert.ok(
+      !/database[s]? recorded/.test(context.message),
+      `${label} must not be counted: ${context.message}`
+    )
+  }
+
+  // An absent key is the same situation. `blank` always writes it.
+  const missing = completeConfig()
+  missing.state = 'creating'
+  delete missing.databases
+  writeConfig(missing)
+  const context = reader.contextFor('calendar', CONTRACT)
+  assert.strictEqual(context.code, reader.REFUSAL.DATABASES_DAMAGED)
+  assert.strictEqual(context.databases, 'missing')
 })
 
 check('a database the config does not record is refused', () => {

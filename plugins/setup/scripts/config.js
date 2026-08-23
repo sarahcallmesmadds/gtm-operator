@@ -532,9 +532,10 @@ function ids () {
 }
 
 function missingDatabases () {
-  // `read` normalises an absent `databases` key, so this only has to handle the
-  // absent CONFIG. It briefly carried its own guard as well, which passed its
-  // own test while `recordDatabase` still threw on the same file.
+  // `read` REFUSES a damaged `databases` value rather than normalising it, so by
+  // the time this runs the key is a map or nothing got this far. The fallback
+  // below is for an absent CONFIG only. An earlier version of this comment said
+  // `read` normalises the key, which was true for one round and is not now.
   const have = new Set(Object.keys((read() || { databases: {} }).databases))
   return DATABASES.filter(d => !have.has(d.key))
 }
