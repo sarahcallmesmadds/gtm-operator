@@ -209,7 +209,13 @@ function problems (final, { parentType } = {}) {
     }
   }
 
-  const tags = listValues(row.Tags)
+  // THE SHAPE GUARD IS NOT OPTIONAL HERE. `Tags` is in MULTI_SELECT_FIELDS, so
+  // the loop above has already recorded a refusal for a list holding something
+  // that is not a value name. Counting it as well means `listValues` trims a
+  // number, and `problems` throws instead of returning the refusal it just
+  // wrote. A caller asking what is wrong with a row gets a stack trace rather
+  // than the answer, for a row this function had already judged correctly.
+  const tags = listProblem(row.Tags) ? [] : listValues(row.Tags)
   if (tags.length > TAGS_MAX) {
     add(
       'Tags',
