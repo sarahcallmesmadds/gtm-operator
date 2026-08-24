@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 774 checks, up from 716.
+The suite is 776 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3483,3 +3483,43 @@ write side guarded with the read side open. Nothing in the prompts prevented any
 of them. What found all four was asking a reviewer whether a specific guard is
 reachable from every path, and handing it the previous rounds' findings so it
 knew what shape to look for.
+
+### Review round 7 on pull request 16, both reviewers, two different findings
+
+The first round where the two reviewers found different things, and both were
+real.
+
+**Devin: `topics` never got the shape guard every other list has.** `sources`,
+`channels`, `dms` and `ways` each refuse a value that is not a list. `topics` did
+not, so a bare string fell through to the "no topics were named" refusal and
+reported a missing list to somebody looking straight at one. The `notNames` fix
+in round 2 reached five lists and this guard reached four, which is the same
+fault twice inside the same function.
+
+Devin also found the check that would have covered it going green either way,
+because both refusals come back under `topics`. It asserts the whole refusal list
+now rather than that one is present.
+
+**Codex: the empty-to-populated transition was the one going unwatched, and it is
+the backfill case.** Round 6 added the before values of the three verification
+fields so `prove-update` could check they had not moved. It keyed the object on
+the fields present on the fetched row, so an *empty* verification field dropped
+out entirely, was reported as unknown, and a stamp landing on it was proved as a
+clean write.
+
+A backfilled artifact has all three empty by design. That is the whole mechanism
+behind the never-verified signal. So round 6 guarded the transition that happens
+to artifacts somebody has already read, and left open the one that happens to
+every artifact backfill creates. All three are carried now with an explicit null
+for the ones the row did not hold.
+
+**The message names both causes.** A field that was empty and comes back holding
+something is either a stamp from somewhere this edit did not send, or a before
+row that never carried the column. Blaming one of those sends somebody looking in
+the wrong place, which is a fault this repository has been corrected for before.
+
+**Five of the ten findings across seven rounds are one fault**, and round 7's
+half of it lived inside round 6's fix. Two of those five were introduced by the
+fix for the previous one. The pattern is not that the pair is hard to see, it is
+that fixing one half creates a new pair nobody looks at, so the fix and its own
+review have to be treated as a new surface rather than as a closed item.

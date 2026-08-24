@@ -278,10 +278,19 @@ check('topics handed over without choosing that way are refused, not quietly use
 
 check('choosing the topics way without naming topics is refused', () => {
   const out = backfill.plan({ sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['topics'] })
-  assert.ok(
-    out.refusals.some(one => one.field === 'topics' && one.kind === 'missing'),
-    JSON.stringify(out.refusals.map(one => `${one.field}:${one.kind}`))
-  )
+  assert.deepStrictEqual(faults(out), ['topics:missing'])
+})
+
+check('TOPICS GETS THE SHAPE GUARD EVERY OTHER LIST HAS', () => {
+  // `sources`, `channels`, `dms` and `ways` each refuse a value that is not a
+  // list. `topics` did not, so a bare string fell through to "no topics were
+  // named" and reported a missing list to somebody looking straight at one.
+  // The check above would have gone green for that, because both come back
+  // under `topics`, which is why it asserts the whole refusal list now.
+  const out = backfill.plan({
+    sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['topics'], topics: 'refunds'
+  })
+  assert.deepStrictEqual(faults(out), ['topics:not-a-list'])
 })
 
 check('WHAT IS NOT BEING READ IS SAID, source by source and way by way', () => {
@@ -742,6 +751,46 @@ check('A NON-REVIEW EDIT IS PROVED BY THE THREE THAT DID NOT MOVE', () => {
     })
   ))
   assert.strictEqual(stamped.proved, false, 'a stamp moved on a non-review edit and that was proved as clean')
+  process.exitCode = 0
+})
+
+check('A STAMP LANDING ON A FIELD THAT WAS EMPTY IS CAUGHT, which is the backfill case', () => {
+  // The round-6 check watched a populated field changing. A backfilled artifact
+  // has all three EMPTY by design, which is what makes the never-verified signal
+  // work, so empty becoming populated is the transition that matters and it was
+  // the one going unwatched: an empty field dropped out of `verificationBefore`
+  // entirely and was reported as unknown rather than compared.
+  const context = contextNow()
+  const before = { ...EXISTING }
+  for (const field of schema.VERIFICATION_FIELDS) delete before[field]
+  const after = backfill.fill(before, { Domain: 'Customer Success' }).after
+  const sent = capture(() => command.commands.update(
+    write('before-e.json', before),
+    write('after-e.json', after),
+    '2026-08-23'
+  ))
+
+  for (const field of schema.VERIFICATION_FIELDS) {
+    const out = capture(() => command.commands['prove-update'](
+      write('sent-e.json', sent),
+      write('back-e.json', {
+        url: URL_A,
+        properties: { ...sent.properties, [context.property(field)]: '2026-08-23' }
+      })
+    ))
+    assert.strictEqual(out.proved, false, `${field} appeared on a page that had none and that was proved as clean`)
+    assert.ok(
+      out.problems.some(one => one.includes(context.property(field))),
+      `${field} appeared and no problem named it: ${JSON.stringify(out.problems)}`
+    )
+  }
+
+  // And the clean case still passes, so the check above is not just always red.
+  const clean = capture(() => command.commands['prove-update'](
+    write('sent-e.json', sent),
+    write('back-e2.json', { url: URL_A, properties: sent.properties })
+  ))
+  assert.strictEqual(clean.proved, true, JSON.stringify(clean.problems))
   process.exitCode = 0
 })
 
