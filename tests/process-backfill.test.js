@@ -87,7 +87,17 @@ const write = (name, value) => {
   return file
 }
 
-const kinds = out => (out.refusals || []).map(one => one.kind)
+/**
+ * Every refusal as `field:kind`.
+ *
+ * NOT THE KIND ALONE. Three refusals in `plan` share the kind `missing` and
+ * three more in `draft` do, so a check matching on the kind passes for a fault
+ * in a field it does not name. Reasoning case by case about which kinds happen
+ * to be unique today is the wrong fix: a kind that is unique today becomes
+ * shared the next time one is added, and nothing goes red when it does.
+ */
+const faults = out => (out.refusals || []).map(one => `${one.field}:${one.kind}`)
+
 const URL_A = 'https://notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
 
 /** A window that is valid, so a test about something else is not about dates. */
@@ -105,7 +115,7 @@ check('a scope naming no source is refused, because there is nothing to point it
 
 check('an unknown source is refused rather than skipped', () => {
   const out = backfill.plan({ sources: ['confluence'] })
-  assert.ok(kinds(out).includes('unknown-source'), JSON.stringify(kinds(out)))
+  assert.ok(faults(out).includes('sources:unknown-source'), JSON.stringify(faults(out)))
   // Skipping it would report on less material than was asked about without saying so.
   assert.strictEqual(out.ok, false)
 })
@@ -113,7 +123,7 @@ check('an unknown source is refused rather than skipped', () => {
 check('DIRECT MESSAGES CANNOT BE READ AS A GROUP', () => {
   for (const dms of ['all', true]) {
     const out = backfill.plan({ sources: ['slack'], slack: { channels: 'all', dms, ...WINDOW }, ways: ['sweep'] })
-    assert.ok(kinds(out).includes('dms-all'), `dms: ${JSON.stringify(dms)} was allowed`)
+    assert.ok(faults(out).includes('slack:dms-all'), `dms: ${JSON.stringify(dms)} was allowed`)
     // ASSERTING THE REFUSAL IS NOT ASSERTING THE OUTCOME. The refusal was
     // recorded and `reading.slack` stood there anyway with an empty `dms`, so
     // the same output said ok: false, said nothing is read, and handed back a
@@ -186,30 +196,30 @@ check('named direct messages are read, and only the named ones', () => {
 
 check('THERE IS NO UNBOUNDED READ: each end of the range is refused separately', () => {
   const neither = backfill.plan({ sources: ['email'], email: {}, ways: ['sweep'] })
-  assert.strictEqual(kinds(neither).filter(k => k === 'range-open').length, 2, JSON.stringify(kinds(neither)))
+  assert.deepStrictEqual(faults(neither), ['email:range-open', 'email:range-open'], JSON.stringify(faults(neither)))
 
   const halfOpen = backfill.plan({ sources: ['email'], email: { from: '2026-01-01' }, ways: ['sweep'] })
-  assert.ok(kinds(halfOpen).includes('range-open'), 'an open-ended range was accepted')
+  assert.ok(faults(halfOpen).includes('email:range-open'), 'an open-ended range was accepted')
 })
 
 check('a backwards range is refused, because reading nothing looks like a workspace with nothing in it', () => {
   const out = backfill.plan({
     sources: ['email'], email: { from: '2026-06-01', to: '2026-01-01' }, ways: ['sweep']
   })
-  assert.ok(kinds(out).includes('range-backwards'), JSON.stringify(kinds(out)))
+  assert.ok(faults(out).includes('email:range-backwards'), JSON.stringify(faults(out)))
 })
 
 check('a mailbox that is not the user\'s own is refused', () => {
   const out = backfill.plan({
     sources: ['email'], email: { mailbox: 'ceo@example.com', ...WINDOW }, ways: ['sweep']
   })
-  assert.ok(kinds(out).includes('mailbox-not-own'), JSON.stringify(kinds(out)))
+  assert.ok(faults(out).includes('email:mailbox-not-own'), JSON.stringify(faults(out)))
   assert.strictEqual(out.reading.email, undefined, 'a refused mailbox still ended up in the read plan')
 })
 
 check('call recordings need the recorder named, because setup does not assume one', () => {
   const without = backfill.plan({ sources: ['recordings'], recordings: WINDOW, ways: ['sweep'] })
-  assert.ok(kinds(without).includes('recorder-unnamed'), JSON.stringify(kinds(without)))
+  assert.ok(faults(without).includes('recordings:recorder-unnamed'), JSON.stringify(faults(without)))
 
   const with_ = backfill.plan({ sources: ['recordings'], recordings: { recorder: 'granola', ...WINDOW }, ways: ['sweep'] })
   assert.strictEqual(with_.ok, true, JSON.stringify(with_.refusals))
@@ -218,7 +228,7 @@ check('call recordings need the recorder named, because setup does not assume on
 
 check('slack needs channels said out loud, and "all" is one of the two answers', () => {
   const silent = backfill.plan({ sources: ['slack'], slack: { ...WINDOW }, ways: ['sweep'] })
-  assert.ok(kinds(silent).includes('channels-unset'), JSON.stringify(kinds(silent)))
+  assert.ok(faults(silent).includes('slack:channels-unset'), JSON.stringify(faults(silent)))
 
   const all = backfill.plan({ sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['sweep'] })
   assert.strictEqual(all.ok, true, JSON.stringify(all.refusals))
@@ -233,7 +243,7 @@ check('a document store is sorted rather than searched, so it needs no way of lo
 
 check('a document store still has to say where it is', () => {
   const out = backfill.plan({ sources: ['documents'], documents: {} })
-  assert.ok(kinds(out).includes('unlocated'), JSON.stringify(kinds(out)))
+  assert.ok(faults(out).includes('documents:unlocated'), JSON.stringify(faults(out)))
 })
 
 check('a conversation source with no way of looking through it is refused', () => {
@@ -263,7 +273,7 @@ check('topics handed over without choosing that way are refused, not quietly use
   const out = backfill.plan({
     sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['sweep'], topics: ['refunds']
   })
-  assert.ok(kinds(out).includes('topics-unused'), JSON.stringify(kinds(out)))
+  assert.ok(faults(out).includes('ways:topics-unused'), JSON.stringify(faults(out)))
 })
 
 check('choosing the topics way without naming topics is refused', () => {
@@ -328,7 +338,7 @@ check('EVERY ASKING KEEPS WHERE IT WAS SAID', () => {
 check('an asking that cannot be traced back is refused, and nothing is clustered', () => {
   const out = backfill.repeats([...ASKINGS, { question: 'how do we handle refunds too' }])
   assert.strictEqual(out.ok, false)
-  assert.deepStrictEqual(kinds(out), ['provenance-missing'])
+  assert.deepStrictEqual(faults(out), ['askings[4]:provenance-missing'])
   assert.strictEqual(out.clusters.length, 0, 'a run with an untraceable asking still produced clusters')
 })
 
@@ -348,13 +358,13 @@ const FOUND = [
 
 check('a candidate that cannot be traced back is refused', () => {
   const out = backfill.candidates([{ what: 'Refund handling' }])
-  assert.deepStrictEqual(kinds(out), ['provenance-missing'])
+  assert.deepStrictEqual(faults(out), ['found[0]:provenance-missing'])
   assert.strictEqual(out.candidates.length, 0)
 })
 
 check('an unknown type is refused here rather than at write time', () => {
   const out = backfill.candidates([{ what: 'x', where: '#a', type: 'Runbook' }])
-  assert.deepStrictEqual(kinds(out), ['unknown-type'])
+  assert.deepStrictEqual(faults(out), ['found[0]:unknown-type'])
 })
 
 check('an absent type is a question, not a refusal', () => {
@@ -424,13 +434,13 @@ check('THE SOURCES SECTION IS GENERATED FROM THE SOURCES, not written beside the
 })
 
 check('a draft with nothing to substantiate it is refused', () => {
-  assert.deepStrictEqual(kinds(backfill.draft({ what: 'x', type: 'SOP/ROE', body: SOP_BODY })), ['missing'])
+  assert.deepStrictEqual(faults(backfill.draft({ what: 'x', type: 'SOP/ROE', body: SOP_BODY })), ['sources:missing'])
 })
 
 check('an owner offered to a draft is refused, not dropped', () => {
   const out = draftOf({ Owner: ['11111111-1111-1111-1111-111111111111'] })
   assert.strictEqual(out.ok, false)
-  assert.deepStrictEqual(kinds(out), ['backfill-person'])
+  assert.deepStrictEqual(faults(out), ['Owner:backfill-person'])
   assert.strictEqual(out.artifact, null, 'a draft carrying an owner was still handed back')
 })
 
@@ -584,7 +594,7 @@ check('`reviewed` is false, because nobody re-read anything', () => {
 check('a row with no url is refused, because nothing could say which page it is', () => {
   const out = backfill.fill({ ...EXISTING, url: undefined }, { Domain: 'Customer Success' })
   assert.strictEqual(out.ok, false)
-  assert.deepStrictEqual(kinds(out), ['missing'])
+  assert.deepStrictEqual(faults(out), ['url:missing'])
 })
 
 check('filling nothing is a finished answer rather than a failure', () => {
