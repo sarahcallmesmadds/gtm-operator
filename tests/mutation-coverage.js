@@ -37,6 +37,8 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    if (NOT_A_FIELD.has(field) || fillable.has(field) || alreadyRefused.has(field)) continue", "    if (true) continue"],
+  [B, "  const NOT_A_FIELD = new Set(['id', 'what', 'where', 'kind', 'why', 'needs', 'type', 'url', 'reviewed', 'backfill', 'parentType'])", "  const NOT_A_FIELD = new Set([])"],
   [P, "      new Date(parsed).toISOString().slice(0, 10) === today) return today", "      true) return today"],
   [B, "    if (typeof value === 'string' && value.trim()) return false", "    if (true) return false"],
   [B, "  const nameBroken = identityProblem('Name', given.Name)", "  const nameBroken = false; identityProblem('Name', undefined)"],

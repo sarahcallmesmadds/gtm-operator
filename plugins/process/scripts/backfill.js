@@ -1056,6 +1056,46 @@ function fill (existing, candidate) {
     filling.push(field)
   }
 
+  /*
+   * AND EVERY OTHER FIELD IT WILL NOT WRITE, WHICH WAS FOUR OF TWELVE.
+   *
+   * Round 6 set the rule that a field `fill` declines is refused rather than
+   * dropped, because dropping it means somebody approved a change and a smaller
+   * one ran. It was applied to the four on `REFUSED_ON_A_BACKFILL` and to
+   * nothing else, so `Status`, a `body`, the `sources` a draft carries, a
+   * `parent` and a `Supersedes` were all read past in silence while the run
+   * reported success. `Status` is the one that matters: `update` can genuinely
+   * write it, so this was a normal edit disappearing.
+   *
+   * DERIVED RATHER THAN LISTED. A hand-written list of fields is exactly what
+   * drifted into this: `REFUSED_ON_A_BACKFILL` was written by hand and covered a
+   * third of the ground it names. This asks the schema what an artifact field is
+   * and refuses any that `fill` does not fill, so a field added to the schema
+   * tomorrow is refused rather than silently ignored.
+   *
+   * The candidate's own vocabulary is not an artifact field and is not refused:
+   * `id`, `what`, `where`, `kind`, `why`, `needs` and `type` are what
+   * `candidates` emits, and the skill tells the caller to hand that straight to
+   * this command.
+   */
+  const NOT_A_FIELD = new Set(['id', 'what', 'where', 'kind', 'why', 'needs', 'type', 'url', 'reviewed', 'backfill', 'parentType'])
+  const fillable = new Set(FILLABLE)
+  const alreadyRefused = new Set(REFUSED_ON_A_BACKFILL)
+
+  for (const field of Object.keys(given)) {
+    if (NOT_A_FIELD.has(field) || fillable.has(field) || alreadyRefused.has(field)) continue
+    if (field === 'Name' || field === 'Type') continue
+    if (artifact.askedForNothing(given[field])) continue
+    refused.push({
+      field,
+      kind: 'never-filled',
+      holding: before[field],
+      offered: given[field],
+      why: `\`${field}\` is not something backfill fills. Offered here it would be read past in silence and the rest ` +
+        'of the update would run, so somebody would have approved one change and a smaller one would have happened.'
+    })
+  }
+
   // THE SAME LIST `draft` REFUSES, not the person half of it. Dropping the other
   // two silently is what let a caller offer `Verified date` and be told there
   // was nothing to fill.

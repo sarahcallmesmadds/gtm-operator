@@ -4568,3 +4568,36 @@ not a decision that stays true, and the reason is the part that expires.
 
 The fix is a strict narrowing. It refuses only dates that were already going to
 write a different day than the one supplied.
+
+### Round 32, finding two: the rule from round 6 covered four fields of twelve
+
+**Codex named two and the set was eight.** Round 6 established that a field `fill`
+declines is refused rather than dropped, because dropping it means somebody
+approved a change and a smaller one ran. That rule was applied to the four on
+`REFUSED_ON_A_BACKFILL` and to nothing else, so `Status`, `body`, `sources`,
+`parent`, `parentType`, `backfill`, `Supersedes` and `Project` were all read past
+in silence while the run reported success.
+
+**`Status` is the one that matters.** It is a field `update` can genuinely write,
+so this was a normal edit disappearing rather than an exotic value being mishandled.
+
+**Derived rather than listed, because a hand-written list is what caused it.**
+`REFUSED_ON_A_BACKFILL` was written by hand and covered a third of the ground its
+name claims. The refusal now asks what `fill` fills and refuses anything else that
+is not the candidate's own vocabulary, so a field added to the schema tomorrow is
+refused rather than silently ignored.
+
+**The candidate vocabulary is named explicitly and is the one hand-written list
+left**, because `id`, `what`, `where`, `kind`, `why`, `needs` and `type` are what
+`candidates` emits and the skill tells the caller to hand that straight to this
+command. Refusing them would reject every candidate the documented flow produces.
+That list is pinned by a check that runs a real candidate through `fill`.
+
+**The check for this failed first on a fixture of my own making**, asserting a
+fill of `Description` on a row where `Description` is already occupied. The
+assertion was wrong, not the code. Worth noting only because it is the fourth time
+today a check has had to be corrected before it could prove anything, and each
+time the failure was visible immediately rather than after a reviewer found it.
+
+815 checks, 99 in the backfill suite. 138 mutations, all landed, one survivor and
+it is the known `wantsAPerson` inversion `process-audit-update` catches.
