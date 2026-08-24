@@ -30,6 +30,7 @@ process.env.GTM_OPERATOR_CONFIG = path.join(SANDBOX, 'gtm-operator.config.json')
 const setupSchema = require('../plugins/setup/scripts/schema')
 const artifact = require('../plugins/process/scripts/artifact')
 const backfill = require('../plugins/process/scripts/backfill')
+const similar = require('../plugins/process/scripts/similar')
 const schema = require('../shared/process-schema')
 const processNames = setupSchema.identityNames('process')
 
@@ -1190,6 +1191,43 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
   }
 })
 
+
+check('THE SAME ASKINGS GIVE THE SAME ANSWER IN ANY ORDER', () => {
+  // Similarity is not transitive: A can resemble B and B resemble C while A and
+  // C have nothing in common. The cluster loop puts each asking in the FIRST
+  // cluster it matches, so whichever one arrived in the middle decided the
+  // outcome. [B, A, C] made one cluster of three and every other order of the
+  // same three made none, so identical material crossed the documented threshold
+  // because an export came out in a different sequence.
+  const A = { question: 'refunds process', where: '#cs', when: '2026-01-05' }
+  const B = { question: 'refunds process billing cycle', where: '#cs', when: '2026-02-05' }
+  const C = { question: 'billing cycle', where: '#cs', when: '2026-03-05' }
+
+  // The premise the check rests on, asserted rather than assumed: A and C both
+  // reach the threshold against B and not against each other.
+  assert.ok(similar.similarity(A.question, B.question) >= backfill.REPEAT_SIMILARITY)
+  assert.ok(similar.similarity(B.question, C.question) >= backfill.REPEAT_SIMILARITY)
+  assert.ok(similar.similarity(A.question, C.question) < backfill.REPEAT_SIMILARITY)
+
+  const shape = list => {
+    const out = backfill.repeats(list)
+    return [...out.clusters, ...out.below].map(cluster => `${cluster.question}:${cluster.asked}`)
+  }
+  const first = shape([A, B, C])
+  for (const order of [[B, A, C], [C, A, B], [A, C, B], [C, B, A], [B, C, A]]) {
+    assert.deepStrictEqual(shape(order), first, `order ${order.map(one => one.question).join(' | ')} gave a different answer`)
+  }
+
+  // AND THE SUBJECT IS THE EARLIEST ASKING, not whichever line the export put
+  // first, because the subject is what a person is shown and judges.
+  assert.strictEqual(first[0].split(':')[0], A.question)
+
+  // An asking with no date sorts last, because it cannot claim to be the first
+  // time somebody asked.
+  const undated = { question: 'refunds process', where: '#sales', when: undefined }
+  const withUndated = backfill.repeats([undated, B, A])
+  assert.strictEqual([...withUndated.clusters, ...withUndated.below][0].question, A.question)
+})
 
 check('THE SAME ASKING RECORDED TWICE IS ONE ASKING, not two towards the threshold', () => {
   // The threshold this feeds is "asked three or more times" and nothing removed

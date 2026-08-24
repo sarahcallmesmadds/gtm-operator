@@ -4271,3 +4271,34 @@ mean a re-run quietly reporting fewer askings than were handed in.
 **Worth noting where this came from.** It was found by pointing the prompt at
 re-running and counting, after eight findings in a row about value shapes. The
 code it is in had been read by twenty-four rounds.
+
+### Review round 25, finding two: the same askings gave different answers in different orders
+
+**Codex.** Similarity is not transitive. A can reach the threshold against B, and
+B against C, while A and C have nothing in common. The cluster loop puts each
+asking in the first cluster it matches, so whichever one arrived in the middle
+decided the outcome: `[B, A, C]` produced one cluster of three and every other
+order of the same three produced none. Identical material crossed the documented
+threshold because an export came out in a different sequence.
+
+**Sorted rather than made transitive, and that is a decision rather than the easy
+option.** Comparing against every member and taking the best is exactly the
+chaining the comment above the loop already rejects, and it would be a worse trade
+here than in most places: the threshold is `REPEAT_SIMILARITY` and
+`REPEAT_SIMILARITY_IS_MEASURED` is false, so chaining would build a bigger claim
+on a number nobody has calibrated. Deterministic order fixes what is actually
+broken, which is one input giving two answers, without pretending the measure is
+better than it is.
+
+**Earliest first, which also decides what a person sees.** The first asking is the
+cluster's subject and the subject is what somebody reads and judges, so it is now
+the first time the question was asked rather than whichever line the export put at
+the top. An asking with no date sorts last, because it cannot claim to be the
+first time.
+
+**Non-transitivity is still there and is now written down.** A and C landing in
+different clusters when both resemble B is a property of a blunt measure and is
+left alone deliberately. What was fixed is that the answer no longer depends on
+the order of the file.
+
+807 checks. 118 mutations, all landed, all 89 backfill checks reached.

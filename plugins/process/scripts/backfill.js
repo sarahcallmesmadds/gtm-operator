@@ -609,8 +609,39 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
    * The first asking is the cluster's subject, which is also what gets shown to
    * the person, so the thing they judge is the thing that decided membership.
    */
+  /*
+   * SORTED FIRST, BECAUSE THE MATCH BELOW IS GREEDY AND GREEDY IS ORDER-BOUND.
+   *
+   * Similarity is not transitive: A can resemble B and B resemble C while A and
+   * C have nothing in common. The loop below puts each asking in the first
+   * cluster it matches, so whichever one arrives in the middle decides what
+   * happens. Three questions in the order [B, A, C] made one cluster of three
+   * and every other order of the same three made none, which means identical
+   * material crossed the documented threshold because an export came out in a
+   * different sequence.
+   *
+   * SORTED RATHER THAN MADE TRANSITIVE. Comparing against every member and
+   * taking the best is the chaining the comment below rejects, and it would be a
+   * worse trade here than elsewhere: the threshold is `REPEAT_SIMILARITY` and
+   * `REPEAT_SIMILARITY_IS_MEASURED` is false, so chaining would be built on a
+   * number nobody has calibrated. Deterministic order fixes what is actually
+   * broken, which is the same input giving two answers.
+   *
+   * Earliest first, which also decides what a person sees: the first asking is
+   * the cluster's subject, so the subject is now the first time somebody asked
+   * rather than whichever line the export happened to put first. An asking with
+   * no date sorts last, because it cannot claim to be the first time.
+   */
+  const ordered = distinct.slice().sort((a, b) => {
+    const when = (a.when || '9999-12-31').localeCompare(b.when || '9999-12-31')
+    if (when) return when
+    const question = a.question.localeCompare(b.question)
+    if (question) return question
+    return a.where.localeCompare(b.where)
+  })
+
   const clusters = []
-  for (const asking of distinct) {
+  for (const asking of ordered) {
     const home = clusters.find(cluster => similarity(cluster.question, asking.question) >= threshold)
     if (home) home.askings.push(asking)
     else clusters.push({ question: asking.question, askings: [asking] })
