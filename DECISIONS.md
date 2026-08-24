@@ -2828,3 +2828,34 @@ them.
 
 That makes six weak fixtures found across this pull request and the last, every
 one of them by mutation and none by reading.
+
+### Review round 6 on pull request 15
+
+Every round 5 finding is resolved. Four more taken.
+
+**Asking to own a document emptied it.** `properties` drops a person field it
+cannot resolve, and `me` with no configured person is exactly that, so the value
+fell into the clear branch. "Make me the owner" was carried out as "remove the
+owner": the reverse of what was asked, silently, on the field that records who is
+accountable. Refused now, and an explicit null still clears, because emptying it
+on purpose is a different and legitimate request.
+
+**`prove-update` checked the headings of a page it had already rejected.** The
+property loop was guarded by the binding check and the headings block was not, so
+a read-back of another page had its headings compared and reported as checked,
+underneath a result that had just said nothing below was looked at.
+
+**The same page opened from a view keyed as a different page.** `pageKey` took
+the last 32 hex characters of the whole string, and in
+`.../page-<id>?v=<view id>` those belong to the view. The binding check would
+have refused a correct read-back. It reads the last path segment now, with the
+query and the fragment cut off first.
+
+**And a person read as changed for the shape it came back in.** An owner fetched
+as `user://abc`, left untouched in the after row, compared as an edit, went into
+the payload, and on a review moved the verification stamp for a change nobody
+made. The same measured fact already lives in `shared/notion-compare.js`, which
+answers a different question: that one is about proving a write landed, this one
+about deciding what changed. Both need it and they are not the same call.
+
+Five mutations, each confirmed to have landed. 693 checks.

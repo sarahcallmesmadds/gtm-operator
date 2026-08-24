@@ -147,7 +147,15 @@ function memosContextOrExit () {
  */
 function pageKey (value) {
   if (typeof value !== 'string') return null
-  const hex = value.replace(/[^0-9a-fA-F]/g, '')
+  // THE ID IS AT THE END OF THE PATH, AND NOTHING AFTER THE PATH COUNTS. Run
+  // over the whole string, the last 32 hex characters of
+  // `.../page-<id>?v=<another id>` are the view's id and not the page's, so the
+  // same page opened from a view compared as a different page. A trailing slash
+  // does the same in reverse by emptying the last segment.
+  const withoutTail = String(value).split('#')[0].split('?')[0]
+  const segments = withoutTail.split('/').filter(Boolean)
+  const last = segments.length ? segments[segments.length - 1] : withoutTail
+  const hex = last.replace(/[^0-9a-fA-F]/g, '')
   if (hex.length < 32) return null
   return hex.slice(-32).toLowerCase()
 }
@@ -169,6 +177,18 @@ function anyPerson (value) {
     }
     return text.length > 0
   }
+  return true
+}
+
+/**
+ * Whether a person field is asking for somebody rather than asking for nobody.
+ *
+ * `me` and a named id both want an owner. `null`, `[]` and `''` want the field
+ * emptied, which is a different request and a legitimate one.
+ */
+function wantsAPerson (value) {
+  if (value === null || value === undefined || value === '' || value === '[]') return false
+  if (Array.isArray(value)) return value.length > 0
   return true
 }
 
@@ -285,7 +305,13 @@ function sameValue (logical, a, b) {
   const norm = value => {
     if (value === null || value === undefined || value === '') return null
     if (listShaped) {
-      const entries = listOfNames(value)
+      // A PERSON IS WRITTEN BARE AND READ BACK PREFIXED, measured 2026-08-20.
+      // Without stripping it, an owner fetched as `user://abc` and left alone in
+      // the after row compared as a change, went into the payload, and on a
+      // reviewed update moved the verification stamp for an edit nobody made.
+      // The same fact is in `shared/notion-compare.js`, which is about proving a
+      // write rather than deciding what changed.
+      const entries = listOfNames(value).map(one => (typeof one === 'string' ? one.replace(/^user:\/\//, '') : one))
       return entries.length ? entries.map(one => String(one).trim()).slice().sort().join('\u0000') : null
     }
     if (Array.isArray(value)) return value.length ? value.map(String).slice().sort().join('\u0000') : null
@@ -1162,6 +1188,21 @@ const commands = {
     for (const logical of changedFields) {
       const name = context.property(logical)
       if (!(name in editable)) {
+        // ASKING TO OWN IT AND EMPTYING IT ARE OPPOSITE INTENTIONS.
+        //
+        // `properties` drops a person field it cannot resolve, and `me` with no
+        // configured person is exactly that. Falling into the clear branch then
+        // read "make me the owner" as "remove the owner", which is the reverse
+        // of what was asked, done silently, on the field that says who is
+        // accountable for the document.
+        if (schema.PERSON_FIELDS.includes(logical) && wantsAPerson(after[logical]) && !context.personId) {
+          throw new Error(
+            `${logical} was set to ${JSON.stringify(after[logical])} and the config records no person, so there is ` +
+            'nobody to write. It is refused rather than emptied: asking to own something and asking to un-own it are ' +
+            `opposite intentions, and the second one is not what was said. Either give ${logical} a Notion person id, ` +
+            `or set it to null if emptying it is what you meant.`
+          )
+        }
         // The field was emptied. It has to go as an explicit empty value, or the
         // write is a no-op and the old value silently survives a change the
         // person asked for and was told had happened.
@@ -1304,12 +1345,17 @@ const commands = {
       }
     }
 
+    // ONLY ONCE THE PAGE IS KNOWN TO BE THE RIGHT ONE. This block used to run
+    // whatever the binding check found, so a read-back of a different page had
+    // its headings compared and reported as checked, under a result that had
+    // already said nothing below was looked at.
+    //
     // THE HEADINGS ARE CHECKED WHEN THEY CAME BACK. `update` says which headings
     // it is writing and this used to list the whole body as unchecked without
     // looking at any of it, including the part it could check. A Notion page can
     // come back with a heading missing on a silent partial failure, which is the
     // same failure `new` proves against after a create.
-    if ((intended.headings || []).length) {
+    if (!problems.length && (intended.headings || []).length) {
       const back = (readback.headings || []).map(one => String(one).trim())
       if (!back.length) {
         unchecked.push('the headings, because the page came back without a heading list. Save the whole page, not a summary of it.')
