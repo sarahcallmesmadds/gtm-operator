@@ -272,9 +272,11 @@ function dayOrRefuse (value, doing) {
  * emptied, which is a different request and a legitimate one.
  */
 function wantsAPerson (value) {
-  if (value === null || value === undefined || value === '' || value === '[]') return false
-  if (Array.isArray(value)) return value.length > 0
-  return true
+  // ASKED THROUGH THE ONE RULE. Written out here it was a correct copy sitting
+  // next to an incorrect one: `peopleAsked` wrote the same test by hand and
+  // missed `'[]'`. A copy that happens to agree today is the next one to drift,
+  // which is the argument the seven `cameBackEmpty` consolidations were built on.
+  return !cameBackEmpty(value)
 }
 
 /** The pages a relation column names, however the surface encoded them. */

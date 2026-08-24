@@ -127,7 +127,26 @@ function personIdFrom (value) {
  * because only one of them is a request.
  */
 function peopleAsked (value) {
+  // THE EIGHTH READER OF THE EMPTINESS RULE, AND THE ONE THAT NEVER GOT IT.
+  //
+  // `'[]'` is what Notion returns for an empty person field, which is why
+  // `cameBackEmpty` exists and why `askedForNothing` and `wantsAPerson` both
+  // read it as asking for nobody. This wrote the test out by hand and missed it,
+  // so a row fetched with an empty `Owner` and handed straight back read as a
+  // request for a person literally named "[]". `check` saw nothing wrong,
+  // because it does not judge person values, and `properties` then threw on the
+  // same file at `personIdFrom`. A gate that passes what the write refuses is
+  // worse than no gate.
   if (value === undefined || value === null || value === '' || value === 'me') return null
+
+  // `'[]'` JOINS THE EMPTY LIST, NOT THE ABSENT ONE. The caller reads three
+  // answers here and only two of them are the same: null means nobody asked, so
+  // the default person may be applied, and an empty list means somebody asked
+  // for nobody, so the field is left alone. Folding `'[]'` into null would put
+  // the config person onto an owner that had just been cleared, which is the
+  // silent reassignment `properties` carries a separate warning about.
+  if (value === '[]') return []
+
   if (Array.isArray(value)) return value.filter(v => v !== undefined && v !== null && String(v).trim())
   return [value]
 }
@@ -225,6 +244,20 @@ function sourcesSection (sources) {
  * a refusal rather than an assumption: the whole rule exists because Notion
  * cannot check it, so guessing here would remove the only check there is.
  */
+/**
+ * Whether `body` is the shape everything downstream reads it as: a map of
+ * heading to text.
+ *
+ * A string, a list, a number or a boolean indexes to `undefined` for every
+ * heading, which under the partial-body rule reads as "not sent, leave it
+ * alone". So a malformed body was judged clean, rendered to nothing, and the
+ * edit was dropped without a word.
+ */
+function bodyIsMap (value) {
+  if (value === undefined || value === null) return true
+  return typeof value === 'object' && !Array.isArray(value)
+}
+
 function problems (final, { parentType, partialBody = false } = {}) {
   const found = []
   const add = (field, kind, message) => found.push({ field, kind, message })
@@ -335,8 +368,32 @@ function problems (final, { parentType, partialBody = false } = {}) {
 
   // --------------------------------------------------------------------- the body
 
+  /*
+   * THE CONTAINER IS JUDGED BEFORE THE SECTIONS IN IT.
+   *
+   * `body` was read as a map of heading to text and nothing asked whether it was
+   * one. Anything that is not indexes to `undefined` for every heading, and
+   * under the partial-body rule below `undefined` means "not sent, leave it
+   * alone", so every section read as untouched, nothing was refused, and
+   * `update` rendered an empty body and empty headings from a body somebody had
+   * asked to change. The edit went in silence and `prove-update`, having no
+   * heading to check, could report the empty write as proved.
+   *
+   * SAME SHAPE AS THE MAILBOX FINDING ONE ROUND EARLIER: a guard whose cases are
+   * all well-formed. Absent and malformed are different answers, and reading the
+   * second as the first turns a value somebody set into one nobody did.
+   */
   const sections = sectionsFor(row.Type)
-  if (sections) {
+  if (sections && !bodyIsMap(row.body)) {
+    add(
+      'body',
+      'not-a-section-map',
+      `\`body\` is ${JSON.stringify(row.body)}, which is not a set of sections. It is read as heading to text, one ` +
+      'key per heading, and anything else indexes to nothing for every heading. Read as sections it is empty, so the ' +
+      'edit would be dropped without a word and the write would come back looking clean. It is refused rather than ' +
+      'read as an untouched body.'
+    )
+  } else if (sections) {
     const body = row.body || {}
     for (const section of sections) {
       const text = body[section.heading]
