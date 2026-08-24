@@ -74,6 +74,19 @@ const REPEAT_SIMILARITY = 0.5
 const REPEAT_SIMILARITY_IS_MEASURED = false
 
 /**
+ * The fields `fill` will put into a blank, hoisted out of the function.
+ *
+ * EXPORTED SO THE RAW-KEY GUARD CAN BE BUILT FROM IT. `process.js` has to refuse
+ * a row keyed by the workspace's own property names, and to do that it needs to
+ * know which logical names this function is going to look for. Built from a
+ * separate list over there, the guard covered `UPDATABLE_FIELDS`, which holds
+ * `Owner` and none of the other three fields a backfill refuses, so a candidate
+ * carrying the workspace's name for `Verified date` passed the guard, became
+ * invisible here, and was ignored rather than refused.
+ */
+const FILLABLE = ['Description', 'Domain', 'Review cadence', ...schema.MULTI_SELECT_FIELDS]
+
+/**
  * Every field a backfill refuses to be handed, person and verification alike.
  *
  * ONE LIST BECAUSE TWO CALLERS KEPT DISAGREEING WITH IT. `artifact.js` refuses
@@ -656,7 +669,6 @@ function fill (existing, candidate) {
   const blank = value => value === undefined || value === null || value === '' ||
     (Array.isArray(value) && value.length === 0)
 
-  const FILLABLE = ['Description', 'Domain', 'Review cadence', ...schema.MULTI_SELECT_FIELDS]
 
   const after = { url: before.url, reviewed: false }
   const filling = []
@@ -708,6 +720,7 @@ function fill (existing, candidate) {
 }
 
 module.exports = {
+  FILLABLE,
   REFUSED_ON_A_BACKFILL,
   SOURCES,
   CONVERSATION_SOURCES,

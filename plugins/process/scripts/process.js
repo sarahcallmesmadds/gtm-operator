@@ -683,9 +683,17 @@ function staleness (row, today) {
  * SHARED BY BOTH CALLERS RATHER THAN COPIED. `fill` reads the same fetched row
  * for a different reason, and a guard that lives in one of two callers is a
  * guard the other one does not have.
+ *
+ * `fields` IS THE CALLER'S OWN LIST, NOT A GLOBAL ONE. Sharing the guard is only
+ * half of sharing it: built from `UPDATABLE_FIELDS` for everybody, it watched
+ * `Owner` and none of the other three fields a backfill refuses, so a candidate
+ * carrying the workspace's name for `Verified date` walked through the guard and
+ * was then invisible to the thing the guard exists to protect. A guard has to
+ * watch the fields its caller is about to read, and only the caller knows which
+ * those are.
  */
-function refuseRawKeys (context, rows, consequence) {
-  const rawKeys = row => UPDATABLE_FIELDS.filter(logical => {
+function refuseRawKeys (context, rows, consequence, fields = UPDATABLE_FIELDS) {
+  const rawKeys = row => fields.filter(logical => {
     const workspace = context.property(logical)
     return workspace !== logical && workspace in row && !(logical in row)
   })
@@ -1664,10 +1672,14 @@ const commands = {
     //     there was nothing to fill. That is reported as a finished answer and
     //     exits zero, which is the quieter of the two failures and the harder
     //     one to notice.
+    // BUILT FROM WHAT `fill` READS, not from the global list. It looks at the
+    // fields it can put into a blank and at the four it refuses outright, and
+    // only one of those four is in `UPDATABLE_FIELDS`.
     refuseRawKeys(context, [
       ['existing', existing],
       ['candidate', candidate]
-    ], 'read as empty, so nothing is filled and this reports that there was nothing to fill')
+    ], 'read as empty, so nothing is filled and this reports that there was nothing to fill',
+    [...backfill.FILLABLE, ...backfill.REFUSED_ON_A_BACKFILL])
 
     const out = backfill.fill(existing, candidate)
     console.log(JSON.stringify(out, null, 2))
