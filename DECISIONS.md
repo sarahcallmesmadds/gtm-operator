@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 786 checks, up from 716.
+The suite is 788 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3753,3 +3753,40 @@ covers every fillable field now, in both directions.
 written and nothing had ever validated them, so adding the validation turned two
 existing checks red. That is the validation working, and it is also a reminder
 that a fixture is not evidence of anything until something reads it.
+
+### Review round 14 on pull request 16, both reviewers, three more
+
+All three sit in or beside round 13's fix, which is the fifth time on this branch
+that a fix has made the next bug.
+
+**Codex: the emptiness rule on its seventh copy.** `fill`'s local `blank` helper
+missed `'[]'` the same way the six before it did. An empty multi-select comes
+back from Notion as a JSON array in a string, so the field read as occupied and
+was never filled: the one thing this command exists to do, refused for the value
+Notion actually returns.
+
+**Codex: `fill` filtered away the one problem it could not survive.** Round 13
+judged the offered values with `problems` and kept only the problems belonging to
+fields being filled, which dropped a missing `Name` or `Type` on the before row.
+So an incomplete row came back `ok: true` with a runnable `after`, and `update`
+restored its identity from that same row and refused it. The identity is a
+refusal of its own now, before the value check runs.
+
+**Devin: the raw-key guard drifted from what `fill` reads, for the third time.**
+Round 5 made the guard caller-specific and round 10 fixed `update`'s copy of the
+same fault. Round 13 then taught `fill` to read `Name` and `Type`, and neither is
+in the two lists the guard was assembled from over in `process.js`. So a row
+keyed by the workspace's own name for `Type` walked through, read as absent, and
+the identity check never ran.
+
+**The structural fix is `READ_BY_FILL`, one list beside the reading.** Assembling
+the guard's list at the call site is what let it drift three times: the person
+adding a reader is not looking at the call site, and the call site is not
+watching what the function reads.
+
+**And the check for it was defeatable by deleting the thing it watched.** It
+looped over `READ_BY_FILL`, so shrinking that list made it check one field fewer
+and stay green. The list is pinned against its parts first, then iterated. That
+is the same trap recorded from the audit session, where the tests written to stop
+a drift could be beaten by removing what they tested, and it was found by
+mutating rather than by reading.
