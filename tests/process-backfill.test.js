@@ -1243,6 +1243,29 @@ check('THE DUPLICATE CHECK CAN READ THE CANDIDATE THE FLOW HANDS IT', () => {
     judged.matches.some(one => one.name === 'Refund policy'),
     `judge did not recognise the page the candidate would duplicate: ${JSON.stringify(judged.matches)}`
   )
+
+  // AND THE SUPERSEDE HALF, which is the weaker half of the same promise and the
+  // half the first version of this check did not assert. A candidate that would
+  // replace an existing Strategy Decision has to reach `possibleReplacements`,
+  // or the side-by-side prompt never appears and a decision is silently
+  // duplicated instead of superseded.
+  const decisionCandidate = capture(() => command.commands.candidates(
+    write('rr-dec-found.json', [{ what: 'How we price renewals', where: 'Drive/GTM', type: schema.PARENT_TYPE }])
+  )).candidates[0]
+  const existingDecision = {
+    url: URL_B,
+    [context.property('Name')]: 'How we price renewals',
+    [context.property('Type')]: schema.PARENT_TYPE,
+    [context.property('Status')]: 'Active'
+  }
+  const superseding = capture(() => command.commands.judge(
+    write('rr-dec.json', decisionCandidate),
+    write('rr-dec-rows.json', [existingDecision])
+  ))
+  assert.ok(
+    superseding.possibleReplacements.some(one => one.name === 'How we price renewals'),
+    `a candidate that would supersede a decision was not offered as a replacement: ${JSON.stringify(superseding.possibleReplacements)}`
+  )
 })
 
 check('A Sources SECTION THAT IS NOT TEXT IS REFUSED, not crashed on', () => {
