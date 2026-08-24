@@ -254,7 +254,16 @@ function asksToEmpty (value) {
  */
 function dayOrRefuse (value, doing) {
   const today = value || new Date().toISOString().slice(0, 10)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(today) && !Number.isNaN(Date.parse(`${today}T00:00:00Z`))) return today
+  // WRITTEN BACK OUT AND COMPARED, which is the pair of the fix `backfill.js`
+  // `day` got in round 4 and did not get here until round 32. `Date.parse` takes
+  // `2026-02-30` and hands back the 2nd of March, so the regex and a not-NaN
+  // test together still let a rolled-over day through, into a Notion date
+  // property on the writing side and into a staleness calculation on the reading
+  // one. The only way to tell the two apart once the string has been parsed is
+  // to render it again and see whether it changed.
+  const parsed = Date.parse(`${today}T00:00:00Z`)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(today) && !Number.isNaN(parsed) &&
+      new Date(parsed).toISOString().slice(0, 10) === today) return today
   throw new Error(
     `"${today}" is not a date. Use YYYY-MM-DD. ` +
     (doing === 'reading'

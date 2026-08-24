@@ -37,6 +37,7 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [P, "      new Date(parsed).toISOString().slice(0, 10) === today) return today", "      true) return today"],
   [B, "    if (typeof value === 'string' && value.trim()) return false", "    if (true) return false"],
   [B, "  const nameBroken = identityProblem('Name', given.Name)", "  const nameBroken = false; identityProblem('Name', undefined)"],
   [P, "    return typeof one.Name === 'string' ? one.Name.trim() : ''", "    return String(one.Name).trim()"],

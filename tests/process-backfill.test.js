@@ -1192,6 +1192,39 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`dayOrRefuse` REFUSES A ROLLED-OVER DAY, the pair of the fix round 4 made', () => {
+  // `backfill.js` `day` was taught in round 4 to write the parsed date back out
+  // and compare, because Date.parse('2026-02-30') is not NaN, it is the 2nd of
+  // March. `dayOrRefuse` kept the older regex-plus-parse test, so `update`,
+  // `draft` and `trust` could carry a rolled-over day into a Notion date
+  // property or into a staleness calculation. Recorded as deferred for three
+  // rounds on the grounds that it changes commands this branch does not touch,
+  // which stopped being true once the flow started feeding them.
+  for (const rolled of ['2026-02-30', '2026-04-31', '2026-02-31', '2026-06-31']) {
+    assert.throws(
+      () => capture(() => command.commands.update(
+        write('day-before.json', EXISTING),
+        write('day-after.json', backfill.fill(EXISTING, { Domain: 'Customer Success' }).after),
+        rolled
+      )),
+      /is not a date/,
+      `${rolled} was accepted and would have written a different day`
+    )
+    assert.strictEqual(backfill.day(rolled), null, `backfill.day disagrees about ${rolled}`)
+  }
+
+  // A REAL DAY STILL PASSES, on both sides, or the check above is a command that
+  // refuses every date.
+  for (const real of ['2026-02-28', '2026-08-23', '2024-02-29']) {
+    assert.strictEqual(backfill.day(real), real)
+    assert.doesNotThrow(() => capture(() => command.commands.update(
+      write('day-before2.json', EXISTING),
+      write('day-after2.json', backfill.fill(EXISTING, { Domain: 'Customer Success' }).after),
+      real
+    )))
+  }
+})
+
 check('AN IDENTITY FIELD THAT IS SUPPLIED AND UNREADABLE IS REFUSED, not replaced by the old one', () => {
   // `text(given.Name) || text(given.what)` reads a malformed Name as absent and
   // falls back, so a candidate edited to `Name: 42` was accepted and written

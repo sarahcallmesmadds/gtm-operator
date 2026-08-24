@@ -4544,3 +4544,27 @@ all of them mine:
 
 813 checks, 97 in the backfill suite. 135 mutations, all landed, one survivor and
 it is the known `wantsAPerson` inversion that `process-audit-update` catches.
+
+### Round 32, finding one: the deferral that was raised three times
+
+**Devin, for the third round running, and this time with the argument that
+settles it.** `dayOrRefuse` is the pair of the fix `backfill.js` `day` got in
+round 4. `Date.parse('2026-02-30T00:00:00Z')` is not `NaN`, it is the 2nd of
+March, so a regex and a not-NaN test together let a rolled-over day through.
+`day` writes the parsed date back out and compares; `dayOrRefuse` did not, so
+`update`, `draft` and `trust` could carry a wrong day into a Notion date property
+or into a staleness calculation.
+
+**It was recorded as a deliberate deferral in rounds 26 and 29, on the grounds
+that it changes behaviour in commands this branch does not touch.** That reason
+stopped being true when the flow started feeding those commands, which is the
+second recorded deferral on this branch to go stale by the branch's own growth.
+The first was the shape check.
+
+**Both went stale the same way, and both were only re-examined because a reviewer
+raised them again.** A deferral records a decision and its reason; nothing rereads
+the reason when the thing it depended on changes. Worth carrying: a deferral is
+not a decision that stays true, and the reason is the part that expires.
+
+The fix is a strict narrowing. It refuses only dates that were already going to
+write a different day than the one supplied.
