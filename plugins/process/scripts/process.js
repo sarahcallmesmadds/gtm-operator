@@ -932,7 +932,7 @@ const commands = {
 
   create (file) {
     if (!file) throw new Error('Usage: node process.js create <artifact.json>')
-    const final = readJson(file, 'the artifact')
+    const final = readJson(file, 'the artifact', 'fields')
     const context = contextOrExit()
 
     const properties = artifact.properties(context, final, {
@@ -986,7 +986,7 @@ const commands = {
       throw new Error('Usage: node process.js prove <artifact.json> <readback.json> <created-url>')
     }
     const final = readJson(artifactFile, 'the artifact')
-    const readback = readJson(readbackFile, 'the page as it came back')
+    const readback = readJson(readbackFile, 'the page as it came back', 'fields')
     const context = contextOrExit()
 
     const problems = []
@@ -1377,8 +1377,8 @@ const commands = {
       throw new Error('update needs the artifact as it is now and as it would be: node process.js update before.json after.json [YYYY-MM-DD]')
     }
     const context = contextOrExit()
-    const before = readJson(beforeFile, 'the artifact as it is now')
-    const after = readJson(afterFile, 'the artifact as it would be')
+    const before = readJson(beforeFile, 'the artifact as it is now', 'fields')
+    const after = readJson(afterFile, 'the artifact as it would be', 'fields')
 
     // THE ROWS HAVE TO BE KEYED LOGICALLY, AND THAT IS CHECKED.
     //
@@ -1666,8 +1666,8 @@ const commands = {
     if (!updateFile || !readbackFile) {
       throw new Error("prove-update needs the update output and the page as it came back: node process.js prove-update update.json readback.json")
     }
-    const intended = readJson(updateFile, 'the update that was sent')
-    const readback = readJson(readbackFile, 'the page as it came back')
+    const intended = readJson(updateFile, 'the update that was sent', 'fields')
+    const readback = readJson(readbackFile, 'the page as it came back', 'fields')
 
     // IT HAS TO BE `update`'s OUTPUT, AND THAT IS CHECKED. Given anything else,
     // the page-binding check found no target to compare and the property loop
