@@ -66,6 +66,13 @@ const writeConfig = ({ process: p = processNames, memos: m = memoNames, withMemo
 
 let command = writeConfig()
 
+/** The context for whatever config `writeConfig` last wrote. */
+const contextNow = () => {
+  delete require.cache[require.resolve('../shared/config-read')]
+  const fresh = require('../shared/config-read')
+  return fresh.contextFor('process', require('../shared/process-schema').IDENTITY)
+}
+
 let failures = 0
 const check = (name, fn) => {
   try {
@@ -271,6 +278,52 @@ check('and somebody actually named is not flagged', () => {
       `Verified by as ${JSON.stringify(filled)} was read as empty`
     )
   }
+})
+
+check('A MULTI-SELECT IS TRANSLATED INSIDE A JSON STRING TOO', () => {
+  // A list arrives as a string holding a JSON array, which is the shape this
+  // surface actually returns. The first reverse map handled a real array and a
+  // bare scalar and let the string fall through, so a renamed workspace came
+  // back with its own option names on every multi-select: the fault the reverse
+  // map exists to fix, in the shape it was most likely to arrive in.
+  command = writeConfig({ process: rename(processNames) })
+  const raw = [{ url: 'u', 'R Audience': JSON.stringify(['R Sales', 'R RevOps']) }]
+  const [row] = command.normaliseRows(contextNow(), raw)
+  assert.deepStrictEqual(row.Audience, ['Sales', 'RevOps'], `came back as ${JSON.stringify(row.Audience)}`)
+  command = writeConfig()
+})
+
+check('and a value the workspace added is still passed through inside a string', () => {
+  command = writeConfig({ process: rename(processNames) })
+  const raw = [{ url: 'u', 'R Audience': JSON.stringify(['R Sales', 'Something they invented']) }]
+  const [row] = command.normaliseRows(contextNow(), raw)
+  assert.deepStrictEqual(row.Audience, ['Sales', 'Something they invented'], JSON.stringify(row.Audience))
+  command = writeConfig()
+})
+
+check('AN INSTALL WITH NO PERSON SAYS WHY EVERY ARTIFACT IS FLAGGED', () => {
+  // Nothing fills Verified by on such an install, so every artifact carries the
+  // flag every run. Reported without the reason it is noise, and a list where
+  // every row says the same thing teaches the reader to skip the whole report.
+  command = writeConfig({ personId: null })
+  const out = runFlags([artifactRow({ 'Verified by': null })], [])
+  assert.ok(signals(out).includes('never-verified'), 'the signal stopped firing')
+  assert.ok(/RECORDS NO PERSON/.test(out.neverVerifiedNote || ''), out.neverVerifiedNote)
+  command = writeConfig()
+})
+
+check('and an install that does record one says nothing about it', () => {
+  const out = runFlags([artifactRow({ 'Verified by': null })], [])
+  assert.strictEqual(out.neverVerifiedNote, null, 'the caveat fired on an install that has a person')
+})
+
+check('a today that is not a date is refused', () => {
+  assert.throws(
+    () => runFlags([artifactRow()], [], 'last Tuesday'),
+    /is not a date/,
+    'a mistyped date was carried through and every cadence would read as unknown'
+  )
+  assert.throws(() => runFlags([artifactRow()], [], '2026-13-45'), /is not a date/)
 })
 
 check('signal 4: never verified', () => {
@@ -773,6 +826,29 @@ check('A PERSON COMPARES THE SAME WITH OR WITHOUT THE PREFIX', () => {
     '2026-08-23'
   ))
   assert.deepStrictEqual(out.changed, [], `the owner read as changed across shapes: ${JSON.stringify(out.changed)}`)
+})
+
+check('SETTING THE OWNER TO "me" WHEN THEY ALREADY OWN IT IS NOT A CHANGE', () => {
+  // `properties` understands "me" and the comparison did not, so this reported
+  // a change and rewrote the same value, which on a review would also have moved
+  // the verification stamp for an edit nobody made.
+  const owned = { ...BEFORE, Owner: ['person-1'] }
+  const out = capture(() => command.commands.update(
+    write('before.json', owned),
+    write('after.json', { ...owned, Owner: 'me', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, [], `"me" against the same person read as a change: ${JSON.stringify(out.changed)}`)
+})
+
+check('and "me" against a different owner still is one', () => {
+  const out = capture(() => command.commands.update(
+    write('before.json', BEFORE),
+    write('after.json', { ...BEFORE, Owner: 'me', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Owner'], 'a real handover stopped being seen')
+  assert.deepStrictEqual(out.properties.Owner, ['person-1'], JSON.stringify(out.properties.Owner))
 })
 
 check('AND THE REVIEW STAMP STILL RECORDS WHO READ IT', () => {

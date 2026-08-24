@@ -2920,3 +2920,40 @@ when it should fail, and these failed when they should have passed. The first
 kind hides a defect, the second wastes a round. Matching on a sentence fragment
 is what made them brittle, and the narrower of the two was matching on singular
 wording that goes plural as soon as more than one field is raw.
+
+### Review round 9 on pull request 15
+
+**Zero bugs open at the start of this round**, for the first time. Four flags,
+all real, all taken.
+
+**The reverse value map missed the shape the surface actually returns.** It
+handled a real array and a bare scalar and let a string holding a JSON array fall
+through untouched, so a renamed workspace came back with its own option names on
+every multi-select. That is the fault the whole reverse map exists to fix,
+surviving in the shape it was most likely to arrive in. One translator now, used
+by both row readers, and a string that parses as an array comes back as an array:
+the caller is reading a list either way and should not have to know which shape
+it arrived in.
+
+**Signal 4 flags every artifact on an install that records no person**, because
+nothing ever fills `Verified by` there. That is not wrong and it is useless
+without the reason, so the report says it once. A list where every row carries
+the same flag teaches the reader to skip the whole report, including the three
+signals that do mean something.
+
+**Setting the owner to `me` when the config person already owned it reported a
+change**, and rewrote the same value. `properties` understands `me` and the
+comparison did not. It is resolved once, before anything is compared, rather than
+in both places.
+
+**`flags` accepted "last Tuesday" as a date.** Every cadence comparison would come
+back `unknown`, which is also what `staleness` says about a cadence it has never
+seen, so a mistyped argument read as a library nobody had checked. Refused now.
+
+Six mutations, each confirmed to have landed. One needed rewriting because the
+first attempt matched nothing: there are two date guards in this file and the
+pattern hit neither. A mutation that fails to apply reports the check as proved,
+which is the lesson from the round before this work started, and the reason each
+one is diffed against the original before the suite runs.
+
+706 checks.

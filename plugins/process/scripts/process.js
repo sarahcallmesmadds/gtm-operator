@@ -194,6 +194,39 @@ function anyPerson (value) {
 }
 
 /**
+ * One value, translated from the workspace's option names back to the logical
+ * ones.
+ *
+ * A LIST ARRIVES AS A STRING HOLDING A JSON ARRAY, and that is the shape this
+ * surface actually returns. The first version handled a real array and a bare
+ * scalar and let a JSON string fall through untouched, so a renamed workspace
+ * came back with its own option names still on every multi-select. That is the
+ * fault the whole reverse map exists to fix, surviving in the shape it was most
+ * likely to arrive in.
+ *
+ * A string that parses as an array comes back as a real array, because the
+ * caller is reading a list either way and should not have to know which shape
+ * it arrived in. A value the map does not carry is passed through as itself.
+ */
+function toLogicalValue (options, logical, value) {
+  if (!options) return value
+  const translate = entry => (typeof entry === 'string' && entry in options ? options[entry] : entry)
+  if (Array.isArray(value)) return value.map(translate)
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text)
+        if (Array.isArray(parsed)) return parsed.map(translate)
+      } catch (error) {
+        // Not a JSON array after all. Fall through and treat it as one value.
+      }
+    }
+  }
+  return translate(value)
+}
+
+/**
  * Whether a person field is asking for somebody rather than asking for nobody.
  *
  * `me` and a named id both want an owner. `null`, `[]` and `''` want the field
@@ -437,12 +470,7 @@ function auditColumnMap (context) {
 function normaliseAuditRows (context, rows) {
   const map = auditColumnMap(context)
   const back = logicalValues(context)
-  const toLogical = (logical, value) => {
-    const options = back[logical]
-    if (!options) return value
-    if (Array.isArray(value)) return value.map(entry => (entry in options ? options[entry] : entry))
-    return value in options ? options[value] : value
-  }
+  const toLogical = (logical, value) => toLogicalValue(back[logical], logical, value)
   return rowList(rows).map(row => {
     const out = {}
     for (const [logical, actual] of Object.entries(map)) out[logical] = toLogical(logical, row[actual])
@@ -519,12 +547,7 @@ function logicalValues (context) {
 function normaliseRows (context, rows) {
   const map = columnMap(context)
   const back = logicalValues(context)
-  const toLogical = (logical, value) => {
-    const options = back[logical]
-    if (!options) return value
-    if (Array.isArray(value)) return value.map(entry => (entry in options ? options[entry] : entry))
-    return value in options ? options[value] : value
-  }
+  const toLogical = (logical, value) => toLogicalValue(back[logical], logical, value)
 
   return rowList(rows).map(row => {
     const out = {}
@@ -954,6 +977,17 @@ const commands = {
     const context = contextOrExit()
     const memosCtx = memosContextOrExit()
     const today = todayArg || new Date().toISOString().slice(0, 10)
+    // A DATE THAT DOES NOT PARSE MAKES EVERY CADENCE COMPARISON MEANINGLESS, and
+    // it does it quietly: `staleness` reports `unknown` for a row it cannot
+    // date, which is the same answer it gives for a cadence it does not
+    // recognise, so a mistyped argument read as a library nobody had checked.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`))) {
+      throw new Error(
+        `"${today}" is not a date. Use YYYY-MM-DD. It is refused rather than carried through, because every ` +
+        'cadence comparison would come back "unknown", which is also what this says about a cadence it has ' +
+        'never seen, and a mistyped argument would read as a library nobody has checked.'
+      )
+    }
 
     const artifacts = normaliseAuditRows(context, readJson(artifactsFile, 'the artifact rows'))
     const memoRows = rowList(readJson(memosFile, 'the memo rows'))
@@ -987,6 +1021,14 @@ const commands = {
         }
       }
     }
+
+    // WITH NO PERSON CONFIGURED, SIGNAL 4 CANNOT MEAN ANYTHING. Nothing this
+    // plugin writes ever fills `Verified by` on such an install, so every
+    // artifact is flagged as never verified, every run. That is not wrong, and
+    // reported without the reason it is noise: a list where every row carries
+    // the same flag teaches the reader to skip the whole report, including the
+    // three signals that do mean something.
+    const noPersonConfigured = !context.personId
 
     const flagged = []
     const flag = (row, signal, why) => flagged.push({
@@ -1057,6 +1099,11 @@ const commands = {
       supersedeNote: supersedeCandidates.length
         ? 'CANDIDATES, NOT A VERDICT. Two Active Strategy Decisions look alike. Whether one supersedes the other is a ' +
           'person\'s call: getting it wrong archives a live document. Show both and ask.'
+        : null,
+      neverVerifiedNote: noPersonConfigured && flagged.some(one => one.signal === 'never-verified')
+        ? 'THIS INSTALL RECORDS NO PERSON, so nothing ever fills Verified by and every artifact carries the ' +
+          'never-verified flag whatever its state. Say that when reporting rather than listing them as findings. ' +
+          'The other three signals are unaffected.'
         : null,
       memoSignalNote: memoRows.length
         ? null
@@ -1202,13 +1249,24 @@ const commands = {
     // and forgot a field deleted it, and the output called that a clear as if it
     // had been asked for. Clearing is now something you say, with an explicit
     // null or empty list, the same rule the body already follows.
+    // `me` RESOLVED BEFORE ANYTHING IS COMPARED. `properties` understands it and
+    // the comparison did not, so setting the owner to `me` when the config
+    // person already owns it reported a change and rewrote the same value. The
+    // resolution happens once, here, rather than in both places.
+    const resolved = { ...after }
+    if (context.personId) {
+      for (const field of schema.PERSON_FIELDS) {
+        if (resolved[field] === 'me') resolved[field] = [context.personId]
+      }
+    }
+
     const changedFields = []
     const unchangedFields = []
     const untouchedFields = []
     for (const logical of UPDATABLE_FIELDS) {
       if (schema.VERIFICATION_FIELDS.includes(logical)) continue
-      if (!(logical in after)) { untouchedFields.push(logical); continue }
-      if (sameValue(logical, before[logical], after[logical])) unchangedFields.push(logical)
+      if (!(logical in resolved)) { untouchedFields.push(logical); continue }
+      if (sameValue(logical, before[logical], resolved[logical])) unchangedFields.push(logical)
       else changedFields.push(logical)
     }
 
