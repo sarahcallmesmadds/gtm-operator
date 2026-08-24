@@ -4916,3 +4916,20 @@ which is the vendor mechanism working, proved by re-vendoring the mutant
 (red in the command suite) and by the drift itself (red in the vendor test).
 The mutation harness still covers only the backfill suite; memos and projects
 are open work.
+
+### Round 1, 2026-08-24: one flag, ruled intended and pinned
+
+Devin's round 1 on pull request 18: 0 vulnerabilities, 0 bugs, 1 flag,
+readable only on the Devin page as a title and line range, per the standing
+constraint. **"Canceled row with priority but no effort is refused"**,
+`project.js` 193–195: the priority-before-effort refusal runs outside the
+`scoped` branch, so a Canceled row carrying a Priority and no Level of Effort
+is refused.
+
+Ruled intended rather than fixed. The design's rule is that priority is
+relative to effort, and that does not stop being true when the outcome is "do
+not build this": a canceled row may carry both, worked out during scoping and
+then not built, or neither, but a priority hanging on nothing is the exact
+value the rule exists to keep out of the database. Pinned by a test naming
+the flag rather than changed, the same handling as the disputed slop-check
+finding of 2026-08-18.

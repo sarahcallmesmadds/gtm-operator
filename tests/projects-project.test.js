@@ -115,6 +115,18 @@ check('a Canceled outcome does not demand effort, priority or an outcome line', 
   assert.deepStrictEqual(project.scopeProblems(canceled), [])
 })
 
+check('a priority with no effort is refused on a Canceled outcome too', () => {
+  // Devin round 1 flagged this line range as reachable on a Canceled row, and
+  // the behaviour is intended rather than accidental, so it is pinned: the
+  // design says priority is relative to effort in every outcome it describes.
+  // A canceled row may carry both (worked out during scoping, then not built)
+  // or neither, but never a priority hanging on nothing.
+  const found = project.scopeProblems(clean({ Status: 'Canceled', 'Level of Effort': undefined }))
+  assert.ok(kinds(found).includes('priority-before-effort'))
+  assert.deepStrictEqual(project.scopeProblems(clean({ Status: 'Canceled' })), [],
+    'a canceled row carrying both effort and priority is legal')
+})
+
 check('a scoped row without effort and priority is refused, and priority never comes first', () => {
   assert.ok(kinds(project.scopeProblems(clean({ 'Level of Effort': undefined, Priority: undefined }))).includes('missing'))
   const found = project.scopeProblems(clean({ 'Level of Effort': undefined }))
