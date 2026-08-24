@@ -4432,3 +4432,30 @@ about `possibleReplacements`, so it proved the half that had been fixed.
 finished until the other side has been tried, and the test for it is not finished
 until it asserts the weaker half. Half a fix reads exactly like a whole one from
 the side that works.
+
+### Review round 29, finding two: the shape check stopped short of where the flow goes
+
+**Devin, and it corrects a deferral recorded on this branch rather than a bug
+introduced by it.** The shape check was declared on the five backfill commands
+and written up as deliberately not swept into the older ones, on the grounds that
+each declaration changes what a command accepts and the commands this branch did
+not touch were not its to change quietly.
+
+**That was right when it was written and wrong once the flow was finished.**
+`draft` and `fill` hand artifacts straight to `create` and `update`, and `create`
+hands its result to `prove`. Those are not commands this branch leaves alone, they
+are the ones its output flows into. A list reaching `create` was read as an
+artifact and refused for a missing url, which names the wrong problem in exactly
+the way the shape check exists to stop.
+
+**Declared on the three the flow feeds, and no further.** `check`, `duplicates`,
+`judge`, `audit` and `trust` still do not declare, and that remains recorded
+rather than assumed. The line is now what the backfill flow reaches rather than
+what the branch happened to add.
+
+**Worth keeping.** A recorded deferral is not a decision that stays true. This one
+was correct on the day and stale by the end of the same branch, and nothing would
+have re-examined it if a reviewer had not been pointed at the promises rather than
+the code.
+
+813 checks. 130 mutations, all landed, all 94 backfill checks reached.

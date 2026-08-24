@@ -1192,6 +1192,42 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('THE COMMANDS THE BACKFILL FLOW FEEDS DECLARE THEIR SHAPES TOO', () => {
+  // The shape check was declared on the five backfill commands and recorded as
+  // deliberately not swept into the older ones. That was right when it was
+  // written and wrong once `draft` and `fill` hand artifacts straight to
+  // `create` and `update`: those are no longer commands this branch does not
+  // touch, they are the ones its output flows into. A list reaching `create` was
+  // read as an artifact and refused for a missing url, which names the wrong
+  // problem.
+  const wrong = write('flow-wrong.json', ['not', 'an', 'artifact'])
+  const rightRow = write('flow-right.json', EXISTING)
+
+  const feeds = [
+    ['create', file => command.commands.create(file)],
+    ['update before', file => command.commands.update(file, rightRow, '2026-08-23')],
+    ['update after', file => command.commands.update(rightRow, file, '2026-08-23')],
+    ['prove-update sent', file => command.commands['prove-update'](file, rightRow)],
+    ['prove-update readback', file => command.commands['prove-update'](rightRow, file)]
+  ]
+  for (const [name, run] of feeds) {
+    assert.throws(() => run(wrong), /read as a set of fields/, `${name} accepted a list`)
+  }
+
+  // AND EACH STILL RUNS ON THE RIGHT SHAPE, or the loop above passes against
+  // commands that refuse everything.
+  process.exitCode = 0
+  const drafted = backfill.draft({
+    Name: 'Refund policy',
+    Type: 'SOP/ROE',
+    sources: [{ what: 'refunds.doc', contributed: 'the steps' }],
+    body: { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+  })
+  assert.strictEqual(drafted.ok, true, JSON.stringify(drafted.problems))
+  assert.doesNotThrow(() => capture(() => command.commands.create(write('flow-art.json', drafted.artifact))))
+  process.exitCode = 0
+})
+
 check('THE DUPLICATE CHECK CAN READ THE CANDIDATE THE FLOW HANDS IT', () => {
   // `candidates` emits `what` and `type`. `duplicates` and `judge` read `Name`
   // and `Type`. The note printed beside the candidate list says to run both on
