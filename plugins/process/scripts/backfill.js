@@ -73,11 +73,25 @@ const REPEAT_MIN = 3
 const REPEAT_SIMILARITY = 0.5
 const REPEAT_SIMILARITY_IS_MEASURED = false
 
-/** A YYYY-MM-DD day, or null. Refusals are collected here, never thrown. */
+/**
+ * A YYYY-MM-DD day, or null. Refusals are collected by the caller, never thrown.
+ *
+ * THE ROLL-OVER IS THE REASON FOR THE LAST LINE. `Date.parse` accepts
+ * `2026-02-30` and hands back the 2nd of March, so a range ending on a day that
+ * does not exist silently reads two days past where it was set. On this side of
+ * the plugin that is the direction that matters: it reads more than was asked
+ * for, in the one place where nothing downstream can catch it, because there is
+ * no approval gate in front of a read.
+ */
 function day (value) {
   if (typeof value !== 'string') return null
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-  if (Number.isNaN(Date.parse(`${value}T00:00:00Z`))) return null
+  const parsed = Date.parse(`${value}T00:00:00Z`)
+  if (Number.isNaN(parsed)) return null
+  // Written back out and compared. A day that rolled over comes back as a
+  // different one, which is the only way to tell 2026-02-30 from 2026-03-02
+  // once the string has been parsed.
+  if (new Date(parsed).toISOString().slice(0, 10) !== value) return null
   return value
 }
 
@@ -93,6 +107,23 @@ function nameList (value) {
   if (!Array.isArray(value)) return null
   const names = value.map(one => text(one)).filter(Boolean)
   return names.length ? names : null
+}
+
+/**
+ * The entries in a list that are not names, as `[index, value]`.
+ *
+ * DROPPING ONE IS NARROWING, AND NARROWING IS THE THING THIS FILE REFUSES.
+ * `nameList` and every `.filter(Boolean)` beside it quietly discard whatever is
+ * not a usable string, so `["#gtm", 42]` became a plan covering one channel and
+ * reported `ok: true`. The run then reads less material than was asked about and
+ * says it read what was asked about, which is the exact failure `plan` exists to
+ * prevent, arriving through the helper rather than through the scope.
+ */
+function notNames (value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((one, index) => [index, one])
+    .filter(([, one]) => text(one) === null)
 }
 
 /**
@@ -120,8 +151,11 @@ function plan (request) {
   } else if (!Array.isArray(req.sources)) {
     add('sources', 'not-a-list', `\`sources\` is ${JSON.stringify(req.sources)}. It is a list, because a backfill run reads any combination of ${SOURCES.join(', ')}.`)
   } else {
+    for (const [index, one] of notNames(req.sources)) {
+      add('sources', 'not-a-name', `\`sources[${index}]\` is ${JSON.stringify(one)}, which is not a source name. It is refused rather than dropped: a list quietly shortened reads less material than was asked about and reports that it read what was asked about.`)
+    }
     asked = req.sources.map(one => text(one)).filter(Boolean)
-    if (!asked.length) {
+    if (!asked.length && !notNames(req.sources).length) {
       add('sources', 'missing', 'The source list is empty, so there is nothing to read.')
     }
     for (const one of asked) {
@@ -145,12 +179,22 @@ function plan (request) {
   const range = (source, holder) => {
     const from = day(holder.from)
     const to = day(holder.to)
-    if (!from) {
-      add(source, 'range-open', `${source} has no usable \`from\` date, so this is an unbounded read. There is no unbounded read: a conversation source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
+
+    // TWO DIFFERENT FAULTS, AND ONE WORDING FOR BOTH IS ITS OWN BUG. An absent
+    // date is an unbounded read. A date like `2026-02-30` is a read whose end
+    // rolled forward into March, which is a bounded read of the wrong window.
+    // Telling somebody their date is missing when it is sitting right there
+    // sends them looking in the wrong place.
+    const end = (which, value, parsed) => {
+      if (parsed) return
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        add(source, 'range-not-a-day', `${source} is scoped \`${which}\` ${value}, which is written as a date and is not one. Parsed loosely it rolls forward into the next month and reads a window nobody set, so it is refused rather than carried through.`)
+        return
+      }
+      add(source, 'range-open', `${source} has no usable \`${which}\` date, so this is an unbounded read. There is no unbounded read: a conversation source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
     }
-    if (!to) {
-      add(source, 'range-open', `${source} has no usable \`to\` date, so this is an unbounded read. Use YYYY-MM-DD.`)
-    }
+    end('from', holder.from, from)
+    end('to', holder.to, to)
     if (from && to && from > to) {
       add(source, 'range-backwards', `${source} is scoped from ${from} to ${to}, which is backwards. Read as it is written it covers nothing, and a run that reads nothing looks exactly like a workspace with nothing in it.`)
       return null
@@ -182,8 +226,11 @@ function plan (request) {
     if (holder.channels === 'all') {
       channels = 'all'
     } else if (Array.isArray(holder.channels)) {
+      for (const [index, one] of notNames(holder.channels)) {
+        add('slack', 'channel-not-a-name', `\`slack.channels[${index}]\` is ${JSON.stringify(one)}, which is not a channel name. Dropping it would read fewer channels than were asked for without saying so.`)
+      }
       channels = nameList(holder.channels)
-      if (!channels) {
+      if (!channels && !notNames(holder.channels).length) {
         add('slack', 'channels-empty', 'The Slack channel list is empty. Either name the channels to read, or say "all" deliberately. An empty list reads as nothing and is more likely to be a mistake than a request.')
       }
     } else {
@@ -206,6 +253,9 @@ function plan (request) {
       } else if (!Array.isArray(holder.dms)) {
         add('slack', 'dms-not-a-list', `\`dms\` is ${JSON.stringify(holder.dms)}. It is a list of specific conversations, named one by one.`)
       } else {
+        for (const [index, one] of notNames(holder.dms)) {
+          add('slack', 'dm-not-a-name', `\`slack.dms[${index}]\` is ${JSON.stringify(one)}, which does not name a conversation. Direct messages are named one by one, so an entry that names nothing is refused rather than skipped.`)
+        }
         dms = nameList(holder.dms) || []
       }
     }
@@ -261,6 +311,9 @@ function plan (request) {
   } else if (!Array.isArray(req.ways)) {
     add('ways', 'not-a-list', `\`ways\` is ${JSON.stringify(req.ways)}. It is a list, because any combination of ${WAYS.join(', ')} can run, and which ones is chosen per run rather than at install time.`)
   } else {
+    for (const [index, one] of notNames(req.ways)) {
+      add('ways', 'not-a-name', `\`ways[${index}]\` is ${JSON.stringify(one)}, which is not a way of looking. One or more of: ${WAYS.join(', ')}.`)
+    }
     ways = req.ways.map(one => text(one)).filter(Boolean)
     for (const one of ways) {
       if (!WAYS.includes(one)) {
@@ -269,8 +322,11 @@ function plan (request) {
     }
   }
 
+  for (const [index, one] of notNames(req.topics)) {
+    add('topics', 'not-a-name', `\`topics[${index}]\` is ${JSON.stringify(one)}, which is not a topic. Looking by topic finds exactly what was asked for, so a topic that reaches nothing is refused rather than dropped from the list.`)
+  }
   const topics = nameList(req.topics)
-  if (ways.includes('topics') && !topics) {
+  if (ways.includes('topics') && !topics && !notNames(req.topics).length) {
     add('topics', 'missing', 'Looking by topic means naming the topics. Without them there is nothing to look for, and this mode is the one that finds exactly what was asked for rather than guessing.')
   }
   if (topics && !ways.includes('topics')) {
@@ -288,12 +344,29 @@ function plan (request) {
     if (!ways.includes(one)) notReading.push(`The "${one}" way of looking was not chosen.`)
   }
 
+  /*
+   * A REFUSED PLAN CARRIES NO PLAN.
+   *
+   * Each refusal above kept the source it named out of `reading`, and that was
+   * not enough. Refusing `dms: "all"` left `reading.slack` standing with an
+   * empty `dms`, so the same output said `ok: false`, said "NOTHING IS READ",
+   * and handed back a narrowed plan that runs. A caller reading `reading`
+   * without checking `ok` first would have read the channels and skipped the
+   * direct messages, which is the narrowing this whole function refuses to do,
+   * arriving as the shape of the answer rather than as a decision in it.
+   *
+   * Emptying it here rather than at each refusal is deliberate: per-refusal
+   * removal is a rule every future source has to remember, and the one that
+   * forgets is the one that ships.
+   */
+  const ok = refusals.length === 0
+
   return {
-    ok: refusals.length === 0,
-    reading,
+    ok,
+    reading: ok ? reading : {},
     notReading,
-    ways,
-    topics: topics || [],
+    ways: ok ? ways : [],
+    topics: ok && topics ? topics : [],
     refusals
   }
 }
@@ -612,6 +685,7 @@ module.exports = {
   day,
   text,
   nameList,
+  notNames,
   plan,
   repeats,
   candidates,
