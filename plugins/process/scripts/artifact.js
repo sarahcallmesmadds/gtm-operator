@@ -709,6 +709,7 @@ module.exports = {
   peopleAsked,
   personIdFrom,
   askedForNothing,
+  bodyIsMap,
   problems,
   concerns,
   sourceProblems,

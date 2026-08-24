@@ -1290,6 +1290,33 @@ check('A BODY THAT IS NOT A SET OF SECTIONS IS REFUSED, not read as an untouched
     )
   }
 
+  // AND THROUGH EVERY CALLER THAT REACHES IT, not just the function that holds
+  // it. `draft` spread the body into the artifact before handing it over, and
+  // `{ ...'a string' }` is a map of index to character, so the refusal could
+  // never fire through that path and what came back was five section-missing
+  // problems naming the wrong fault. Calling `problems` directly is half a pair.
+  const sources = [{ what: 'refunds.doc', contributed: 'the steps and the exceptions' }]
+  for (const body of ['not an object', [], 42, true]) {
+    const drafted = backfill.draft({ Name: 'Refund policy', Type: 'SOP/ROE', body, sources })
+    assert.strictEqual(drafted.ok, false, `draft accepted a body of ${JSON.stringify(body)}`)
+    assert.strictEqual(drafted.artifact, null, `draft built an artifact from a body of ${JSON.stringify(body)}`)
+    assert.deepStrictEqual(
+      drafted.refusals.map(one => `${one.field}:${one.kind}`),
+      ['body:not-a-section-map'],
+      `draft named the wrong fault for a body of ${JSON.stringify(body)}`
+    )
+  }
+
+  // A DRAFT WITH A REAL BODY STILL DRAFTS, and one with no body at all is still
+  // the every-section-missing case, or the loop above passes against a draft
+  // that refuses every body it is given.
+  const wholeBody = { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+  const fine = backfill.draft({ Name: 'Refund policy', Type: 'SOP/ROE', body: wholeBody, sources })
+  assert.strictEqual(fine.ok, true, JSON.stringify(fine.problems))
+  const bodyless = backfill.draft({ Name: 'Refund policy', Type: 'SOP/ROE', sources })
+  assert.deepStrictEqual(bodyless.refusals, [], 'a draft with no body was refused as malformed')
+  assert.ok(bodyless.problems.some(one => one.kind === 'section-missing'))
+
   // A REAL PARTIAL EDIT STILL GOES THROUGH, and still renders the section it
   // carries, or the refusal above is just a body check that refuses everything.
   const good = { Name: 'Refund policy', Type: 'SOP/ROE', body: { Steps: '1. Check the order date.' } }

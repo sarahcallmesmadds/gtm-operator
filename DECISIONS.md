@@ -4071,3 +4071,42 @@ finished.
 797 checks, up from 796. 95 mutations, all landed, all 81 backfill checks reached,
 and the one survivor is the `wantsAPerson` inversion that `process-audit-update`
 catches.
+
+### Review round 22 on pull request 16: the round 20 guard could never fire through its own caller
+
+**Codex: `draft` spread the body before anything judged it.** `{ ...'a string' }`
+is a map of character index to character, `{ ...[1, 2] }` is a map of numeric
+index, and `{ ...42 }` is `{}`. So a malformed body reached `problems` already
+converted into something that looks valid, the `body:not-a-section-map` refusal
+added one round earlier could never fire through this path, and what came back
+instead was five `section-missing` problems naming the wrong fault, beside an
+artifact whose body held twenty-six character keys.
+
+**The check written for round 20 is why it got through.** It called `problems`
+directly and never came through `draft`. That is proving one half of a pair, which
+is the fault this branch has been cataloguing since round 1, arriving inside the
+check written to stop a different one. **A guard is not proved until every path
+that reaches it has been tried**, and the check now runs the malformed body
+through `draft` as well, asserting the artifact is null rather than merely that
+something was refused.
+
+`bodyIsMap` is exported from `artifact.js` and asked rather than repeated, because
+a second copy of this rule is how the first one drifted.
+
+**The harness caught a bad mutation of mine before it became a false claim.**
+Replacing `{ ...(given.body || {}) }` with `Object.assign({}, given.body)` was
+recorded as surviving. It should survive: the two are the same operation, so
+nothing was mutated and a suite that stays green is correct. A mutation that
+changes no behaviour reads exactly like a gap in the tests, which is its own
+version of a check that passes without checking. It is replaced with one that
+reproduces the actual bug, asking the guard about the spread copy rather than the
+original.
+
+**This round has one reviewer.** The Devin CLI was killed with no output for the
+second round running, and this time nothing was edited while it read, so the cause
+is not the tree moving underneath it. Two rounds now rest on Codex and the GitHub
+reviewer alone.
+
+798 checks, up from 797. 97 mutations, all landed, all 81 backfill checks reached,
+and the one survivor is the `wantsAPerson` inversion caught by
+`process-audit-update`.
