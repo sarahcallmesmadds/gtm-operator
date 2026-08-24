@@ -442,6 +442,27 @@ check('THE SOURCES SECTION IS GENERATED FROM THE SOURCES, not written beside the
   assert.ok(!out.artifact.body.Sources.includes('Some reading I did'), 'a hand-written Sources section survived')
 })
 
+check('A MALFORMED SOURCE IS REFUSED BEFORE THE SECTION IS BUILT', () => {
+  // `sourcesSection` drops an entry it cannot render. Building first and
+  // validating after handed back a refusal that correctly said the list was
+  // wrong, alongside an artifact whose Sources section had already been built
+  // from the narrowed list, so the section and the record disagreed.
+  for (const bad of [42, null, { what: 'a thread' }, { contributed: 'the threshold' }]) {
+    const out = backfill.draft({
+      what: 'Refund handling',
+      type: 'SOP/ROE',
+      sources: [...SOURCES, bad],
+      body: SOP_BODY
+    })
+    assert.strictEqual(out.ok, false, `${JSON.stringify(bad)} was accepted as a source`)
+    assert.strictEqual(out.artifact, null, `a draft built from a narrowed source list came back for ${JSON.stringify(bad)}`)
+    assert.ok(
+      faults(out).some(one => one.startsWith('Sources:source-')),
+      `${JSON.stringify(bad)} was dropped rather than refused: ${JSON.stringify(faults(out))}`
+    )
+  }
+})
+
 check('a draft with nothing to substantiate it is refused', () => {
   assert.deepStrictEqual(faults(backfill.draft({ what: 'x', type: 'SOP/ROE', body: SOP_BODY })), ['sources:missing'])
 })
@@ -650,6 +671,34 @@ check('a row with no url is refused, because nothing could say which page it is'
   const out = backfill.fill({ ...EXISTING, url: undefined }, { Domain: 'Customer Success' })
   assert.strictEqual(out.ok, false)
   assert.deepStrictEqual(faults(out), ['url:missing'])
+})
+
+check('A REFUSED FILL EXITS NON-ZERO, and a finished one does not', () => {
+  // `fill` puts a missing url under `refusals` and everything it declined to
+  // touch under `refused`, and the exit code read only the first. So a fill
+  // refused for carrying `Verified date` printed the refusal and exited zero,
+  // which is the same quiet exit-zero shape the raw-candidate case had.
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    process.exitCode = 0
+    capture(() => command.commands.fill(
+      write('exit-row.json', EXISTING),
+      write('exit-cand.json', { [field]: '2026-08-23' })
+    ))
+    assert.strictEqual(process.exitCode, 1, `a fill refused for ${field} exited zero`)
+  }
+
+  // A FIELD THAT IS ALREADY OCCUPIED IS BACKFILL WORKING, not a fault. On a
+  // re-run over the same folder most fields are occupied, so exiting non-zero on
+  // that would cry wolf on every normal run and the case above would disappear
+  // into the noise. Both land in `refused` and only one is a fault.
+  process.exitCode = 0
+  const declined = capture(() => command.commands.fill(
+    write('exit-row.json', EXISTING),
+    write('exit-cand2.json', { Description: 'already occupied' })
+  ))
+  assert.strictEqual(process.exitCode, 0, 'declining to overwrite an occupied field was reported as a failure')
+  assert.deepStrictEqual(declined.refused.map(one => one.kind), ['occupied'])
+  assert.deepStrictEqual(declined.neverFilled, [])
 })
 
 check('filling nothing is a finished answer rather than a failure', () => {

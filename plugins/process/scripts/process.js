@@ -1809,7 +1809,18 @@ const commands = {
 
     const out = backfill.fill(existing, candidate)
     console.log(JSON.stringify(out, null, 2))
-    if (!out.ok && out.refusals) process.exitCode = 1
+
+    // `fill` puts a missing url under `refusals` and everything it declined to
+    // touch under `refused`, and this checked only the first, so a fill refused
+    // for carrying `Verified date` printed the refusal and exited zero.
+    //
+    // ONLY THE NEVER-FILLED HALF OF `refused` IS A FAULT. A field that is
+    // already occupied is backfill working, and on a re-run over the same folder
+    // most fields are, so exiting non-zero on that would cry wolf on every
+    // normal run. `ok: false` on its own is not a failure either: having nothing
+    // left to fill is a finished answer.
+    const refused = (out.refusals && out.refusals.length) || (out.neverFilled && out.neverFilled.length)
+    if (refused) process.exitCode = 1
   },
 
   trust (rowsFile, todayArg) {
