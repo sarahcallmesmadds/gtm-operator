@@ -37,6 +37,9 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "  if (typeof threshold !== 'number' || Number.isNaN(threshold) || threshold < 0 || threshold > 1) {", "  if (false) {"],
+  [B, "  if (typeof min !== 'number' || !Number.isInteger(min) || min < 1) {", "  if (false) {"],
+  [B, "  if (rangeProblems.length) return { ok: false, clusters: [], below: [], refusals: rangeProblems }", "  if (false) return { ok: false, clusters: [], below: [], refusals: rangeProblems }"],
   [B, "    if (NOT_A_FIELD.has(field) || fillable.has(field) || alreadyRefused.has(field)) continue", "    if (true) continue"],
   [B, "  const NOT_A_FIELD = new Set(['id', 'what', 'where', 'kind', 'why', 'needs', 'type', 'url', 'reviewed', 'backfill', 'parentType'])", "  const NOT_A_FIELD = new Set([])"],
   [P, "      new Date(parsed).toISOString().slice(0, 10) === today) return today", "      true) return today"],

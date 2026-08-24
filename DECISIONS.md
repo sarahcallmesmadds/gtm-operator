@@ -4601,3 +4601,33 @@ time the failure was visible immediately rather than after a reviewer found it.
 
 815 checks, 99 in the backfill suite. 138 mutations, all landed, one survivor and
 it is the known `wantsAPerson` inversion `process-audit-update` catches.
+
+### Review round 33: the fifth set, right type and wrong range
+
+Devin came back clean and said so plainly, naming the categories it had worked
+through. Codex found the fifth set.
+
+**`judge` refuses a threshold outside 0 to 1, ten lines away in the other file.
+`repeats` took the same kind of value and checked neither of its two.** With
+`threshold: -1` every question resembles every other, so two unrelated ones merged
+into a qualifying repeated question. With `min: 0` every single asking was
+reported as one people keep asking. Both returned `ok: true`.
+
+**A number of the right type and the wrong range is worse than a malformed one**,
+because nothing downstream can tell that the answer it is reading was computed
+against a bound that cannot mean anything. Every other fault this branch found
+left a trace: a refusal, a crash, a field that vanished. This one produces a
+plausible answer.
+
+**Refused rather than clamped.** Clamping `-1` to `0` answers a question nobody
+asked, which is the narrowing this file refuses everywhere else.
+
+**Worth stating about reachability.** The `repeats` command never passes these
+options, so through the documented flow the defaults always apply and the fault is
+unreachable. It is reachable by calling the function, which the suite does and
+another plugin could. It was fixed anyway because the identical check already
+existed in the sibling, and one of a pair validating while the other does not is
+the fault that produced most of this branch's findings.
+
+816 checks, 100 in the backfill suite. 141 mutations, all landed, one survivor and
+it is the known `wantsAPerson` inversion `process-audit-update` catches.
