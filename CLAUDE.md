@@ -2,7 +2,8 @@
 
 A Claude Code marketplace that builds a go-to-market operating system in Notion.
 The design is one plugin per foundation object under `plugins/`, built from the
-design documents at the root. `setup`, `calendar` and `process` are built.
+design documents at the root. `setup`, `calendar`, `process` and `memos` are
+built.
 
 **The design lives in the root documents, not in this file.** `DECISIONS.md`
 holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
