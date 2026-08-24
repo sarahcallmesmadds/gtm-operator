@@ -4247,3 +4247,27 @@ that twenty-three rounds had read. A clean round says clean against what the
 prompt asks about.
 
 805 checks. 115 mutations, all landed, all 87 backfill checks reached.
+
+### Review round 25, finding one: the same asking recorded twice counted twice
+
+**Codex.** The threshold this feeds is "asked three or more times", and nothing
+removed duplicates before counting. The identical record three times over came
+back `asked: 3`, crossed the threshold, and listed the same channel and the same
+date three times in the evidence a person is shown. One question ingested three
+times is not a repeated question, and finding the ones people keep asking is the
+entire job of the command.
+
+**A duplicate is the same question, in the same place, on the same day.** The same
+question in two channels is two askings and is exactly what this looks for. The
+same question in one channel a month apart is two as well. What is not two is one
+line read twice, which is what a re-run over an overlapping export produces, and
+`backfill` is documented as safe to re-run.
+
+**Dropped rather than refused, and the number is said out loud.** A source
+exported twice is a normal thing to hand this and not a mistake worth stopping
+for, so `duplicates` and a note carry the count. Silence about the number would
+mean a re-run quietly reporting fewer askings than were handed in.
+
+**Worth noting where this came from.** It was found by pointing the prompt at
+re-running and counting, after eight findings in a row about value shapes. The
+code it is in had been read by twenty-four rounds.
