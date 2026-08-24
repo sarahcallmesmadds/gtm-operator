@@ -560,6 +560,37 @@ check('THE READ PATH CANNOT DIVERGE FROM THE WRITE PATH: prove expects no stamp 
   assert.strictEqual(out.proved, true, JSON.stringify(out.problems))
 })
 
+check('A BACKFILLED PAGE THAT CAME BACK STAMPED IS NOT PROVED', () => {
+  // The check above feeds back exactly what was sent, which has no stamp on it,
+  // so it can only ever pass. Its name claimed `prove` guards the read side and
+  // its fixture made that assertion unreachable: the page it hands back is
+  // incapable of carrying the thing the check is named for.
+  //
+  // `prove` walks the properties that were INTENDED, and on a backfill the four
+  // that matter are intended to be absent. Nothing was looking at what came back
+  // carrying them.
+  const final = draftOf().artifact
+  const context = contextNow()
+  const sent = capture(() => command.commands.create(write('backfilled3.json', final)))
+
+  for (const logical of backfill.REFUSED_ON_A_BACKFILL) {
+    const out = capture(() => command.commands.prove(
+      write('backfilled3.json', final),
+      write('back3.json', {
+        url: URL_A,
+        properties: { ...sent.properties, [context.property(logical)]: '2026-08-23' },
+        headings: sent.headings
+      })
+    ))
+    assert.strictEqual(out.proved, false, `a backfilled page came back carrying ${logical} and was proved`)
+    assert.ok(
+      out.problems.some(one => one.what === context.property(logical)),
+      `${logical} was on the page and no problem named it: ${JSON.stringify(out.problems)}`
+    )
+  }
+  process.exitCode = 0
+})
+
 // ---------------------------------------------------------------------- fill
 
 const EXISTING = {
@@ -677,6 +708,64 @@ check('WHAT FILL PRODUCES DRIVES `update`, AND MOVES NO VERIFICATION FIELD', () 
   for (const field of schema.VERIFICATION_FIELDS) {
     assert.ok(!(context.property(field) in sent.properties), `${field} was written by a fill`)
   }
+})
+
+check('A NON-REVIEW EDIT IS PROVED BY THE THREE THAT DID NOT MOVE', () => {
+  // `update` sends none of the three on a `reviewed: false` edit, so the loop
+  // that walks what was sent never looks at them, and a page that came back
+  // freshly stamped read as a clean write. `fill` leans on that promise for
+  // every artifact it touches.
+  const context = contextNow()
+  const before = { ...EXISTING, 'Last checked for accuracy': '2026-01-01' }
+  const after = backfill.fill(before, { Domain: 'Customer Success' }).after
+  const sent = capture(() => command.commands.update(
+    write('before-v.json', before),
+    write('after-v.json', after),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(sent.verificationFields, [])
+
+  const clean = capture(() => command.commands['prove-update'](
+    write('sent-v.json', sent),
+    write('back-v.json', {
+      url: URL_A,
+      properties: { ...sent.properties, [context.property('Last checked for accuracy')]: '2026-01-01' }
+    })
+  ))
+  assert.strictEqual(clean.proved, true, JSON.stringify(clean.problems))
+
+  const stamped = capture(() => command.commands['prove-update'](
+    write('sent-v.json', sent),
+    write('back-v2.json', {
+      url: URL_A,
+      properties: { ...sent.properties, [context.property('Last checked for accuracy')]: '2026-08-23' }
+    })
+  ))
+  assert.strictEqual(stamped.proved, false, 'a stamp moved on a non-review edit and that was proved as clean')
+  process.exitCode = 0
+})
+
+check('AN ABSENT PROPERTY IS NOT REPORTED AS A CLEARED ONE', () => {
+  // Notion leaves an empty property off a page and a summary read-back leaves
+  // everything off, so the two are indistinguishable. Calling either a cleared
+  // field reports a clean edit as a failure, which is the false positive this
+  // file has been corrected for before.
+  const before = { ...EXISTING, 'Last checked for accuracy': '2026-01-01' }
+  const after = backfill.fill(before, { Domain: 'Customer Success' }).after
+  const sent = capture(() => command.commands.update(
+    write('before-v3.json', before),
+    write('after-v3.json', after),
+    '2026-08-23'
+  ))
+  const out = capture(() => command.commands['prove-update'](
+    write('sent-v3.json', sent),
+    write('back-v3.json', { url: URL_A, properties: sent.properties })
+  ))
+  assert.strictEqual(out.proved, true, JSON.stringify(out.problems))
+  assert.ok(
+    out.unchecked.some(one => /Last checked for accuracy/.test(one)),
+    `it passed without saying it could not check the stamp: ${JSON.stringify(out.unchecked)}`
+  )
 })
 
 console.log(failures ? `\n${failures} failed.\n` : '\nAll passed.\n')

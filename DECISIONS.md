@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 771 checks, up from 716.
+The suite is 774 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3438,3 +3438,48 @@ softening: writing "a fix in one place whose pair in another place was missed" a
 the top of every review prompt did not stop it, and neither did fixing it twice.
 What found it each time was a reviewer given the specific question of whether a
 guard is reachable, and given the previous rounds' findings to work from.
+
+### Review round 6 on pull request 16, from the Devin CLI
+
+One finding, the same fault a fourth time, and this one had been sitting there
+since the mode was built rather than arriving in a fix.
+
+**`prove` guarded the write side of backfill mode and not the read side.** It
+walks the properties that were *intended*, and on a backfill the four that
+matter are intended to be absent, so a page that came back carrying a stamp was
+reported as a clean write. That is the one outcome the whole mode exists to
+prevent: a stamped import is indistinguishable from an artifact somebody read,
+and it drops out of the never-verified audit signal without saying so.
+
+**The check that claimed to cover it had a fixture that made its own assertion
+unreachable.** It was called "the read path cannot diverge from the write path"
+and it handed `prove` a read-back built from the payload that had just been sent,
+which by construction has no stamp on it. The page it feeds back is incapable of
+carrying the thing the check is named for. That is the fifth variety of
+check-that-passes-without-checking in this branch and it is the one the previous
+session hit four times.
+
+**The same gap on the `update` side was fixed at the same time.** `fill` promises
+that a non-review edit moves none of the three verification fields, and
+`prove-update` walks what was sent, and on that path none of them is sent. So
+nothing was watching the promise `fill` leans on for every artifact it touches.
+`update` now carries the before values of the three in its output and
+`prove-update` compares them.
+
+**Absent is reported as unchecked rather than as a cleared field**, and getting
+that wrong first is what six existing checks caught. Notion leaves an empty
+property off a page, and a read-back saved as a summary leaves everything off, so
+the two are indistinguishable and calling either one a clear reports a clean edit
+as a failure. The direction that *can* be told apart is the dangerous one, a
+value appearing where there was none, and that is what the check is for. Six
+suites went red on the first version of this, which is the check-a-fix-against-
+the-existing-tests step working.
+
+**Four of the eight findings across six rounds are one fault.** A rule enforced
+in one place and missed in its pair, found once by each reviewer twice over. The
+four were: a guard on one of two arguments, a refusal in `artifact.js` unreachable
+from both callers, a shared guard built from the wrong field list, and now a
+write side guarded with the read side open. Nothing in the prompts prevented any
+of them. What found all four was asking a reviewer whether a specific guard is
+reachable from every path, and handing it the previous rounds' findings so it
+knew what shape to look for.
