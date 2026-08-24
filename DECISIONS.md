@@ -4837,3 +4837,82 @@ hand mutations were run before the first commit (the period-wrong-type
 refusal, `follow`'s branch stop, `prove`'s page binding) and each went red in
 exactly the check that watches it; the mutation harness itself still covers
 only the backfill suite, and extending it to memos is open work.
+
+## The projects plugin, built at 0.1.0, 2026-08-24
+
+Plugin five. Six skills, the ones `SKILLS-projects.md` names and no others:
+`problem-scan`, `problem-statement`, `scope`, `new`, `comms`, `ship`. The
+build decisions that are not already in the design documents, recorded here so
+review starts from what was decided rather than reconstructing it.
+
+**The memo builder moved to `shared/memo-write.js`, and memos went to 0.1.1
+for it.** Three skills here write Memos rows, which is the moment
+`SKILLS-memos.md` open item 2 came due: the memo shapes must be one definition
+in every plugin that writes them. The file that was
+`plugins/memos/scripts/memo.js` is now a vendored shared source with sibling
+requires, `propertyTypes` moved into it beside the `properties` it must agree
+with, and both plugins run the same copy, held current by the vendor test. No
+behaviour change in memos.
+
+**`shared/prove-create.js` is the proof source going forward.** It returns
+rather than prints, so one function serves four kinds of write, and its page
+binding is action-neutral so an update proves the same way a create does.
+`memos`, `process` and `calendar` still carry their own inline versions,
+under the same standing note as the calendar copy of `notion-compare`: retire
+each the next time its plugin is opened.
+
+**The status transitions are code, not prose.** `scope` may leave a row at
+Scoped or Canceled, `start` moves Scoped to In progress and refuses every
+other state by name, `close` moves In progress to Done and refuses without
+the release memo's url, because writing the release and closing are one
+action and the url is the evidence they happened as one. `fill` accepts a row
+at Intake and nothing else: anything past Intake is a project somebody worked
+on, and overwriting it discards that work.
+
+**No relation is written, anywhere**, the standing marketplace rule. The
+problem statement is required and checked as a page but not linked; every
+task is an orphan the Needs attention view surfaces until a person links it;
+a memo's project and a release's artifacts are named in the output for a
+person to link. Each command says so rather than letting the write look
+complete.
+
+**No task body is written at creation.** Requirements live in the task body,
+written when the task is picked up, by a person. `SKILLS-projects.md` says
+requirements are "written when that task is picked up", and a PRD at creation
+time is a document about work nobody has started. `Order` carries the list
+order as a plain number.
+
+**The project body has no numeric word ceiling, because the design states
+none.** Process has 800 and Memos 600, both stated in their schema files;
+`SCHEMA-projects.md` says "sections have caps, when one runs long, cut it"
+and gives no number. Inventing one would be inventing design, so the gate
+holds the four required sections and the skill holds the trimming.
+
+**Out Of Scope refuses the literal dismissals** ("nothing", "none", "n/a"),
+because the design says "nothing" is not an acceptable answer there, while
+"none known" stays acceptable in Risks And Dependencies, where it records
+that the question was asked. The two sections differ on purpose and the tests
+pin both directions.
+
+**A Canceled outcome does not demand effort, priority or a business
+outcome.** Scoping can end in "do not build this", and demanding a priority
+for work that will not happen would push the skill toward always answering
+Scoped. Name, Description, the problem statement and the full body are still
+required, so the record of why reads like one.
+
+**Four to seven tasks is a concern, never a refusal**, same split as the word
+ceiling on memos: a three-task breakdown is a question for the person, not a
+corrupt row. TBD effort or priority leaving `scope` at Scoped is likewise
+asked about, not refused, because TBD is a value the property genuinely has.
+
+**What the new tests do not prove, stated in their headers**: no SQL in
+`projects-command.test.js` has been sent to Notion, and the schema-agrees
+test compares this checkout against itself. Ten hand mutations were run
+before the first commit and eight went red at once. The two survivors were
+both findings: `memo-create`'s own type gate was tested only through
+`memo-check`, fixed with a test and re-run red; and a mutation to
+`shared/prove-create.js` survived because the plugin runs its vendored copy,
+which is the vendor mechanism working, proved by re-vendoring the mutant
+(red in the command suite) and by the drift itself (red in the vendor test).
+The mutation harness still covers only the backfill suite; memos and projects
+are open work.

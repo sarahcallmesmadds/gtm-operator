@@ -71,6 +71,22 @@
         "memos",
         "communication"
       ]
+    },
+    {
+      "name": "projects",
+      "source": "./plugins/projects",
+      "description": "Runs a project from named problem to shipped release. Finds problems that keep coming up and nobody has written down, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. A skill never advances a status it did not earn, and scoping refuses to finish without a problem statement. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sarah Madden"
+      },
+      "category": "productivity",
+      "tags": [
+        "notion",
+        "gtm",
+        "projects",
+        "tasks"
+      ]
     }
   ]
 }

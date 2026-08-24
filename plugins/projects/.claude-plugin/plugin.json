@@ -1,0 +1,30 @@
+{
+  "name": "projects",
+  "version": "0.1.0",
+  "description": "Runs a project from named problem to shipped release in the databases the gtm-operator setup plugin created. Finds problems that keep coming up and nobody has written down, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. Three skills write Memos rows and two move a project's status, each exactly one step it earned. Creates no database and writes no config.",
+  "author": {
+    "name": "Sarah Madden",
+    "url": "https://github.com/sarahcallmesmadds"
+  },
+  "homepage": "https://github.com/sarahcallmesmadds/gtm-operator/tree/main/plugins/projects",
+  "repository": "https://github.com/sarahcallmesmadds/gtm-operator",
+  "license": "MIT",
+  "keywords": [
+    "notion",
+    "gtm",
+    "projects",
+    "tasks",
+    "scoping"
+  ],
+  "gtmOperator": {
+    "vendor": [
+      "config-read.js",
+      "projects-schema.js",
+      "memos-schema.js",
+      "memo-write.js",
+      "prove-create.js",
+      "page-id.js",
+      "notion-compare.js"
+    ]
+  }
+}
