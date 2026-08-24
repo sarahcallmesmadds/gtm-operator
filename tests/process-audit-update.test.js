@@ -37,7 +37,7 @@ const rename = names => ({
   )
 })
 
-const writeConfig = ({ process: p = processNames, memos: m = memoNames, withMemos = true } = {}) => {
+const writeConfig = ({ process: p = processNames, memos: m = memoNames, withMemos = true, personId = 'person-1' } = {}) => {
   const databases = {
     process: {
       databaseId: 'db1', dataSourceId: 'ds1', displayName: 'Process',
@@ -53,7 +53,7 @@ const writeConfig = ({ process: p = processNames, memos: m = memoNames, withMemo
   fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify({
     configVersion: 3,
     state: 'complete',
-    notion: { parentPageId: 'p', personId: 'person-1' },
+    notion: { parentPageId: 'p', personId },
     databases,
     verified: { at: 'x', definitions: 'y' },
     defaults: {}, sources: {}, taxonomyPath: '/tmp/x'
@@ -599,6 +599,75 @@ check('CLEARING THE OWNER EMPTIES IT, and does not hand it to the config person'
 check('a person field clears with a list, not a null', () => {
   const out = runUpdate({ ...BEFORE, Owner: null, reviewed: false })
   assert.ok(Array.isArray(out.properties.Owner), 'a null would be accepted by Notion and leave the old owner in place')
+})
+
+check('CLAIMING OWNERSHIP WITH NOBODY CONFIGURED IS REFUSED, not read as emptying it', () => {
+  // `properties` drops a person field it cannot resolve, and "me" with no
+  // configured person is exactly that. It fell into the clear branch, so "make
+  // me the owner" was carried out as "remove the owner": the reverse of what was
+  // asked, silently, on the field that says who is accountable.
+  command = writeConfig({ personId: null })
+  assert.throws(
+    () => runUpdate({ ...BEFORE, Owner: 'me', reviewed: false }),
+    /opposite intentions/,
+    'asking to own it emptied it'
+  )
+  command = writeConfig()
+})
+
+check('and emptying it on purpose still works with nobody configured', () => {
+  command = writeConfig({ personId: null })
+  const out = runUpdate({ ...BEFORE, Owner: null, reviewed: false })
+  assert.deepStrictEqual(out.clearing, ['Owner'], 'an explicit clear was refused')
+  command = writeConfig()
+})
+
+check('A PAGE OPENED FROM A VIEW IS THE SAME PAGE', () => {
+  // The last 32 hex characters of `.../page-<id>?v=<view id>` are the view's id.
+  // Run over the whole string, the same page opened from a view keyed as a
+  // different page, so the binding check would have refused a correct read-back.
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: `${URL_A}?v=abcdef0123456789abcdef0123456789`, properties: sent.properties })
+  ))
+  assert.strictEqual(out.proved, true, `a correct read-back was refused: ${JSON.stringify(out.problems)}`)
+})
+
+check('and a genuinely different page is still refused', () => {
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: `${URL_B}?v=abcdef0123456789abcdef0123456789`, properties: sent.properties })
+  ))
+  assert.strictEqual(out.proved, false, 'the wrong page passed once a query string was on it')
+})
+
+check('NOTHING IS CHECKED ON A PAGE THAT IS NOT THE ONE WRITTEN, headings included', () => {
+  // The headings block used to run whatever the binding check found, so a
+  // read-back of another page had its headings compared and reported as checked,
+  // under a result that had already said nothing below was looked at.
+  const sent = runUpdate({ ...BEFORE, body: { Steps: 'new text' }, reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_B, properties: sent.properties, headings: ['Steps'] })
+  ))
+  assert.strictEqual(out.proved, false)
+  assert.deepStrictEqual(out.checked, [], `something was checked on the wrong page: ${JSON.stringify(out.checked)}`)
+})
+
+check('A PERSON COMPARES THE SAME WITH OR WITHOUT THE PREFIX', () => {
+  // A person is written bare and read back prefixed. An owner fetched as
+  // `user://abc` and left alone in the after row compared as a change, went into
+  // the payload, and on a review moved the verification stamp for an edit
+  // nobody made.
+  const fetched = { ...BEFORE, Owner: JSON.stringify(['user://11111111-2222-3333-4444-555555555555']) }
+  const out = capture(() => command.commands.update(
+    write('before.json', fetched),
+    write('after.json', { ...BEFORE, reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, [], `the owner read as changed across shapes: ${JSON.stringify(out.changed)}`)
 })
 
 check('AND THE REVIEW STAMP STILL RECORDS WHO READ IT', () => {
