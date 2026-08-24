@@ -1191,6 +1191,39 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('A NAME THAT IS NOT TEXT IS REFUSED FOR THAT, not reported as no name at all', () => {
+  // The same function already told not-text from missing for Description and did
+  // not for the title, so a Name that arrived as an object was reported as no
+  // name, sending somebody to supply one they can see is already there. The
+  // title is written with String(), so an object would have become the literal
+  // "[object Object]" as the page's title.
+  for (const name of [{ a: 1 }, ['R'], 42, true]) {
+    assert.deepStrictEqual(
+      artifact.problems({ Name: name, Type: 'SOP/ROE' }).filter(one => one.field === 'Name').map(one => one.kind),
+      ['not-text'],
+      `a Name of ${JSON.stringify(name)} was reported as missing`
+    )
+  }
+
+  // ABSENT AND BLANK ARE STILL MISSING, which is the case the original refusal
+  // was written for, and a real name is still fine.
+  for (const name of [undefined, null, '', '   ']) {
+    assert.deepStrictEqual(
+      artifact.problems({ Name: name, Type: 'SOP/ROE' }).filter(one => one.field === 'Name').map(one => one.kind),
+      ['missing'],
+      `a Name of ${JSON.stringify(name)} was not reported as missing`
+    )
+  }
+  assert.deepStrictEqual(artifact.problems({ Name: 'Refund policy', Type: 'SOP/ROE' }).filter(one => one.field === 'Name'), [])
+
+  // AND IT NEVER REACHES THE WRITE, where String() would have made a title of it.
+  const context = { property: field => field, value: (field, value) => value, personId: null }
+  assert.throws(
+    () => artifact.properties(context, { Name: { a: 1 }, Type: 'SOP/ROE' }, { defaultsPerson: false }),
+    /is not text/
+  )
+})
+
 check('EVERY BACKFILL COMMAND REFUSES A FILE OF THE WRONG SHAPE', () => {
   // Declared per command rather than swept across all twenty-one reads, so each
   // one is a decision with a check behind it. These five are the ones this

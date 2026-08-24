@@ -4155,3 +4155,17 @@ are `check`, `create`, `prove`, `duplicates`, `audit`, `update`, `prove-update`
 and `trust`.
 
 801 checks. 104 mutations, all landed, all 83 backfill checks reached.
+
+### Review round 23, finding one: a Name that is not text was reported as no name
+
+**Devin.** `problems` already told a malformed `Description` from an absent one
+and did not do the same for the title. A `Name` that arrived as an object was
+reported as `Name:missing`, which sends somebody to supply a name they can see is
+already there. `properties` writes the title with `String(...)`, so an object
+would have become the literal "[object Object]" as the page's title, and nothing
+downstream reports a title as wrong.
+
+The same fault as the mailbox, the body, the candidate and the person field:
+missing and malformed given one answer. This one is notable for sitting six lines
+from a field that got it right, which is what a rule enforced by hand rather than
+by a shared test looks like.
