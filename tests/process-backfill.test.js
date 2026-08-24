@@ -96,7 +96,23 @@ const write = (name, value) => {
  * to be unique today is the wrong fix: a kind that is unique today becomes
  * shared the next time one is added, and nothing goes red when it does.
  */
-const faults = out => (out.refusals || []).map(one => `${one.field}:${one.kind}`)
+const named = list => (list || []).map(one => `${one.field}:${one.kind}`)
+
+/**
+ * Every refusal as `field:kind`.
+ *
+ * NOT THE KIND ALONE. Three refusals in `plan` share the kind `missing` and
+ * three more in `draft` do, so a check matching on the kind passes for a fault
+ * in a field it does not name. Reasoning case by case about which kinds happen
+ * to be unique today is the wrong fix: a kind that is unique today becomes
+ * shared the next time one is added, and nothing goes red when it does.
+ *
+ * `named` takes any of the three containers. Round 3 fixed this for `refusals`
+ * and left `problems` and `refused` matching bare kinds, which is the same fault
+ * in a different container: exactly the pair shape the rest of this branch keeps
+ * hitting.
+ */
+const faults = out => named(out.refusals)
 
 const URL_A = 'https://notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
 
@@ -491,7 +507,7 @@ check('A HAND-WRITTEN BACKFILL ROW IS REFUSED TOO, not only one `draft` built', 
   // caller: a person writing the JSON by hand and running `create` directly.
   const { sources: _dropped, ...unsourced } = draftOf().artifact
   const found = artifact.problems(unsourced)
-  assert.deepStrictEqual(found.map(one => one.kind), ['backfill-unsourced'])
+  assert.deepStrictEqual(named(found), ['Sources:backfill-unsourced'])
 })
 
 check('a person field cannot ride through the draft as an empty string', () => {
@@ -541,12 +557,12 @@ check('THE CONTROL: the same artifact without the flag does stamp and does own',
 
 check('an owner on a backfill row is refused by problems, which is the other half of that pair', () => {
   const found = artifact.problems({ ...draftOf().artifact, Owner: ['11111111-1111-1111-1111-111111111111'] })
-  assert.deepStrictEqual(found.map(one => one.kind), ['backfill-person'])
+  assert.deepStrictEqual(named(found), ['Owner:backfill-person'])
 })
 
 check('a verification field on a backfill row is refused', () => {
   const found = artifact.problems({ ...draftOf().artifact, 'Verified date': '2026-08-23' })
-  assert.deepStrictEqual(found.map(one => one.kind), ['backfill-verification'])
+  assert.deepStrictEqual(named(found), ['Verified date:backfill-verification'])
 })
 
 check('AN EMPTIED PERSON FIELD IS ASKING FOR NOBODY, which is what a backfill is', () => {
@@ -556,7 +572,12 @@ check('AN EMPTIED PERSON FIELD IS ASKING FOR NOBODY, which is what a backfill is
   // cleared was refused with a message saying an owner was set on it.
   const row = draftOf().artifact
   for (const field of backfill.REFUSED_ON_A_BACKFILL) {
-    for (const emptied of [[], null, '']) {
+    // `'[]'` IS IN THIS LIST BECAUSE IT WAS THE ONE MISSING. Notion returns an
+    // empty list as a JSON array inside a string, `wantsAPerson` and `anyPerson`
+    // both already read it as asking for nobody, and the copy of this test in
+    // `artifact.js` did not, so an owner that had already been emptied was
+    // refused for being set.
+    for (const emptied of [[], null, '', '[]']) {
       assert.deepStrictEqual(
         artifact.problems({ ...row, [field]: emptied }),
         [],
@@ -579,13 +600,13 @@ check('A NAMED PARENT IS CARRIED INTO THE DRAFT, so the rule Notion cannot check
     parent: 'https://notion.so/parent', parentType: 'Enablement'
   })
   assert.strictEqual(wrong.ok, false, 'an Enablement was accepted as a parent')
-  assert.ok(wrong.problems.some(one => one.kind === 'parent-wrong-type'), JSON.stringify(wrong.problems))
+  assert.ok(named(wrong.problems).includes('parent:parent-wrong-type'), JSON.stringify(named(wrong.problems)))
 
   const unTyped = backfill.draft({
     what: 'Refund handling', type: 'SOP/ROE', sources: SOURCES, body: SOP_BODY,
     parent: 'https://notion.so/parent'
   })
-  assert.ok(unTyped.problems.some(one => one.kind === 'parent-type-unknown'), JSON.stringify(unTyped.problems))
+  assert.ok(named(unTyped.problems).includes('parent:parent-type-unknown'), JSON.stringify(named(unTyped.problems)))
 
   const right = backfill.draft({
     what: 'Refund handling', type: 'SOP/ROE', sources: SOURCES, body: SOP_BODY,
@@ -607,13 +628,13 @@ check('`backfill: "false"` IS REFUSED RATHER THAN READ AS TRUTHY', () => {
   // A truthiness test would turn the mode off here while everything printed
   // still said backfill, which is the one shape that must never be guessed at.
   const found = artifact.problems({ ...draftOf().artifact, backfill: 'false' })
-  assert.deepStrictEqual(found.map(one => one.kind), ['not-a-boolean'])
+  assert.deepStrictEqual(named(found), ['backfill:not-a-boolean'])
 })
 
 check('a Sources section that disagrees with the sources is refused', () => {
   const row = draftOf().artifact
   const found = artifact.problems({ ...row, body: { ...row.body, Sources: '- something else: made up' } })
-  assert.deepStrictEqual(found.map(one => one.kind), ['backfill-sources-disagree'])
+  assert.deepStrictEqual(named(found), ['Sources:backfill-sources-disagree'])
 })
 
 check('create says it is a backfill, and prove reads the mode from the same file', () => {
@@ -687,7 +708,7 @@ const EXISTING = {
 }
 
 check('fill fills what is blank', () => {
-  const out = backfill.fill(EXISTING, { Domain: 'Customer Success', Tags: ['refunds'] })
+  const out = backfill.fill(EXISTING, { Domain: 'Customer Success', Tags: ['AI'] })
   assert.strictEqual(out.ok, true, JSON.stringify(out))
   assert.deepStrictEqual(out.filling.sort(), ['Domain', 'Tags'])
   assert.strictEqual(out.after.Domain, 'Customer Success')
@@ -701,8 +722,8 @@ check('IT NEVER OVERWRITES, and says what it declined to touch', () => {
 })
 
 check('an empty list counts as blank, and a filled one does not', () => {
-  assert.ok(backfill.fill(EXISTING, { Tags: ['refunds'] }).filling.includes('Tags'))
-  const full = backfill.fill({ ...EXISTING, Tags: ['billing'] }, { Tags: ['refunds'] })
+  assert.ok(backfill.fill(EXISTING, { Tags: ['AI'] }).filling.includes('Tags'))
+  const full = backfill.fill({ ...EXISTING, Tags: ['Data'] }, { Tags: ['AI'] })
   assert.deepStrictEqual(full.refused.map(one => one.field), ['Tags'])
 })
 
@@ -751,7 +772,7 @@ check('A REFUSED FILL EXITS NON-ZERO, and a finished one does not', () => {
     write('exit-cand2.json', { Description: 'already occupied' })
   ))
   assert.strictEqual(process.exitCode, 0, 'declining to overwrite an occupied field was reported as a failure')
-  assert.deepStrictEqual(declined.refused.map(one => one.kind), ['occupied'])
+  assert.deepStrictEqual(named(declined.refused), ['Description:occupied'])
   assert.deepStrictEqual(declined.neverFilled, [])
 })
 
@@ -1025,6 +1046,39 @@ check('`prove-update` READS `[]`-IN-A-STRING AS EMPTY TOO, not as a changed valu
     `it passed without saying it could not tell emptied from unsaved: ${JSON.stringify(out.unchecked)}`
   )
   process.exitCode = 0
+})
+
+
+check('WHAT `fill` HANDS BACK IS SOMETHING `update` WILL TAKE', () => {
+  // The values come off a candidate a model built and were copied into `after`
+  // unread, so `{ Tags: "refunds" }` came back ok, listed under `filling`, and
+  // died in `update` with Tags:not-a-list. The end-to-end check only ever filled
+  // `Domain`, so it never touched a multi-select at all.
+  const bad = [
+    [{ Tags: 'AI' }, 'Tags:not-a-list'],
+    [{ Tags: ['not a tag'] }, 'Tags:unknown-value'],
+    [{ Domain: 'Nowhere' }, 'Domain:unknown-value'],
+    [{ 'Review cadence': 'Hourly' }, 'Review cadence:unknown-value'],
+    [{ Audience: 'AE' }, 'Audience:not-a-list']
+  ]
+  for (const [candidate, expected] of bad) {
+    const out = backfill.fill(EXISTING, candidate)
+    assert.strictEqual(out.ok, false, `${expected} was accepted`)
+    assert.strictEqual(out.after, null, `${expected} came back with a runnable after row`)
+    assert.ok(faults(out).includes(expected), `${expected} not reported: ${JSON.stringify(faults(out))}`)
+  }
+
+  // And every fillable field still works when the value is real, so the check
+  // above is not just refusing everything.
+  const good = { Domain: 'Customer Success', Tags: ['AI'], Audience: ['AE'], 'Review cadence': 'Monthly' }
+  const out = backfill.fill(EXISTING, good)
+  assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))
+  const sent = capture(() => command.commands.update(
+    write('before-fv.json', EXISTING),
+    write('after-fv.json', out.after),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(sent.changed.sort(), ['Audience', 'Domain', 'Review cadence', 'Tags'])
 })
 
 
