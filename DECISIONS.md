@@ -4662,3 +4662,61 @@ one: a mutation that changes no behaviour reads exactly like a gap in the tests.
 
 817 checks, 101 in the backfill suite. 142 mutations, all landed, one survivor and
 it is the known `wantsAPerson` inversion.
+
+### The live end-to-end run, 2026-08-24
+
+The whole backfill flow ran against the real workspace, under the Plugins
+testing page, and every claim below was proved by reading something back rather
+than by a call returning. The source was one of Sarah's own Drive documents,
+read after `scope` approved exactly that folder; its title stays in the local
+run files because it names a client and this repository is public.
+
+**Install verified with zero mismatches.** All six data sources and databases
+were fetched back and transcribed verbatim. `install.js verify` matched every
+property, type, option list, option order and option colour on all six schemas;
+all twelve relations at both ends, including both self-relations arriving from
+one statement each and the one-way `Integrates with` carrying no counterpart;
+and all seven views. All six filtered views were proved by rows: the view query
+and the rule SQL returned the same pages by identity, on five seed rows built
+so no pair could be empty-empty.
+
+**One run does not fit inside a Free/Plus SQL quota.** Five rule-SQL queries
+exhausted the workspace's metered Query Data Source allowance before the sixth
+ran, and `self` then reported `query_data_sources: upgrade_required`. The run
+stalled one query short of verify until the workspace was upgraded to Business
+mid-run, after which the same query returned the expected row first try.
+Backfill's live surface assumes SQL that a metered workspace cannot supply in
+one sitting, and nothing in the flow says so until verify refuses.
+
+**The `state: creating` gate held and then opened.** `context` refused every
+process command while config said creating, and passed immediately after
+`complete`. That closes the previous session's finding: the gate exists, fires,
+and names the resume path.
+
+**`duplicates` and `judge` ran live against a genuinely empty library**:
+compared 0, no matches, which is the first time that SQL has been sent to
+Notion rather than asserted as a string.
+
+**`create` then `prove`, in backfill mode.** The page came back with all six
+SOP/ROE headings and with `Owner`, `Verified by`, `Verified date` and `Last
+checked for accuracy` provably absent, absent keys counting as empty through
+`cameBackEmpty`. `prove` said what it did not check: body text under the
+headings, and property values beyond presence.
+
+**`audit` flagged the page it was designed to flag.** Both queries ran live;
+the artifact query returned exactly the created page and `flags` reported it
+`never-verified`, with the memo signal saying plainly that no memos were read
+because none exist rather than because none were stale.
+
+**`fill` filled one blank and refused one occupied field, live.** `Audience`
+went from empty to a value; a differing `Description` was refused as occupied
+with both values shown, exit zero, which is the never-overwrite rule working
+rather than failing. `update` sent only the filled field; `prove-update` read
+the page back, compared `Audience` as matching, and checked all three
+verification fields unchanged, as a `reviewed: false` edit requires.
+
+**Cleanup ran and was read back.** The Plugins testing page was fetched first
+and held exactly the six recorded databases and nothing else, was emptied with
+`allow_deleting_content`, and fetched back as a blank page. The config file at
+`~/.claude/gtm-operator.config.json` was removed. Nothing of the install
+remains on this machine or in the workspace.
