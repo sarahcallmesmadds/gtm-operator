@@ -3369,3 +3369,39 @@ by rereading the test:
 
 Only the first is found by measuring mutation coverage. The other three need
 somebody asking what the check would still pass on.
+
+### Review round 4 on pull request 16, from Codex
+
+One finding, and it is the missed-pair fault for the second time in four rounds.
+
+**`draft` and `fill` each refused the person half of what a backfill will not
+take, and dropped the other two silently.** `artifact.js` refuses all four,
+person fields and verification fields alike, and it was right. It was also
+unreachable from either of the paths anyone uses: `draft` copies a whitelist that
+does not include `Verified date` or `Last checked for accuracy`, so supplying one
+came back `ok: true` with the field quietly gone, and `fill` never looked at them
+at all, so offering one came back as a finished no-op with an empty `refused`
+list.
+
+**The check that should have caught it asserted the wrong direction.** "A draft
+carries no verification field" checked that the output lacked those fields, which
+is exactly what a silently discarded field produces. Asserting the absence of
+something proves nothing about whether it was refused or dropped, and those are
+different answers to the person who supplied it.
+
+**Fixed with one list rather than two loops.** `REFUSED_ON_A_BACKFILL` is
+`PERSON_FIELDS` plus the verification fields that are not already in it, and both
+callers iterate it. The reason given depends on which group the field belongs to
+rather than on which loop reached it, so a field cannot get the wrong explanation
+by being reached from the wrong place.
+
+**The tests iterate the list rather than naming a field**, because naming one is
+how this was missed. A check that names `Owner` goes green forever while the
+other three rot.
+
+**Two of the six findings across four rounds were the same fault**, one from each
+reviewer: a rule enforced in one place and missed in its pair. That is the fault
+this repository is worst at and it is worth saying plainly that writing it down
+in `DECISIONS.md` twelve times last session did not stop it happening twice more.
+What caught it both times was a reviewer asked specifically whether the guard was
+reachable on every path, rather than whether the code was correct.

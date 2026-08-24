@@ -74,6 +74,31 @@ const REPEAT_SIMILARITY = 0.5
 const REPEAT_SIMILARITY_IS_MEASURED = false
 
 /**
+ * Every field a backfill refuses to be handed, person and verification alike.
+ *
+ * ONE LIST BECAUSE TWO CALLERS KEPT DISAGREEING WITH IT. `artifact.js` refuses
+ * both groups on the row itself. `draft` and `fill` each refused only the person
+ * half and then dropped the other two on the floor: `draft` copies a whitelist
+ * that does not include them, `fill` never looks at them, so a caller supplying
+ * `Verified date` got `ok: true` and a field that had quietly disappeared. The
+ * low-level refusal was unreachable through both of the paths anyone uses.
+ *
+ * `Verified by` is in both groups, so the reason given depends on which group
+ * the field belongs to rather than on which loop reached it.
+ */
+const REFUSED_ON_A_BACKFILL = [
+  ...schema.PERSON_FIELDS,
+  ...schema.VERIFICATION_FIELDS.filter(field => !schema.PERSON_FIELDS.includes(field))
+]
+
+/** Why a backfill will not take this field, in the words of the rule it breaks. */
+function whyRefused (field) {
+  return schema.PERSON_FIELDS.includes(field)
+    ? `${field} is a person field, and backfill never fills one. A machine pulled this in, so guessing at who owns or verified it is worse than an empty field. Notify the real person, and set it with \`update\` once they have read it.`
+    : `${field} is one of the three verification fields, and nobody has read this artifact. Empty is the honest value, and it is what makes the never-verified audit signal mean something: an artifact stamped by the import that created it is indistinguishable from one a person actually checked.`
+}
+
+/**
  * A YYYY-MM-DD day, or null. Refusals are collected by the caller, never thrown.
  *
  * THE ROLL-OVER IS THE REASON FOR THE LAST LINE. `Date.parse` accepts
@@ -560,9 +585,13 @@ function draft (candidate, { today } = {}) {
     add('sources', 'missing', 'A backfilled artifact records where it came from, and this one carries no sources. Build them from the candidate\'s `where`: that line is the only claim backfill makes that a reader can check.')
   }
 
-  for (const field of schema.PERSON_FIELDS) {
+  for (const field of REFUSED_ON_A_BACKFILL) {
     if (given[field] === undefined || given[field] === null || given[field] === '') continue
-    add(field, 'backfill-person', `${field} was passed to a backfill draft. Backfill never fills a person field: notify the real person instead, and set it with \`update\` once they have read it.`)
+    add(
+      field,
+      schema.PERSON_FIELDS.includes(field) ? 'backfill-person' : 'backfill-verification',
+      `${field} was passed to a backfill draft. ${whyRefused(field)}`
+    )
   }
 
   if (refusals.length) return { ok: false, artifact: null, refusals }
@@ -649,13 +678,16 @@ function fill (existing, candidate) {
     filling.push(field)
   }
 
-  for (const field of schema.PERSON_FIELDS) {
+  // THE SAME LIST `draft` REFUSES, not the person half of it. Dropping the other
+  // two silently is what let a caller offer `Verified date` and be told there
+  // was nothing to fill.
+  for (const field of REFUSED_ON_A_BACKFILL) {
     if (given[field] === undefined || given[field] === null || given[field] === '') continue
     refused.push({
       field,
       holding: before[field],
       offered: given[field],
-      why: 'Backfill never fills a person field, on a blank row as much as on a full one. Guessing at an owner is worse than an empty field.'
+      why: `${whyRefused(field)} This holds on a blank row as much as on a full one.`
     })
   }
 
@@ -676,6 +708,7 @@ function fill (existing, candidate) {
 }
 
 module.exports = {
+  REFUSED_ON_A_BACKFILL,
   SOURCES,
   CONVERSATION_SOURCES,
   WAYS,
