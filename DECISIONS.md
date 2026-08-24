@@ -2985,3 +2985,33 @@ stayed. The last one is the interesting one, because it fails a check written tw
 rounds earlier for a different reason.
 
 710 checks.
+
+### Review round 11 on pull request 15
+
+Zero bugs again. Two flags, both real.
+
+**A field with a default behind it could not be emptied.** `properties` fills
+some fields in when they are absent, and a missing `Review cadence` becomes the
+default. Asked to empty one, the value came back present, the clear branch was
+never reached, and the field was written with a default instead of emptied.
+
+The clear branch reads the request now rather than the payload, which makes
+clearing mean the same thing for every field instead of depending on whether that
+field happens to have a default behind it. The Owner fix from round 1 was the
+same fault seen through one field; this is the general form of it, and the two
+would have kept arriving one field at a time.
+
+**`update` wrote a date it never checked.** `flags` refused an unreadable one and
+`update` carried the same argument into the payload, so
+`update before.json after.json "last Tuesday"` put those words into a Notion date
+property. One validator now, used by both, and it names the two failures
+separately because they differ: unreadable on the reading side makes every
+cadence comparison come back `unknown`, which is also the honest answer for a
+cadence nobody recognises, and on the writing side it goes to Notion.
+
+Four mutations, each confirmed to have landed. One had to be repointed: it
+targeted the editable payload's date and the stamp comes from the other one, so
+the check passed while the thing it watches was untouched. Two payloads means two
+places to aim.
+
+714 checks.

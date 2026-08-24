@@ -640,6 +640,42 @@ check('AN EMPTIED FIELD IS SENT AS AN EXPLICIT EMPTY VALUE', () => {
   assert.strictEqual(out.properties.Domain, null)
 })
 
+check('A FIELD WITH A DEFAULT BEHIND IT STILL CLEARS WHEN ASKED', () => {
+  // `properties` fills some fields in when they are absent: a missing Review
+  // cadence becomes the default. Asked to empty one, the value came back
+  // present, the clear branch was never reached, and the field was written with
+  // a default instead of emptied. Reading the request rather than the payload is
+  // what makes clearing mean the same thing for every field.
+  const out = runUpdate({ ...BEFORE, 'Review cadence': null, reviewed: false })
+  assert.deepStrictEqual(out.clearing, ['Review cadence'], JSON.stringify(out.clearing))
+  assert.strictEqual(out.properties['Review cadence'], null, `wrote ${JSON.stringify(out.properties['Review cadence'])} instead of emptying it`)
+})
+
+check('and setting that field to a real value still sets it', () => {
+  const out = runUpdate({ ...BEFORE, 'Review cadence': 'Yearly', reviewed: false })
+  assert.deepStrictEqual(out.changed, ['Review cadence'])
+  assert.strictEqual(out.properties['Review cadence'], 'Yearly', JSON.stringify(out.properties['Review cadence']))
+})
+
+check('UPDATE REFUSES A DATE IT CANNOT READ, the same as flags does', () => {
+  // flags refused one and update carried the same argument into the payload, so
+  // the words "last Tuesday" would have gone into a Notion date property.
+  assert.throws(
+    () => capture(() => command.commands.update(
+      write('bd.json', BEFORE),
+      write('ad.json', { ...BEFORE, Description: 'x', reviewed: true }),
+      'last Tuesday'
+    )),
+    /is not a date/,
+    'a date that cannot be read was written into the payload'
+  )
+})
+
+check('and the stamp it does write is the date it was given', () => {
+  const out = runUpdate({ ...BEFORE, Description: 'x', reviewed: true })
+  assert.strictEqual(out.properties['Last checked for accuracy'], '2026-08-23', JSON.stringify(out.properties['Last checked for accuracy']))
+})
+
 check('a cleared multi-select clears with a list, not a null', () => {
   const out = runUpdate({ ...BEFORE, Tags: [], body: BODY, reviewed: false })
   assert.deepStrictEqual(out.clearing, ['Tags'])

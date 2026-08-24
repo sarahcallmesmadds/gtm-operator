@@ -226,6 +226,39 @@ function toLogicalValue (options, logical, value) {
   return translate(value)
 }
 
+/** Whether the after artifact is asking for this field to be emptied. */
+function asksToEmpty (value) {
+  if (value === null) return true
+  if (value === '' || value === '[]') return true
+  if (Array.isArray(value) && value.length === 0) return true
+  return false
+}
+
+/**
+ * A day, or a refusal naming what would have gone wrong.
+ *
+ * BOTH COMMANDS TAKE A DATE AND ONLY ONE OF THEM CHECKED IT. `flags` refused a
+ * date it could not read, and `update` carried the same argument straight into
+ * the payload, so `node process.js update before.json after.json "last Tuesday"`
+ * put the words "last Tuesday" into a Notion date property. The two failures
+ * differ enough to be worth naming separately, which is what `doing` is for:
+ * unreadable on the reading side makes every cadence comparison come back
+ * `unknown`, which is also the honest answer for a cadence nobody recognises;
+ * on the writing side it goes to Notion.
+ */
+function dayOrRefuse (value, doing) {
+  const today = value || new Date().toISOString().slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(today) && !Number.isNaN(Date.parse(`${today}T00:00:00Z`))) return today
+  throw new Error(
+    `"${today}" is not a date. Use YYYY-MM-DD. ` +
+    (doing === 'reading'
+      ? 'It is refused rather than carried through, because every cadence comparison would come back "unknown", ' +
+        'which is also what this says about a cadence it has never seen, and a mistyped argument would read as a ' +
+        'library nobody has checked.'
+      : 'It is refused rather than written, because it would go into a date property as the text it is.')
+  )
+}
+
 /**
  * Whether a person field is asking for somebody rather than asking for nobody.
  *
@@ -976,18 +1009,7 @@ const commands = {
     }
     const context = contextOrExit()
     const memosCtx = memosContextOrExit()
-    const today = todayArg || new Date().toISOString().slice(0, 10)
-    // A DATE THAT DOES NOT PARSE MAKES EVERY CADENCE COMPARISON MEANINGLESS, and
-    // it does it quietly: `staleness` reports `unknown` for a row it cannot
-    // date, which is the same answer it gives for a cadence it does not
-    // recognise, so a mistyped argument read as a library nobody had checked.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`))) {
-      throw new Error(
-        `"${today}" is not a date. Use YYYY-MM-DD. It is refused rather than carried through, because every ` +
-        'cadence comparison would come back "unknown", which is also what this says about a cadence it has ' +
-        'never seen, and a mistyped argument would read as a library nobody has checked.'
-      )
-    }
+    const today = dayOrRefuse(todayArg, 'reading')
 
     const artifacts = normaliseAuditRows(context, readJson(artifactsFile, 'the artifact rows'))
     const memoRows = rowList(readJson(memosFile, 'the memo rows'))
@@ -1250,11 +1272,13 @@ const commands = {
     // person field too, and the review stamp depends on that default to record
     // who read the artifact. So the editable payload is built without it and the
     // verification stamp with it, and each is used only for what it is right for.
+    const stamp = dayOrRefuse(todayArg, 'writing')
+
     const editable = artifact.properties(context, merged, {
-      defaultsPerson: false, parentType: after.parentType, today: todayArg, partialBody: true
+      defaultsPerson: false, parentType: after.parentType, today: stamp, partialBody: true
     })
     const stamped = artifact.properties(context, merged, {
-      defaultsPerson: true, parentType: after.parentType, today: todayArg, partialBody: true
+      defaultsPerson: true, parentType: after.parentType, today: stamp, partialBody: true
     })
 
     // Which logical fields actually differ. Compared logically, before the
@@ -1292,6 +1316,19 @@ const commands = {
     const cleared = []
     for (const logical of changedFields) {
       const name = context.property(logical)
+      // AN EXPLICIT EMPTY IS A CLEAR, WHATEVER THE PAYLOAD BUILDER DID WITH IT.
+      // `properties` fills some fields in when they are absent: a missing
+      // `Review cadence` becomes the default. Asked to empty one, the value came
+      // back present, the clear branch was never reached, and the field was
+      // written with a default instead of emptied. Reading the request rather
+      // than the payload is what makes clearing mean the same thing for every
+      // field, instead of depending on whether that field happens to have a
+      // default behind it.
+      if (asksToEmpty(resolved[logical])) {
+        properties[name] = emptyValueFor(logical)
+        cleared.push(logical)
+        continue
+      }
       if (!(name in editable)) {
         // ASKING TO OWN IT AND EMPTYING IT ARE OPPOSITE INTENTIONS.
         //
