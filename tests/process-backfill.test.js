@@ -1191,6 +1191,45 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('NEITHER SIDE OF `fill` IS READ AS A ROW UNLESS IT IS ONE', () => {
+  // Third of this shape on the branch, after the mailbox and the body. It went
+  // two ways at once: a candidate of [] has none of the fillable fields, so
+  // nothing was refused, nothing was filled, and the run called itself a
+  // finished answer and exited zero, dropping an approved fill in silence. A
+  // candidate that was a string, a number or a boolean threw a raw TypeError out
+  // of the `in` operator instead.
+  for (const bad of [[], 'a string', 42, true, null, undefined]) {
+    const out = backfill.fill(EXISTING, bad)
+    assert.strictEqual(out.ok, false, `a candidate of ${JSON.stringify(bad)} was runnable`)
+    assert.deepStrictEqual(faults(out), ['candidate:not-a-candidate'], JSON.stringify(bad))
+    assert.ok(!out.emptyNote, `a candidate of ${JSON.stringify(bad)} called itself a finished answer`)
+  }
+
+  // THE ROW SIDE REFUSED ALL FOUR ALREADY, as url:missing, which is true and
+  // sends somebody to fix the wrong thing: a row that is not a row has not
+  // mislaid its url.
+  for (const bad of [[], 'a string', 42, true, null]) {
+    const out = backfill.fill(bad, { Domain: 'Customer Success' })
+    assert.deepStrictEqual(faults(out), ['existing:not-a-row'], JSON.stringify(bad))
+  }
+
+  // AND A ROW THAT IS A ROW AND HAS NO URL KEEPS ITS OWN REFUSAL, or the check
+  // above passes against a fill that answers not-a-row for everything.
+  assert.deepStrictEqual(faults(backfill.fill({ Name: 'R', Type: 'SOP/ROE' }, { Domain: 'CS' })), ['url:missing'])
+
+  // OFFERING NOTHING IS STILL A FINISHED ANSWER. `{}` is a real candidate that
+  // happens to carry no fields, and it is the case the empty note exists for.
+  const nothing = backfill.fill(EXISTING, {})
+  assert.deepStrictEqual(faults(nothing), [])
+  assert.ok(/finished answer/.test(nothing.emptyNote))
+
+  // A REFUSED CONTAINER EXITS NON-ZERO, like every other refusal here.
+  process.exitCode = 0
+  capture(() => command.commands.fill(write('cont-row.json', EXISTING), write('cont-cand.json', [])))
+  assert.strictEqual(process.exitCode, 1, 'a fill given a list as its candidate exited zero')
+  process.exitCode = 0
+})
+
 check('`[]`-IN-A-STRING IS ASKING FOR NOBODY HERE TOO, and `check` and the write agree about it', () => {
   // The eighth reader of the emptiness rule and the one that never got it.
   // `'[]'` is what Notion returns for an empty person field, so a row fetched
