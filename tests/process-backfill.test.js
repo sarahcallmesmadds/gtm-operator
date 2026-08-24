@@ -1191,6 +1191,80 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`[]`-IN-A-STRING IS ASKING FOR NOBODY HERE TOO, and `check` and the write agree about it', () => {
+  // The eighth reader of the emptiness rule and the one that never got it.
+  // `'[]'` is what Notion returns for an empty person field, so a row fetched
+  // with an empty Owner and handed straight back read as a request for a person
+  // literally named "[]". `check` saw nothing wrong, because it does not judge
+  // person values, and `properties` then threw on the same file.
+  assert.deepStrictEqual(artifact.peopleAsked('[]'), [], "'[]' was read as a person named []")
+
+  // THREE ANSWERS, NOT TWO, AND THIS IS WHY IT IS `[]` AND NOT null. null means
+  // nobody asked, so the default person may be applied. An empty list means
+  // somebody asked for nobody, so the field is left alone. Folding the two
+  // together puts the config person back onto an owner that was just cleared.
+  assert.strictEqual(artifact.peopleAsked(undefined), null)
+  assert.strictEqual(artifact.peopleAsked('me'), null)
+  assert.deepStrictEqual(artifact.peopleAsked([]), [])
+
+  const context = { property: name => name, value: (field, value) => value, personId: 'user://DEFAULT' }
+  const full = {
+    Name: 'Refund policy',
+    Type: 'SOP/ROE',
+    body: { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+  }
+
+  for (const cleared of ['[]', []]) {
+    const out = artifact.properties(context, { ...full, Owner: cleared }, { defaultsPerson: true })
+    assert.strictEqual(out.Owner, undefined, `an Owner cleared with ${JSON.stringify(cleared)} was reassigned`)
+  }
+
+  // AND THE DEFAULT STILL APPLIES WHEN NOBODY ASKED, or the check above passes
+  // against a properties that never writes an owner at all.
+  const defaulted = artifact.properties(context, { ...full }, { defaultsPerson: true })
+  assert.deepStrictEqual(defaulted.Owner, ['user://DEFAULT'])
+
+  // The gate and the write agree now: check passed this row before, and the
+  // write threw on it.
+  assert.deepStrictEqual(artifact.problems({ ...full, Owner: '[]' }), [])
+})
+
+check('A BODY THAT IS NOT A SET OF SECTIONS IS REFUSED, not read as an untouched one', () => {
+  // The partial-body rule reads an absent section as "not sent, leave it alone".
+  // A body that is not a map indexes to undefined for EVERY heading, so the
+  // whole edit read as untouched: no problems, an empty rendered body, empty
+  // headings, and nothing for prove-update to check, which means the dropped
+  // edit could come back proved. Same shape as the mailbox finding one round
+  // earlier, a guard whose cases are all well-formed.
+  for (const body of ['not an object', [], 42, true]) {
+    const row = { Name: 'Refund policy', Type: 'SOP/ROE', body }
+    assert.deepStrictEqual(
+      artifact.problems(row, { partialBody: true }).map(one => `${one.field}:${one.kind}`),
+      ['body:not-a-section-map'],
+      `a body of ${JSON.stringify(body)} was read as an untouched one`
+    )
+    // AND ON THE CREATE PATH TOO, where it read as every section missing and so
+    // was refused for the wrong reason.
+    assert.ok(
+      artifact.problems(row).some(one => one.kind === 'not-a-section-map'),
+      `a body of ${JSON.stringify(body)} was not refused on a create`
+    )
+  }
+
+  // A REAL PARTIAL EDIT STILL GOES THROUGH, and still renders the section it
+  // carries, or the refusal above is just a body check that refuses everything.
+  const good = { Name: 'Refund policy', Type: 'SOP/ROE', body: { Steps: '1. Check the order date.' } }
+  assert.deepStrictEqual(artifact.problems(good, { partialBody: true }), [])
+  assert.deepStrictEqual(artifact.expectedHeadings(good, { partialBody: true }), ['Steps'])
+  assert.strictEqual(artifact.body(good, { partialBody: true }).length, 1)
+
+  // An absent body is still untouched, and a section supplied blank is still the
+  // case the original check was written for.
+  assert.deepStrictEqual(artifact.problems({ Name: 'Refund policy', Type: 'SOP/ROE' }, { partialBody: true }), [])
+  assert.ok(artifact.problems({ Name: 'Refund policy', Type: 'SOP/ROE', body: { Steps: '   ' } }, { partialBody: true })
+    .some(one => one.field === 'Steps' && one.kind === 'section-missing'))
+})
+
 check('A SUPPLIED MAILBOX IS NEVER READ AS THE DEFAULT ONE', () => {
   // `mailbox` is the only scope value whose absence means read anyway. Every
   // other unreadable value refuses and nothing is read, so conflating absent

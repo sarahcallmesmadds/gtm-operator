@@ -3971,3 +3971,53 @@ refusal. Both say what was supplied now.
 reached, plus six written against this fix and every one red, including one that
 confirms an absent mailbox still means "own" and one that confirms a named
 non-own mailbox keeps its own refusal rather than being folded into the new one.
+
+### Review round 20 on pull request 16: both reviewers, and both found a guard whose cases were all well-formed
+
+**Codex: a `body` that is not a set of sections was read as an untouched one.**
+The partial-body rule reads an absent section as "not sent, leave it alone", and
+a body that is not a map indexes to `undefined` for every heading. So the whole
+edit read as untouched: no problems, an empty rendered body, empty headings, and
+nothing for `prove-update` to walk, which means the dropped edit could come back
+proved. The container is judged before the sections in it now, on the create path
+as well, where it had been refused for the wrong reason.
+
+**Devin: `peopleAsked` never got the emptiness rule.** `'[]'` is what Notion
+returns for an empty person field, which is why `cameBackEmpty` exists and why
+`askedForNothing` and `wantsAPerson` both read it as asking for nobody. This
+wrote the test out by hand and missed it, so a row fetched with an empty `Owner`
+and handed straight back read as a request for a person literally named "[]".
+`check` reported `writable: true`, because it does not judge person values, and
+`properties` threw on the same file. A gate that passes what the write refuses is
+worse than no gate.
+
+**Both are the shape round 19 named**: a guard whose cases are all well-formed.
+Three rounds running now, and it is worth stating as a rule rather than as three
+observations. Every one of these was found by asking what the malformed value
+does, not the wrong-but-readable one.
+
+**The first fix for the person one was wrong and the caller caught it.**
+`peopleAsked` was routed through `askedForNothing`, which collapses three answers
+into two. `properties` reads null as "nobody asked, so the default person may be
+applied" and an empty list as "asked for nobody, so leave it alone". Folding them
+together would have put the config person back onto an owner that had just been
+cleared, which is the silent reassignment `properties` carries its own warning
+about. `'[]'` joins the empty list, not the absent one, and all three answers are
+pinned.
+
+**`wantsAPerson` was collapsed onto the shared rule too.** It was a correct
+hand-written copy sitting directly beside an incorrect one, which is the drift the
+seven earlier consolidations were built to stop.
+
+**What the coverage run corrected, and it was a claim rather than code.** The
+harness reported 80 checks with 79 reached: the new body check was reached by
+none of the 88 mutations. Five targeted mutations did reach it and all were red,
+so the check is proved, but "all N checks reached" would have been wider than what
+was run, which is one of the seven varieties this branch has been cataloguing.
+Four mutations were added, and one of them, inverting `wantsAPerson`, survives the
+backfill suite and is caught by `tests/process-audit-update.test.js`. That is not
+a gap. It is the harness being scoped to one suite, and it is worth knowing before
+reading its output as a whole-repository number.
+
+796 checks, up from 794. 92 mutations, all landed, all 80 backfill checks reached,
+and the one survivor is caught by another suite.
