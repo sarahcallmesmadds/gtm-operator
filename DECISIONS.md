@@ -3659,3 +3659,28 @@ nothing in the suite was watching it. That is the sixth check-that-passes-withou
 checking in this branch and the first found by mutating a fix rather than by a
 reviewer, which is the argument for running the mutation pass after every round
 rather than at the end.
+
+### Review round 11 on pull request 16: Devin clean, Codex found the round-10 fix
+
+Devin found nothing. Codex found one, inside round 10's own fix, which is the
+fourth time on this branch that a fix has made the next bug.
+
+**A valid parent passed `draft` and was refused by `create`.** Round 10 copied
+`parent` onto the artifact and not `parentType`. `draft` validates the parent
+with the `parentType` it was handed; `create` re-validates with
+`final.parentType`, read off the artifact. So a `Strategy Decision` parent that
+had been supplied and checked came back `ok: true` and was refused one step later
+as `parent-type-unknown`.
+
+**The check stopped at the key being present.** It asserted `artifact.parent`
+survived and went no further, so it proved the copy and said nothing about
+whether the thing copied was usable. That is the seventh variety of
+check-that-passes-without-checking on this branch: proving a value moved without
+proving it still works where it is going. The check runs the drafted artifact
+through `create` now.
+
+**Sixteen findings across eleven rounds and every one real.** The tally of the
+recurring fault stands at eight of sixteen, with four of those eight arriving
+inside the fix for an earlier one. That ratio has been stable since round 5 and
+is the honest summary of this branch: the pairs were not hard to see once
+somebody looked, and every round of looking created a new pair.

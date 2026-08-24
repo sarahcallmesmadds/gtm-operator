@@ -652,6 +652,13 @@ function draft (candidate, { today } = {}) {
   // which is a different thing from never having looked at it.
   if (given.parent !== undefined && given.parent !== null && given.parent !== '') {
     out.parent = given.parent
+    // AND ITS TYPE, BECAUSE THE NEXT GATE ASKS THE ARTIFACT AND NOT THIS
+    // FUNCTION. `draft` validates the parent with the `parentType` it was
+    // handed; `create` re-validates with `final.parentType`, off the artifact.
+    // Copying the parent and not its type let a valid parent pass here and be
+    // refused one step later as parent-type-unknown, for a type that had been
+    // supplied and checked.
+    if (given.parentType !== undefined) out.parentType = given.parentType
   }
 
   const problems = artifact.problems(out, { parentType: given.parentType })
