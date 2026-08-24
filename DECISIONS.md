@@ -3894,3 +3894,46 @@ the round completed and came back clean.
 
 792 checks, up from 790. 88 mutations, all landed, none surviving, all 76
 backfill checks reached, plus six written against the new gate and every one red.
+
+### Round 18: the informational list on the Devin page, read for the first time
+
+Devin's GitHub reviewer came back with zero bugs and zero vulnerabilities on the
+round 17 commit, and its page carried eleven informational findings that reach no
+API. Seven had never been read. Reading them found two real faults and confirmed
+one already known.
+
+**`plan` emptied three fields on a refusal and left the fourth.** The rule from
+round 2 names `reading`, `ways` and `topics`. `notReading` is written to be shown
+to a person before a run starts, and a refused plan came back reading nothing
+while still listing which sources it was leaving out, which reads as a run that
+is taking the rest. It now says that nothing is read and why, rather than being
+emptied: this is the field the skill tells a person to read, and handing them an
+empty list says nothing at all.
+
+**The rollover-date refusal used one wording for two faults**, which is what the
+comment directly above the helper calls its own bug. Round 4 taught it to name
+the rollover, and a month past 12 does not roll forward: it does not resolve at
+all. The fix for the first fault introduced a third case and lumped it in with
+them. Both causes are named now.
+
+**Three of the seven were not defects.** Two describe changes this branch made,
+`check` exiting non-zero and `prove` taking the created url. The third, the
+verification comparison relying on `PROPERTY_TYPES`, was checked: an unmapped
+name returns `unchecked` with a reason rather than comparing raw, and the caller
+handles that state explicitly.
+
+**Two are recorded rather than fixed.** `dayOrRefuse` still accepts a rolled-over
+date, which is the known deferral because it changes `new`, `update` and `trust`.
+And the backfill Sources check compares exact strings, which given what this
+repository has measured about Notion reshaping what it returns could report a
+false disagreement. That one cannot be answered without a live run and belongs on
+the live-run list rather than being fixed blind.
+
+**The thing worth carrying: the informational list is not noise.** The item at
+`backfill.js:823-838`, "fill can return ok:true while flagging a refusal", was
+sitting on that page marked READ, and it is exactly the fault Codex found in
+round 17 and the previous commit fixed. It had been seen, marked, and not acted
+on. A green check with zero bugs is not the end of the reading.
+
+793 checks, up from 792. 88 mutations, all landed, none surviving, all 77 checks
+reached, plus six written against these two fixes and every one red.

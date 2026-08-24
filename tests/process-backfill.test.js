@@ -1191,7 +1191,21 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
-check('A REFUSED SCOPE EMPTIES ALL THREE, topics included', () => {
+check('A MONTH PAST 12 IS REFUSED FOR THE RIGHT REASON, not for the rollover one', () => {
+  // Round 4 taught this refusal to name the rollover, and a month past 12 does
+  // not roll: it does not resolve at all. One wording for two faults is what the
+  // comment above the helper calls its own bug, and the fix for the first fault
+  // introduced a third case it lumped in with them.
+  for (const value of ['2026-02-30', '2026-13-01']) {
+    const out = backfill.plan({ sources: ['slack'], slack: { channels: ['general'], from: value, to: '2026-06-01' } })
+    const said = out.refusals.find(one => one.kind === 'range-not-a-day')
+    assert.ok(said, `${value} was not refused as a day`)
+    assert.ok(!/^[^;]*rolls forward[^;]*$/.test(said.message), `${value} was told it rolls forward and nothing else`)
+    assert.ok(/does not resolve/.test(said.message), `${value} was not told the other cause`)
+  }
+})
+
+check('A REFUSED SCOPE EMPTIES ALL FOUR, topics and what it is not reading included', () => {
   // Reached with topics actually set, so the emptying is exercised rather than
   // asserted against a value that was never there.
   const out = backfill.plan({
@@ -1205,7 +1219,16 @@ check('A REFUSED SCOPE EMPTIES ALL THREE, topics included', () => {
   assert.deepStrictEqual(out.ways, [])
   assert.deepStrictEqual(out.topics, [])
 
-  // The same request without the refusal keeps all three, so the check above is
+  // AND THE FOURTH FIELD, which the emptying left standing for four rounds. A
+  // refused plan reading nothing while still listing the sources it leaves out
+  // reads as a run that is taking the rest, and this is the field the skill
+  // tells a person to read before starting.
+  assert.strictEqual(out.notReading.length, 1, `a refused plan still listed what it was leaving out:\n${out.notReading.join('\n')}`)
+  for (const source of ['Documents', 'Email', 'Call recordings']) {
+    assert.ok(!out.notReading.join(' ').includes(source), `${source} was named as an exclusion by a plan that reads nothing`)
+  }
+
+  // The same request without the refusal keeps all four, so the check above is
   // not passing on a plan that never had them.
   const fine = backfill.plan({
     sources: ['slack'],
@@ -1216,6 +1239,8 @@ check('A REFUSED SCOPE EMPTIES ALL THREE, topics included', () => {
   assert.strictEqual(fine.ok, true, JSON.stringify(fine.refusals))
   assert.deepStrictEqual(fine.topics, ['how refunds get handled'])
   assert.deepStrictEqual(fine.ways, ['topics'])
+  assert.ok(fine.notReading.length > 1, 'a plan that was not refused stopped saying what it leaves out')
+  assert.ok(fine.notReading.join(' ').includes('Email'), 'a plan that was not refused stopped naming the sources it leaves out')
 })
 
 check('THE PROOF IS BOUND TO THE PAGE THAT WAS CREATED', () => {
