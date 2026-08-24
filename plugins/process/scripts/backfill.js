@@ -542,6 +542,40 @@ function plan (request) {
  * scans, so a cluster that is wrong costs one "no".
  */
 function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } = {}) {
+  /*
+   * THE TWO NUMBERS THAT DECIDE THE ANSWER ARE JUDGED FIRST.
+   *
+   * `judge` refuses a threshold outside 0 to 1 and says so, ten lines away in the
+   * other file. This took the same kind of value and checked neither of its two,
+   * so `threshold: -1` made every question resemble every other and merged two
+   * unrelated ones into a qualifying repeated question, and `min: 0` reported
+   * every single asking as repeated. Both came back `ok: true`.
+   *
+   * A number of the right type and the wrong range is the shape this branch had
+   * not looked at until now, and it is worse than a malformed one: nothing
+   * downstream can tell that the answer it is reading was computed against a
+   * bound that cannot mean anything.
+   *
+   * Refused rather than clamped. Clamping `-1` to `0` answers a question nobody
+   * asked, which is the narrowing this file refuses everywhere else.
+   */
+  const rangeProblems = []
+  if (typeof threshold !== 'number' || Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
+    rangeProblems.push({
+      field: 'threshold',
+      kind: 'out-of-range',
+      message: `\`threshold\` is ${JSON.stringify(threshold)}. It is how alike two questions have to be to count as the same one, as a number from 0 to 1. Outside that it either merges every question or separates every one, and the clusters would say nothing about what people keep asking.`
+    })
+  }
+  if (typeof min !== 'number' || !Number.isInteger(min) || min < 1) {
+    rangeProblems.push({
+      field: 'min',
+      kind: 'out-of-range',
+      message: `\`min\` is ${JSON.stringify(min)}. It is how many times a question has to have been asked before it counts as repeated, so it is a whole number of at least 1. Below that every question asked once is reported as one people keep asking.`
+    })
+  }
+  if (rangeProblems.length) return { ok: false, clusters: [], below: [], refusals: rangeProblems }
+
   const refusals = []
   const add = (field, kind, message) => refusals.push({ field, kind, message })
 

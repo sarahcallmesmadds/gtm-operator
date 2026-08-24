@@ -1192,6 +1192,38 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`repeats` REFUSES A THRESHOLD OR A MINIMUM THAT CANNOT MEAN ANYTHING', () => {
+  // `judge` refuses a threshold outside 0..1 ten lines away in the other file,
+  // and `repeats` took the same kind of value and checked neither of its two.
+  // threshold: -1 merged two unrelated questions into a qualifying repeated
+  // question, and min: 0 reported every single asking as repeated. Both returned
+  // ok: true.
+  const two = [
+    { question: 'How do refunds work?', where: '#help', when: '2026-08-01' },
+    { question: 'Where is pricing?', where: '#sales', when: '2026-08-02' }
+  ]
+
+  for (const bad of [-1, 2, 1.5, NaN, '0.5', null]) {
+    const out = backfill.repeats(two, { threshold: bad })
+    assert.strictEqual(out.ok, false, `a threshold of ${JSON.stringify(bad)} was accepted`)
+    assert.deepStrictEqual(faults(out), ['threshold:out-of-range'], JSON.stringify(bad))
+  }
+
+  for (const bad of [0, -1, 1.5, NaN, '3', null]) {
+    const out = backfill.repeats(two, { min: bad })
+    assert.strictEqual(out.ok, false, `a minimum of ${JSON.stringify(bad)} was accepted`)
+    assert.deepStrictEqual(faults(out), ['min:out-of-range'], JSON.stringify(bad))
+  }
+
+  // THE BOUNDS THEMSELVES ARE USABLE, and the defaults still work, or the loops
+  // above pass against a command that refuses every option it is given.
+  assert.strictEqual(backfill.repeats(two, { threshold: 0 }).ok, true)
+  assert.strictEqual(backfill.repeats(two, { threshold: 1 }).ok, true)
+  assert.strictEqual(backfill.repeats(two, { min: 1 }).ok, true)
+  assert.strictEqual(backfill.repeats(two).ok, true)
+  assert.strictEqual(backfill.repeats(two).min, backfill.REPEAT_MIN)
+})
+
 check('`fill` REFUSES EVERY FIELD IT WILL NOT WRITE, not four of them', () => {
   // Round 6 set the rule: a field `fill` will not write is refused rather than
   // dropped, because dropping it means somebody approved a change and a smaller
