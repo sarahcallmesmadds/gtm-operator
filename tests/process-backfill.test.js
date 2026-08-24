@@ -1449,13 +1449,16 @@ check('THE COMMANDS THE BACKFILL FLOW FEEDS DECLARE THEIR SHAPES TOO', () => {
     assert.throws(() => run(wrong), /read as a set of fields/, `${name} accepted a list`)
   }
 
-  // AND THE ONE THAT READS A LIST IS REFUSED THE OTHER WAY ROUND, because a
-  // command that takes a list and a command that takes fields are the same
-  // mistake seen from either end.
+  // AND THE ONE THAT READS ROWS IS STILL REFUSED GARBAGE, but by `rowList`
+  // rather than at the door. A bare-array guard here refused the documented
+  // flow itself: the query surface answers `{ results: [...] }` and
+  // `duplicates` says to pass what came back straight in, so the envelope is a
+  // legal shape and the refusal below is for a fields object that is not one
+  // of the measured envelopes.
   assert.throws(
     () => command.commands.judge(write('flow-art2.json', EXISTING), write('flow-notlist.json', { not: 'a list' })),
-    /read as a list/,
-    'judge accepted a set of fields where its rows go'
+    /shape this does not recognise/,
+    'judge accepted a set of fields that is not a measured envelope'
   )
 
   // AND EACH STILL RUNS ON THE RIGHT SHAPE, or the loop above passes against

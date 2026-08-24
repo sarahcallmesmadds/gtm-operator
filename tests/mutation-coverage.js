@@ -49,7 +49,14 @@ const M = [
   [P, "    return typeof one.Name === 'string' ? one.Name.trim() : ''", "    return String(one.Name).trim()"],
   [B, "    } else if (holder.channels !== undefined && holder.channels !== null) {", "    } else if (false) {"],
   [P, "    const final = readJson(artifactFile, 'the artifact', 'fields')", "    const final = readJson(artifactFile, 'the artifact')"],
-  [P, "    const rows = readJson(rowsFile, 'the rows that came back', 'list')\n    const context = contextOrExit()", "    const rows = readJson(rowsFile, 'the rows that came back')\n    const context = contextOrExit()"],
+  // The direction flipped on 2026-08-24. The guarded form WAS the code and the
+  // mutation relaxed it; a Devin round then showed the guard itself was the bug,
+  // refusing the `{ results: [...] }` envelope the query surface returns and
+  // `duplicates` says to pass straight in. The unguarded form is the code now,
+  // so the mutation restores the guard, and the envelope test is what catches
+  // it. Anchored on the comment line because `trust` reads its rows with the
+  // identical pair of lines.
+  [P, "    // while `trust` and `flags` accepted it. One reader, not two opinions.\n    const rows = readJson(rowsFile, 'the rows that came back')", "    // while `trust` and `flags` accepted it. One reader, not two opinions.\n    const rows = readJson(rowsFile, 'the rows that came back', 'list')"],
   [P, "    const proposed = readJson(file, 'the proposed artifact', 'fields')\n\n    const problems", "    const proposed = readJson(file, 'the proposed artifact')\n\n    const problems"],
   [P, "readJson(file, 'the artifact', 'fields')", "readJson(file, 'the artifact')"],
   [P, "readJson(beforeFile, 'the artifact as it is now', 'fields')", "readJson(beforeFile, 'the artifact as it is now')"],
