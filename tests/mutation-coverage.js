@@ -37,6 +37,10 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    } else if (holder.channels !== undefined && holder.channels !== null) {", "    } else if (false) {"],
+  [P, "    const final = readJson(artifactFile, 'the artifact', 'fields')", "    const final = readJson(artifactFile, 'the artifact')"],
+  [P, "    const rows = readJson(rowsFile, 'the rows that came back', 'list')\n    const context = contextOrExit()", "    const rows = readJson(rowsFile, 'the rows that came back')\n    const context = contextOrExit()"],
+  [P, "    const proposed = readJson(file, 'the proposed artifact', 'fields')\n\n    const problems", "    const proposed = readJson(file, 'the proposed artifact')\n\n    const problems"],
   [P, "readJson(file, 'the artifact', 'fields')", "readJson(file, 'the artifact')"],
   [P, "readJson(beforeFile, 'the artifact as it is now', 'fields')", "readJson(beforeFile, 'the artifact as it is now')"],
   [P, "    const intended = readJson(updateFile, 'the update that was sent', 'fields')\n    const readback = readJson(readbackFile, 'the page as it came back', 'fields')", "    const intended = readJson(updateFile, 'the update that was sent', 'fields')\n    const readback = readJson(readbackFile, 'the page as it came back')"],

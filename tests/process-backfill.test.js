@@ -1192,6 +1192,29 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`slack.channels` TELLS A MALFORMED VALUE FROM AN ABSENT ONE, like its four siblings', () => {
+  // `dms`, `ways`, `topics` and `sources` were each taught to tell the two
+  // apart. `channels` was the one list in the same function left falling through
+  // to the unset branch, so `channels: "#gtm"` and leaving channels out entirely
+  // came back identical. A caller told it named no channels, while looking at
+  // the channel it named, goes and adds a second one.
+  const W = { from: '2026-01-01', to: '2026-06-01' }
+  for (const channels of ['#gtm', 42, true, { name: '#gtm' }]) {
+    const out = backfill.plan({ sources: ['slack'], slack: { channels, ...W }, ways: ['topics'], topics: ['refunds'] })
+    assert.deepStrictEqual(faults(out), ['slack:channels-not-a-list'], JSON.stringify(channels))
+  }
+
+  // ABSENT IS STILL UNSET, which is the refusal the branch was written for and a
+  // different thing to say.
+  const absent = backfill.plan({ sources: ['slack'], slack: { ...W }, ways: ['topics'], topics: ['refunds'] })
+  assert.deepStrictEqual(faults(absent), ['slack:channels-unset'])
+
+  // AND BOTH REAL FORMS STILL WORK, or the check above passes against a plan
+  // that refuses every channels value.
+  assert.deepStrictEqual(faults(backfill.plan({ sources: ['slack'], slack: { channels: 'all', ...W }, ways: ['topics'], topics: ['refunds'] })), [])
+  assert.deepStrictEqual(faults(backfill.plan({ sources: ['slack'], slack: { channels: ['#gtm'], ...W }, ways: ['topics'], topics: ['refunds'] })), [])
+})
+
 check('THE COMMANDS THE BACKFILL FLOW FEEDS DECLARE THEIR SHAPES TOO', () => {
   // The shape check was declared on the five backfill commands and recorded as
   // deliberately not swept into the older ones. That was right when it was
@@ -1203,8 +1226,17 @@ check('THE COMMANDS THE BACKFILL FLOW FEEDS DECLARE THEIR SHAPES TOO', () => {
   const wrong = write('flow-wrong.json', ['not', 'an', 'artifact'])
   const rightRow = write('flow-right.json', EXISTING)
 
+  // EVERY COMMAND THIS FLOW FEEDS, not the ones a reviewer named. Fixing only
+  // what was reported is what kept five rounds finding the pair of the round
+  // before, so the whole set was worked out by reading every `readJson` call and
+  // asking which of them the backfill flow reaches.
   const feeds = [
+    ['check', file => command.commands.check(file)],
+    ['duplicates', file => command.commands.duplicates(file)],
+    ['judge proposed', file => command.commands.judge(file, write('flow-rows.json', []))],
     ['create', file => command.commands.create(file)],
+    ['prove artifact', file => command.commands.prove(file, rightRow, URL_A)],
+    ['prove readback', file => command.commands.prove(rightRow, file, URL_A)],
     ['update before', file => command.commands.update(file, rightRow, '2026-08-23')],
     ['update after', file => command.commands.update(rightRow, file, '2026-08-23')],
     ['prove-update sent', file => command.commands['prove-update'](file, rightRow)],
@@ -1213,6 +1245,15 @@ check('THE COMMANDS THE BACKFILL FLOW FEEDS DECLARE THEIR SHAPES TOO', () => {
   for (const [name, run] of feeds) {
     assert.throws(() => run(wrong), /read as a set of fields/, `${name} accepted a list`)
   }
+
+  // AND THE ONE THAT READS A LIST IS REFUSED THE OTHER WAY ROUND, because a
+  // command that takes a list and a command that takes fields are the same
+  // mistake seen from either end.
+  assert.throws(
+    () => command.commands.judge(write('flow-art2.json', EXISTING), write('flow-notlist.json', { not: 'a list' })),
+    /read as a list/,
+    'judge accepted a set of fields where its rows go'
+  )
 
   // AND EACH STILL RUNS ON THE RIGHT SHAPE, or the loop above passes against
   // commands that refuse everything.

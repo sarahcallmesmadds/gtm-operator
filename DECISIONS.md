@@ -4473,3 +4473,37 @@ only mutate a string that occurs exactly once, because mutating two places at on
 makes it impossible to say which check caught it. That refusal is the harness
 working: an ambiguous mutation that ran would have reported coverage it had not
 established.
+
+### Review round 30: the pair was found by looking for all of them, not by waiting
+
+**Codex found `prove` reading its read-back with the shape check and its artifact
+without**, which is the pair of round 29's fix and the sixth round running where
+the finding was the missing half of the round before.
+
+**Five rounds of that is enough to change how it is fixed.** Rather than declaring
+the shape on the one read that was reported, every `readJson` call in the file was
+listed and each one asked whether the backfill flow reaches it. Five did and were
+undeclared: `check`, `duplicates`, both files `judge` reads, and `prove`'s
+artifact. Fixing only the reported one would have left four, and round 31 would
+have found them, which is the loop exactly.
+
+**Devin found the same shape in the other file.** `dms`, `ways`, `topics` and
+`sources` were each taught to tell a malformed value from an absent one, and
+`slack.channels` was the one list in the same function left falling through to the
+unset branch. `channels: "#gtm"` and leaving channels out came back identical, so
+somebody told they named no channels, while looking at the channel they named,
+adds a second one.
+
+**What the two findings have in common is the lesson, not the code.** Both are a
+rule applied to some members of a set and not the rest, and in both cases the set
+was knowable by reading: every `readJson` call, every list in `plan`. Neither
+needed a reviewer to find it. What a reviewer did was notice one member, which is
+a different and much slower thing than checking the set.
+
+**Two harness anchors were wrong on the first attempt**, one matching two places
+and one matching none, and both were reported rather than silently passing. That
+is the property worth keeping: a mutation that changes nothing reads exactly like
+a mutation that was caught.
+
+811 checks, 95 in the backfill suite. 134 mutations, all landed, one survivor and
+it is the `wantsAPerson` inversion `process-audit-update` catches.
