@@ -39,7 +39,7 @@ const T = path.join(ROOT, 'tests/process-backfill.test.js')
 const M = [
   [P, "readJson(file, 'the artifact', 'fields')", "readJson(file, 'the artifact')"],
   [P, "readJson(beforeFile, 'the artifact as it is now', 'fields')", "readJson(beforeFile, 'the artifact as it is now')"],
-  [P, "readJson(readbackFile, 'the page as it came back', 'fields')", "readJson(readbackFile, 'the page as it came back')"],
+  [P, "    const intended = readJson(updateFile, 'the update that was sent', 'fields')\n    const readback = readJson(readbackFile, 'the page as it came back', 'fields')", "    const intended = readJson(updateFile, 'the update that was sent', 'fields')\n    const readback = readJson(readbackFile, 'the page as it came back')"],
   [P, "  return String(one.Type || one.type || '').trim()", "  return String(one.Type || '').trim()"],
   [P, "  return String(one.Name || one.what || '').trim()", "  return String(one.Name || '').trim()"],
   [P, "  return `${subjectName(one)} ${one.Description || one.why || ''}`.trim()", "  return `${one.Name || ''} ${one.Description || ''}`.trim()"],
