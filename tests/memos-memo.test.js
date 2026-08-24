@@ -270,10 +270,52 @@ check('the body keeps section order and omits an empty conditional section', () 
   ])
 })
 
-check('a filled conditional section is emitted, last', () => {
-  const withSources = clean({ body: Object.assign(clean().body, { Sources: '- the deck: numbers' }) })
+check('the Sources section is generated from the record, and comes last', () => {
+  const withSources = clean({ sources: [{ what: 'the deck', contributed: 'numbers' }] })
   const built = memo.body(withSources)
   assert.strictEqual(built[built.length - 1].heading, 'Sources')
+  assert.strictEqual(built[built.length - 1].text, '- the deck: numbers')
+  assert.ok(memo.expectedHeadings(withSources).includes('Sources'))
+})
+
+check('a hand-written Sources section with no record behind it is refused', () => {
+  // The section is an unchecked claim without the structured list, and the
+  // skill promises the script refuses a source with no line of context. That
+  // promise only holds if this is the one path to the section. Found by
+  // review on round 1: the list was validated and then dropped, while the
+  // text a reader sees went out unchecked.
+  const found = memo.problems(clean({ body: Object.assign(clean().body, { Sources: '- the deck: numbers' }) }))
+  assert.ok(kinds(found).includes('sources-hand-written'))
+})
+
+check('a Sources section that disagrees with the record is refused, a copy of it is not', () => {
+  const record = [{ what: 'the deck', contributed: 'numbers' }]
+  const disagreeing = clean({
+    sources: record,
+    body: Object.assign(clean().body, { Sources: '- a different deck: vibes' })
+  })
+  assert.ok(kinds(memo.problems(disagreeing)).includes('sources-disagree'))
+
+  const copying = clean({
+    sources: record,
+    body: Object.assign(clean().body, { Sources: '- the deck: numbers' })
+  })
+  assert.deepStrictEqual(memo.problems(copying), [])
+})
+
+check('sources on a type whose template has no Sources section are refused, not dropped', () => {
+  const found = memo.problems(clean({
+    Type: 'Incident Report',
+    sources: [{ what: 'the pager log', contributed: 'the timeline' }],
+    body: {
+      Impact: 'Everyone, for an hour.',
+      'What Happened': 'The sync stopped.',
+      Timeline: 'Started 09:00, noticed 09:40, fixed 10:00.',
+      'Why It Happened': 'The token expired and nothing watched it.',
+      'What Changed': 'The token is monitored now.'
+    }
+  }))
+  assert.ok(kinds(found).includes('sources-no-section'))
 })
 
 check('the headings the proof expects are the sections the body writes', () => {

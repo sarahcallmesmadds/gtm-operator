@@ -182,6 +182,26 @@ function sourceProblems (sources) {
 }
 
 /**
+ * The Sources section, rendered from the sources that were actually read.
+ *
+ * ONE SOURCE OF TRUTH FOR A SECTION THAT COULD HAVE TWO. `sources` is the
+ * structured record this file validates, and a free-text `body.Sources` would
+ * be an unchecked claim beside it. So the section is generated from the
+ * record, always: a supplied `body.Sources` that is not this text is refused
+ * by `problems`, and there is no hand-written path. Process allows one on an
+ * artifact somebody typed and cross-checks only on a backfill; a memo's rule
+ * is harder, because "record every source you actually opened, and never one
+ * you did not" is the whole of what the section is for.
+ */
+function sourcesSection (sources) {
+  if (!Array.isArray(sources)) return ''
+  return sources
+    .filter(source => source && typeof source.what === 'string' && source.what.trim())
+    .map(source => `- ${source.what.trim()}: ${String(source.contributed || '').trim()}`)
+    .join('\n')
+}
+
+/**
  * The `Corrects` request on a proposed memo, judged before anything is built.
  *
  * ONE TARGET IS THE RULE, from `SKILLS-memos.md`: a memo corrects exactly one
@@ -391,6 +411,58 @@ function problems (final) {
 
   found.push(...sourceProblems(row.sources))
 
+  /*
+   * THE SECTION AND THE RECORD ARE ONE THING, AND THE RECORD IS IT. `sources`
+   * is validated above and the Sources section is generated from it in
+   * `body()`, so a `body.Sources` supplied by hand is either a copy of the
+   * generated text, which is accepted, or a claim nothing checked, which is
+   * refused. Without this, the structured list was validated and then dropped
+   * while the section a reader actually sees went out unchecked, and the
+   * skill's promise that a source with no line of context is refused did not
+   * hold. Found by review on the first round of this plugin.
+   */
+  const listed = Array.isArray(row.sources) && row.sources.length > 0
+  const sectioned = sections && sections.some(section => section.heading === 'Sources')
+
+  if (listed && sections && !sectioned) {
+    add(
+      'Sources',
+      'sources-no-section',
+      `Sources are recorded on a ${row.Type}, whose template has no Sources section, so there is nowhere for them to appear. ` +
+      'They are refused rather than validated and dropped, because a record that silently goes nowhere looks kept.'
+    )
+  }
+
+  if (sectioned && bodyIsMap(row.body)) {
+    const written = (row.body || {}).Sources
+    if (written !== undefined && written !== null && typeof written !== 'string') {
+      add(
+        'Sources',
+        'not-text',
+        `The Sources section is ${JSON.stringify(written)}, which is not text. It is generated from the sources that were actually read, and a value that is not text cannot be compared against that record.`
+      )
+    } else if (typeof written === 'string' && written.trim()) {
+      const expected = sourcesSection(row.sources).trim()
+      if (!listed) {
+        add(
+          'Sources',
+          'sources-hand-written',
+          'The Sources section is written by hand and no sources are recorded. The section is generated from the ' +
+          'structured `sources` list, each entry saying what was read and what it contributed, so pass the list ' +
+          'rather than the text: a hand-written Sources section is exactly the unchecked claim the rule exists to stop.'
+        )
+      } else if (written.trim() !== expected) {
+        add(
+          'Sources',
+          'sources-disagree',
+          'The Sources section does not match the sources this memo records, so the section says one thing and the ' +
+          'record says another. The section is generated from the record; leave `body.Sources` out, or make it ' +
+          'exactly:\n' + expected
+        )
+      }
+    }
+  }
+
   return found
 }
 
@@ -523,7 +595,12 @@ function body (final) {
   const out = []
 
   for (const section of sections) {
-    const text = content[section.heading]
+    // The Sources section is generated from the record of what was read,
+    // never taken from the content map. `problems` has already refused a
+    // hand-written one that is not this text, so the two cannot disagree.
+    const text = section.heading === 'Sources'
+      ? sourcesSection(final && final.sources)
+      : content[section.heading]
     const filled = typeof text === 'string' && text.trim()
     if (!filled && section.conditional) continue
     out.push({ heading: section.heading, text: filled ? text.trim() : '' })
@@ -553,6 +630,7 @@ module.exports = {
   personIdFrom,
   correctionAsked,
   sourceProblems,
+  sourcesSection,
   problems,
   concerns,
   properties,
