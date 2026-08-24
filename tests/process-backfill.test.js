@@ -1192,6 +1192,41 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`prove-update` READS THE PAGE THAT CAME BACK AS A RECORD TOO, not just what was sent', () => {
+  // The read side of the check added one round earlier, which was the sent side
+  // only. A read-back carrying `properties: []` passed, because an array is an
+  // object. On a backfill edit the three verification fields are empty before,
+  // so each one missing from the array read as "empty before and after", went
+  // into `checked`, and the write came back proved having read nothing off the
+  // page at all.
+  const sent = capture(() => command.commands.update(
+    write('rs-before.json', EXISTING),
+    write('rs-after.json', backfill.fill(EXISTING, { Domain: 'Customer Success' }).after),
+    '2026-08-23'
+  ))
+
+  for (const properties of [[], 'not a record', 42, true]) {
+    process.exitCode = 0
+    assert.throws(
+      () => capture(() => command.commands['prove-update'](
+        write('rs-sent.json', sent),
+        write('rs-back.json', { url: URL_A, properties })
+      )),
+      /came back/,
+      `a read-back whose properties were ${JSON.stringify(properties)} was accepted`
+    )
+  }
+  process.exitCode = 0
+
+  // A REAL READ-BACK STILL PROVES, or the loop above is a command that refuses
+  // every page it is shown.
+  const proved = capture(() => command.commands['prove-update'](
+    write('rs-sent2.json', sent),
+    write('rs-back2.json', { url: URL_A, properties: { ...sent.properties } })
+  ))
+  assert.strictEqual(proved.proved, true, JSON.stringify(proved.problems))
+})
+
 check('`prove-update` PROVES NOTHING WHEN IT COMPARED NOTHING', () => {
   // The guard checked that `target` and `properties` were truthy, and an empty
   // ARRAY is truthy. Object.entries([]) then walks nothing, so the command
