@@ -1191,6 +1191,44 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('A RECORD INSIDE A FILE IS CHECKED TOO, not read as a record missing every field', () => {
+  // `readJson` confirms the FILE is a set of fields or a list and stops there.
+  // Every record inside was still read by reaching for keys, so a list or a
+  // string where a record belonged had none of them and every field reported as
+  // missing: documents: ["Drive"] came back "does not say where it is", a true
+  // sentence about the wrong problem. The door was one level short.
+  // `ways` only for the conversation sources: documents is sorted rather than
+  // searched, so handing it a way of looking is its own separate refusal and
+  // would mask the one under test.
+  for (const [source, value] of [
+    ['documents', ['Drive/GTM']],
+    ['slack', 'bad'],
+    ['email', ['boss@corp.com']],
+    ['recordings', 42]
+  ]) {
+    const request = { sources: [source], [source]: value }
+    if (source !== 'documents') Object.assign(request, { ways: ['topics'], topics: ['refunds'] })
+    const out = backfill.plan(request)
+    assert.deepStrictEqual(faults(out), [`${source}:not-a-record`], `${source} of ${JSON.stringify(value)}`)
+  }
+
+  // AND A SOURCE THAT IS A RECORD STILL REPORTS ITS REAL FAULTS, or the loop
+  // above passes against a plan that answers not-a-record for everything.
+  const realFault = backfill.plan({ sources: ['slack'], slack: { channels: 'all' }, ways: ['topics'], topics: ['refunds'] })
+  assert.ok(realFault.refusals.every(one => one.kind !== 'not-a-record'), JSON.stringify(faults(realFault)))
+  assert.ok(realFault.refusals.some(one => one.kind === 'range-open'))
+  assert.deepStrictEqual(faults(backfill.plan({ sources: ['documents'], documents: { where: 'Drive/GTM' } })), [])
+
+  // THE ENTRIES IN A LIST, WHICH IS THE SAME QUESTION AGAIN.
+  assert.deepStrictEqual(faults(backfill.repeats(['a question'])), ['askings[0]:not-a-record'])
+  assert.deepStrictEqual(faults(backfill.candidates(['a candidate'])), ['found[0]:not-a-record'])
+  assert.deepStrictEqual(artifact.sourceProblems(['refunds.doc']).map(one => one.kind), ['source-not-a-record'])
+
+  // A SOURCE ENTRY THAT IS A RECORD AND FORGOT ITS NAME KEEPS ITS OWN REFUSAL.
+  assert.deepStrictEqual(artifact.sourceProblems([{}]).map(one => one.kind), ['source-unnamed'])
+  assert.deepStrictEqual(artifact.sourceProblems([{ what: 'refunds.doc', contributed: 'the steps' }]), [])
+})
+
 check('A `sources` THAT IS NOT A LIST IS REFUSED FOR THAT, not reported as no sources', () => {
   // `sourceProblems` already refuses a sources that is not a list, and `draft`
   // normalised every such value to [] before it could ever see one. So

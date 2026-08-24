@@ -200,7 +200,14 @@ function sourceProblems (sources) {
   }
 
   for (const source of sources) {
-    if (!source || typeof source.what !== 'string' || !source.what.trim()) {
+    // AN ENTRY THAT IS NOT A RECORD IS NOT AN UNNAMED SOURCE. A string or a list
+    // here was reported as a source that forgot its name, which sends somebody to
+    // add one to something that cannot hold it.
+    if (source === null || typeof source !== 'object' || Array.isArray(source)) {
+      add('source-not-a-record', `A source is ${JSON.stringify(source)}, which is not an entry. Each one is a set of fields: what was read, and what it contributed.`)
+      continue
+    }
+    if (typeof source.what !== 'string' || !source.what.trim()) {
       add('source-unnamed', 'A source with no name cannot be checked by a reader, which is the only thing the section is for.')
       continue
     }

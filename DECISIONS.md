@@ -4183,3 +4183,37 @@ Turning a malformed value into an empty one is the same move as reading it as
 absent, written in a different place. It is the fifth time on this branch, and the
 second where the correct refusal already existed and something upstream made it
 unreachable.
+
+### Review round 23, finding three: the door was one level short
+
+**Codex.** `readJson` confirms a file holds a set of fields or a list and stops
+there. Every record inside it was still read by reaching for keys, so a list or a
+string where a record belonged had none of them and every field reported as
+missing. Seven places: the four source settings in `plan`, the entries in
+`repeats` and `candidates`, and the source entries in `sourceProblems`.
+
+`documents: ["Drive/GTM"]` came back "the document source does not say where it
+is". True, and about the wrong problem: it sends somebody to add a field to
+something that cannot hold one.
+
+**Cleared at the return rather than skipped at each site.** Guarding without
+stopping produced `documents:not-a-record` followed by `documents:unlocated`,
+which is the misdescription still sitting underneath the correction. A source
+whose settings cannot be read has no settings to complain about, so the other
+refusals naming that source are dropped where the plan is assembled. Same reason
+a refused plan is emptied there: skipping at each site is a rule every future
+source has to remember.
+
+**And a source that IS a record still reports its real faults**, which is pinned,
+because a guard that answers "not a record" to everything would pass the same
+check.
+
+**What the harness caught this round.** Three checks reached by no mutation, two
+of them from the commits made minutes earlier, and one existing mutation whose
+anchor had gone stale because this branch rewrote the line it pointed at. A stale
+anchor is the worst of the three: it lands nothing, changes nothing, and the suite
+passes, which is indistinguishable from a mutation that was caught. The harness
+asserts every mutation onto disk for exactly this reason and reported it as `did
+not land: 1` rather than as a pass.
+
+804 checks. 113 mutations, all landed, all 86 backfill checks reached.

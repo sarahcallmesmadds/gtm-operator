@@ -215,6 +215,26 @@ function plan (request) {
   // range that is right for a mailbox is rarely the one that is right for a
   // year of meeting recordings.
 
+  /*
+   * THE SETTINGS OF A SOURCE, OR A REFUSAL SAYING THEY CANNOT BE READ.
+   *
+   * `{}` comes back for a refused one so the rest of the function runs without
+   * crashing, and the refusals it then adds are dropped at the return. Cleared
+   * there rather than skipped at each site for the reason a refused plan is
+   * emptied there: skipping is a rule every future source has to remember, and
+   * the one that forgets ships a refusal naming the settings of something that
+   * has none.
+   */
+  const settingsFor = (source, value) => {
+    if (value === undefined || value === null) return {}
+    if (isRecord(value)) return value
+    add(source, 'not-a-record',
+      `\`${source}\` is ${JSON.stringify(value)}, which is not a set of settings. It is read one key at a time, so ` +
+      'as it stands every setting on it reads as absent and what comes back would name the settings rather than the ' +
+      'shape. Pass an object.')
+    return {}
+  }
+
   const range = (source, holder) => {
     const from = day(holder.from)
     const to = day(holder.to)
@@ -244,7 +264,7 @@ function plan (request) {
   // ----------------------------------------------------------------- documents
 
   if (named('documents')) {
-    const holder = req.documents || {}
+    const holder = settingsFor('documents', req.documents)
     const where = text(holder.where)
     if (!where) {
       add('documents', 'unlocated', `The document source does not say where it is${holder.where === undefined || holder.where === null ? '' : `: \`where\` is ${JSON.stringify(holder.where)}, which names nowhere`}. Name the Drive folder, the Notion database or the space, because "the documents" is not somewhere this can be pointed at.`)
@@ -258,7 +278,7 @@ function plan (request) {
   // --------------------------------------------------------------------- slack
 
   if (named('slack')) {
-    const holder = req.slack || {}
+    const holder = settingsFor('slack', req.slack)
     const window = range('slack', holder)
 
     let channels = null
@@ -312,7 +332,7 @@ function plan (request) {
   // --------------------------------------------------------------------- email
 
   if (named('email')) {
-    const holder = req.email || {}
+    const holder = settingsFor('email', req.email)
     const window = range('email', holder)
     const mailbox = text(holder.mailbox)
 
@@ -348,7 +368,7 @@ function plan (request) {
   // ---------------------------------------------------------------- recordings
 
   if (named('recordings')) {
-    const holder = req.recordings || {}
+    const holder = settingsFor('recordings', req.recordings)
     const window = range('recordings', holder)
     const recorder = text(holder.recorder)
 
@@ -429,6 +449,18 @@ function plan (request) {
    * removal is a rule every future source has to remember, and the one that
    * forgets is the one that ships.
    */
+  /*
+   * A SOURCE THAT IS NOT A RECORD CARRIES NO OTHER COMPLAINT. Everything else
+   * said about it was worked out by reaching for keys it cannot have, so it names
+   * the settings rather than the shape and reads as a checklist to go and fill in.
+   */
+  const unreadable = new Set(refusals.filter(one => one.kind === 'not-a-record').map(one => one.field))
+  if (unreadable.size) {
+    for (let i = refusals.length - 1; i >= 0; i--) {
+      if (unreadable.has(refusals[i].field) && refusals[i].kind !== 'not-a-record') refusals.splice(i, 1)
+    }
+  }
+
   const ok = refusals.length === 0
 
   /*
@@ -485,6 +517,13 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
 
   const usable = []
   askings.forEach((one, index) => {
+    // AN ENTRY THAT IS NOT A RECORD HAS NO QUESTION TO BE MISSING. Reported as
+    // `question-missing` it reads as one field short of usable, when what
+    // arrived cannot hold a field at all.
+    if (!isRecord(one)) {
+      add(`askings[${index}]`, 'not-a-record', `\`askings[${index}]\` is ${JSON.stringify(one)}, which is not a question and where it was asked. Each entry is a set of fields, one per thing recorded about the asking.`)
+      return
+    }
     const question = text(one && one.question)
     const where = text(one && one.where)
     if (!question) {
@@ -560,6 +599,12 @@ function candidates (found) {
 
   const out = []
   found.forEach((one, index) => {
+    // Same as the askings above: `what-missing` on something that cannot carry a
+    // `what` names the wrong problem.
+    if (!isRecord(one)) {
+      add(`found[${index}]`, 'not-a-record', `\`found[${index}]\` is ${JSON.stringify(one)}, which is not a thing that was found. Each entry is a set of fields, one per thing recorded about it.`)
+      return
+    }
     const what = text(one && one.what)
     const where = text(one && one.where)
     const type = text(one && one.type)
@@ -776,6 +821,21 @@ function draft (candidate, { today } = {}) {
  * false here: a machine filled these in and nobody re-read the artifact, and
  * `update` leaves all three verification fields alone on a false.
  */
+/**
+ * Whether a value is a record: a set of fields, one key per field.
+ *
+ * THE SAME QUESTION AS `readJson`'s, ONE LEVEL DOWN. That check confirms the file
+ * holds a set of fields or a list and stops there. Every record inside it was
+ * still read by reaching for keys, so a list or a string where a record belonged
+ * had none of them and every field reported as missing. `documents: ["Drive"]`
+ * came back "the document source does not say where it is", which is a true
+ * sentence about the wrong problem: it sends somebody to add a field to something
+ * that cannot hold one.
+ */
+function isRecord (value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function fill (existing, candidate) {
   /*
    * BOTH CONTAINERS ARE JUDGED BEFORE ANYTHING IS READ OUT OF THEM.
