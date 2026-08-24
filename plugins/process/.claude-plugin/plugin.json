@@ -1,7 +1,7 @@
 {
   "name": "process",
-  "version": "0.2.0",
-  "description": "Writes and reads the Process database that the gtm-operator setup plugin created: the living reference of how and why things are done. Writes one artifact from free-form notes, in the body template its type calls for, after checking for a near duplicate. Finds the artifact that answers a question and says whether it is still worth trusting. Creates no database and writes no config. Changes an artifact that already exists, moving the three verification fields together or not at all. Says what has gone stale, contradicts something else, or was never verified, without writing anything.",
+  "version": "0.3.0",
+  "description": "Writes and reads the Process database that the gtm-operator setup plugin created: the living reference of how and why things are done. Writes one artifact from free-form notes, in the body template its type calls for, after checking for a near duplicate. Finds the artifact that answers a question and says whether it is still worth trusting. Creates no database and writes no config. Changes an artifact that already exists, moving the three verification fields together or not at all. Says what has gone stale, contradicts something else, or was never verified, without writing anything. Fills the library from material that already exists, proposing candidates a person approves one at a time, and writing no owner and no verification stamp onto anything it imports.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"

@@ -36,10 +36,19 @@ off it. That is what makes the library navigable instead of a pile.
 | `find` | Finds the artifact that answers a question and says whether it is still worth trusting. Reads only |
 | `update` | Changes an artifact that already exists. Moves the three verification fields together or not at all, and only on an explicit yes |
 | `audit` | Says what has gone stale, contradicts something else, or was never verified. Reads only and writes nothing |
+| `backfill` | Fills the library from material you already have, proposing candidates you approve one at a time. Writes no owner and marks nothing verified |
 
-**One more is designed and not built:** `backfill`, which proposes candidates
-from material you already have, one approval at a time. `SKILLS-process.md` in
-the repository root defines all five.
+All five are built. `SKILLS-process.md` in the repository root defines them.
+
+**`backfill` is the one skill that reads things people said** rather than things
+they wrote down for the record, so two rules in it are refusals in code rather
+than advice in the skill document. The scope it is given is refused rather than
+narrowed, because there is no approval gate in front of a read: by the time
+there is a candidate list, the reading has already happened. And nothing it
+writes carries an owner or a verification stamp, because a machine pulled it in
+and nobody has read it. `audit` flags every backfilled artifact as
+never-verified until somebody does, which is that signal working rather than
+failing.
 
 ## What is not built in this version
 
@@ -52,6 +61,11 @@ Said here so it is not discovered by a user hitting it:
   Memos through the reverse relation. `find` checks the review cadence
   and does not query Memos, and it says so rather than reporting a complete trust
   judgment.
+- **A calibrated repeated-question threshold.** `backfill` decides whether two
+  wordings are the same question by the same blunt token overlap the duplicate
+  check uses, and `SKILLS-process.md` says that needs tuning against real
+  workspaces, which do not exist yet. It is acceptable there and only there,
+  because the output is a candidate list rather than a document.
 - **A calibrated duplicate threshold.** `SKILLS-process.md` says in as many words
   to pick this against real artifacts rather than inheriting the reference's 70%.
   The number in the code is uncalibrated, every result says so, and the skill

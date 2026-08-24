@@ -27,6 +27,11 @@
  *   node process.js prove <artifact.json> <readback.json>  did the create land
  *   node process.js find <question.json>                   the query find reads
  *   node process.js trust <rows.json> [YYYY-MM-DD]         which of these is still worth trusting
+ *   node process.js scope <request.json>                  what backfill is allowed to read, or why this is not a scope
+ *   node process.js repeats <askings.json>                which questions were asked three or more times
+ *   node process.js candidates <found.json>               what was found, as lines a person can go through
+ *   node process.js draft <candidate.json>                an approved candidate, as an artifact ready to check
+ *   node process.js fill <existing.json> <candidate.json> the blanks on an artifact that already exists
  */
 
 const fs = require('fs')
@@ -35,6 +40,7 @@ const path = require('path')
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
 const artifact = require(path.join(__dirname, 'artifact'))
+const backfill = require(path.join(__dirname, 'backfill'))
 const { compareProperty, listOfNames } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const KEY = 'process'
@@ -591,43 +597,11 @@ function normaliseRows (context, rows) {
 }
 
 // ---------------------------------------------------------------- similarity
+//
+// In `similar.js`, because `backfill.js` compares askings of a question with
+// the same measure and cannot require this file back without a cycle.
 
-/** Words worth comparing: lowercased, punctuation dropped, stop words removed. */
-const STOP_WORDS = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'how', 'in',
-  'is', 'it', 'of', 'on', 'or', 'our', 'the', 'to', 'we', 'what', 'when',
-  'where', 'which', 'why', 'with'
-])
-
-function tokens (text) {
-  if (typeof text !== 'string') return []
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(word => word && !STOP_WORDS.has(word))
-}
-
-/**
- * How alike two artifacts are, between 0 and 1.
- *
- * Overlap over union across the name and the description together, which is the
- * "title and topic" the reference compared. It is a blunt measure and is meant
- * to be: it produces candidates for a person to look at, and `SKILLS-process.md`
- * says the duplicate check runs before structuring precisely so a near match
- * costs one question rather than a merged-away document.
- */
-function similarity (left, right) {
-  const a = new Set(tokens(left))
-  const b = new Set(tokens(right))
-  if (!a.size || !b.size) return 0
-
-  let shared = 0
-  for (const word of a) if (b.has(word)) shared++
-
-  const union = a.size + b.size - shared
-  return union ? shared / union : 0
-}
+const { tokens, similarity } = require(path.join(__dirname, 'similar'))
 
 // ------------------------------------------------------------------- staleness
 
@@ -681,6 +655,51 @@ function staleness (row, today) {
     }
   }
   return { state: 'fresh', elapsed, days, why: `Checked ${elapsed} days ago, inside its ${days}-day cadence.` }
+}
+
+/**
+ * Refuse a row that is keyed by the workspace's own property names.
+ *
+ * A page fetched from Notion comes back keyed by whatever the workspace calls
+ * its properties, and `normaliseRows` is what turns those into logical ones.
+ * Handed a raw fetch on a renamed workspace, every logical lookup returns
+ * undefined, and what that means depends on the caller: `update` sees nothing
+ * changed and reports a clean no-op, `fill` sees every field empty and offers to
+ * fill fields that already hold something. Both are silent and both look like a
+ * correct answer, which is why this is a refusal.
+ *
+ * ASKED PER FIELD, NOT ABOUT THE ROW AS A WHOLE. The first version asked whether
+ * the row had ANY logical key and let it through if it did. A workspace that
+ * renamed some properties and not others produces a row carrying both, so a raw
+ * fetch with an unrenamed `Name` on it passed the guard while the renamed field
+ * being edited stayed invisible: the exact fault the guard exists to stop,
+ * surviving inside the guard.
+ *
+ * A field counts as raw when its workspace name is present under a key that is
+ * not its logical one AND the logical key is absent. Both halves matter: without
+ * the second, a workspace whose name for one property happens to equal another's
+ * logical name would refuse a row that is perfectly fine.
+ *
+ * SHARED BY BOTH CALLERS RATHER THAN COPIED. `fill` reads the same fetched row
+ * for a different reason, and a guard that lives in one of two callers is a
+ * guard the other one does not have.
+ */
+function refuseRawKeys (context, rows, consequence) {
+  const rawKeys = row => UPDATABLE_FIELDS.filter(logical => {
+    const workspace = context.property(logical)
+    return workspace !== logical && workspace in row && !(logical in row)
+  })
+  for (const [what, row] of rows) {
+    const raw = rawKeys(row || {})
+    if (!raw.length) continue
+    throw new Error(
+      `The ${what} artifact carries ${raw.map(one => `"${context.property(one)}"`).join(', ')}, ` +
+      `which ${raw.length === 1 ? 'is this workspace\'s name' : 'are this workspace\'s names'} for ` +
+      `${raw.map(one => `"${one}"`).join(', ')} rather than the logical ${raw.length === 1 ? 'one' : 'ones'}. ` +
+      'Pass rows that have been through `normaliseRows`, or rename the keys yourself. Left as they are, those ' +
+      `fields ${consequence}.`
+    )
+  }
 }
 
 // --------------------------------------------------------------------- commands
@@ -827,6 +846,17 @@ const commands = {
       body: artifact.body(final),
       headings: artifact.expectedHeadings(final),
       relatedView: schema.RELATED_VIEW[final.Type],
+      // SAID ON THE WRITE PATH, NOT ONLY IN THE DRAFT. `properties` above wrote
+      // no owner and no verification stamp because the artifact carries
+      // `backfill: true`. Left unsaid here, a page created from a backfill draft
+      // reports exactly like one created by `new`, and the difference between
+      // them is the whole of what `audit` signal 4 is for.
+      backfill: final.backfill === true,
+      backfillNote: final.backfill === true
+        ? 'THIS IS A BACKFILL. No Owner, no Verified by, no Verified date and no Last checked for accuracy are being ' +
+          'written, because a machine pulled this in and nobody has read it. `audit` will flag it as never-verified ' +
+          'until somebody does. Say so when reporting the write: it is not the same page `new` would have made.'
+        : null,
       parentRelation: parentNamed ? final.parent : null,
       parentRelationNote: parentNamed
         ? 'THE PARENT WAS CHECKED AND IS NOT BEING WRITTEN. This version builds no relation, so the page will be ' +
@@ -1182,21 +1212,7 @@ const commands = {
     // is not its logical one AND the logical key is absent. Both halves matter:
     // without the second, a workspace whose name for one property happens to
     // equal another's logical name would refuse a row that is perfectly fine.
-    const rawKeys = row => UPDATABLE_FIELDS.filter(logical => {
-      const workspace = context.property(logical)
-      return workspace !== logical && workspace in row && !(logical in row)
-    })
-    for (const [what, row] of [['before', before], ['after', after]]) {
-      const raw = rawKeys(row)
-      if (!raw.length) continue
-      throw new Error(
-        `The ${what} artifact carries ${raw.map(one => `"${context.property(one)}"`).join(', ')}, ` +
-        `which ${raw.length === 1 ? 'is this workspace\'s name' : 'are this workspace\'s names'} for ` +
-        `${raw.map(one => `"${one}"`).join(', ')} rather than the logical ${raw.length === 1 ? 'one' : 'ones'}. ` +
-        'Pass rows that have been through `normaliseRows`, or rename the keys yourself. Left as they are, those ' +
-        'fields read as unchanged and this reports a clean no-op for an edit that was asked for.'
-      )
-    }
+    refuseRawKeys(context, [['before', before], ['after', after]], 'read as unchanged and this reports a clean no-op for an edit that was asked for')
 
     const target = pageKey(before.url)
     if (!target) {
@@ -1544,6 +1560,105 @@ const commands = {
         : 'Every property sent came back matching. The list above says what was not looked at.'
     }, null, 2))
     if (problems.length) process.exitCode = 1
+  },
+
+  /**
+   * What backfill is allowed to read, or every reason this is not a scope.
+   *
+   * THIS RUNS BEFORE ANYTHING IS READ AND IT IS THE ONLY GATE THERE IS. Every
+   * other judgment in backfill sits behind an approval list, where being wrong
+   * costs one "no". This one does not: by the time a candidate list exists, the
+   * reading has already happened. So it refuses rather than narrowing, and it
+   * says what it is not reading as well as what it is.
+   */
+  scope (file) {
+    if (!file) throw new Error('Usage: node process.js scope <request.json>')
+    const request = readJson(file, 'the scope')
+    const out = backfill.plan(request)
+
+    console.log(JSON.stringify({
+      ...out,
+      note: out.ok
+        ? 'Read only what is under `reading`. Show `notReading` to the person before starting: a source that was ' +
+          'left out and a source that held nothing produce the same empty result, and only one of them is worth ' +
+          'saying out loud.'
+        : 'NOTHING IS READ. Every refusal above is a question for the person, not something to work around by ' +
+          'narrowing the scope yourself. A scope quietly trimmed reads less than was asked for and reports that it ' +
+          'read what was asked for.'
+    }, null, 2))
+    if (!out.ok) process.exitCode = 1
+  },
+
+  repeats (file) {
+    if (!file) throw new Error('Usage: node process.js repeats <askings.json>')
+    const askings = readJson(file, 'the questions and where they were asked')
+    const out = backfill.repeats(askings)
+
+    console.log(JSON.stringify({
+      ...out,
+      note: out.ok
+        ? 'Every cluster is a candidate, not a verdict. Show the wordings and where each one was asked, and let the ' +
+          'person say whether they are the same question. The threshold above has never been measured against a real ' +
+          'workspace, so read a score as a hint.'
+        : 'Nothing was clustered. Every refusal above is an asking that could not be traced back to where it was said.'
+    }, null, 2))
+    if (!out.ok) process.exitCode = 1
+  },
+
+  candidates (file) {
+    if (!file) throw new Error('Usage: node process.js candidates <found.json>')
+    const found = readJson(file, 'what was found')
+    const out = backfill.candidates(found)
+
+    console.log(JSON.stringify({
+      ...out,
+      note: out.ok
+        ? 'RUN `duplicates` AND `judge` ON EACH CANDIDATE BEFORE OFFERING IT. That is the same check `new` uses, and ' +
+          'it is what makes backfill safe to re-run: a second pass over the same folder finds the same documents and ' +
+          'the check recognises them. `withinRunNearMatches` is a different thing, and catches the case the library ' +
+          'check cannot: the same process described in two places, arriving twice in this run, neither in the library yet.'
+        : 'No candidate list was built. Every refusal above is either a line nobody could judge or one that could not ' +
+          'be traced back to where it came from.'
+    }, null, 2))
+    if (!out.ok) process.exitCode = 1
+  },
+
+  draft (file, todayArg) {
+    if (!file) throw new Error('Usage: node process.js draft <candidate.json> [YYYY-MM-DD]')
+    const candidate = readJson(file, 'the approved candidate')
+    const today = todayArg === undefined ? undefined : dayOrRefuse(todayArg, 'writing')
+    const out = backfill.draft(candidate, { today })
+
+    console.log(JSON.stringify({
+      ...out,
+      note: out.ok
+        ? 'Preview this in full before writing it. Then `create` and `prove`, the same two steps `new` uses: the ' +
+          '`backfill: true` on the artifact is what keeps the person fields and the verification stamp off the page, ' +
+          'and both commands read it from this same file so they cannot disagree about which mode this is.'
+        : 'This draft is not writable yet. Anything under `problems` is a refusal and anything under `refusals` is a ' +
+          'question for the person. A section reported missing is content still to be written from what was read, ' +
+          'not a reason to invent one.'
+    }, null, 2))
+    if (!out.ok) process.exitCode = 1
+  },
+
+  fill (existingFile, candidateFile) {
+    if (!existingFile || !candidateFile) {
+      throw new Error('fill needs the artifact as it is now and the candidate: node process.js fill existing.json candidate.json')
+    }
+    const context = contextOrExit()
+    const existing = readJson(existingFile, 'the artifact as it is now')
+    const candidate = readJson(candidateFile, 'the candidate')
+
+    // THE SAME GUARD `update` USES, AND FOR A WORSE FAILURE. On a raw-keyed row
+    // every logical lookup is undefined, which this reads as "empty", so a row
+    // whose every field is filled reads as a row whose every field is blank and
+    // the fill-blanks-only rule stops meaning anything.
+    refuseRawKeys(context, [['existing', existing]], 'read as empty, so a row that is entirely filled in reads as entirely blank and the never-overwrite rule stops meaning anything')
+
+    const out = backfill.fill(existing, candidate)
+    console.log(JSON.stringify(out, null, 2))
+    if (!out.ok && out.refusals) process.exitCode = 1
   },
 
   trust (rowsFile, todayArg) {
