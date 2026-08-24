@@ -1192,6 +1192,50 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('AN ASKING\'S DATE IS READ AS A DATE, which is what the duplicate rule keys on', () => {
+  // `from` and `to` go through `day`, which round 4 taught to write the parsed
+  // date back out and compare. An asking's `when` went through `text`, so
+  // `2026-02-30` and `2026-03-02` were two different days when they are the same
+  // one, and `tomorrow` was accepted and used to order the clusters. The
+  // duplicate rule from round 25 keys on that date, so it failed silently: three
+  // askings of one question in one channel counted as three and crossed the
+  // threshold.
+  const mk = when => ({ question: 'How do refunds work?', where: '#help', when })
+  const rolled = backfill.repeats([mk('2026-02-30'), mk('2026-03-02'), mk('tomorrow')])
+  assert.strictEqual(rolled.ok, false, 'a rolled-over and a non-date `when` were accepted')
+  assert.deepStrictEqual(
+    rolled.refusals.map(one => one.kind),
+    ['not-a-day', 'not-a-day'],
+    JSON.stringify(faults(rolled))
+  )
+
+  for (const bad of ['tomorrow', '2026-02-30', '2026-13-01', '08/23/2026', 42, {}]) {
+    const out = backfill.repeats([mk(bad)])
+    assert.strictEqual(out.ok, false, `a when of ${JSON.stringify(bad)} was accepted`)
+    assert.ok(out.refusals.some(one => one.kind === 'not-a-day'), JSON.stringify(faults(out)))
+  }
+
+  // A REAL DAY STILL WORKS, AND AN ABSENT ONE IS STILL ALLOWED, because `when`
+  // is optional and only `where` is required. Otherwise the checks above pass
+  // against a command that refuses every asking.
+  const real = backfill.repeats([mk('2026-08-01'), mk('2026-08-02'), mk('2026-08-03')])
+  assert.strictEqual(real.ok, true, JSON.stringify(real.refusals))
+  assert.deepStrictEqual(real.clusters.map(one => one.asked), [3])
+
+  const undated = backfill.repeats([{ question: 'How do refunds work?', where: '#help' }])
+  assert.strictEqual(undated.ok, true, JSON.stringify(undated.refusals))
+
+  // AND THE DUPLICATE RULE WORKS AGAIN, which is what this broke. The same
+  // question, same place, same real day written two ways is one asking.
+  // Two distinct askings after the duplicate goes, which is below the threshold
+  // of three, so it lands in `below` rather than in `clusters`. That is the
+  // point: without this it would have been three and would have qualified.
+  const sameDay = backfill.repeats([mk('2026-08-01'), mk('2026-08-01'), mk('2026-08-02')])
+  assert.strictEqual(sameDay.duplicates, 1)
+  assert.deepStrictEqual(sameDay.clusters, [])
+  assert.deepStrictEqual(sameDay.below.map(one => one.asked), [2])
+})
+
 check('`repeats` REFUSES A THRESHOLD OR A MINIMUM THAT CANNOT MEAN ANYTHING', () => {
   // `judge` refuses a threshold outside 0..1 ten lines away in the other file,
   // and `repeats` took the same kind of value and checked neither of its two.

@@ -4631,3 +4631,34 @@ the fault that produced most of this branch's findings.
 
 816 checks, 100 in the backfill suite. 141 mutations, all landed, one survivor and
 it is the known `wantsAPerson` inversion `process-audit-update` catches.
+
+### Review round 34: the sixth set, and it defeated a fix made earlier the same day
+
+Devin came back clean. Codex found one and did not answer the question it was
+asked, which was to make the strongest argument against merging. It found a
+finding instead. That is worth recording: asked to weigh, it hunted.
+
+**An asking's `when` was read as text where `from` and `to` are read as dates.**
+`day` was taught in round 4 to write the parsed date back out and compare, so it
+tells `2026-02-30` from `2026-03-02`. `when` went through `text`, so those two
+were different days when they are the same one, and `tomorrow` was accepted and
+used to order the clusters.
+
+**It defeated the duplicate rule added in round 25**, which keys on exactly that
+value. Three askings of one question in one channel, two of them on the same real
+day written two ways, counted as three and crossed the threshold. **A fix that
+depends on a value nobody validated is a fix with a condition nobody wrote down**,
+and that is the fourth time on this branch that one of my own fixes rested on an
+assumption a later round falsified.
+
+**One member of a two-member set was wrong**, and the correct reader was in the
+same file, forty lines up.
+
+**The mutation run then found a second equivalent mutation of mine.** Once the
+guard refuses everything that is not a day, `day` and `text` return the same thing
+for everything that reaches the line below it, so mutating between them changes
+nothing. Removed rather than counted, for the same reason as the `subjectType`
+one: a mutation that changes no behaviour reads exactly like a gap in the tests.
+
+817 checks, 101 in the backfill suite. 142 mutations, all landed, one survivor and
+it is the known `wantsAPerson` inversion.

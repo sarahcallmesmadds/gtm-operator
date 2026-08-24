@@ -607,7 +607,30 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
       add(`askings[${index}]`, 'provenance-missing', `"${question}" does not say where it was asked. Every candidate says where it came from, down to the channel, the thread or the meeting and date. Nothing is absorbed anonymously, and this mode is the one where that matters most.`)
       return
     }
-    usable.push({ question, where, when: text(one && one.when) })
+    /*
+     * READ AS A DATE, BECAUSE EVERYTHING DOWNSTREAM TREATS IT AS ONE.
+     *
+     * `from` and `to` go through `day`, which round 4 taught to write the parsed
+     * date back out and compare. This went through `text`, so `2026-02-30` and
+     * `2026-03-02` were two different days when they are the same one, and
+     * `tomorrow` was accepted and used to order the clusters.
+     *
+     * The duplicate rule added in round 25 keys on this value, so a malformed
+     * `when` defeated it in silence: three askings of one question in one channel
+     * counted as three and crossed the threshold this command exists to apply.
+     * A fix that depends on a value nobody validated is a fix with a condition
+     * nobody wrote down.
+     *
+     * Absent is still fine. `when` is optional and only `where` is required, so
+     * this refuses a supplied value that is not a day rather than requiring one.
+     */
+    const rawWhen = one && one.when
+    if (rawWhen !== undefined && rawWhen !== null && rawWhen !== '' && !day(rawWhen)) {
+      add(`askings[${index}]`, 'not-a-day', `\`askings[${index}].when\` is ${JSON.stringify(rawWhen)}, which is not a day. It decides whether two askings are the same one and which asking a cluster is named after, so a value that is not a date makes one asking count more than once. Use YYYY-MM-DD, or leave it out.`)
+      return
+    }
+
+    usable.push({ question, where, when: day(rawWhen) })
   })
 
   if (refusals.length) return { ok: false, clusters: [], below: [], refusals }

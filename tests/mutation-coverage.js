@@ -37,6 +37,7 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    if (rawWhen !== undefined && rawWhen !== null && rawWhen !== '' && !day(rawWhen)) {", "    if (false) {"],
   [B, "  if (typeof threshold !== 'number' || Number.isNaN(threshold) || threshold < 0 || threshold > 1) {", "  if (false) {"],
   [B, "  if (typeof min !== 'number' || !Number.isInteger(min) || min < 1) {", "  if (false) {"],
   [B, "  if (rangeProblems.length) return { ok: false, clusters: [], below: [], refusals: rangeProblems }", "  if (false) return { ok: false, clusters: [], below: [], refusals: rangeProblems }"],
