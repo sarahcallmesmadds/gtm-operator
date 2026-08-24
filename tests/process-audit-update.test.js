@@ -357,6 +357,66 @@ check('a missing `reviewed` is refused, not read as false', () => {
   )
 })
 
+check('A LIST IS THE SAME LIST IN EITHER SHAPE IT ARRIVES IN', () => {
+  // A row fetched from Notion carries a multi-select as a string holding a JSON
+  // array. Compared against an after row written as a real array, every
+  // multi-select read as changed, went into the payload unasked, and on a
+  // reviewed update dragged the verification stamp with it.
+  const fetched = { ...BEFORE, Tags: JSON.stringify(['AI', 'Data']) }
+  const out = capture(() => command.commands.update(
+    write('before.json', fetched),
+    write('after.json', { ...BEFORE, Tags: ['AI', 'Data'], reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, [], `a list read as changed across shapes: ${JSON.stringify(out.changed)}`)
+})
+
+check('and a real list change is still seen across shapes', () => {
+  const fetched = { ...BEFORE, Tags: JSON.stringify(['AI', 'Data']) }
+  const out = capture(() => command.commands.update(
+    write('before.json', fetched),
+    write('after.json', { ...BEFORE, Tags: ['AI'], reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Tags'], 'a genuine list change stopped being seen')
+})
+
+check('A PROPERTY-ONLY EDIT NEED NOT REPEAT THE NAME AND TYPE', () => {
+  // problems needs a Name and a Type to judge anything and is right to. But an
+  // edit to a Status is changing neither, and under the rule that an absent key
+  // means untouched, demanding them contradicted that rule one screen above.
+  const out = capture(() => command.commands.update(
+    write('before.json', BEFORE),
+    write('after.json', { url: URL_A, Status: 'Archive', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Status'], JSON.stringify(out.changed))
+  assert.ok(out.untouched.includes('Name'), 'Name was not reported as untouched')
+})
+
+check('but a genuinely unknown type is still refused', () => {
+  assert.throws(
+    () => capture(() => command.commands.update(
+      write('before.json', BEFORE),
+      write('after.json', { url: URL_A, Type: 'Not A Real Type', reviewed: false }),
+      '2026-08-23'
+    )),
+    /not a type this database has/,
+    'an invented type was accepted'
+  )
+})
+
+check('the memo query returns the Status column its map promises', () => {
+  // ASSERTED AGAINST THE SELECT LIST, NOT THE WHOLE STATEMENT. The WHERE clause
+  // filters on Status too, so a check for the name anywhere passed with the
+  // column missing from what comes back, and the map promised a column the rows
+  // would not carry.
+  const out = capture(() => command.commands.audit())
+  assert.ok(out.memoColumns.Status, 'the map names a Status column')
+  const select = out.memoSql.split('\nFROM')[0]
+  assert.ok(select.includes('m."Status"'), `the query does not return it:\n${select}`)
+})
+
 check('REORDERING A MULTI-SELECT IS NOT A CHANGE', () => {
   const out = runUpdate({ ...BEFORE, Tags: ['Data', 'AI'], body: BODY, reviewed: false })
   assert.deepStrictEqual(out.changed, [], 'reordering the same tags read as an edit')
@@ -472,6 +532,26 @@ check('A PARTIAL BODY WRITES ONLY THE SECTIONS IT WAS GIVEN', () => {
   const out = runUpdate({ ...BEFORE, body: { Steps: 'new text' }, reviewed: false })
   assert.deepStrictEqual(out.body.map(s => s.heading), ['Steps'], JSON.stringify(out.body))
   assert.deepStrictEqual(out.headings, ['Steps'], 'the headings disagree with the body being sent')
+})
+
+check('A BEFORE BODY NEVER LEAKS INTO AN UPDATE THAT SENDS NO BODY', () => {
+  // The merge that supplies an untouched Name and Type must not supply a body.
+  //
+  // THE BEFORE BODY HERE IS DELIBERATELY BROKEN, with a required section blank,
+  // which is what a page written before these rules existed looks like. Pulled
+  // into the merge it gets validated, and a Status edit on an old page is
+  // refused for the state of a body nobody is touching. Written with a valid
+  // body this check passed either way: the merge has no other visible effect,
+  // which a mutation showed and reading did not.
+  const legacy = { ...BEFORE, body: { ...BODY, Exceptions: '' } }
+  const out = capture(() => command.commands.update(
+    write('before.json', legacy),
+    write('after.json', { url: URL_A, Status: 'Archive', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Status'], 'an edit was refused for a body it never touched')
+  assert.strictEqual(out.body, null, `a body was sent for an edit that passed none: ${JSON.stringify(out.body)}`)
+  assert.strictEqual(out.headings, null, 'headings were sent for an edit that passed no body')
 })
 
 check('and no untouched section is sent as empty text', () => {
