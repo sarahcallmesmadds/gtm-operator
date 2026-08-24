@@ -3555,3 +3555,50 @@ to stop in round 2, arriving in a different function.
 `sourceProblems` is exported from `artifact.js` and both `problems` and `draft`
 ask it. Reordering the two lines in `draft` would have fixed this instance and
 left the rule written out twice, which is how the next one starts.
+
+### Review round 9 on pull request 16: both reviewers clean
+
+Codex reviewed the round-8 state and found nothing, having also probed a
+`backfill: true` plus `reviewed: true` update on the suspicion that a writer pair
+had been missed. It had not: the shared property builder suppresses the stamp in
+backfill mode whatever `reviewed` says, so that seam was already closed.
+
+Devin reviewed the same head and found nothing, naming the four round-8 surfaces
+it checked.
+
+**Twelve findings across nine rounds, every one real.** No round produced a
+finding that turned out not to be one, which matches the previous pull request
+and is worth noticing about the two reviewers rather than about this branch.
+
+**Six of the twelve were one fault**: a rule enforced in one place and missed in
+its pair. The count is worth writing down plainly because the lesson from last
+session was already recorded and did not prevent it:
+
+| Round | The pair that was missed |
+|---|---|
+| 1 | `fill` guarded one of its two rows |
+| 4 | The refusal in `artifact.js` was unreachable from both callers |
+| 5 | The shared guard was built from the wrong field list, inside round 4's fix |
+| 6 | The write side of backfill mode was guarded and the read side was not |
+| 7 | Empty-to-populated went unwatched, inside round 6's fix |
+| 8 | The exit code read one of two refusal containers |
+
+**Two of the six arrived inside the fix for the previous one.** That is the part
+worth carrying: the fault is not that a pair is hard to see when you look, it is
+that a fix creates a new surface and the fix is not treated as one. Every round
+here started by handing the reviewer the previous rounds' findings, and that is
+what made the fifth and the seventh findable.
+
+**And five varieties of check-that-passes-without-checking were found in one
+branch:**
+
+1. Unreachable: nothing exercised it.
+2. Scoped wider than the thing it names: matching a kind three fields share.
+3. Stopping one step short: asserting a refusal was recorded, not what came back.
+4. Proving one half of a pair: a raw row and a clean candidate.
+5. A fixture that makes the assertion unreachable: a read-back built from the
+   payload just sent, on a check named for the case that payload cannot produce.
+
+Only the first is caught by measuring mutation coverage, which this branch did
+from the start and which still let the other four through. The other four need
+somebody asking what the check would still pass on.
