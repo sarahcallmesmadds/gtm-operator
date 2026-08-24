@@ -1658,6 +1658,15 @@ const commands = {
     const checked = []
     const unchecked = []
 
+    if (readback && readback.properties !== undefined &&
+        (readback.properties === null || typeof readback.properties !== 'object' || Array.isArray(readback.properties))) {
+      throw new Error(
+        `The page that came back carries ${describeShape(readback.properties)} where its properties should be. ` +
+        'It is read one property at a time, so as it stands nothing on the page can be compared with what was sent, ' +
+        'and a write that landed wrong would read as clean. Save the whole page, not a summary of it.'
+      )
+    }
+
     const gotUrl = readback.url || (readback.page && readback.page.url)
     const got = pageKey(gotUrl)
     if (!got) {
@@ -1670,6 +1679,11 @@ const commands = {
     }
 
     if (!problems.length) {
+      // A RECORD OR ABSENT, AND NOTHING ELSE REACHES HERE. The refusal at the
+      // top of the command is the only place that decides what a read-back's
+      // properties may be, so this asks whether there are any rather than asking
+      // the shape question a second time. Two homes for one rule is how the
+      // first seven copies of the emptiness test drifted.
       const back = (readback.properties && typeof readback.properties === 'object') ? readback.properties : null
       if (!back) {
         problems.push('The page came back with no properties, so nothing could be compared. Save the whole page, not a summary of it.')

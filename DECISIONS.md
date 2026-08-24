@@ -4336,3 +4336,30 @@ hand-assembled one, because a hand-made payload fails the page-binding check fir
 and would have proved nothing about the emptiness.
 
 808 checks. 121 mutations, all landed, all 90 backfill checks reached.
+
+### Review round 27: the read side of round 26's fix
+
+Devin came back clean and named `dayOrRefuse` as the one known thing left, which
+is the recorded deferral. Codex found one, and it is the other half of the fix
+made one round earlier.
+
+**Round 26 taught `prove-update` that the properties it SENT must be a record.
+The page that CAME BACK was still only asked whether it was an object, which an
+array is.** On a backfill edit the three verification fields are empty before, so
+each one missing from an array read as "empty before and after", went into
+`checked`, and the write came back proved having read nothing off the page.
+
+**Fifteenth instance of a rule enforced on one side of a pair, and the second
+where the missing half was in my own fix from the round before.** The lesson this
+branch keeps offering and this is the clearest statement of it: a fix to one
+direction of a read-and-write pair is not finished until the other direction has
+been tried, and the round that finds it is the round after.
+
+**One home for the rule, not two.** The refusal at the top of the command is now
+the only place that decides what a read-back's properties may be, and the older
+line that also tested the shape was removed rather than left agreeing. It was
+already unreachable once the refusal existed, which the mutation run reported as a
+survivor, and an unreachable second copy of a rule is exactly how the seven copies
+of the emptiness test drifted apart.
+
+809 checks. 122 mutations, all landed, all 91 backfill checks reached.
