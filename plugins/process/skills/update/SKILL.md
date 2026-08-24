@@ -71,6 +71,15 @@ it is how a section gets emptied by accident.
 **Clearing a person clears it.** Set `Owner` to null to empty it. It will not
 quietly become whoever installed the plugin.
 
+**Leaving a field out leaves it alone.** Only a field you actually put in
+`after.json` can change. To empty one, put it there with an explicit null.
+Omitting it never clears it, and the output lists what it left untouched.
+
+**Pass rows keyed by the logical names**, the ones in this plugin's schema, not
+the workspace's own property names. A page fetched from Notion comes back keyed
+the workspace's way, and `update` refuses that rather than reading every field as
+unchanged.
+
 Then show the person, before anything is written:
 
 - **`changed`** and the values either side.

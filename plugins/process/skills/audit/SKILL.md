@@ -36,6 +36,10 @@ nothing, and the report looks complete. Pass an empty list only if the query
 genuinely returned nothing, and `flags` will say in its output that no memos were
 read so the difference is visible.
 
+**Only Published memos count.** A draft was never announced and a canceled one
+was retracted, so neither should send anybody to re-read an artifact. The query
+filters on it and `flags` checks again on the rows it is given.
+
 **The memo query reads Memos, not the artifact's own relation.** Reading a
 page's relation returns at most 25 references and a relation value caps at 100
 pages, so on any long-lived artifact the newest memo becomes invisible and this

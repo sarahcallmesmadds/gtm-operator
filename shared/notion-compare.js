@@ -66,7 +66,11 @@ function listOfNames (value) {
  */
 function renderList (entries) {
   if (entries.some(entry => typeof entry !== 'string')) return null
-  return entries.map(one => one.trim()).slice().sort().join(' ')
+  // JOINED ON A CHARACTER A VALUE CANNOT CONTAIN. Joined on a space, the single
+  // value "Sales Enablement" and the two values "Sales" and "Enablement"
+  // rendered identically, so a multi-select that had been split into two options
+  // compared equal to the one it came from and the write proved clean.
+  return entries.map(one => one.trim()).slice().sort().join('\u0000')
 }
 
 const stripPerson = one => (typeof one === 'string' ? one.replace(/^user:\/\//, '') : one)

@@ -2717,3 +2717,66 @@ Four mutations, each confirmed to have landed: the section filter removed, the
 flag dropped on the way to `body`, the flag dropped on the way to
 `expectedHeadings` so the headings drift from the body, and the default flipped
 so partial leaks into the create path.
+
+### Review round 4 on pull request 15, read from the Devin page directly
+
+**The findings behind the hidden-findings line are readable without her.** The
+review page can be opened and read in the browser, which is how these seven were
+got. That closes the gap that had been sending every round back to her: the
+GitHub API carries the headline and the inline comments, and the page carries the
+rest.
+
+Seven taken, one left alone.
+
+**A canceled memo could send somebody to re-read an artifact.** Memos has a
+`Status` of Draft, Published or Canceled and the memo query ignored it. A draft
+was never announced and a canceled one was retracted, so neither is work anybody
+failed to fold in. The query filters on Published now, and `flags` checks again
+on the rows it is handed, because those can arrive from a query somebody wrote by
+hand. A row with no `Status` column at all is accepted: that is the shipped
+query, which does not select it back.
+
+**Signal 4 missed exactly the rows it exists to catch.** `!row['Verified by']` is
+false for `[]` and for the string `"[]"`, which are the two shapes an empty
+person property actually arrives in, so a backfilled artifact read as verified
+and the library reported itself fully checked.
+
+**A memo published the morning of the check read as newer than the check.**
+`Published date` comes back carrying a time and `Last checked for accuracy` does
+not, so the raw string comparison flagged everything checked that day. Both sides
+are compared as days now.
+
+**Omitting a field from the after artifact deleted it.** The comparison saw
+undefined against the old value, called it a change, found nothing to send and
+sent an explicit empty. A caller that built the after row by hand and forgot a
+field wiped it, and the output called that a clear as though it had been asked
+for. An absent key now means untouched, and clearing is something you say with an
+explicit null. The output lists what it left alone. This is the same rule the
+body already followed, arrived at twice.
+
+**A page fetched from Notion is keyed the workspace's way.** Handed a raw fetch
+on a renamed workspace, every logical lookup returned undefined, nothing looked
+changed, and `update` would have reported a clean no-op for an edit somebody
+asked for. Refused now, with the reason.
+
+**`["AI Data"]` and `["AI", "Data"]` compared equal**, because the render joined
+on a space. A multi-select split into two options proved clean against the one it
+came from. Joined on a character no value can hold now.
+
+**`prove-update` filed the headings under "not checked" without looking at
+them**, while `update` had just said which ones it was writing. A Notion page can
+come back with a heading missing on a silent partial failure, which is the exact
+thing `new` proves against after a create. Checked now; the section text is still
+not, and it says so.
+
+**Left alone, deliberately:** reading the Memos names outside `contextFor`. That
+is the documented decision above and the flag says as much.
+
+**Two more fixtures that could not fail, both mine, both found by mutation.** The
+before row had no `Description`, so the omit and clear checks passed whatever the
+code did. And the split-option check used a pair that sorts into a different
+order, which cannot collide however it is joined, so it passed on the very join
+it was written to condemn. That is four of these across two pull requests, and
+every one was found by breaking the code rather than by reading the test.
+
+Nine mutations, each confirmed to have landed.
