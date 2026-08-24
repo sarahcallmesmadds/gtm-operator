@@ -468,9 +468,69 @@ check('A ROW KEYED BY THE WORKSPACE NAMES IS REFUSED, not read as no change', ()
       write('araw.json', { ...raw, 'R Status': 'R Archive', reviewed: false }),
       '2026-08-23'
     )),
-    /keyed by this workspace's own property names/,
+    /rather than the logical/,
     'a raw Notion fetch was accepted and would have reported a clean no-op'
   )
+  command = writeConfig()
+})
+
+check('AND A PARTIALLY RENAMED WORKSPACE DOES NOT SLIP THROUGH', () => {
+  // The first guard asked whether the row had ANY logical key. A workspace that
+  // renamed some properties and not others produces a row carrying both, so a
+  // raw fetch with an unrenamed Name on it passed, and the renamed field it was
+  // actually editing stayed invisible. The silent no-op survived inside the
+  // guard written to stop it.
+  const partial = {
+    properties: { ...processNames.properties, Status: 'Workflow State' },
+    values: processNames.values
+  }
+  command = writeConfig({ process: partial })
+  const raw = { url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', 'Workflow State': 'Active' }
+  assert.throws(
+    () => capture(() => command.commands.update(
+      write('bpart.json', raw),
+      write('apart.json', { ...raw, 'Workflow State': 'Archive', reviewed: false }),
+      '2026-08-23'
+    )),
+    /Workflow State/,
+    'a partially renamed workspace let a raw row through'
+  )
+  command = writeConfig()
+})
+
+check('A WORKSPACE NAME THAT IS ANOTHER FIELD\'S LOGICAL NAME DOES NOT CAUSE A FALSE REFUSAL', () => {
+  // The guard asks two things, and this is what the second one is for. Here the
+  // workspace calls Domain "Segment", which is a real logical name for a
+  // different field. A normalised row carrying both keys would trip a guard that
+  // only asked "is the workspace name present", and refusing a row that is
+  // perfectly fine is the mirror of letting a raw one through.
+  const collides = {
+    properties: { ...processNames.properties, Domain: 'Segment', Segment: 'Audience Group' },
+    values: processNames.values
+  }
+  command = writeConfig({ process: collides })
+  const out = capture(() => command.commands.update(
+    write('bcol.json', { url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Domain: 'Deal Execution', Segment: ['Enterprise'] }),
+    write('acol.json', { url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Domain: 'Deal Execution', Segment: ['SMB'], reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Segment'], 'a legitimate row was refused, or the edit was lost')
+  command = writeConfig()
+})
+
+check('and a properly normalised row is still accepted on a partial rename', () => {
+  const partial = {
+    properties: { ...processNames.properties, Status: 'Workflow State' },
+    values: processNames.values
+  }
+  command = writeConfig({ process: partial })
+  const out = capture(() => command.commands.update(
+    write('bok.json', { url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Status: 'Active' }),
+    write('aok.json', { url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Status: 'Archive', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Status'], 'a logical row was refused on a partial rename')
+  assert.ok('Workflow State' in out.properties, `the payload does not use the workspace name: ${JSON.stringify(out.properties)}`)
   command = writeConfig()
 })
 

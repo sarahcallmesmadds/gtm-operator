@@ -1102,14 +1102,30 @@ const commands = {
     // returns undefined: nothing looks changed, nothing is sent, and `update`
     // reports a clean no-op for an edit the person asked for. Silent, and it
     // looks like the edit was already applied.
-    const looksLogical = row => UPDATABLE_FIELDS.some(logical => logical in row)
-    const looksRenamed = row => UPDATABLE_FIELDS.some(logical => context.property(logical) !== logical && context.property(logical) in row)
+    // ASKED PER FIELD, NOT ABOUT THE ROW AS A WHOLE. The first version asked
+    // whether the row had ANY logical key and let it through if it did. A
+    // workspace that renamed some properties and not others produces a row
+    // carrying both, so a raw fetch with an unrenamed `Name` on it passed the
+    // guard, and the renamed field it was actually editing stayed invisible: the
+    // exact silent no-op the guard exists to stop, surviving inside the guard.
+    //
+    // A field counts as raw when its workspace name is present under a key that
+    // is not its logical one AND the logical key is absent. Both halves matter:
+    // without the second, a workspace whose name for one property happens to
+    // equal another's logical name would refuse a row that is perfectly fine.
+    const rawKeys = row => UPDATABLE_FIELDS.filter(logical => {
+      const workspace = context.property(logical)
+      return workspace !== logical && workspace in row && !(logical in row)
+    })
     for (const [what, row] of [['before', before], ['after', after]]) {
-      if (looksLogical(row) || !looksRenamed(row)) continue
+      const raw = rawKeys(row)
+      if (!raw.length) continue
       throw new Error(
-        `The ${what} artifact is keyed by this workspace's own property names rather than the logical ones. ` +
-        'Pass rows that have been through `normaliseRows`, or rename the keys yourself. Left as they are, every ' +
-        'field would read as unchanged and this would report a clean no-op for an edit that was asked for.'
+        `The ${what} artifact carries ${raw.map(one => `"${context.property(one)}"`).join(', ')}, ` +
+        `which ${raw.length === 1 ? 'is this workspace\'s name' : 'are this workspace\'s names'} for ` +
+        `${raw.map(one => `"${one}"`).join(', ')} rather than the logical ${raw.length === 1 ? 'one' : 'ones'}. ` +
+        'Pass rows that have been through `normaliseRows`, or rename the keys yourself. Left as they are, those ' +
+        'fields read as unchanged and this reports a clean no-op for an edit that was asked for.'
       )
     }
 
