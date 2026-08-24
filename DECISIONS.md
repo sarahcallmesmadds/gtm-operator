@@ -3849,3 +3849,48 @@ false one.** The last two rounds have been smaller than the ten before them: a
 test wording and an input nobody would type by hand, against a proof that was not
 bound to the page it proved. That trend is the argument for stopping soon, and it
 is not yet two clean rounds.
+
+### Review round 17 on pull request 16: Devin's CLI clean, two findings that were one fault
+
+**Devin's GitHub reviewer: a refused `fill` called itself a finished answer.**
+Offer a candidate carrying only `Verified date` and the command exits non-zero
+while `emptyNote` beside it says the run was "a finished answer rather than a
+failure". The note's reason was wrong as well as its verdict: it says every field
+offered is either empty on the row or already holds something, when the field
+offered is one backfill never writes at all.
+
+**Codex: a `never-filled` refusal still handed back a runnable partial update.**
+Offer `Domain` and `Verified date` together and `fill` came back `ok: true`
+carrying an `after` holding the Domain change, with the refusal sitting beside
+it. The refused field was narrowed out and the rest stayed executable, so a
+person approved one candidate and a smaller one ran.
+
+**They are the same fault.** Round 11 taught the exit code to read `neverFilled`
+and taught nothing else to, so the list moved the exit code and left the answer
+alone. Everything downstream of it read the answer. This is the sixth time in
+this branch that a fix has made the next bug, and the fifteenth pair where a rule
+was enforced in one place and missed in its pair.
+
+**A never-filled refusal empties the whole update now**, `ok: false`,
+`after: null`, nothing under `filling`, and no finished-answer note. That is the
+rule a refused `plan` already carries from round 2, and it is emptied at the
+return for the reason that one is: removing the refused field where it is refused
+is a rule every future field has to remember, and the one that forgets is the one
+that ships. Declining to overwrite an occupied field is untouched and still exits
+zero, because that is backfill working rather than a fault.
+
+**The check that should have caught it offered each refused field alone.** Alone,
+`filling` is empty whether the answer narrows or refuses, so the two outcomes are
+the same shape and no assertion could tell them apart. The case that separates
+them is a refused field beside a fillable one, and nothing asked for it. That is
+the eighth variety of check-that-passes-without-checking found in this branch: an
+input chosen so that both outcomes look identical.
+
+**Devin's CLI aborted its first run of this round on a permission prompt**, which
+is the failure its own prompt warns about, because the invocation did not pass
+`--config .devin-review/config.json`. That allow list has been in the repository
+since the `allowtools` work and the prompt never said to use it. Re-run with it,
+the round completed and came back clean.
+
+792 checks, up from 790. 88 mutations, all landed, none surviving, all 76
+backfill checks reached, plus six written against the new gate and every one red.

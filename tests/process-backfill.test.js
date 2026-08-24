@@ -741,8 +741,48 @@ check('`fill` REFUSES THE SAME LIST `draft` DOES, on a blank row as much as on a
   for (const field of backfill.REFUSED_ON_A_BACKFILL) {
     const out = backfill.fill(EXISTING, { [field]: '2026-08-23' })
     assert.deepStrictEqual(named(out.refused), [`${field}:never-filled`], `${field} was ignored rather than refused`)
-    assert.strictEqual(out.after[field], undefined, `backfill filled ${field}`)
+    assert.strictEqual(out.after, null, `a fill refused for ${field} still handed back a runnable row`)
   }
+})
+
+check('A NEVER-FILLED REFUSAL EMPTIES THE WHOLE UPDATE, rather than narrowing it to the rest', () => {
+  // Offering each refused field ALONE is what the check above does, and alone it
+  // proves only that the refusal was recorded: `filling` is empty either way, so
+  // an answer that narrows and an answer that refuses are the same shape. The
+  // case that tells them apart is a refused field beside a fillable one, and
+  // nothing asked for it. `neverFilled` moved the exit code and moved nothing
+  // else, so this came back `ok: true` with a runnable `after` holding the
+  // Domain change and the refusal sitting next to it.
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    const out = backfill.fill(EXISTING, { Domain: 'Customer Success', [field]: '2026-08-23' })
+    assert.strictEqual(out.ok, false, `a fill refused for ${field} was runnable because Domain was fillable`)
+    assert.strictEqual(out.after, null, `${field} was narrowed out and the Domain change was still handed over`)
+    assert.deepStrictEqual(out.filling, [], `${field} was refused and Domain was still listed as being filled`)
+    assert.deepStrictEqual(out.neverFilled, [field])
+  }
+
+  // AND THE FILLABLE HALF ON ITS OWN STILL GOES THROUGH, or the check above
+  // passes against a `fill` that refuses everything.
+  const fine = backfill.fill(EXISTING, { Domain: 'Customer Success' })
+  assert.strictEqual(fine.ok, true)
+  assert.strictEqual(fine.after.Domain, 'Customer Success')
+})
+
+check('a refused fill claims no finished answer, because the exit code calls it a failure', () => {
+  // `emptyNote` was written when a refused fill exited zero. Round 11 moved the
+  // exit code to non-zero and left the wording alone, so the command failed
+  // while the note beside it said the run was a finished answer rather than a
+  // failure, and gave a reason (empty, or already holding something) that was
+  // not the one that applied.
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    const out = backfill.fill(EXISTING, { [field]: '2026-08-23' })
+    assert.ok(!out.emptyNote, `a fill refused for ${field} called itself a finished answer: ${out.emptyNote}`)
+    assert.ok(out.note.includes(field), `the refusal did not say which field stopped it: ${out.note}`)
+  }
+
+  // DECLINING TO OVERWRITE IS STILL A FINISHED ANSWER, which is the case the
+  // note exists for and the one that exits zero.
+  assert.ok(/finished answer/.test(backfill.fill(EXISTING, { Description: 'x' }).emptyNote))
 })
 
 check('`reviewed` is false, because nobody re-read anything', () => {
