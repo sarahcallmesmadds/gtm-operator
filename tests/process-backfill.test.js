@@ -114,7 +114,64 @@ check('DIRECT MESSAGES CANNOT BE READ AS A GROUP', () => {
   for (const dms of ['all', true]) {
     const out = backfill.plan({ sources: ['slack'], slack: { channels: 'all', dms, ...WINDOW }, ways: ['sweep'] })
     assert.ok(kinds(out).includes('dms-all'), `dms: ${JSON.stringify(dms)} was allowed`)
+    // ASSERTING THE REFUSAL IS NOT ASSERTING THE OUTCOME. The refusal was
+    // recorded and `reading.slack` stood there anyway with an empty `dms`, so
+    // the same output said ok: false, said nothing is read, and handed back a
+    // narrowed plan that runs. A check that stops at the refusal passes on that.
+    assert.deepStrictEqual(out.reading, {}, 'a refused scope handed back a runnable plan')
   }
+})
+
+check('A REFUSED PLAN CARRIES NO PLAN, whichever source was refused', () => {
+  const out = backfill.plan({
+    sources: ['documents', 'email'],
+    documents: { where: 'Drive/GTM' },
+    email: { mailbox: 'ceo@example.com', ...WINDOW },
+    ways: ['sweep']
+  })
+  assert.strictEqual(out.ok, false)
+  // The documents source is perfectly valid and still does not survive. Reading
+  // the good half of a refused scope is reading a scope nobody agreed to.
+  assert.deepStrictEqual(out.reading, {})
+  assert.deepStrictEqual(out.ways, [])
+})
+
+check('A LIST ENTRY THAT IS NOT A NAME IS REFUSED, NOT DROPPED', () => {
+  // Dropping one is narrowing, and it arrives through the helper rather than
+  // through the scope, so every list that goes through it is checked here.
+  const cases = [
+    ['sources', { sources: ['slack', 42], slack: { channels: 'all', ...WINDOW }, ways: ['sweep'] }, 'not-a-name'],
+    ['slack', { sources: ['slack'], slack: { channels: ['#gtm', 42], ...WINDOW }, ways: ['sweep'] }, 'channel-not-a-name'],
+    ['slack', { sources: ['slack'], slack: { channels: 'all', dms: ['with Tom', 42], ...WINDOW }, ways: ['sweep'] }, 'dm-not-a-name'],
+    ['ways', { sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['sweep', 42] }, 'not-a-name'],
+    ['topics', { sources: ['slack'], slack: { channels: 'all', ...WINDOW }, ways: ['topics'], topics: ['refunds', 42] }, 'not-a-name']
+  ]
+  for (const [field, request, kind] of cases) {
+    const out = backfill.plan(request)
+    assert.ok(
+      out.refusals.some(one => one.field === field && one.kind === kind),
+      `${field}/${kind} was dropped rather than refused: ${JSON.stringify(out.refusals.map(one => `${one.field}:${one.kind}`))}`
+    )
+    assert.deepStrictEqual(out.reading, {}, `${field}/${kind} was refused and a plan came back anyway`)
+  }
+})
+
+check('A DATE THAT IS WRITTEN AS ONE AND IS NOT ONE IS REFUSED, and says which fault it is', () => {
+  // `Date.parse` takes 2026-02-30 and hands back the 2nd of March, so a range
+  // set to end in February would have read two days into March. Nothing
+  // downstream could catch that: there is no approval gate in front of a read.
+  const rolled = backfill.plan({ sources: ['email'], email: { from: '2026-02-01', to: '2026-02-30' }, ways: ['sweep'] })
+  assert.deepStrictEqual(
+    rolled.refusals.map(one => `${one.field}:${one.kind}`),
+    ['email:range-not-a-day']
+  )
+  // A missing date is a different fault and gets a different wording. One
+  // message blaming two causes sends somebody looking in the wrong place.
+  const absent = backfill.plan({ sources: ['email'], email: { to: '2026-06-01' }, ways: ['sweep'] })
+  assert.deepStrictEqual(
+    absent.refusals.map(one => `${one.field}:${one.kind}`),
+    ['email:range-open']
+  )
 })
 
 check('named direct messages are read, and only the named ones', () => {

@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 768 checks, up from 716.
+The suite is 771 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3275,3 +3275,66 @@ that failed was the one about a shared guard, which is the shape this repository
 gets wrong most: a fix landed in one place and its pair missed in another. The
 question that found it was not "is this correct" but "is the guard reachable on
 every path into `fill`".
+
+### Review round 2 on pull request 16, from Codex
+
+Two findings, both real, and both the same fault arriving twice: `plan` narrowed
+where it says it refuses.
+
+**A refused scope handed back a runnable plan.** Refusing `dms: "all"` recorded
+the refusal and left `reading.slack` standing with an empty `dms` list. The same
+output said `ok: false`, said "NOTHING IS READ", and carried a plan that runs. A
+caller reading `reading` without checking `ok` first would have read the channels
+and skipped the direct messages, which is exactly the narrowing this function
+exists to refuse, arriving as the shape of the answer rather than as a decision
+inside it.
+
+**The fix is at the return rather than at each refusal**, and that is the whole
+of the choice. Removing the source at the point of each refusal is a rule every
+future source has to remember, and the one that forgets is the one that ships.
+A refused plan now carries no plan at all: no `reading`, no `ways`, no `topics`.
+The good half of a refused scope does not survive either, because reading the
+half that was fine is still reading a scope nobody agreed to.
+
+**A list entry that was not a name was dropped rather than refused.**
+`sources: ["slack", 42]` came back `ok: true` covering one source.
+`channels: ["#gtm", 42]` came back covering one channel. Five lists went through
+`.filter(Boolean)` and every one of them quietly shortened. A run then reads
+less material than was asked about and reports that it read what was asked
+about, which is the failure `plan` was written to prevent, arriving through the
+helper instead of through the scope.
+
+**The check that should have caught the first one stopped at the refusal.** It
+asserted that `dms-all` was recorded and said nothing about what came back
+alongside it. Asserting the refusal is not asserting the outcome, and that is a
+third variety of check-that-passes-without-checking to add to the list: not
+unreachable, not scoped too wide, but stopping one step short of the thing the
+refusal was for.
+
+### A third fault, found in the reviewer's working notes rather than its findings
+
+Codex tried `from: "2026-02-30"` while exploring, printed the plan it produced,
+and did not carry it into its report. It was real. `Date.parse` accepts
+`2026-02-30` and hands back the 2nd of March, so a range set to end in February
+read two days into March. Nothing downstream could have caught it: there is no
+approval gate in front of a read.
+
+`day` now writes the parsed date back out and compares, which is the only way to
+tell `2026-02-30` from `2026-03-02` once the string has been parsed.
+
+**It gets its own refusal wording rather than the missing-date one.** A date
+sitting right there, reported as absent, sends somebody looking in the wrong
+place. That is the same fault as the round-2 message in the previous session
+that blamed two different causes with one sentence.
+
+**`dayOrRefuse` in `process.js` has the same gap and is deliberately not changed
+here.** It validates a date being written into a Notion date property, where
+`2026-02-30` would land as the 2nd of March. That is worth fixing and it changes
+behaviour in `new`, `update` and `trust`, none of which this branch touches.
+Recorded here rather than folded in, so that the two validators disagreeing is a
+known thing rather than a discovered one.
+
+**Worth carrying about the review itself.** Reading only the findings would have
+missed this. The reviewer's own reasoning found something its report did not
+mention, which is the same lesson as the green Devin check whose body said it had
+found something, arriving from the other direction: the summary is not the review.
