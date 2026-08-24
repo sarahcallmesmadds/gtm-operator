@@ -755,6 +755,44 @@ function fill (existing, candidate) {
    */
   const neverFilled = refused.filter(one => one.kind === 'never-filled')
 
+  /*
+   * WHAT GOES BACK HAS TO BE SOMETHING `update` WILL TAKE.
+   *
+   * The values came off a candidate a model built, and they were copied into
+   * `after` unread: `{ Tags: "refunds" }` came back `ok: true`, listed under
+   * `filling`, and then died in `update` with `Tags:not-a-list`. A command whose
+   * documented next step refuses its own advertised output is worse than one
+   * that refuses up front, because the refusal arrives after the person has
+   * approved the candidate.
+   *
+   * Judged with the identity carried across from the before row, the same way
+   * `update` does it, because nothing can be judged without a `Type`: it decides
+   * which sections a body has and which values a select takes.
+   */
+  const offered = {}
+  for (const field of filling) offered[field] = after[field]
+  const badValues = filling.length
+    ? artifact.problems(
+      { Name: before.Name, Type: before.Type, ...offered },
+      { parentType: before.parentType, partialBody: true }
+    ).filter(one => filling.includes(one.field))
+    : []
+
+  if (badValues.length) {
+    return {
+      ok: false,
+      after: null,
+      filling: [],
+      refused,
+      neverFilled: neverFilled.map(one => one.field),
+      refusals: badValues,
+      note:
+        'Nothing is being sent. Every refusal above is a value the candidate offered that `update` would reject, ' +
+        'and refusing it here rather than there means the person hears about it before they approve the candidate ' +
+        'rather than after.'
+    }
+  }
+
   return {
     ok: filling.length > 0,
     after,

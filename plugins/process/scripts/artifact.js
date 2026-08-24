@@ -27,6 +27,7 @@ const path = require('path')
 // here rather than restating it is the same rule `CLAUDE.md` states for counts:
 // a value written beside the thing it defines is a copy, and copies drift.
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
+const { cameBackEmpty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const {
   TYPES, WRITABLE_STATUSES, PARENT_TYPE, PERSON_FIELDS, VERIFICATION_FIELDS,
@@ -101,8 +102,13 @@ const PERSON_ID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]
  * Refusing somebody for asking for exactly the state backfill produces.
  */
 function askedForNothing (value) {
-  return value === undefined || value === null || value === '' ||
-    (Array.isArray(value) && value.length === 0)
+  // ASKED THROUGH THE ONE RULE, NOT WRITTEN OUT AGAIN. This was the sixth copy
+  // of the test and it missed `'[]'`, the same shape the five before it missed:
+  // `wantsAPerson` and `anyPerson` in `process.js` both already read it as
+  // asking for nobody, and `cameBackEmpty` records why. Written out here it
+  // refused an owner that had already been emptied, which is the state a
+  // backfill exists to produce.
+  return cameBackEmpty(value)
 }
 
 function personIdFrom (value) {

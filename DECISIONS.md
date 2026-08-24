@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 785 checks, up from 716.
+The suite is 786 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3715,3 +3715,41 @@ into lists and calls them the same. It is reached only when the before value hel
 somebody and the page came back empty. That took a purpose-built case to reach,
 and it is the second time on this branch that mutating the fix found what
 reviewing it did not.
+
+### Review round 13 on pull request 16, both reviewers, three more
+
+**Devin: the same emptiness shape, one round later, on the request side.** Round
+12 collapsed the read-back copies into `cameBackEmpty` and left
+`askedForNothing` in `artifact.js` written out by hand, missing `'[]'` exactly
+the way the five before it did. So `draft`, `fill` and `problems` all refused an
+`Owner` that had already been emptied, which is the state a backfill exists to
+produce. `askedForNothing` asks `cameBackEmpty` now.
+
+That is the sixth copy of one rule, found one round after the fifth was fixed,
+and it is worth being blunt about why: round 12 fixed the copies it could see
+from the finding it was given, and the finding named the read-back side.
+
+**Devin: the bare-kind assertions were fixed for one container and not the other
+two.** Round 3 replaced every bare-kind match on `refusals` and left `problems`
+and `refused` matching on kind alone, which is the same fault in a different
+container. There is one `named` helper now that takes any of the three, and the
+`faults` shorthand is built from it.
+
+**Codex: `fill` handed back an `after` row its own documented next step refuses.**
+The values come off a candidate a model built and were copied in unread, so
+`{ Tags: "refunds" }` came back `ok: true`, listed under `filling`, and died in
+`update` with `Tags:not-a-list`. A command whose next step refuses its own
+advertised output is worse than one that refuses up front, because the refusal
+arrives after the person has approved the candidate. `fill` judges the values it
+is about to hand over, with the identity carried across from the before row the
+same way `update` does it.
+
+**The end-to-end check only ever filled `Domain`**, so it never touched a
+multi-select at all, and four of the seven fillable fields are multi-selects. It
+covers every fillable field now, in both directions.
+
+**Two of this round's three fixtures used values this schema does not have.**
+`Tags: ['refunds']` and `Tags: ['billing']` were invented when the checks were
+written and nothing had ever validated them, so adding the validation turned two
+existing checks red. That is the validation working, and it is also a reminder
+that a fixture is not evidence of anything until something reads it.
