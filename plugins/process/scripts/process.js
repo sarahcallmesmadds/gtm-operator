@@ -35,7 +35,7 @@ const path = require('path')
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
 const artifact = require(path.join(__dirname, 'artifact'))
-const { compareProperty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
+const { compareProperty, listOfNames } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const KEY = 'process'
 
@@ -268,9 +268,26 @@ function emptyValueFor (logical) {
  * An absent value and an empty one are also the same thing here: a property that
  * was never set and one set to nothing are both nothing.
  */
-function sameValue (a, b) {
+function sameValue (logical, a, b) {
+  // A LIST ARRIVES IN TWO SHAPES AND THEY ARE THE SAME LIST. A row fetched from
+  // Notion carries a multi-select as a string holding a JSON array; a row
+  // written by hand carries a real array. Compared as written, every
+  // multi-select on a fetched before row read as changed, went into the payload
+  // unasked, and on a reviewed update dragged the verification stamp with it.
+  //
+  // Which fields are lists comes from the schema rather than from the shape of
+  // the value. Not because a scalar would currently be mangled by the list
+  // reader, which it would not: a mutation making every field list-shaped
+  // changed nothing any check could see. It is from the schema because that is
+  // where the answer actually lives, and reading it from the value would make
+  // the behaviour depend on what a row happened to contain that day.
+  const listShaped = schema.MULTI_SELECT_FIELDS.includes(logical) || schema.PERSON_FIELDS.includes(logical)
   const norm = value => {
     if (value === null || value === undefined || value === '') return null
+    if (listShaped) {
+      const entries = listOfNames(value)
+      return entries.length ? entries.map(one => String(one).trim()).slice().sort().join('\u0000') : null
+    }
     if (Array.isArray(value)) return value.length ? value.map(String).slice().sort().join('\u0000') : null
     return String(value)
   }
@@ -863,6 +880,7 @@ const commands = {
       },
       memoSql:
         `SELECT m.url, m.${identifier(memos.property('Artifacts'))}, ` +
+        `m.${identifier(memos.property('Status'))}, ` +
         `m.${identifier(`date:${memos.property('Published date')}:start`)}\n` +
         'FROM <memos-ds> AS m\n' +
         `WHERE m.${identifier(memos.property('Artifacts'))} IS NOT NULL\n` +
@@ -1077,7 +1095,23 @@ const commands = {
     // Everything it does not send stays as it is on the page, so judging an
     // absent section as an empty one made this refuse any edit that did not
     // carry the whole body, which is most edits.
-    const problems = artifact.problems(after, { parentType: after.parentType, partialBody: true })
+    // WHAT IS NOT BEING CHANGED IS TAKEN FROM THE BEFORE ARTIFACT.
+    //
+    // `problems` needs a `Name` and a `Type` to judge anything, and it is right
+    // to: there is no template without a type. But an update that changes a
+    // Status is not changing either, and under the rule that an absent key means
+    // untouched, demanding them here contradicted the rule one screen above.
+    // A property-only edit was refused for missing the two fields it was
+    // deliberately not touching.
+    //
+    // The body is deliberately NOT merged. `after.body` is what is being
+    // written, and pulling the before body in would validate and then send
+    // sections nobody edited, which is the fault round 3 fixed.
+    const merged = { ...before, ...after }
+    delete merged.body
+    if (after.body !== undefined) merged.body = after.body
+
+    const problems = artifact.problems(merged, { parentType: after.parentType, partialBody: true })
     if (problems.length) {
       throw new Error(`This artifact cannot be written yet:\n  ${problems.map(one => one.message).join('\n  ')}`)
     }
@@ -1096,10 +1130,10 @@ const commands = {
     // person field too, and the review stamp depends on that default to record
     // who read the artifact. So the editable payload is built without it and the
     // verification stamp with it, and each is used only for what it is right for.
-    const editable = artifact.properties(context, after, {
+    const editable = artifact.properties(context, merged, {
       defaultsPerson: false, parentType: after.parentType, today: todayArg, partialBody: true
     })
-    const stamped = artifact.properties(context, after, {
+    const stamped = artifact.properties(context, merged, {
       defaultsPerson: true, parentType: after.parentType, today: todayArg, partialBody: true
     })
 
@@ -1119,7 +1153,7 @@ const commands = {
     for (const logical of UPDATABLE_FIELDS) {
       if (schema.VERIFICATION_FIELDS.includes(logical)) continue
       if (!(logical in after)) { untouchedFields.push(logical); continue }
-      if (sameValue(before[logical], after[logical])) unchangedFields.push(logical)
+      if (sameValue(logical, before[logical], after[logical])) unchangedFields.push(logical)
       else changedFields.push(logical)
     }
 

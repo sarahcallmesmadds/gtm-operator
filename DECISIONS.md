@@ -2780,3 +2780,51 @@ it was written to condemn. That is four of these across two pull requests, and
 every one was found by breaking the code rather than by reading the test.
 
 Nine mutations, each confirmed to have landed.
+
+### Review round 5 on pull request 15
+
+Every round 4 finding is marked resolved. Three more taken.
+
+**A multi-select on a fetched row read as changed every time.** A row that came
+from Notion carries a list as a string holding a JSON array; a row written by
+hand carries a real array. `sameValue` compared them as written, so every
+multi-select on a fetched before row looked edited, went into the payload unasked
+and, on a reviewed update, dragged the verification stamp with it. Which fields
+are lists comes from the schema rather than from the shape of the value.
+
+**A property-only edit was refused for missing the fields it was not touching.**
+`problems` needs a `Name` and a `Type`, rightly, and an edit to a Status changes
+neither. Under the rule that an absent key means untouched, demanding them
+contradicted the rule one screen above. Identity now comes from the before
+artifact where the after artifact is silent.
+
+**The body is deliberately not part of that merge.** Pulling the before body in
+would validate sections nobody edited, which is the round 3 fault arriving by
+another door. It shows up on a page written before these rules existed, whose
+`Exceptions` is blank: merged in, a Status edit on that page is refused for the
+state of a body it never touched.
+
+**And the memo query promised a Status column it did not return.** It selects it
+now, which also makes the defensive check in `flags` something other than dead
+code.
+
+### Three mutations that found nothing, and what each one was worth
+
+Not every miss is a weak test, and telling those apart is the point of running
+them.
+
+- **The Status check passed with the column gone**, because the WHERE clause
+  filters on Status too and the assertion looked at the whole statement. Scoped
+  to the SELECT list now. A real weak check.
+- **The body-leak check passed with the merge broken**, because a valid before
+  body makes the merge invisible. It uses a legacy body with a blank required
+  section now, which is the only state where the leak has an effect. A real weak
+  check, and one reading would not have found.
+- **Treating every field as list-shaped changed nothing any check could see**,
+  and that one is not a weak test. The list reader returns a scalar unchanged, so
+  there is no defect to catch. The comment claiming otherwise was wrong and is
+  corrected: the schema is consulted because that is where the answer lives, not
+  because a scalar would be mangled.
+
+That makes six weak fixtures found across this pull request and the last, every
+one of them by mutation and none by reading.
