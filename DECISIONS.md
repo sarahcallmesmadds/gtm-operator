@@ -3821,3 +3821,31 @@ built on top of them.
 broad change was unwatched. Both are covered now, and the new check reaches it
 with topics actually set rather than asserting emptiness against a value that was
 never there, which is the fixture-makes-it-unreachable fault from round 6.
+
+### Review round 16 on pull request 16, both reviewers, two more
+
+**Codex: `fill` let a Description that was not text through to the write.**
+`properties` writes it with `String(...)`, so an object reached Notion as the
+literal `[object Object]` and a number as a number-shaped string, neither
+reported by anything. `fill` is what made this reachable: it takes its values off
+a candidate a model built rather than off a person typing into a prompt.
+`problems` refuses non-text now, which covers `new` and `update` as well.
+
+**The check that was named for this covered the selects and multi-selects and
+not the one plain-text field.** It also could not have reached it: `Description`
+is filled on the fixture it used, so a Description offered there is declined as
+occupied and never reaches the value check at all. Both halves, the omission and
+the fixture, and the second is the same fault as round 6.
+
+**Devin: three assertions on `refused` still matched a bare field name.** Round 3
+scoped `refusals` and round 13 scoped `problems` and `refused` where it found
+them, and three survived. If `occupied` and `never-filled` swapped, all three
+would still have passed. That is the third round to find remnants of one
+mechanical change, which is an argument for making such a change by forbidding
+the old shape rather than by replacing the instances that turn up.
+
+**Twenty-eight findings across sixteen rounds and no reviewer has yet produced a
+false one.** The last two rounds have been smaller than the ten before them: a
+test wording and an input nobody would type by hand, against a proof that was not
+bound to the page it proved. That trend is the argument for stopping soon, and it
+is not yet two clean rounds.
