@@ -4132,3 +4132,26 @@ nobody could review. This commit adds the capability and uses it nowhere.
 **What it does not fix.** The shape check knows a set of fields from a list. It
 does not know whether the fields inside are the right ones, so the guards added in
 rounds 19 to 22 all stay: this is a second net above them, not a replacement.
+
+### The five backfill commands declare what shape their files are
+
+`scope`, `draft` and both sides of `fill` read a set of fields. `repeats` and
+`candidates` read a list. All six say so now, so a file of the wrong shape is
+refused at the door with a message naming what it actually holds.
+
+**Where this overlaps the guards from rounds 21 and 22, the door wins and both
+are kept.** Handing the `fill` command a list as its candidate used to reach
+`fill`, which refused it as `candidate:not-a-candidate`. It never gets that far
+now, and being told "this file holds a list and the candidate is read as a set of
+fields" is more use than being told the candidate is not a candidate. The
+function-level refusals stay because `draft` and the suite both call these
+functions directly, with values rather than files, and nothing reads a file on
+that path.
+
+**Sixteen reads in the older commands still do not declare a shape.** That is
+recorded rather than swept: each one changes what a command accepts, and the
+commands this branch did not touch are not this branch's to change quietly. They
+are `check`, `create`, `prove`, `duplicates`, `audit`, `update`, `prove-update`
+and `trust`.
+
+801 checks. 104 mutations, all landed, all 83 backfill checks reached.
