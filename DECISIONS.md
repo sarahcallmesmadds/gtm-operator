@@ -4458,4 +4458,18 @@ was correct on the day and stale by the end of the same branch, and nothing woul
 have re-examined it if a reviewer had not been pointed at the promises rather than
 the code.
 
-813 checks. 130 mutations, all landed, all 94 backfill checks reached.
+810 checks, 94 of them in the backfill suite. 130 mutations, all landed, none
+surviving beyond the known `wantsAPerson` one that `process-audit-update` catches.
+
+**The commit for this said 813 and the number is 810.** Nothing rests on it and it
+is corrected here rather than by rewriting a pushed commit on a public repository.
+Worth naming rather than quietly fixing, because a count stated more precisely
+than it was measured is the same fault this branch has been cataloguing all day,
+and it is not less of one for being in a commit message.
+
+**One mutation was refused by the harness for having an ambiguous anchor.** The
+text it matched appears in both `prove` and `prove-update`, and the harness will
+only mutate a string that occurs exactly once, because mutating two places at once
+makes it impossible to say which check caught it. That refusal is the harness
+working: an ambiguous mutation that ran would have reported coverage it had not
+established.
