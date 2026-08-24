@@ -4021,3 +4021,13 @@ reading its output as a whole-repository number.
 
 796 checks, up from 794. 92 mutations, all landed, all 80 backfill checks reached,
 and the one survivor is caught by another suite.
+
+**The harness is in the repository now, at `tests/mutation-coverage.js`.** It had
+been living in a scratch directory for four rounds, which is a tool that decides
+whether a claim about the tests is true surviving only as long as the session that
+wrote it. It is deliberately not named `.test.js`, because it edits source on disk
+and puts it back rather than asserting anything, so `tests/run.sh` leaves it alone
+and it is run by hand. What it does not do is written at the top: it catches a
+check nothing reaches, which is one of the seven varieties found here, and it is
+scoped to one suite, so a survivor means this suite does not watch that line
+rather than that nothing does.
