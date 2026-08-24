@@ -1074,6 +1074,31 @@ check('A READ-BACK OF A DIFFERENT PAGE IS CAUGHT', () => {
   assert.ok(/not the one that was updated/.test(out.problems.join(' ')), out.problems.join(' '))
 })
 
+check('A CLEAR THAT LANDED IS NOT REPORTED AS A FAILURE', () => {
+  // Notion leaves an empty property out of a page rather than returning it
+  // holding nothing, so a clear that landed perfectly came back reported as a
+  // write that never happened. Absent and empty are the same state, and empty is
+  // the only thing that was asked for.
+  const sent = runUpdate({ ...BEFORE, Domain: null, reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: {} })
+  ))
+  assert.strictEqual(out.proved, true, `a landed clear was reported as failed: ${JSON.stringify(out.problems)}`)
+  assert.ok(out.checked.some(c => /Domain/.test(c)), `the clear was not reported as checked: ${JSON.stringify(out.checked)}`)
+})
+
+check('but a property that was SET and came back absent still fails', () => {
+  // The other half. Absent means empty, and empty is only correct when empty is
+  // what was asked for.
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: {} })
+  ))
+  assert.strictEqual(out.proved, false, 'a write that never landed passed')
+})
+
 check('A CLEAR THAT DID NOT LAND IS CAUGHT', () => {
   // The reason prove-update takes the update output rather than the two files:
   // a payload rebuilt from a merged row has no record of what was emptied.

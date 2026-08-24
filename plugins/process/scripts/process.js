@@ -1476,6 +1476,15 @@ const commands = {
 
         for (const [name, sent] of Object.entries(intended.properties)) {
           if (!(name in back)) {
+            // AN EMPTIED PROPERTY IS ALLOWED TO BE ABSENT. Notion leaves an
+            // empty property out of a page rather than returning it holding
+            // nothing, so a clear that landed perfectly came back reported as a
+            // write that never happened. Absent and empty are the same state,
+            // and the only thing that was asked for here was empty.
+            if (asksToEmpty(sent)) {
+              checked.push(`${name} (emptied, and absent from the page, which is how Notion returns an empty property)`)
+              continue
+            }
             problems.push(`"${name}" was sent and is not in what came back, so the write did not land.`)
             continue
           }
