@@ -37,6 +37,9 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [P, "      typeof intended.properties === 'object' && !Array.isArray(intended.properties)", "      typeof intended.properties === 'object'"],
+  [P, "    const comparedNothing = checked.length === 0", "    const comparedNothing = false"],
+  [P, "      proved: problems.length === 0 && !comparedNothing,", "      proved: problems.length === 0,"],
   [B, "    if (seen.has(key)) continue", "    if (false) continue"],
   [B, "    const key = JSON.stringify([asking.question, asking.where, asking.when])", "    const key = JSON.stringify([asking.question])"],
   [B, "  const ordered = distinct.slice().sort((a, b) => {", "  const ordered = distinct.slice().reverse(); const unusedSort = ((a, b) => {"],
