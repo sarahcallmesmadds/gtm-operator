@@ -1191,6 +1191,51 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('SETTINGS FOR A SOURCE NOBODY ASKED FOR ARE A CONTRADICTION, not a spare part', () => {
+  // Each source's settings were only looked at inside if (named(source)), so a
+  // request naming documents beside a fully scoped slack block came back ok:true,
+  // read documents alone, and said "Slack. It was not named" while slack sat in
+  // the same request with channels and a date range. That sentence goes in
+  // notReading, which the skill says to show somebody BEFORE the run starts.
+  const scopedSlack = { channels: ['#gtm'], ...WINDOW }
+  const contradictory = backfill.plan({
+    sources: ['documents'],
+    documents: { where: 'Drive/GTM' },
+    slack: scopedSlack,
+    email: { mailbox: 'own', ...WINDOW }
+  })
+  assert.strictEqual(contradictory.ok, false, 'a request that disagreed with itself was runnable')
+  assert.deepStrictEqual(faults(contradictory), ['slack:settings-unasked', 'email:settings-unasked'])
+
+  // AND THE SENTENCE THAT WAS FALSE IS NOT THERE TO BE READ OUT, because a
+  // refused plan says nothing is read at all.
+  assert.ok(
+    !contradictory.notReading.join(' ').includes('It was not named'),
+    `a refused plan still told somebody slack was never named:\n${contradictory.notReading.join('\n')}`
+  )
+
+  // BOTH DIRECTIONS, because naming a source without settings and supplying
+  // settings without naming it are the same disagreement seen from either end.
+  assert.deepStrictEqual(
+    faults(backfill.plan({ sources: ['slack'], slack: scopedSlack, documents: { where: 'Drive/GTM' }, ways: ['topics'], topics: ['refunds'] })),
+    ['documents:settings-unasked']
+  )
+
+  // A REQUEST THAT AGREES WITH ITSELF IS UNTOUCHED, either way round, or the
+  // checks above pass against a plan that refuses whenever two sources appear.
+  assert.deepStrictEqual(faults(backfill.plan({ sources: ['documents'], documents: { where: 'Drive/GTM' } })), [])
+  assert.deepStrictEqual(
+    faults(backfill.plan({
+      sources: ['documents', 'slack'],
+      documents: { where: 'Drive/GTM' },
+      slack: scopedSlack,
+      ways: ['topics'],
+      topics: ['refunds']
+    })),
+    []
+  )
+})
+
 check('A RECORD INSIDE A FILE IS CHECKED TOO, not read as a record missing every field', () => {
   // `readJson` confirms the FILE is a set of fields or a list and stops there.
   // Every record inside was still read by reaching for keys, so a list or a

@@ -205,6 +205,37 @@ function plan (request) {
   }
 
   const named = source => asked.includes(source)
+
+  /*
+   * SETTINGS FOR A SOURCE NOBODY ASKED FOR ARE A CONTRADICTION, NOT A SPARE PART.
+   *
+   * Each source's settings were only ever looked at inside `if (named(source))`,
+   * so `sources: ["documents"]` beside a fully scoped `slack` block came back
+   * `ok: true`, read documents alone, and told the person "Slack. It was not
+   * named, so no channels and no direct messages are being read." Slack was
+   * named, in the same request, with channels and a date range on it.
+   *
+   * That sentence goes in `notReading`, which the skill tells you to show
+   * somebody BEFORE the run starts. So the one output written to be read out
+   * loud was the one giving a confident and false account of what was about to
+   * be read, and the request was narrowed to a scope nobody agreed to, which is
+   * the single thing this function exists to refuse.
+   *
+   * Which half is wrong cannot be guessed from here. Somebody either forgot to
+   * list the source or forgot to delete its settings, and those want opposite
+   * repairs, so it is a question for them rather than a default.
+   */
+  for (const source of SOURCES) {
+    if (named(source)) continue
+    if (req[source] === undefined || req[source] === null) continue
+    add(
+      source,
+      'settings-unasked',
+      `\`${source}\` carries settings and is not in \`sources\`, so the request disagrees with itself. Read as it ` +
+      `stands, ${source} would be skipped and reported as never having been named. Either add "${source}" to ` +
+      '`sources` or take its settings off, because which of those you meant is not something this can pick for you.'
+    )
+  }
   const reading = {}
   const notReading = []
 
