@@ -787,11 +787,34 @@ function draft (candidate, { today } = {}) {
   const refusals = []
   const add = (field, kind, message) => refusals.push({ field, kind, message })
 
+  /*
+   * A FALLBACK IS FOR AN ABSENT FIELD, NOT AN UNREADABLE ONE.
+   *
+   * `text()` returns null for a number, an object, a list or a boolean, so
+   * `Name: 42` read as absent and fell straight through to the candidate's old
+   * `what`. The draft was accepted and written under the name it had before: the
+   * person approved one change and a different one was made, which is the single
+   * thing the approval gate cannot catch.
+   *
+   * Absent still falls back, because that is what the fallback is for. Supplied
+   * and unreadable is refused, because it is a decision somebody made that
+   * nothing here can carry out.
+   */
+  const identityProblem = (field, value) => {
+    if (value === undefined || value === null) return false
+    if (typeof value === 'string' && value.trim()) return false
+    add(field, 'not-text', `\`${field}\` is ${JSON.stringify(value)}, which is not a name this can write. It is supplied rather than absent, so it is refused rather than falling back to the candidate's own: falling back would write the artifact under the value that was being changed.`)
+    return true
+  }
+
+  const nameBroken = identityProblem('Name', given.Name)
+  const typeBroken = identityProblem('Type', given.Type)
+
   const name = text(given.Name) || text(given.what)
-  if (!name) add('Name', 'missing', 'The draft has no name. Either `Name`, or the candidate\'s `what` to start from.')
+  if (!name && !nameBroken) add('Name', 'missing', 'The draft has no name. Either `Name`, or the candidate\'s `what` to start from.')
 
   const type = text(given.Type) || text(given.type)
-  if (!type) add('Type', 'missing', `The draft has no type, so there is no template to write. One of: ${schema.TYPES.join(', ')}.`)
+  if (!type && !typeBroken) add('Type', 'missing', `The draft has no type, so there is no template to write. One of: ${schema.TYPES.join(', ')}.`)
 
   /*
    * NORMALISING TO `[]` HERE ANSWERED A QUESTION NOBODY ASKED. `sourceProblems`

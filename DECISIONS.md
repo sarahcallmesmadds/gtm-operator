@@ -4507,3 +4507,40 @@ a mutation that was caught.
 
 811 checks, 95 in the backfill suite. 134 mutations, all landed, one survivor and
 it is the `wantsAPerson` inversion `process-audit-update` catches.
+
+### Review round 31: a third set, and it included the helper written to fix the second
+
+Devin came back clean. Codex found the third set, which is what it was asked for.
+
+**A fallback is for an absent field, not an unreadable one.** `draft` read
+`text(given.Name) || text(given.what)`, and `text()` returns null for a number, an
+object, a list or a boolean, so `Name: 42` read as absent and fell through to the
+candidate's own `what`. The draft was accepted and written under the name it had
+before: somebody approved one change and a different one was made.
+
+**The set was five, not the two reported, and two of them were in the helper added
+in round 28 to fix a different half of the same problem.** `subjectName` and
+`subjectType` read `Name || what` through `String()`, so a `Name` of `{}` searched
+the library for a page called "[object Object]" and a `Name` of 42 searched for
+"42". The helper written to let the duplicate check read a candidate had the same
+fault as the code it was written beside.
+
+**Absent still falls back and that is pinned**, because a check that refuses every
+value would pass the same assertions as one that refuses only the unreadable ones.
+
+**What the mutation run then corrected, and it is worth stating.** Three problems,
+all of them mine:
+
+- Two anchors from earlier rounds had gone stale, because this round rewrote the
+  lines they pointed at. A stale anchor mutates nothing and the suite passes,
+  which is indistinguishable from a mutation being caught.
+- One mutation of my own was equivalent rather than real. `subjectType` feeds only
+  the supersede filter, and `"42"`, `"[object Object]"` and `""` all fail that
+  filter identically, so the guard on the `Type` half is defensive and has no
+  observable effect today. It is removed rather than counted, because a mutation
+  that changes no behaviour reads exactly like a gap in the tests. **The `Type`
+  half of this fix is therefore unproven by measurement and is written down as
+  such rather than covered by a claim.**
+
+813 checks, 97 in the backfill suite. 135 mutations, all landed, one survivor and
+it is the known `wantsAPerson` inversion that `process-audit-update` catches.

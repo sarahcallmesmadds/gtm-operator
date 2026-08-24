@@ -1192,6 +1192,64 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('AN IDENTITY FIELD THAT IS SUPPLIED AND UNREADABLE IS REFUSED, not replaced by the old one', () => {
+  // `text(given.Name) || text(given.what)` reads a malformed Name as absent and
+  // falls back, so a candidate edited to `Name: 42` was accepted and written
+  // under the name it had before. The person approved a change and something
+  // else was created. Absent still falls back, which is what the fallback is for.
+  const src = [{ what: 'refunds.doc', contributed: 'the steps' }]
+  const body = { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+
+  for (const bad of [42, {}, [], true]) {
+    const named = backfill.draft({ what: 'Refund policy', type: 'SOP/ROE', Name: bad, sources: src, body })
+    assert.strictEqual(named.ok, false, `a Name of ${JSON.stringify(bad)} was accepted`)
+    assert.deepStrictEqual(faults(named), ['Name:not-text'], JSON.stringify(bad))
+
+    const typed = backfill.draft({ what: 'Refund policy', type: 'SOP/ROE', Type: bad, sources: src, body })
+    assert.strictEqual(typed.ok, false, `a Type of ${JSON.stringify(bad)} was accepted`)
+    assert.deepStrictEqual(faults(typed), ['Type:not-text'], JSON.stringify(bad))
+  }
+
+  // THE FALLBACK STILL WORKS WHEN THE FIELD IS ABSENT, which is the whole point
+  // of it, or the checks above pass against a draft that refuses every candidate.
+  const fallen = backfill.draft({ what: 'Refund policy', type: 'SOP/ROE', sources: src, body })
+  assert.strictEqual(fallen.ok, true, JSON.stringify(fallen.problems))
+  assert.strictEqual(fallen.artifact.Name, 'Refund policy')
+  assert.strictEqual(fallen.artifact.Type, 'SOP/ROE')
+
+  // AND AN EXPLICIT NAME STILL WINS over the candidate's `what`.
+  const explicit = backfill.draft({ what: 'Refund policy', type: 'SOP/ROE', Name: 'Refunds, revised', sources: src, body })
+  assert.strictEqual(explicit.artifact.Name, 'Refunds, revised')
+})
+
+check('THE DUPLICATE LOOKUP DOES NOT COERCE AN UNREADABLE NAME INTO A SEARCH', () => {
+  // `subjectName` and `subjectType` were added a round earlier to read either an
+  // artifact or a candidate, and they read `Name || what` through `String()`, so
+  // a Name of `{}` searched the library for a page called "[object Object]" and
+  // a Type of 42 quietly turned the supersede check off. Same shape as the draft
+  // fallback, in the helper written to fix a different half of it.
+  const rows = [{
+    url: URL_A,
+    [contextNow().property('Name')]: 'Refund policy',
+    [contextNow().property('Type')]: 'SOP/ROE',
+    [contextNow().property('Status')]: 'Active'
+  }]
+
+  for (const bad of [42, {}, true]) {
+    process.exitCode = 0
+    const out = capture(() => command.commands.duplicates(write('coerce.json', { Name: bad, what: 'Refund policy' })))
+    assert.strictEqual(out.sql, null, `a Name of ${JSON.stringify(bad)} was searched for`)
+    assert.strictEqual(process.exitCode, 1)
+    process.exitCode = 0
+  }
+
+  // A CANDIDATE WITH NO `Name` AT ALL STILL FALLS BACK TO `what`, which is what
+  // the helper was added for.
+  const fine = capture(() => command.commands.duplicates(write('coerce-ok.json', { what: 'Refund policy' })))
+  assert.ok(fine.sql)
+  void rows
+})
+
 check('`slack.channels` TELLS A MALFORMED VALUE FROM AN ABSENT ONE, like its four siblings', () => {
   // `dms`, `ways`, `topics` and `sources` were each taught to tell the two
   // apart. `channels` was the one list in the same function left falling through

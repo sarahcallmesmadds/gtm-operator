@@ -780,7 +780,15 @@ function refuseRawKeys (context, rows, consequence, fields = UPDATABLE_FIELDS) {
  */
 function subjectName (row) {
   const one = row || {}
-  return String(one.Name || one.what || '').trim()
+  // A FALLBACK IS FOR AN ABSENT FIELD. Read through `String()` a `Name` of `{}`
+  // searched the library for a page called "[object Object]" and a `Name` of 42
+  // searched for "42". Supplied and unreadable stops here rather than falling
+  // past to `what`, so the command refuses and says it has no name, which is
+  // true and is the answer that stops the write.
+  if (one.Name !== undefined && one.Name !== null) {
+    return typeof one.Name === 'string' ? one.Name.trim() : ''
+  }
+  return typeof one.what === 'string' ? one.what.trim() : ''
 }
 
 /**
@@ -795,7 +803,12 @@ function subjectName (row) {
  */
 function subjectType (row) {
   const one = row || {}
-  return String(one.Type || one.type || '').trim()
+  // Same as `subjectName`. A `Type` of 42 read as "42", which matches no type,
+  // so the supersede check turned itself off without saying so.
+  if (one.Type !== undefined && one.Type !== null) {
+    return typeof one.Type === 'string' ? one.Type.trim() : ''
+  }
+  return typeof one.type === 'string' ? one.type.trim() : ''
 }
 
 /** The description to compare on, from either shape. A candidate has no description. */
