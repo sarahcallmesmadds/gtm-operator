@@ -2859,3 +2859,38 @@ answers a different question: that one is about proving a write landed, this one
 about deciding what changed. Both need it and they are not the same call.
 
 Five mutations, each confirmed to have landed. 693 checks.
+
+### Review round 7 on pull request 15
+
+**A body-only edit crashed.** The sections a body has are decided by the `Type`,
+and an edit that changes only the body is not changing the type, so under the
+rule that an absent key means untouched the after row had no reason to carry one.
+Built from the after row alone it threw "No template for undefined" on exactly
+the edit this command is most for. The body is built from the merged row now, and
+`merged.body` is still `after.body`, so what gets written is only what was sent.
+
+**The page id was being assembled rather than matched.** `pageKey` stripped every
+non-hex character out of the last segment and took the last 32 of what was left,
+so the letters of the title were concatenated with the id. That gives the right
+answer when an id is there and invents one when it is not, and an invented key
+matches nothing, which reads as a memo pointing at no artifact. Both forms are
+matched at the end of the segment now, the bare 32 and the dashed uuid, and a url
+with no id in it returns nothing.
+
+**A seventh weak fixture, same shape as the other six.** The no-id url in that
+check held 30 hex characters, so the assembling version returned nothing too and
+the check passed whichever way the code went. It carries exactly 32 now, and
+asserts that it does, so a later edit to the fixture cannot quietly disarm it.
+
+### Two informational flags left alone, and why
+
+**"Memo status re-check compares unnormalised values."** The re-check compares the
+raw returned value against `memosCtx.value('Status', 'Published')`, which is the
+workspace's own name for it, so both sides are in the workspace's vocabulary and
+the comparison is right. The asymmetry Devin is pointing at is real, though: the
+artifact rows go through `normaliseAuditRows` and the memo rows do not. That is
+because only three memo columns are read and none of the judgments compare them
+to a logical constant. Recorded rather than changed.
+
+**"Two-payload person-default split holds up."** Not a defect. A reviewer
+confirming the round 1 fix survived everything since.

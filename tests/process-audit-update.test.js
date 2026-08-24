@@ -622,6 +622,51 @@ check('and emptying it on purpose still works with nobody configured', () => {
   command = writeConfig()
 })
 
+check('A BODY-ONLY EDIT DOES NOT HAVE TO REPEAT THE TYPE', () => {
+  // The sections a body has are decided by the Type, and an edit that changes
+  // only the body is not changing the type. Built from the after row alone it
+  // threw "No template for undefined" on exactly the edit this command is most
+  // for.
+  const out = capture(() => command.commands.update(
+    write('before.json', BEFORE),
+    write('after.json', { url: URL_A, body: { Steps: 'new text' }, reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.body.map(s => s.heading), ['Steps'], JSON.stringify(out.body))
+  assert.deepStrictEqual(out.changed, [], 'a body-only edit reported a property change')
+})
+
+check('THE PAGE ID IS MATCHED, NOT ASSEMBLED FROM WHATEVER HEX IS AROUND', () => {
+  // The first version stripped every non-hex character out of the segment and
+  // took the last 32, concatenating the title's letters with the id. That is
+  // right when an id is there and invents one when it is not, and an invented
+  // key matches nothing, which reads as a memo pointing at no artifact.
+  // THE TITLE HERE CARRIES EXACTLY 32 HEX CHARACTERS AND NO ID. That matters:
+  // written with a title holding fewer than 32, the old assembling version
+  // returned null too and the check passed either way. Mutating it back showed
+  // that, and reading it did not. It ends in `zz`, so there is no trailing run
+  // for the strict match to find.
+  const noId = 'https://notion.so/deadbeef-cafebabe-deadbeef-cafebabe-zz'
+  assert.strictEqual(noId.split('/').pop().replace(/[^0-9a-fA-F]/g, '').length, 32, 'the fixture no longer holds 32 hex characters')
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: noId, properties: sent.properties })
+  ))
+  assert.strictEqual(out.proved, false, 'a url with no page id in it produced a key and passed')
+  assert.ok(/no usable url/.test(out.problems.join(' ')), out.problems.join(' '))
+})
+
+check('and a dashed uuid is the same page as the bare one', () => {
+  const sent = runUpdate({ ...BEFORE, Description: 'new text', reviewed: false })
+  const dashed = 'https://notion.so/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: dashed, properties: sent.properties })
+  ))
+  assert.strictEqual(out.proved, true, `the same page written two ways read as two pages: ${JSON.stringify(out.problems)}`)
+})
+
 check('A PAGE OPENED FROM A VIEW IS THE SAME PAGE', () => {
   // The last 32 hex characters of `.../page-<id>?v=<view id>` are the view's id.
   // Run over the whole string, the same page opened from a view keyed as a
