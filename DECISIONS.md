@@ -3015,3 +3015,41 @@ the check passed while the thing it watches was untouched. Two payloads means tw
 places to aim.
 
 714 checks.
+
+### Review round 12 on pull request 15
+
+Zero bugs. One flag taken, three recorded and not changed.
+
+**A clear that landed perfectly reported itself as a write that never
+happened.** Notion leaves an empty property out of a page rather than returning
+it holding nothing, so the read-back had no key for the field that had just been
+emptied, and the absence read as a failure. Absent and empty are the same state,
+and empty is the only thing that was asked for. Both halves have a check: a
+property that was SET and came back absent still fails, because absence only
+means success when success meant absence.
+
+That is three rounds in a row where the fault was `prove-update` reporting a
+correct write as a failure. A proof that cries wolf is worse than no proof: it
+gets ignored, and then the one real failure is ignored too.
+
+### Three informational flags recorded rather than changed
+
+**"Reverse-relation memo SQL asserted as a string, never run."** True, and stated
+in the pull request, in the test file's header and in the section above. No SQL
+this plugin builds has been sent to Notion. It is the honest caveat on the whole
+of `process`, not a defect in this round.
+
+**"Memo rows compared in workspace vocabulary, artifact rows in logical."** Also
+true and already recorded in round 7. The memo rows are read for three columns
+and no judgment compares them against a logical constant, so translating them
+would be work with nothing behind it. The asymmetry is deliberate and written
+down where somebody would hit it.
+
+**"Multi-select in JSON-string shape on the after row would mis-clear."** It does
+not mis-clear: `problems` refuses it, because a bare string sent to a multi-select
+is a 400 at Notion. The split is deliberate and worth stating plainly, since the
+code does look inconsistent: the BEFORE row may arrive in either shape, because
+it was fetched, and `sameValue` reads both. The AFTER row is authored rather than
+fetched, so it carries real lists and the refusal keeps it that way.
+
+716 checks.
