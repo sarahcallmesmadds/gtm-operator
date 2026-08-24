@@ -1192,6 +1192,42 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`fill` REFUSES EVERY FIELD IT WILL NOT WRITE, not four of them', () => {
+  // Round 6 set the rule: a field `fill` will not write is refused rather than
+  // dropped, because dropping it means somebody approved a change and a smaller
+  // one ran. Four fields got that treatment through REFUSED_ON_A_BACKFILL and
+  // the rest did not, so offering `Status`, a body, or the sources a draft
+  // carries made them vanish while the run reported success.
+  //
+  // `Status` is the one that matters most: it is a field `update` can genuinely
+  // write, so this is a normal edit disappearing rather than an exotic value.
+  for (const [field, value] of [
+    ['Status', 'Archived'],
+    ['body', { Steps: 'new text' }],
+    ['sources', [{ what: 'refunds.doc', contributed: 'the steps' }]],
+    ['parent', 'https://www.notion.so/decision-1'],
+    ['Supersedes', 'https://www.notion.so/old-1']
+  ]) {
+    const out = backfill.fill(EXISTING, { [field]: value })
+    assert.ok(
+      out.refused.some(one => one.field === field),
+      `${field} was offered and neither filled nor refused: ${JSON.stringify(faults(out))}`
+    )
+    assert.strictEqual(out.after, null, `${field} was dropped and the rest still ran`)
+  }
+
+  // THE CANDIDATE'S OWN VOCABULARY IS NOT A FIELD AND IS NOT REFUSED, or every
+  // candidate the documented flow produces would be rejected by the command the
+  // skill tells you to hand it to.
+  const candidate = backfill.candidates([{ what: 'Refund policy', where: 'Drive/GTM', type: 'SOP/ROE' }]).candidates[0]
+  const fromFlow = backfill.fill(EXISTING, { ...candidate, Domain: 'Customer Success' })
+  assert.deepStrictEqual(faults(fromFlow), [], JSON.stringify(fromFlow.refused))
+  assert.deepStrictEqual(fromFlow.filling, ['Domain'])
+
+  // AND A PLAIN FILL IS UNTOUCHED.
+  assert.deepStrictEqual(backfill.fill(EXISTING, { Domain: 'Customer Success' }).filling, ['Domain'])
+})
+
 check('`dayOrRefuse` REFUSES A ROLLED-OVER DAY, the pair of the fix round 4 made', () => {
   // `backfill.js` `day` was taught in round 4 to write the parsed date back out
   // and compare, because Date.parse('2026-02-30') is not NaN, it is the 2nd of
