@@ -37,6 +37,12 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    if (isRecord(value)) return value", "    if (true) return value"],
+  [B, "function isRecord (value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value)", "function isRecord (value) {\n  return value !== null && typeof value === 'object'"],
+  [B, "    if (!isRecord(one)) {\n      add(`askings[${index}]`", "    if (false) {\n      add(`askings[${index}]`"],
+  [B, "    if (!isRecord(one)) {\n      add(`found[${index}]`", "    if (false) {\n      add(`found[${index}]`"],
+  [B, "  const unreadable = new Set(refusals.filter(one => one.kind === 'not-a-record').map(one => one.field))", "  const unreadable = new Set()"],
+  [A, "    if (source === null || typeof source !== 'object' || Array.isArray(source)) {", "    if (false) {"],
   [P, "readJson(file, 'the scope', 'fields')", "readJson(file, 'the scope')"],
   [P, "readJson(file, 'what was found', 'list')", "readJson(file, 'what was found')"],
   [P, "readJson(candidateFile, 'the candidate', 'fields')", "readJson(candidateFile, 'the candidate')"],
@@ -65,7 +71,10 @@ const M = [
   [B, "if (type && !schema.TYPES.includes(type)) {", "if (false) {"],
   [B, "if (!where) {\n      add(`found[${index}]`, 'provenance-missing'", "if (false) {\n      add(`found[${index}]`, 'provenance-missing'"],
   [B, "if (score >= REPEAT_SIMILARITY) near.push({ a: out[i].id, b: out[j].id, score })", "void score"],
-  [B, "  if (!sources.length) {", "  if (false) {"],
+  [B, "  if (!listed || (Array.isArray(given.sources) && !sources.length)) {", "  if (false) {"],
+  [B, "  if (listed && !Array.isArray(given.sources)) {", "  if (false) {"],
+  [B, "  const listed = given.sources !== undefined && given.sources !== null", "  const listed = true"],
+  [A, "  if (row.Name !== undefined && row.Name !== null && typeof row.Name !== 'string') {", "  if (false) {"],
   [B, "  for (const field of REFUSED_ON_A_BACKFILL) {\n    // Asked through `artifact.js` rather than repeated", "  for (const field of []) {\n    // Asked through `artifact.js` rather than repeated"],
   [B, "const REFUSED_ON_A_BACKFILL = [\n  ...schema.PERSON_FIELDS,\n  ...schema.VERIFICATION_FIELDS.filter(field => !schema.PERSON_FIELDS.includes(field))\n]", "const REFUSED_ON_A_BACKFILL = [...schema.PERSON_FIELDS]"],
   [B, "body.Sources = artifact.sourcesSection(sources)", "if (!body.Sources) body.Sources = artifact.sourcesSection(sources)"],
