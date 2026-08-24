@@ -152,9 +152,12 @@ inventing content.
 
 ### Sources
 
-**Record every source you actually opened, and never one you did not.** Each
-gets a line saying what it contributed. The script refuses a source with no
-line of context. A Sources section that cannot be trusted is worse than none.
+**Record every source you actually opened, and never one you did not.** Pass
+them as the structured `sources` list, each entry saying what was read and
+what it contributed. **The Sources section is generated from that list**: the
+script refuses a source with no line of context, refuses a hand-written
+Sources section, and refuses one that disagrees with the record, because a
+Sources section that cannot be trusted is worse than none.
 
 ---
 
