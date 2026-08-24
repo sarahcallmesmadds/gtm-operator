@@ -176,6 +176,11 @@ is not licence to invent a section.
 Preview each draft **in full** before writing. Then `create` and `prove`, the
 same two steps `new` uses.
 
+**Keep the url the create returned and pass it to `prove`.** It refuses without
+it: otherwise it checks that some page has the right shape rather than that the
+page just written does, and the backfill absence check below sits on top of
+that, so it would prove only that some page was unstamped.
+
 **Say it is a backfill when you report the write.** The page is not what `new`
 would have made: it has no owner and nothing has verified it, and `audit` will
 flag it until somebody does.
