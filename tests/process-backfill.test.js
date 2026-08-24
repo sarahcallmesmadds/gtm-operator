@@ -953,5 +953,80 @@ check('`update` REFUSES A RAW-KEYED ROW FOR THE FIELDS IT ONLY READS', () => {
 })
 
 
+check('AN EMPTY LIST THAT CAME BACK AS `[]` IN A STRING IS STILL EMPTY', () => {
+  // Notion returns an empty list three ways and `listOfNames` records all
+  // three. Every hand-written copy of this test covered absent and the empty
+  // string and missed the JSON array inside a string, which is the one that was
+  // measured, so a person property that came back as `'[]'` read as a value
+  // where the plugin had deliberately left none.
+  const final = draftOf().artifact
+  const context = contextNow()
+  const sent = capture(() => command.commands.create(write('empty-shapes.json', final)))
+
+  for (const shape of [undefined, null, '', '[]', []]) {
+    const properties = { ...sent.properties }
+    for (const logical of backfill.REFUSED_ON_A_BACKFILL) {
+      if (shape !== undefined) properties[context.property(logical)] = shape
+    }
+    const out = capture(() => command.commands.prove(
+      write('empty-shapes.json', final),
+      write('empty-back.json', { url: URL_A, properties, headings: sent.headings })
+    ))
+    assert.strictEqual(out.proved, true, `a backfilled page whose fields came back as ${JSON.stringify(shape)} was not proved: ${JSON.stringify(out.problems)}`)
+  }
+  process.exitCode = 0
+})
+
+check('`check` EXITS NON-ZERO WHEN IT REFUSES, like every other gate here', () => {
+  // It printed `writable: false` and exited zero, so a caller reading the status
+  // rather than the body carried on toward the write it had just refused.
+  process.exitCode = 0
+  const refused = capture(() => command.commands.check(
+    write('unwritable.json', { ...draftOf().artifact, Owner: ['11111111-1111-1111-1111-111111111111'] })
+  ))
+  assert.strictEqual(refused.writable, false)
+  assert.strictEqual(process.exitCode, 1, 'check refused an artifact and exited zero')
+
+  // A concern is a question for a person, not a precondition, so it must not
+  // move the exit code. Without this the fix turns every long artifact into an
+  // error.
+  process.exitCode = 0
+  const clean = capture(() => command.commands.check(write('writable.json', draftOf().artifact)))
+  assert.strictEqual(clean.writable, true)
+  assert.strictEqual(process.exitCode, 0, 'a writable artifact exited non-zero')
+})
+
+
+check('`prove-update` READS `[]`-IN-A-STRING AS EMPTY TOO, not as a changed value', () => {
+  // Masked on the equal path, because `compareProperty` turns both sides into
+  // lists and calls them the same. It is reached when the before value held
+  // somebody and the page came back empty: read naively, `'[]'` is not empty,
+  // so a verification field that Notion returned as an empty list was reported
+  // as one that changed on an edit that never touched it.
+  const context = contextNow()
+  const before = { ...EXISTING, 'Verified by': ['user://11111111-1111-1111-1111-111111111111'] }
+  const after = backfill.fill(before, { Domain: 'Customer Success' }).after
+  const sent = capture(() => command.commands.update(
+    write('before-sq.json', before),
+    write('after-sq.json', after),
+    '2026-08-23'
+  ))
+
+  const out = capture(() => command.commands['prove-update'](
+    write('sent-sq.json', sent),
+    write('back-sq.json', {
+      url: URL_A,
+      properties: { ...sent.properties, [context.property('Verified by')]: '[]' }
+    })
+  ))
+  assert.strictEqual(out.proved, true, `an empty list returned as a string was read as a change: ${JSON.stringify(out.problems)}`)
+  assert.ok(
+    out.unchecked.some(one => /Verified by/.test(one)),
+    `it passed without saying it could not tell emptied from unsaved: ${JSON.stringify(out.unchecked)}`
+  )
+  process.exitCode = 0
+})
+
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll passed.\n')
 process.exit(failures ? 1 : 0)

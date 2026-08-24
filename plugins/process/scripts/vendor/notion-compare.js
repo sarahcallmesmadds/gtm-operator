@@ -68,6 +68,26 @@ function listOfNames (value) {
  * `null` where an entry is not a name, because rendering a nested object as
  * `[object Object]` would make two different values compare equal.
  */
+/**
+ * Whether a property came back from Notion holding nothing.
+ *
+ * THE FIFTH COPY OF THIS TEST, AND THE FOUR BEFORE IT DISAGREED. Notion returns
+ * an empty list three ways and `listOfNames` above records all three: absent,
+ * the empty string, and the JSON-array-in-a-string `'[]'`, which is the one that
+ * was measured. Every caller that wrote the test out by hand covered the first
+ * two and missed the third, so a person property that came back as `'[]'` read
+ * as a value where the plugin had deliberately left none.
+ *
+ * It lives here because this file is where the measured read-back shapes are
+ * recorded, and because a rule about what Notion returns has no business being
+ * restated by each reader of it.
+ */
+function cameBackEmpty (value) {
+  if (value === undefined || value === null || value === '' || value === '[]') return true
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
 function renderList (entries) {
   if (entries.some(entry => typeof entry !== 'string')) return null
   // JOINED ON A CHARACTER A VALUE CANNOT CONTAIN. Joined on a space, the single
@@ -116,4 +136,4 @@ function compareProperty (type, sent, back) {
   return { state: 'different', sent: a, back: b }
 }
 
-module.exports = { COMPARABLE, listOfNames, renderList, compareProperty }
+module.exports = { COMPARABLE, listOfNames, renderList, compareProperty, cameBackEmpty }

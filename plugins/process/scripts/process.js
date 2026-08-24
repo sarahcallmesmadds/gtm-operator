@@ -41,7 +41,7 @@ const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
 const artifact = require(path.join(__dirname, 'artifact'))
 const backfill = require(path.join(__dirname, 'backfill'))
-const { compareProperty, listOfNames } = require(path.join(__dirname, 'vendor', 'notion-compare'))
+const { compareProperty, listOfNames, cameBackEmpty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const KEY = 'process'
 
@@ -744,6 +744,13 @@ const commands = {
         ? 'Every problem here is a refusal. Notion rejects a bad select value as a whole, so a drafted artifact is lost at write time rather than partly saved.'
         : 'Nothing blocks this write. Anything under concerns is a question for the user, not a fault.'
     }, null, 2))
+
+    // A REFUSAL EXITS NON-ZERO, LIKE EVERY OTHER GATE HERE. `scope`, `draft` and
+    // `fill` all do. This one printed `writable: false` and exited zero, so a
+    // caller reading the status rather than the body carried on toward the write
+    // the check had just refused. Only `problems` move it: a concern is a
+    // question for a person and answering it is not a precondition.
+    if (problems.length) process.exitCode = 1
   },
 
   duplicates (file) {
@@ -935,7 +942,12 @@ const commands = {
       for (const logical of backfill.REFUSED_ON_A_BACKFILL) {
         const name = context.property(logical)
         const got = readback.properties[name]
-        if (got === undefined || got === null || got === '' || (Array.isArray(got) && got.length === 0)) {
+        // ASKED THROUGH THE FILE THAT RECORDS THE MEASURED SHAPES. Notion
+        // returns an empty list three ways and the third, the JSON array inside
+        // a string, is the one every hand-written copy of this test has missed.
+        // A person property that came back as `'[]'` read as a value where the
+        // plugin had deliberately left none.
+        if (cameBackEmpty(got)) {
           checked.push({ what: name, type: 'absent, which is what a backfill requires' })
           continue
         }
@@ -1585,8 +1597,7 @@ const commands = {
               checked.push(`${name} (unchanged, as a non-review edit requires)`)
               continue
             }
-            const empty = value => value === undefined || value === null || value === '' ||
-              (Array.isArray(value) && value.length === 0)
+            const empty = cameBackEmpty
 
             if (empty(now) && empty(was)) {
               checked.push(`${name} (empty before and after, which a non-review edit requires)`)

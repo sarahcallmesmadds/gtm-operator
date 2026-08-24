@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 782 checks, up from 716.
+The suite is 785 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3684,3 +3684,34 @@ recurring fault stands at eight of sixteen, with four of those eight arriving
 inside the fix for an earlier one. That ratio has been stable since round 5 and
 is the honest summary of this branch: the pairs were not hard to see once
 somebody looked, and every round of looking created a new pair.
+
+### Review round 12 on pull request 16, both reviewers, two more
+
+**Devin: the emptiness test was on its fifth copy and the copies disagreed.**
+Notion returns an empty list three ways and `listOfNames` records all three:
+absent, the empty string, and the JSON array inside a string, `'[]'`, which is
+the one that was measured. Every hand-written copy of the test covered the first
+two and missed the third, so a person property that came back as `'[]'` read as a
+value on a page where the plugin had deliberately left none, and `prove` reported
+a correct backfill as a failed one.
+
+It is `cameBackEmpty` in `shared/notion-compare.js` now, which is where the
+measured read-back shapes are recorded, and the plugin's vendored copy has been
+refreshed. A rule about what Notion returns has no business being restated by
+each reader of it, and this is the second rule this branch has had to collapse
+into one place after the copies drifted, the first being the person-field
+emptiness test in round 10.
+
+**Codex: `check` printed `writable: false` and exited zero.** `scope`, `draft`
+and `fill` all exit non-zero when they refuse. A caller reading the status rather
+than the body carried on toward the write that had just been refused. Only
+`problems` move it: a concern is a question for a person, and answering it is not
+a precondition. This is the one finding on the branch that lands on a command
+`backfill` did not add, `check` having shipped with `new`.
+
+**The `prove-update` half of the emptiness fix survived its mutation pass**,
+because the path is masked on the equal side: `compareProperty` turns both sides
+into lists and calls them the same. It is reached only when the before value held
+somebody and the page came back empty. That took a purpose-built case to reach,
+and it is the second time on this branch that mutating the fix found what
+reviewing it did not.
