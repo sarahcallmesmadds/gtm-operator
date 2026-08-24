@@ -1191,6 +1191,33 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('A `sources` THAT IS NOT A LIST IS REFUSED FOR THAT, not reported as no sources', () => {
+  // `sourceProblems` already refuses a sources that is not a list, and `draft`
+  // normalised every such value to [] before it could ever see one. So
+  // sources: "Drive/GTM" came back as sources:missing, telling somebody they
+  // recorded nothing when they had recorded one in the wrong shape, and the
+  // refusal written for that case was unreachable from this caller.
+  for (const sources of ['not a list', 42, true, { where: 'Drive/GTM' }]) {
+    const out = backfill.draft({ Name: 'Refund policy', Type: 'SOP/ROE', sources })
+    assert.deepStrictEqual(faults(out), ['sources:not-a-list'], `sources of ${JSON.stringify(sources)}`)
+  }
+
+  // ABSENT AND EMPTY ARE STILL MISSING, which is the case the original refusal
+  // was written for, and a real list still drafts.
+  for (const sources of [undefined, null, []]) {
+    const out = backfill.draft({ Name: 'Refund policy', Type: 'SOP/ROE', sources })
+    assert.deepStrictEqual(faults(out), ['sources:missing'], `sources of ${JSON.stringify(sources)}`)
+  }
+  const fine = backfill.draft({
+    Name: 'Refund policy',
+    Type: 'SOP/ROE',
+    sources: [{ what: 'refunds.doc', contributed: 'the steps' }],
+    body: { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+  })
+  assert.deepStrictEqual(faults(fine), [])
+  assert.strictEqual(fine.ok, true, JSON.stringify(fine.problems))
+})
+
 check('A NAME THAT IS NOT TEXT IS REFUSED FOR THAT, not reported as no name at all', () => {
   // The same function already told not-text from missing for Description and did
   // not for the title, so a Name that arrived as an object was reported as no
