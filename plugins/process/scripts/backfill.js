@@ -360,11 +360,22 @@ function plan (request) {
     }
   }
 
+  // THE SHAPE GUARD EVERY OTHER LIST HAS. `sources`, `channels`, `dms` and
+  // `ways` each refuse a value that is not a list. `topics` did not, so a bare
+  // string fell through to the "no topics were named" refusal and reported a
+  // missing list to somebody looking straight at one. The `notNames` fix reached
+  // five lists and this guard reached four, which is the same fault in the same
+  // function twice.
+  if (req.topics !== undefined && req.topics !== null && !Array.isArray(req.topics)) {
+    add('topics', 'not-a-list', `\`topics\` is ${JSON.stringify(req.topics)}. It is a list of topics, because looking by topic means naming each one. A bare string is refused rather than read as one topic: nothing here can tell "refunds and routing" from two topics somebody meant to separate.`)
+  }
   for (const [index, one] of notNames(req.topics)) {
     add('topics', 'not-a-name', `\`topics[${index}]\` is ${JSON.stringify(one)}, which is not a topic. Looking by topic finds exactly what was asked for, so a topic that reaches nothing is refused rather than dropped from the list.`)
   }
   const topics = nameList(req.topics)
-  if (ways.includes('topics') && !topics && !notNames(req.topics).length) {
+  const topicsMalformed = (req.topics !== undefined && req.topics !== null && !Array.isArray(req.topics)) ||
+    notNames(req.topics).length > 0
+  if (ways.includes('topics') && !topics && !topicsMalformed) {
     add('topics', 'missing', 'Looking by topic means naming the topics. Without them there is nothing to look for, and this mode is the one that finds exactly what was asked for rather than guessing.')
   }
   if (topics && !ways.includes('topics')) {

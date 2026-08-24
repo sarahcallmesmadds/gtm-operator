@@ -1442,12 +1442,24 @@ const commands = {
       // promise for every artifact it touches, so the promise needed something
       // watching it. The values are the workspace's own names, which is how they
       // come back.
+      //
+      // ALL THREE, WITH AN EXPLICIT null FOR THE ONES THE ROW DID NOT CARRY.
+      // Keyed only on the fields present, an empty verification field dropped
+      // out of this object entirely, `prove-update` marked it unknown, and a
+      // stamp landing on a field that had been empty was proved as a clean
+      // write. That is the backfill case exactly: a backfilled artifact has all
+      // three empty, which is what makes the never-verified signal work, so the
+      // one transition that matters is the one that went unwatched.
       verificationBefore: Object.fromEntries(
-        schema.VERIFICATION_FIELDS
-          .filter(logical => logical in before)
-          .map(logical => [context.property(logical), before[logical]])
+        schema.VERIFICATION_FIELDS.map(logical => [
+          context.property(logical),
+          logical in before ? before[logical] : null
+        ])
       ),
-      verificationUnknown: schema.VERIFICATION_FIELDS.filter(logical => !(logical in before)),
+      verificationBeforeNote:
+        'These are the three as the fetched artifact held them, with null for any the row did not carry. ' +
+        'A field this says was empty and that comes back holding something has either been stamped by something ' +
+        'other than this edit, or was never in the row you fetched. Both need a person, and `prove-update` names both.',
       verificationNote: after.reviewed === true
         ? `Recorded as a review, so ${verification.join(', ')} all move together to today's stamp.`
         : 'NOT recorded as a review, so Last checked for accuracy, Verified by and Verified date are all left where they are. ' +
@@ -1588,17 +1600,30 @@ const commands = {
               continue
             }
 
+            if (empty(was)) {
+              // TWO CAUSES, AND THE MESSAGE NAMES BOTH. The field was empty on
+              // the row that was fetched and holds something now, which is
+              // either a stamp landing from somewhere this edit did not send,
+              // or a before row that never carried the column. Blaming one of
+              // those sends somebody looking in the wrong place, and on a
+              // backfilled artifact the first one is the whole reason this
+              // check exists: all three are empty by design, so this is the
+              // transition that matters.
+              problems.push(
+                `"${name}" was empty on the artifact that was fetched and holds ${JSON.stringify(now)} on the page that came back. ` +
+                'This edit was not recorded as a review and sent nothing for it, so either something else stamped it, or the row ' +
+                'you fetched did not carry that property. Both need a person to look. On a backfilled artifact all three are empty ' +
+                'by design, which is what makes the never-verified audit signal work, so this is the transition that matters most.'
+              )
+              continue
+            }
             problems.push(
-              `"${name}" ${empty(was) ? 'was empty and now holds' : 'changed on an edit that was not recorded as a review. It held ' + JSON.stringify(was) + ' and now holds'} ${JSON.stringify(now)}. ` +
+              `"${name}" changed on an edit that was not recorded as a review. It held ${JSON.stringify(was)} and now holds ${JSON.stringify(now)}. ` +
               'Nothing here sent it, so something else did. Last checked for accuracy drives the staleness check, and moving it on an ' +
               'edit that was not a review makes a stale document look freshly checked with nothing downstream able to tell.'
             )
           }
         }
-        for (const logical of (intended.verificationUnknown || [])) {
-          unchecked.push(`${logical} was not on the artifact that was fetched, so there is no before value to compare it against.`)
-        }
-
         for (const [name, sent] of Object.entries(intended.properties)) {
           if (!(name in back)) {
             // AN EMPTIED PROPERTY IS ALLOWED TO BE ABSENT. Notion leaves an
