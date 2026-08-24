@@ -1822,7 +1822,7 @@ const commands = {
    */
   scope (file) {
     if (!file) throw new Error('Usage: node process.js scope <request.json>')
-    const request = readJson(file, 'the scope')
+    const request = readJson(file, 'the scope', 'fields')
     const out = backfill.plan(request)
 
     console.log(JSON.stringify({
@@ -1840,7 +1840,7 @@ const commands = {
 
   repeats (file) {
     if (!file) throw new Error('Usage: node process.js repeats <askings.json>')
-    const askings = readJson(file, 'the questions and where they were asked')
+    const askings = readJson(file, 'the questions and where they were asked', 'list')
     const out = backfill.repeats(askings)
 
     console.log(JSON.stringify({
@@ -1856,7 +1856,7 @@ const commands = {
 
   candidates (file) {
     if (!file) throw new Error('Usage: node process.js candidates <found.json>')
-    const found = readJson(file, 'what was found')
+    const found = readJson(file, 'what was found', 'list')
     const out = backfill.candidates(found)
 
     console.log(JSON.stringify({
@@ -1874,7 +1874,7 @@ const commands = {
 
   draft (file, todayArg) {
     if (!file) throw new Error('Usage: node process.js draft <candidate.json> [YYYY-MM-DD]')
-    const candidate = readJson(file, 'the approved candidate')
+    const candidate = readJson(file, 'the approved candidate', 'fields')
     const today = todayArg === undefined ? undefined : dayOrRefuse(todayArg, 'writing')
     const out = backfill.draft(candidate, { today })
 
@@ -1896,8 +1896,8 @@ const commands = {
       throw new Error('fill needs the artifact as it is now and the candidate: node process.js fill existing.json candidate.json')
     }
     const context = contextOrExit()
-    const existing = readJson(existingFile, 'the artifact as it is now')
-    const candidate = readJson(candidateFile, 'the candidate')
+    const existing = readJson(existingFile, 'the artifact as it is now', 'fields')
+    const candidate = readJson(candidateFile, 'the candidate', 'fields')
 
     // THE SAME GUARD `update` USES, AND FOR A WORSE FAILURE. On a raw-keyed row
     // every logical lookup is undefined, and what that means depends on which

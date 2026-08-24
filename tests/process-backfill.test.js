@@ -1191,6 +1191,41 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('EVERY BACKFILL COMMAND REFUSES A FILE OF THE WRONG SHAPE', () => {
+  // Declared per command rather than swept across all twenty-one reads, so each
+  // one is a decision with a check behind it. These five are the ones this
+  // branch added. The rest of the plugin still reads without declaring, which is
+  // recorded rather than assumed.
+  const wrongForFields = write('wrong-fields.json', ['not', 'a', 'set', 'of', 'fields'])
+  const wrongForList = write('wrong-list.json', { not: 'a list' })
+  const row = write('shape-row.json', EXISTING)
+
+  const takesFields = [
+    ['scope', file => command.commands.scope(file)],
+    ['draft', file => command.commands.draft(file)],
+    ['fill candidate', file => command.commands.fill(row, file)],
+    ['fill existing', file => command.commands.fill(file, write('shape-cand.json', { Domain: 'CS' }))]
+  ]
+  for (const [name, run] of takesFields) {
+    assert.throws(() => run(wrongForFields), /read as a set of fields/, `${name} accepted a list`)
+  }
+
+  const takesList = [
+    ['repeats', file => command.commands.repeats(file)],
+    ['candidates', file => command.commands.candidates(file)]
+  ]
+  for (const [name, run] of takesList) {
+    assert.throws(() => run(wrongForList), /read as a list/, `${name} accepted a set of fields`)
+  }
+
+  // AND EVERY ONE OF THEM STILL RUNS ON THE RIGHT SHAPE, or the loops above pass
+  // against commands that refuse everything.
+  assert.doesNotThrow(() => capture(() => command.commands.scope(write('shape-scope.json', { sources: [] }))))
+  assert.doesNotThrow(() => capture(() => command.commands.repeats(write('shape-askings.json', []))))
+  assert.doesNotThrow(() => capture(() => command.commands.candidates(write('shape-found.json', []))))
+  process.exitCode = 0
+})
+
 check('`readJson` REFUSES A FILE OF THE WRONG SHAPE, and refuses nothing unless asked', () => {
   // Valid JSON of the wrong shape is the failure this plugin has been corrected
   // for five times. A list where a set of fields was expected has none of those
@@ -1267,11 +1302,27 @@ check('NEITHER SIDE OF `fill` IS READ AS A ROW UNLESS IT IS ONE', () => {
   assert.deepStrictEqual(faults(nothing), [])
   assert.ok(/finished answer/.test(nothing.emptyNote))
 
-  // A REFUSED CONTAINER EXITS NON-ZERO, like every other refusal here.
+  // THROUGH THE COMMAND IT NEVER GETS THIS FAR NOW, and that is the better
+  // answer rather than a competing one. `readJson` refuses the file at the door
+  // and says what it actually holds, which is a more useful thing to be told
+  // than that the candidate is not a candidate. Both nets are kept: this one
+  // catches a file, and the refusals above catch any caller handing `fill` a
+  // value directly, which the test above and `draft` both do.
+  assert.throws(
+    () => command.commands.fill(write('cont-row.json', EXISTING), write('cont-cand.json', [])),
+    /read as a set of fields/,
+    'a list handed to the fill command was not refused at the door'
+  )
+
+  // AND A REAL FILL STILL RUNS THROUGH THE COMMAND, or the throw above is a
+  // command that refuses every candidate it is given.
   process.exitCode = 0
-  capture(() => command.commands.fill(write('cont-row.json', EXISTING), write('cont-cand.json', [])))
-  assert.strictEqual(process.exitCode, 1, 'a fill given a list as its candidate exited zero')
-  process.exitCode = 0
+  const ran = capture(() => command.commands.fill(
+    write('cont-row2.json', EXISTING),
+    write('cont-cand2.json', { Domain: 'Customer Success' })
+  ))
+  assert.strictEqual(process.exitCode, 0, JSON.stringify(ran.refusals))
+  assert.deepStrictEqual(ran.filling, ['Domain'])
 })
 
 check('`[]`-IN-A-STRING IS ASKING FOR NOBODY HERE TOO, and `check` and the write agree about it', () => {
