@@ -1191,6 +1191,42 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('THE SAME ASKING RECORDED TWICE IS ONE ASKING, not two towards the threshold', () => {
+  // The threshold this feeds is "asked three or more times" and nothing removed
+  // duplicates before counting, so one record three times over came back
+  // asked: 3, crossed it, and listed the same channel and the same date three
+  // times in the evidence a person is shown. That is what a re-run over an
+  // overlapping export produces.
+  const one = { question: 'how do refunds get handled', where: '#cs', when: '2026-01-05' }
+  const repeated = backfill.repeats([{ ...one }, { ...one }, { ...one }])
+  assert.deepStrictEqual(repeated.clusters, [], 'one asking recorded three times crossed the threshold')
+  assert.strictEqual(repeated.duplicates, 2)
+  assert.deepStrictEqual(repeated.below.map(cluster => cluster.asked), [1])
+
+  // THE SAME QUESTION IN TWO PLACES IS TWO ASKINGS, and in one place a month
+  // apart is two as well. Those are what this command exists to find, so the
+  // check above must not be passing against a version that folds them together.
+  const genuine = backfill.repeats([
+    { question: 'how do refunds get handled', where: '#cs', when: '2026-01-05' },
+    { question: 'how do refunds get handled', where: '#sales', when: '2026-02-05' },
+    { question: 'how do refunds get handled', where: '#cs', when: '2026-03-05' }
+  ])
+  assert.deepStrictEqual(genuine.clusters.map(cluster => cluster.asked), [3])
+  assert.strictEqual(genuine.duplicates, 0)
+  assert.strictEqual(genuine.duplicatesNote, null)
+
+  // Same question, same place, DIFFERENT day is still two.
+  const sameChannel = backfill.repeats([
+    { question: 'how do refunds get handled', where: '#cs', when: '2026-01-05' },
+    { question: 'how do refunds get handled', where: '#cs', when: '2026-02-05' }
+  ])
+  assert.strictEqual(sameChannel.duplicates, 0)
+
+  // AND THE NUMBER DROPPED IS SAID OUT LOUD, or a re-run quietly reports fewer
+  // askings than the person handed it.
+  assert.ok(repeated.duplicatesNote.includes('2 of the 3'), repeated.duplicatesNote)
+})
+
 check('SETTINGS FOR A SOURCE NOBODY ASKED FOR ARE A CONTRADICTION, not a spare part', () => {
   // Each source's settings were only looked at inside if (named(source)), so a
   // request naming documents beside a fully scoped slack block came back ok:true,

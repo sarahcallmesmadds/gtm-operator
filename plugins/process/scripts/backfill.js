@@ -571,6 +571,37 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
   if (refusals.length) return { ok: false, clusters: [], below: [], refusals }
 
   /*
+   * THE SAME ASKING RECORDED TWICE IS ONE ASKING.
+   *
+   * The threshold this feeds is "asked three or more times", and nothing removed
+   * duplicates before counting. So the identical record three times over came
+   * back `asked: 3`, crossed the threshold, and listed the same channel and the
+   * same date three times in the evidence a person is shown. One question
+   * ingested three times is not a repeated question, and the whole point of the
+   * count is to find the ones people keep asking.
+   *
+   * A duplicate is the same question, in the same place, on the same day. Same
+   * question in two channels is two askings and is exactly what this looks for;
+   * same question in one channel a month apart is two askings too. What is not
+   * two is one line read twice, which is what a re-run over an overlapping
+   * export produces.
+   *
+   * Dropped silently rather than refused, because a source exported twice is a
+   * normal thing to hand this and not a mistake worth stopping for. `duplicates`
+   * says how many went, so it is not silent about the number, only about
+   * carrying on.
+   */
+  const seen = new Set()
+  const distinct = []
+  for (const asking of usable) {
+    const key = JSON.stringify([asking.question, asking.where, asking.when])
+    if (seen.has(key)) continue
+    seen.add(key)
+    distinct.push(asking)
+  }
+  const duplicates = usable.length - distinct.length
+
+  /*
    * GREEDY, AND COMPARED AGAINST THE FIRST ASKING IN THE CLUSTER.
    *
    * Comparing against every member and taking the best would chain: A is near
@@ -579,7 +610,7 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
    * the person, so the thing they judge is the thing that decided membership.
    */
   const clusters = []
-  for (const asking of usable) {
+  for (const asking of distinct) {
     const home = clusters.find(cluster => similarity(cluster.question, asking.question) >= threshold)
     if (home) home.askings.push(asking)
     else clusters.push({ question: asking.question, askings: [asking] })
@@ -597,6 +628,12 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
     threshold,
     thresholdIsMeasured: REPEAT_SIMILARITY_IS_MEASURED,
     min,
+    duplicates,
+    duplicatesNote: duplicates
+      ? `${duplicates} of the ${usable.length} askings given were the same question, in the same place, on the same ` +
+        'day as another, so they were counted once. That is what a re-run over an overlapping export produces, and ' +
+        'counting them separately would push a question over the threshold that nobody asked twice.'
+      : null,
     clusters: scored.filter(one => one.asked >= min),
     below: scored.filter(one => one.asked < min),
     refusals: []
