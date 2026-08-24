@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 788 checks, up from 716.
+The suite is 790 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3790,3 +3790,34 @@ and stay green. The list is pinned against its parts first, then iterated. That
 is the same trap recorded from the audit session, where the tests written to stop
 a drift could be beaten by removing what they tested, and it was found by
 mutating rather than by reading.
+
+### Review round 15 on pull request 16, both reviewers, two more
+
+**Codex: `prove` never bound its proof to the page that was created.** It took
+the artifact and a read-back and ignored the read-back's url entirely, so what it
+actually established was that *some* page had the right headings and the right
+properties absent. A different page that happened to match passed, and so did the
+case the command exists for: a page created malformed while the skill read back
+something else.
+
+**The backfill absence check from round 6 sat on top of that**, which means the
+guarantee this whole branch is built on, that a backfilled page carries no owner
+and no stamp, was being proved about an unspecified page. Codex confirmed it by
+mutating the fixtures to return a different url and watching the entire backfill
+suite stay green.
+
+`prove-update` has bound its proof since it was written, because `update` knows
+the page it is writing to. `create` does not: the page does not exist when the
+payload is built. So the url the create call returned is now a required third
+argument, and the read-back has to be that page. Both skill documents say to keep
+it and why.
+
+**This is the second finding to land on a command `backfill` did not add**, after
+`check`'s exit code in round 12, and both were reached through what backfill
+built on top of them.
+
+**Devin: the refused-plan check named two of the three things a refusal empties.**
+`reading` and `ways` were asserted and `topics` was not, so the third half of a
+broad change was unwatched. Both are covered now, and the new check reaches it
+with topics actually set rather than asserting emptiness against a value that was
+never there, which is the fixture-makes-it-unreachable fault from round 6.

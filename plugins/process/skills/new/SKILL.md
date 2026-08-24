@@ -26,7 +26,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" duplicates <proposed.json>
 node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" judge <proposed.json> <rows.json> [threshold]
 node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" check <proposed.json>
 node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" create <artifact.json>
-node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" prove <artifact.json> <readback.json>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" prove <artifact.json> <readback.json> <created-url>
 ```
 
 **Do not compose a query by hand and do not build a property payload by hand.**
@@ -239,8 +239,13 @@ That returns the properties payload, the body sections and the headings to expec
 Create the page, **then read it back and prove it**:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" prove artifact.json readback.json
+node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" prove artifact.json readback.json <the url the create returned>
 ```
+
+**Keep the url the create call returned and pass it as the third argument.**
+`prove` refuses without it, and the reason is that otherwise it checks that
+*some* page has the right shape rather than that the page just written does. A
+page created malformed passes as long as the one read back is fine.
 
 **A create call that returned without an error proves nothing.** A Notion page
 can be created with an empty body on a silent partial failure. If a heading is

@@ -115,6 +115,7 @@ const named = list => (list || []).map(one => `${one.field}:${one.kind}`)
 const faults = out => named(out.refusals)
 
 const URL_A = 'https://notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+const URL_B = 'https://notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'
 
 /** A window that is valid, so a test about something else is not about dates. */
 const WINDOW = { from: '2026-01-01', to: '2026-06-01' }
@@ -160,6 +161,10 @@ check('A REFUSED PLAN CARRIES NO PLAN, whichever source was refused', () => {
   // the good half of a refused scope is reading a scope nobody agreed to.
   assert.deepStrictEqual(out.reading, {})
   assert.deepStrictEqual(out.ways, [])
+  // AND `topics`. Naming two of the three left the third half of a broad change
+  // unwatched, which is the same shape as every guard on this branch that
+  // covered some of what it was for.
+  assert.deepStrictEqual(out.topics, [])
 })
 
 check('A LIST ENTRY THAT IS NOT A NAME IS REFUSED, NOT DROPPED', () => {
@@ -646,7 +651,8 @@ check('create says it is a backfill, and prove reads the mode from the same file
 
   const out = capture(() => command.commands.prove(
     file,
-    write('back.json', { url: URL_A, properties: sent.properties, headings: sent.headings })
+    write('back.json', { url: URL_A, properties: sent.properties, headings: sent.headings }),
+    URL_A
   ))
   assert.strictEqual(out.proved, true, JSON.stringify(out.problems))
 })
@@ -661,7 +667,7 @@ check('THE READ PATH CANNOT DIVERGE FROM THE WRITE PATH: prove expects no stamp 
   const out = capture(() => command.commands.prove(
     write('backfilled2.json', final),
     write('back2.json', { url: URL_A, properties: sent.properties, headings: sent.headings })
-  ))
+  , URL_A))
   assert.strictEqual(out.proved, true, JSON.stringify(out.problems))
 })
 
@@ -685,7 +691,8 @@ check('A BACKFILLED PAGE THAT CAME BACK STAMPED IS NOT PROVED', () => {
         url: URL_A,
         properties: { ...sent.properties, [context.property(logical)]: '2026-08-23' },
         headings: sent.headings
-      })
+      }),
+      URL_A
     ))
     assert.strictEqual(out.proved, false, `a backfilled page came back carrying ${logical} and was proved`)
     assert.ok(
@@ -1007,7 +1014,7 @@ check('AN EMPTY LIST THAT CAME BACK AS `[]` IN A STRING IS STILL EMPTY', () => {
     const out = capture(() => command.commands.prove(
       write('empty-shapes.json', final),
       write('empty-back.json', { url: URL_A, properties, headings: sent.headings })
-    ))
+    , URL_A))
     assert.strictEqual(out.proved, true, `a backfilled page whose fields came back as ${JSON.stringify(shape)} was not proved: ${JSON.stringify(out.problems)}`)
   }
   process.exitCode = 0
@@ -1124,6 +1131,70 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
     assert.strictEqual(out.after, null, `a row with no ${field} came back with a runnable after row`)
     assert.deepStrictEqual(faults(out), [`${field}:missing`])
   }
+})
+
+
+check('A REFUSED SCOPE EMPTIES ALL THREE, topics included', () => {
+  // Reached with topics actually set, so the emptying is exercised rather than
+  // asserted against a value that was never there.
+  const out = backfill.plan({
+    sources: ['slack'],
+    slack: { channels: 'all', dms: 'all', ...WINDOW },
+    ways: ['topics'],
+    topics: ['how refunds get handled']
+  })
+  assert.strictEqual(out.ok, false)
+  assert.deepStrictEqual(out.reading, {})
+  assert.deepStrictEqual(out.ways, [])
+  assert.deepStrictEqual(out.topics, [])
+
+  // The same request without the refusal keeps all three, so the check above is
+  // not passing on a plan that never had them.
+  const fine = backfill.plan({
+    sources: ['slack'],
+    slack: { channels: 'all', ...WINDOW },
+    ways: ['topics'],
+    topics: ['how refunds get handled']
+  })
+  assert.strictEqual(fine.ok, true, JSON.stringify(fine.refusals))
+  assert.deepStrictEqual(fine.topics, ['how refunds get handled'])
+  assert.deepStrictEqual(fine.ways, ['topics'])
+})
+
+check('THE PROOF IS BOUND TO THE PAGE THAT WAS CREATED', () => {
+  // Without this, `prove` checked that SOME page had the right headings and the
+  // right properties absent. A different page that happened to match passed, and
+  // so did the case this exists for: a page created malformed while the skill
+  // read back something else. The backfill absence check sat on top of that, so
+  // it proved only that some page was unstamped.
+  const final = draftOf().artifact
+  const file = write('bound.json', final)
+  const sent = capture(() => command.commands.create(file))
+  const back = { url: URL_A, properties: sent.properties, headings: sent.headings }
+
+  const right = capture(() => command.commands.prove(file, write('bound-back.json', back), URL_A))
+  assert.strictEqual(right.proved, true, JSON.stringify(right.problems))
+
+  process.exitCode = 0
+  const wrong = capture(() => command.commands.prove(file, write('bound-back.json', back), URL_B))
+  assert.strictEqual(wrong.proved, false, 'a read-back of a different page was proved as the write that just happened')
+  assert.strictEqual(process.exitCode, 1)
+
+  process.exitCode = 0
+  const noUrl = capture(() => command.commands.prove(
+    file,
+    write('bound-back2.json', { properties: sent.properties, headings: sent.headings }),
+    URL_A
+  ))
+  assert.strictEqual(noUrl.proved, false, 'a read-back with no url was proved')
+
+  // And the created url is required, not optional, or the binding is advisory.
+  assert.throws(
+    () => command.commands.prove(file, write('bound-back.json', back)),
+    /url the create call returned/,
+    'prove ran without being told which page it was proving'
+  )
+  process.exitCode = 0
 })
 
 

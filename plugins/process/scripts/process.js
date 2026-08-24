@@ -24,7 +24,7 @@
  *   node process.js duplicates <proposed.json>             the query the near-duplicate check reads
  *   node process.js judge <proposed.json> <rows.json>      which existing artifacts are near matches
  *   node process.js create <artifact.json>                 the properties payload and the body
- *   node process.js prove <artifact.json> <readback.json>  did the create land
+ *   node process.js prove <artifact.json> <readback.json> <created-url>  did the create land, on that page
  *   node process.js find <question.json>                   the query find reads
  *   node process.js trust <rows.json> [YYYY-MM-DD]         which of these is still worth trusting
  *   node process.js scope <request.json>                  what backfill is allowed to read, or why this is not a scope
@@ -884,9 +884,9 @@ const commands = {
     }, null, 2))
   },
 
-  prove (artifactFile, readbackFile) {
+  prove (artifactFile, readbackFile, createdUrl) {
     if (!artifactFile || !readbackFile) {
-      throw new Error('Usage: node process.js prove <artifact.json> <readback.json>')
+      throw new Error('Usage: node process.js prove <artifact.json> <readback.json> <created-url>')
     }
     const final = readJson(artifactFile, 'the artifact')
     const readback = readJson(readbackFile, 'the page as it came back')
@@ -895,6 +895,48 @@ const commands = {
     const problems = []
     const checked = []
     const unchecked = []
+
+    /*
+     * THE PROOF IS BOUND TO THE PAGE THAT WAS CREATED.
+     *
+     * Without this, `prove` checked that SOME page had the right headings and
+     * the right properties absent, and said the write landed. A different page
+     * that happened to match passed, and so did the case this exists for: a
+     * page created malformed while the skill read back something else. The
+     * backfill absence check added in round 6 sat on top of that, so it proved
+     * only that some page was unstamped.
+     *
+     * `prove-update` has bound its proof since it was written, because `update`
+     * knows the page it is writing to. `create` does not: the page does not
+     * exist when the payload is built. So the url the create call returned is
+     * passed in here, and the read-back has to be that page.
+     */
+    const created = pageKey(createdUrl)
+    if (!created) {
+      throw new Error(
+        `prove needs the url the create call returned, and got ${JSON.stringify(createdUrl)}. Without it this checks ` +
+        'that some page has the right shape rather than that the page just written does, and a page created ' +
+        'malformed passes as long as the one read back is fine.'
+      )
+    }
+    const got = pageKey(readback && (readback.url || (readback.page && readback.page.url)))
+    if (!got) {
+      problems.push({
+        what: 'the page that came back',
+        why: 'It carries no usable url, so nothing can say it is the page that was just created. Save the whole page, keeping its url.'
+      })
+    } else if (got !== created) {
+      problems.push({
+        what: 'the page that came back',
+        why: `It is not the page that was created. Created ${created}, read back ${got}. Nothing below was checked, because checking a different page reports a clean write on the wrong artifact.`
+      })
+    }
+
+    if (problems.length) {
+      console.log(JSON.stringify({ proved: false, problems, checked, unchecked }, null, 2))
+      process.exitCode = 1
+      return
+    }
 
     if (!readback || !readback.properties) {
       console.log(JSON.stringify({
