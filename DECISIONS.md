@@ -4110,3 +4110,25 @@ reviewer alone.
 798 checks, up from 797. 97 mutations, all landed, all 81 backfill checks reached,
 and the one survivor is the `wantsAPerson` inversion caught by
 `process-audit-update`.
+
+### Reading a file checks its shape, and the commands opt in one at a time
+
+Five of the last six findings were the same fault: valid JSON of the wrong shape.
+A list where a set of fields was expected has none of those fields, every field
+reads as absent, and absent means leave it alone nearly everywhere here, so the
+run reports there was nothing to do and exits zero having dropped what somebody
+approved. It was fixed five times in five places, which is the shape of a rule
+that has no home.
+
+`readJson` is where all twenty-one file reads already go, so it is where the
+question belongs. It takes an expected shape now, `fields` or `list`, and refuses
+at the door with a message saying what the file actually holds.
+
+**A caller that does not declare a shape gets exactly the old behaviour.** That is
+deliberate. Declaring it changes what a command accepts, so it is a decision per
+command with its own check, rather than a sweep across twenty-one call sites that
+nobody could review. This commit adds the capability and uses it nowhere.
+
+**What it does not fix.** The shape check knows a set of fields from a list. It
+does not know whether the fields inside are the right ones, so the guards added in
+rounds 19 to 22 all stay: this is a second net above them, not a replacement.
