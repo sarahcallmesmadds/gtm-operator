@@ -4302,3 +4302,37 @@ left alone deliberately. What was fixed is that the answer no longer depends on
 the order of the file.
 
 807 checks. 118 mutations, all landed, all 89 backfill checks reached.
+
+### Review round 26: `prove-update` could prove nothing and call it clean
+
+Devin came back clean. Codex found one, in the command whose only job is saying
+whether a write landed.
+
+**The guard asked whether `properties` was truthy, and `[]` is truthy.**
+`Object.entries([])` then walked nothing, so a payload carrying an empty list came
+back `proved: true`, `checked: []`, and "Every property sent came back matching"
+having compared not one property. That is the exact failure the guard above it was
+written to stop, one type short: it asked whether the field was there rather than
+whether it was the thing it is read as.
+
+**The first fix was wrong and two existing checks caught it**, which is the second
+time on this branch that the suite has refused a fix of mine rather than a
+reviewer doing it. Requiring `properties` to be non-empty broke a body-only edit,
+which changes no property, so `update` correctly prints `{}` with headings beside
+it. Empty is a real payload. A list is not.
+
+**So the two questions are answered in two places.** The shape is judged at the
+door: a list, a string, a number is not the output of `update`. The emptiness is
+judged at the verdict: a run that compared nothing is not a proof, whatever its
+shape was, and it now says so and exits non-zero rather than reporting a clean
+write.
+
+**Worth recording about reachability.** Through real `update` output this is hard
+to reach, because a non-review edit carries the three verification fields for
+exactly this purpose and a body-only edit carries headings. It is reachable by
+hand, which is how a person debugging a failed write would reach it. The check is
+built from a real payload with its contents emptied rather than from a
+hand-assembled one, because a hand-made payload fails the page-binding check first
+and would have proved nothing about the emptiness.
+
+808 checks. 121 mutations, all landed, all 90 backfill checks reached.
