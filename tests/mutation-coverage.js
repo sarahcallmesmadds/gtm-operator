@@ -37,6 +37,10 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [P, "  if (expected === 'list' && !isList) {", "  if (false) {"],
+  [P, "  if (expected === 'fields' && !isFields) {", "  if (false) {"],
+  [P, "  if (expected === undefined) return parsed", "  if (true) return parsed"],
+  [P, "  const isFields = parsed !== null && typeof parsed === 'object' && !isList", "  const isFields = parsed !== null && typeof parsed === 'object'"],
   [B, "  if (!artifact.bodyIsMap(given.body)) {", "  if (false) {"],
   [B, "  if (!artifact.bodyIsMap(given.body)) {", "  if (!artifact.bodyIsMap({ ...(given.body || {}) })) {"],
   [B, "  if (!looksLikeARow(existing)) {", "  if (false) {"],
