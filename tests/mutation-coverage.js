@@ -37,6 +37,9 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    if (seen.has(key)) continue", "    if (false) continue"],
+  [B, "    const key = JSON.stringify([asking.question, asking.where, asking.when])", "    const key = JSON.stringify([asking.question])"],
+  [B, "  const ordered = distinct.slice().sort((a, b) => {", "  const ordered = distinct.slice().reverse(); const unusedSort = ((a, b) => {"],
   [B, "    if (req[source] === undefined || req[source] === null) continue", "    if (true) continue"],
   [B, "    if (named(source)) continue\n    if (req[source] === undefined", "    if (false) continue\n    if (req[source] === undefined"],
   [B, "    if (isRecord(value)) return value", "    if (true) return value"],
