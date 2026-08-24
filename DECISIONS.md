@@ -3405,3 +3405,36 @@ this repository is worst at and it is worth saying plainly that writing it down
 in `DECISIONS.md` twelve times last session did not stop it happening twice more.
 What caught it both times was a reviewer asked specifically whether the guard was
 reachable on every path, rather than whether the code was correct.
+
+### Review round 5 on pull request 16, from the Devin CLI
+
+One finding, and it is the same fault a third time, sitting in the seam that
+round 4's fix created.
+
+**The shared raw-key guard was built from the wrong field list.**
+`refuseRawKeys` watched `UPDATABLE_FIELDS` for every caller. `fill` reads the
+fields it can put into a blank and the four it refuses outright, and only one of
+those four, `Owner`, is in `UPDATABLE_FIELDS`. So a candidate carrying the
+workspace's own name for `Verified date` walked through the guard, became
+invisible to `fill`, and was ignored rather than refused: precisely the thing
+round 4 had just made impossible through the other door.
+
+**Sharing a guard is only half of sharing it.** Round 1 put the guard on both
+rows and stopped there. What it also needed was the guard watching the fields
+its caller is about to read, and only the caller knows which those are. `fields`
+is a parameter now, defaulting to `UPDATABLE_FIELDS` for `update`, and `fill`
+passes `FILLABLE` plus `REFUSED_ON_A_BACKFILL`. `FILLABLE` moved out of the
+function body and is exported for exactly that reason, so the guard is built
+from the same list the reading is done with rather than from a second one that
+looks similar.
+
+**The check proved one field.** It used `R Domain`, so the suite stayed green
+over every field the guard was not watching. It iterates the whole list now, on
+both the existing row and the candidate.
+
+**Three of the seven findings across five rounds are this one fault**, and the
+third arrived inside the fix for the second. That is worth stating without
+softening: writing "a fix in one place whose pair in another place was missed" at
+the top of every review prompt did not stop it, and neither did fixing it twice.
+What found it each time was a reviewer given the specific question of whether a
+guard is reachable, and given the previous rounds' findings to work from.

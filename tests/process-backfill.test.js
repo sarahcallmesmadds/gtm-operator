@@ -637,11 +637,29 @@ check('A RAW-KEYED ROW IS REFUSED ON BOTH SIDES, not just the one that was fetch
     /normaliseRows/,
     'a raw-keyed existing row was read as blank and offered for filling'
   )
-  assert.throws(
-    () => renamedCommand.commands.fill(write('row-ok.json', logicalRow), write('raw-cand.json', { 'R Domain': 'Customer Success' })),
-    /normaliseRows/,
-    'a raw-keyed candidate offered nothing and that was reported as nothing to fill'
-  )
+  // EVERY FIELD `fill` READS, not one of them. The guard was built from
+  // `UPDATABLE_FIELDS`, which holds `Owner` and none of the other three fields a
+  // backfill refuses, so a candidate carrying the workspace's name for
+  // `Verified date` walked through the guard and was then invisible to the thing
+  // the guard exists to protect. Checking one field kept the suite green over it.
+  for (const field of [...backfill.FILLABLE, ...backfill.REFUSED_ON_A_BACKFILL]) {
+    assert.throws(
+      () => renamedCommand.commands.fill(
+        write('row-ok.json', logicalRow),
+        write('raw-cand.json', { [`R ${field}`]: 'anything' })
+      ),
+      /normaliseRows/,
+      `a raw-keyed candidate carrying ${field} offered nothing and that was reported as nothing to fill`
+    )
+    assert.throws(
+      () => renamedCommand.commands.fill(
+        write('raw-row2.json', { url: URL_A, [`R ${field}`]: 'anything' }),
+        write('cand-ok2.json', { Domain: 'Customer Success' })
+      ),
+      /normaliseRows/,
+      `a raw-keyed existing row carrying ${field} read as blank`
+    )
+  }
   command = writeConfig()
 })
 
