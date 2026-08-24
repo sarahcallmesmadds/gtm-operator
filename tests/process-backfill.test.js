@@ -724,14 +724,14 @@ check('fill fills what is blank', () => {
 check('IT NEVER OVERWRITES, and says what it declined to touch', () => {
   const out = backfill.fill(EXISTING, { Description: 'What a machine would have said' })
   assert.strictEqual(out.after.Description, undefined, 'a filled field was overwritten')
-  assert.deepStrictEqual(out.refused.map(one => one.field), ['Description'])
+  assert.deepStrictEqual(named(out.refused), ['Description:occupied'])
   assert.strictEqual(out.refused[0].holding, 'The version a person wrote.')
 })
 
 check('an empty list counts as blank, and a filled one does not', () => {
   assert.ok(backfill.fill(EXISTING, { Tags: ['AI'] }).filling.includes('Tags'))
   const full = backfill.fill({ ...EXISTING, Tags: ['Data'] }, { Tags: ['AI'] })
-  assert.deepStrictEqual(full.refused.map(one => one.field), ['Tags'])
+  assert.deepStrictEqual(named(full.refused), ['Tags:occupied'])
 })
 
 check('`fill` REFUSES THE SAME LIST `draft` DOES, on a blank row as much as on a full one', () => {
@@ -740,7 +740,7 @@ check('`fill` REFUSES THE SAME LIST `draft` DOES, on a blank row as much as on a
   // finished no-op with an empty `refused` list.
   for (const field of backfill.REFUSED_ON_A_BACKFILL) {
     const out = backfill.fill(EXISTING, { [field]: '2026-08-23' })
-    assert.deepStrictEqual(out.refused.map(one => one.field), [field], `${field} was ignored rather than refused`)
+    assert.deepStrictEqual(named(out.refused), [`${field}:never-filled`], `${field} was ignored rather than refused`)
     assert.strictEqual(out.after[field], undefined, `backfill filled ${field}`)
   }
 })
@@ -1092,6 +1092,23 @@ check('WHAT `fill` HANDS BACK IS SOMETHING `update` WILL TAKE', () => {
 
   // And every fillable field still works when the value is real, so the check
   // above is not just refusing everything.
+  // `Description` IS CHECKED AGAINST A ROW THAT HAS NONE. It is the only
+  // fillable field that is plain text, and on `EXISTING` it is already occupied,
+  // so it never reaches the value check there. `properties` writes it with
+  // `String(...)`, so an object reached Notion as the literal "[object Object]"
+  // with nothing downstream reporting it.
+  const blankDescription = { ...EXISTING, Description: null }
+  for (const value of [{ text: 'a description' }, 42, true, ['a']]) {
+    const out = backfill.fill(blankDescription, { Description: value })
+    assert.strictEqual(out.ok, false, `Description ${JSON.stringify(value)} was accepted`)
+    assert.strictEqual(out.after, null, `Description ${JSON.stringify(value)} came back with a runnable after row`)
+    assert.deepStrictEqual(faults(out), ['Description:not-text'])
+  }
+  assert.ok(
+    backfill.fill(blankDescription, { Description: 'real text' }).filling.includes('Description'),
+    'a real description was refused'
+  )
+
   const good = { Domain: 'Customer Success', Tags: ['AI'], Audience: ['AE'], 'Review cadence': 'Monthly' }
   const out = backfill.fill(EXISTING, good)
   assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))

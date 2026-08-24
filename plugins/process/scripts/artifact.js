@@ -243,6 +243,20 @@ function problems (final, { parentType, partialBody = false } = {}) {
     add('Type', 'unknown-value', `"${row.Type}" is not a type this database has. One of: ${TYPES.join(', ')}.`)
   }
 
+  // TEXT HAS TO BE TEXT. `properties` writes this with `String(...)`, so an
+  // object arrived in Notion as the literal `[object Object]` and a number
+  // arrived as a number-shaped string, both without a word of complaint. `fill`
+  // is what made this reachable: it takes its values off a candidate a model
+  // built rather than off a person typing into a prompt.
+  if (row.Description !== undefined && row.Description !== null && typeof row.Description !== 'string') {
+    add(
+      'Description',
+      'not-text',
+      `Description is ${JSON.stringify(row.Description)}, which is not text. Written as it stands it reaches Notion as whatever ` +
+      '`String()` makes of it, which for an object is the literal "[object Object]", and nothing downstream would report that as wrong.'
+    )
+  }
+
   if (row.Status !== undefined && !WRITABLE_STATUSES.includes(row.Status)) {
     add(
       'Status',
