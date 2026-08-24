@@ -26,6 +26,7 @@ const path = require('path')
 
 const artifact = require(path.join(__dirname, 'artifact'))
 const { similarity } = require(path.join(__dirname, 'similar'))
+const { cameBackEmpty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
 
 /**
@@ -704,8 +705,11 @@ function fill (existing, candidate) {
     }
   }
 
-  const blank = value => value === undefined || value === null || value === '' ||
-    (Array.isArray(value) && value.length === 0)
+  // THE SEVENTH COPY OF THIS RULE, AND IT MISSED THE SAME SHAPE AS THE SIX
+  // BEFORE IT. An empty multi-select comes back from Notion as `'[]'`, so a
+  // field that was empty read as occupied and was never filled: the one thing
+  // this command is for, refused for the value Notion actually returns.
+  const blank = cameBackEmpty
 
 
   const after = { url: before.url, reviewed: false }
@@ -771,6 +775,29 @@ function fill (existing, candidate) {
    */
   const offered = {}
   for (const field of filling) offered[field] = after[field]
+
+  // THE IDENTITY IS REQUIRED RATHER THAN FILTERED AWAY. `problems` reports a
+  // missing `Name` or `Type` and the filter below dropped those, because they
+  // are not fields being filled. So a before row missing either came back
+  // `ok: true` with a runnable `after`, and `update` restored its identity from
+  // that same incomplete row and refused it. Nothing can judge a value without
+  // a `Type`: it decides which values a select takes.
+  const identity = ['Name', 'Type'].filter(field => !text(before[field]))
+  if (identity.length) {
+    return {
+      ok: false,
+      after: null,
+      filling: [],
+      refused,
+      neverFilled: neverFilled.map(one => one.field),
+      refusals: identity.map(field => ({
+        field,
+        kind: 'missing',
+        message: `The artifact as it is now carries no ${field}, so nothing can judge what is being offered for it: the type decides which values a select takes. Fetch the whole row rather than the fields being changed.`
+      }))
+    }
+  }
+
   const badValues = filling.length
     ? artifact.problems(
       { Name: before.Name, Type: before.Type, ...offered },
@@ -810,7 +837,21 @@ function fill (existing, candidate) {
   }
 }
 
+/**
+ * Every logical field `fill` reads off the rows it is given.
+ *
+ * THE RAW-KEY GUARD IS BUILT FROM THIS AND NOTHING ELSE. It was assembled over
+ * there from two of the three lists, and then round 13 taught `fill` to read
+ * `Name` and `Type` to judge the values it hands over. Neither is in either
+ * list, so a row keyed by the workspace's own name for `Type` walked through the
+ * guard, read as absent, and the identity check never ran. That is the third
+ * time a reader has been added to a row whose guard was not told about it, so
+ * the guard reads one list now and the list lives beside the reading.
+ */
+const READ_BY_FILL = ['Name', 'Type', ...FILLABLE, ...REFUSED_ON_A_BACKFILL]
+
 module.exports = {
+  READ_BY_FILL,
   FILLABLE,
   REFUSED_ON_A_BACKFILL,
   SOURCES,

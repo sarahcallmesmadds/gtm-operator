@@ -806,7 +806,22 @@ check('A RAW-KEYED ROW IS REFUSED ON BOTH SIDES, not just the one that was fetch
   // backfill refuses, so a candidate carrying the workspace's name for
   // `Verified date` walked through the guard and was then invisible to the thing
   // the guard exists to protect. Checking one field kept the suite green over it.
-  for (const field of [...backfill.FILLABLE, ...backfill.REFUSED_ON_A_BACKFILL]) {
+  // EVERY FIELD `fill` READS, from the one list it reads them from. Assembled
+  // here out of two of the three lists, it passed without checking `Name` and
+  // `Type`, which `fill` reads to judge the values it hands over.
+  //
+  // THE LIST ITSELF IS PINNED FIRST. A loop over the list under test cannot
+  // catch that list shrinking: delete a name from it and the loop simply checks
+  // one field fewer, still green. That is a check defeated by deleting the thing
+  // it watches, which this repository has been caught by before.
+  for (const required of ['Name', 'Type', ...backfill.FILLABLE, ...backfill.REFUSED_ON_A_BACKFILL]) {
+    assert.ok(
+      backfill.READ_BY_FILL.includes(required),
+      `${required} is read by fill and is not in READ_BY_FILL, so the guard does not watch it`
+    )
+  }
+
+  for (const field of backfill.READ_BY_FILL) {
     assert.throws(
       () => renamedCommand.commands.fill(
         write('row-ok.json', logicalRow),
@@ -1079,6 +1094,36 @@ check('WHAT `fill` HANDS BACK IS SOMETHING `update` WILL TAKE', () => {
     '2026-08-23'
   ))
   assert.deepStrictEqual(sent.changed.sort(), ['Audience', 'Domain', 'Review cadence', 'Tags'])
+})
+
+
+check('AN EMPTY MULTI-SELECT RETURNED AS `[]` IN A STRING IS STILL A BLANK', () => {
+  // The seventh copy of the emptiness rule, and it missed the same shape as the
+  // six before it. Notion returns an empty multi-select as a JSON array inside a
+  // string, so the field read as occupied and was never filled: the one thing
+  // this command is for, refused for the value Notion actually returns.
+  for (const empty of [[], null, '', '[]']) {
+    const out = backfill.fill({ ...EXISTING, Tags: empty }, { Tags: ['AI'] })
+    assert.ok(out.filling.includes('Tags'), `Tags holding ${JSON.stringify(empty)} was read as occupied`)
+  }
+  // A real value is still occupied, so the line above is not just always true.
+  const held = backfill.fill({ ...EXISTING, Tags: ['Data'] }, { Tags: ['AI'] })
+  assert.deepStrictEqual(named(held.refused), ['Tags:occupied'])
+})
+
+check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
+  // `problems` reported the missing Name or Type and the bad-values filter
+  // dropped it, because neither is a field being filled. So a before row missing
+  // its identity came back ok with a runnable after, and `update` restored the
+  // identity from that same incomplete row and refused it.
+  for (const field of ['Name', 'Type']) {
+    const before = { ...EXISTING }
+    delete before[field]
+    const out = backfill.fill(before, { Domain: 'Customer Success' })
+    assert.strictEqual(out.ok, false, `a row with no ${field} was accepted`)
+    assert.strictEqual(out.after, null, `a row with no ${field} came back with a runnable after row`)
+    assert.deepStrictEqual(faults(out), [`${field}:missing`])
+  }
 })
 
 

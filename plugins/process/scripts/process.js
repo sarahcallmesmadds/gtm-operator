@@ -1821,14 +1821,14 @@ const commands = {
     //     there was nothing to fill. That is reported as a finished answer and
     //     exits zero, which is the quieter of the two failures and the harder
     //     one to notice.
-    // BUILT FROM WHAT `fill` READS, not from the global list. It looks at the
-    // fields it can put into a blank and at the four it refuses outright, and
-    // only one of those four is in `UPDATABLE_FIELDS`.
+    // BUILT FROM WHAT `fill` READS, and from one list rather than assembled
+    // here. Assembled here it was two of the three lists, and `fill` later
+    // learned to read `Name` and `Type` as well, which were in neither.
     refuseRawKeys(context, [
       ['existing', existing],
       ['candidate', candidate]
     ], 'read as empty, so nothing is filled and this reports that there was nothing to fill',
-    [...backfill.FILLABLE, ...backfill.REFUSED_ON_A_BACKFILL])
+    backfill.READ_BY_FILL)
 
     const out = backfill.fill(existing, candidate)
     console.log(JSON.stringify(out, null, 2))
