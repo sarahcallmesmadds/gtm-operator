@@ -37,6 +37,7 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [A, "        if (givenSources !== undefined && givenSources !== null && typeof givenSources !== 'string') {", "        if (false) {"],
   [P, "        (readback.properties === null || typeof readback.properties !== 'object' || Array.isArray(readback.properties))) {", "        (false)) {"],
   [P, "      typeof intended.properties === 'object' && !Array.isArray(intended.properties)", "      typeof intended.properties === 'object'"],
   [P, "    const comparedNothing = checked.length === 0", "    const comparedNothing = false"],

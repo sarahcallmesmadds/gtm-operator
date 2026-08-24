@@ -1192,6 +1192,44 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('A Sources SECTION THAT IS NOT TEXT IS REFUSED, not crashed on', () => {
+  // Name and Description were both taught to tell a malformed value from an
+  // absent one, and the Sources section this branch generates was left calling
+  // .trim() on whatever arrived, so a number or a list threw a raw TypeError out
+  // of the gate rather than being refused by it. A gate that crashes reports
+  // nothing at all.
+  const base = {
+    Name: 'Refund policy',
+    Type: 'SOP/ROE',
+    backfill: true,
+    sources: [{ what: 'refunds.doc', contributed: 'the steps' }]
+  }
+  const body = { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'e' }
+
+  for (const Sources of [42, ['refunds.doc'], { what: 'refunds.doc' }, true]) {
+    let problems
+    assert.doesNotThrow(
+      () => { problems = artifact.problems({ ...base, body: { ...body, Sources } }) },
+      `a Sources of ${JSON.stringify(Sources)} threw instead of being refused`
+    )
+    assert.deepStrictEqual(problems.map(one => `${one.field}:${one.kind}`), ['Sources:not-text'], JSON.stringify(Sources))
+  }
+
+  // THE GENERATED SECTION STILL PASSES, or the loop above is a check that
+  // refuses every Sources section including the one the plugin writes itself.
+  assert.deepStrictEqual(
+    artifact.problems({ ...base, body: { ...body, Sources: artifact.sourcesSection(base.sources) } }),
+    []
+  )
+
+  // AND A SECTION THAT IS TEXT BUT DISAGREES WITH THE RECORD IS STILL CAUGHT,
+  // which is the refusal this line was written for in the first place.
+  assert.ok(
+    artifact.problems({ ...base, body: { ...body, Sources: 'Something nobody read' } })
+      .some(one => one.kind === 'backfill-sources-disagree')
+  )
+})
+
 check('`prove-update` READS THE PAGE THAT CAME BACK AS A RECORD TOO, not just what was sent', () => {
   // The read side of the check added one round earlier, which was the sent side
   // only. A read-back carrying `properties: []` passed, because an array is an

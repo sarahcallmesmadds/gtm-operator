@@ -4363,3 +4363,19 @@ survivor, and an unreachable second copy of a rule is exactly how the seven copi
 of the emptiness test drifted apart.
 
 809 checks. 122 mutations, all landed, all 91 backfill checks reached.
+
+### Review round 28, finding one: the Sources section crashed the gate instead of being refused
+
+**Devin.** `Name` and `Description` were both taught to tell a malformed value
+from an absent one. The Sources section this branch generates was left calling
+`.trim()` on whatever arrived, so a number, a list or an object threw a raw
+`TypeError` out of `problems` rather than being refused by it.
+
+**A gate that crashes reports nothing at all**, which is worse than one that
+reports the wrong thing: the caller gets a stack trace naming a line rather than a
+refusal naming a field, and nothing downstream can act on it. It is also the same
+wrong-type shape as the eight before it, in the one place on this branch that had
+not been given the treatment.
+
+The text-but-wrong case it was originally written for is unchanged and pinned: a
+Sources section that disagrees with the record it was built from is still caught.
