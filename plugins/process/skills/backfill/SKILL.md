@@ -62,6 +62,12 @@ What it will refuse:
 | Call recordings with no recorder named | Setup asks whether one is connected and does not assume |
 | Slack with no channels said out loud | "All" and a named list are both offered. Neither is assumed |
 | Topics without choosing that way of looking, or the other way round | Turning a mode on quietly is how a run reads more than was agreed |
+| A list entry that is not a name, anywhere | Dropping it is narrowing. `sources: ["slack", 42]` covering one source and reporting success is the failure this whole step exists to prevent |
+| A date written as one that is not one, such as `2026-02-30` | Parsed loosely it rolls forward into March and reads a window nobody set |
+
+**A refused scope carries no plan at all.** Not `reading`, not `ways`, not
+`topics`, and not the half of it that was fine. Reading the good half of a
+refused scope is still reading a scope nobody agreed to.
 
 **Show `notReading` to the person before you start.** A source that was left out
 and a source that held nothing produce the same empty result, and only one of
@@ -147,6 +153,13 @@ keeps four fields off the page:
   what makes `audit`'s never-verified signal mean something: an artifact stamped
   by the import that created it is indistinguishable from one somebody checked.
 
+**Handing `draft` any of those four is refused, not ignored.** A field it dropped
+quietly would leave you believing it was set.
+
+**And `prove` checks the page came back without them.** A backfilled page is
+proved by what is not on it as much as by what is, because a page that arrived
+stamped drops out of the never-verified signal without anything saying so.
+
 **The Sources section is generated from the sources, not written beside them.**
 Hand `draft` the sources as `{ what, contributed }` and it renders the section
 itself. A section that says one thing while the record says another is refused,
@@ -188,9 +201,16 @@ genuinely empty on the row as it stands.
 - **It fills no person field**, on a blank row as much as on a full one.
 - **`reviewed` is false and stays false.** Nobody re-read the artifact, so
   `update` leaves all three verification fields where they are.
-- **Pass the row through `normaliseRows` first.** A raw fetch from a renamed
-  workspace reads as blank in every field, which would turn "fill the blanks"
-  into "fill everything". It is refused rather than guessed at.
+- **Pass both the row and the candidate through logical names.** A raw fetch from
+  a renamed workspace reads as blank in every field, which would turn "fill the
+  blanks" into "fill everything"; a raw-keyed candidate reads as offering
+  nothing, so you would be told there was nothing to fill. Both are refused
+  rather than guessed at.
+- **Then `prove-update`.** On a `reviewed: false` edit none of the three
+  verification fields is sent, so nothing in the payload would notice one moving.
+  `prove-update` compares them against what the fetched row held, and a field
+  that was empty and comes back holding something is reported rather than
+  passed.
 
 Filling nothing is a finished answer, not a failure.
 

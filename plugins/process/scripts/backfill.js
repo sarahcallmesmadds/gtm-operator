@@ -618,6 +618,13 @@ function draft (candidate, { today } = {}) {
     )
   }
 
+  // ASKED BEFORE THE SECTION IS BUILT. `sourcesSection` drops an entry it cannot
+  // render, so building first and validating after handed back an artifact whose
+  // Sources section and whose `sources` record disagreed, alongside a refusal
+  // that correctly said the list was wrong. The refusal was right and the
+  // artifact beside it was already narrowed.
+  refusals.push(...artifact.sourceProblems(sources))
+
   if (refusals.length) return { ok: false, artifact: null, refusals }
 
   const body = { ...(given.body || {}) }
@@ -691,6 +698,7 @@ function fill (existing, candidate) {
     if (!blank(before[field])) {
       refused.push({
         field,
+        kind: 'occupied',
         holding: before[field],
         offered: given[field],
         why: 'Backfill fills blanks and never overwrites. This field already holds something a person may have put there, and a machine replacing it is exactly the damage the approval gate cannot undo.'
@@ -708,17 +716,31 @@ function fill (existing, candidate) {
     if (given[field] === undefined || given[field] === null || given[field] === '') continue
     refused.push({
       field,
+      kind: 'never-filled',
       holding: before[field],
       offered: given[field],
       why: `${whyRefused(field)} This holds on a blank row as much as on a full one.`
     })
   }
 
+  /*
+   * TWO DIFFERENT THINGS LAND IN `refused` AND ONLY ONE IS A FAULT.
+   *
+   * A field that is already occupied is backfill working: it fills blanks, and
+   * on a re-run over the same folder most fields are occupied. A field on the
+   * never-filled list is the caller asking for something backfill does not do,
+   * whatever the row holds. Reported as one number, the second disappears into
+   * the noise of the first, and the exit code either cries wolf on every normal
+   * run or stays silent on the one that matters.
+   */
+  const neverFilled = refused.filter(one => one.kind === 'never-filled')
+
   return {
     ok: filling.length > 0,
     after,
     filling,
     refused,
+    neverFilled: neverFilled.map(one => one.field),
     note:
       'Pass this to `update` as the after artifact, with the row you fetched as the before. `reviewed` is false and ' +
       'stays false: nobody re-read this artifact, so Last checked for accuracy, Verified by and Verified date are all ' +

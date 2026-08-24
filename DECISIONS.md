@@ -3523,3 +3523,35 @@ half of it lived inside round 6's fix. Two of those five were introduced by the
 fix for the previous one. The pattern is not that the pair is hard to see, it is
 that fixing one half creates a new pair nobody looks at, so the fix and its own
 review have to be treated as a new surface rather than as a closed item.
+
+### Review round 8 on pull request 16, from the Devin CLI
+
+Two findings, both real, both the same narrowing shape from a different angle.
+
+**A refused `fill` exited zero.** `fill` puts a missing url under `refusals` and
+everything it declined to touch under `refused`, and the command's exit code read
+only the first. So a fill refused for carrying `Verified date` printed the
+refusal and exited zero, which is the same quiet exit-zero shape the raw
+candidate had in round 1.
+
+**Fixing that badly is easy, and the first attempt did.** Exiting non-zero on
+anything in `refused` made the normal case an error: a field that is already
+occupied is backfill working, and on a re-run over the same folder most fields
+are occupied. The two are now told apart by a `kind` on each entry, `occupied`
+against `never-filled`, and only the second moves the exit code. Reported as one
+number the second disappears into the noise of the first, and the exit code
+either cries wolf on every run or stays silent on the one that matters. The check
+covers both directions for that reason.
+
+**`draft` built the Sources section before anything judged the list.**
+`sourcesSection` drops an entry it cannot render, so a malformed source was
+filtered out of the section and then correctly refused by `problems` afterwards,
+and the artifact handed back alongside that refusal had already been built from
+the narrowed list. Its section and its record disagreed. That is the list being
+used before it is refused, which is exactly what `notNames` was added to `plan`
+to stop in round 2, arriving in a different function.
+
+**The rule moved into one place rather than being reordered in two.**
+`sourceProblems` is exported from `artifact.js` and both `problems` and `draft`
+ask it. Reordering the two lines in `draft` would have fixed this instance and
+left the rule written out twice, which is how the next one starts.

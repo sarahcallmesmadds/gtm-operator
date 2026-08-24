@@ -139,6 +139,42 @@ function saysNoneKnown (text) {
 }
 
 /**
+ * Everything wrong with a `sources` list, as `{ field, kind, message }`.
+ *
+ * SPLIT OUT SO `draft` CAN ASK BEFORE IT BUILDS. `sourcesSection` silently drops
+ * an entry it cannot render, and `draft` was rendering the section before
+ * anything had judged the list, so a malformed source was filtered out of the
+ * section and then refused by `problems` afterwards. The refusal was right and
+ * the artifact handed back alongside it had already been built from a narrowed
+ * list, so its section and its record disagreed. That is the same narrowing
+ * `notNames` was added to `plan` to stop: the list used before it is refused.
+ */
+function sourceProblems (sources) {
+  const found = []
+  const add = (kind, message) => found.push({ field: 'Sources', kind, message })
+
+  if (sources === undefined || sources === null) return found
+  if (!Array.isArray(sources)) {
+    add('not-a-list', 'Sources is a list of what was actually read.')
+    return found
+  }
+
+  for (const source of sources) {
+    if (!source || typeof source.what !== 'string' || !source.what.trim()) {
+      add('source-unnamed', 'A source with no name cannot be checked by a reader, which is the only thing the section is for.')
+      continue
+    }
+    if (typeof source.contributed !== 'string' || !source.contributed.trim()) {
+      add(
+        'source-uncontributed',
+        `"${source.what}" is listed with no line saying what it contributed. A Sources section that cannot be trusted is worse than none, because a reader has no way to tell which lines are real.`
+      )
+    }
+  }
+  return found
+}
+
+/**
  * The Sources section, rendered from the sources that were actually read.
  *
  * ONE SOURCE OF TRUTH FOR A SECTION THAT HAS TWO. `sources` is a structured
@@ -387,25 +423,7 @@ function problems (final, { parentType, partialBody = false } = {}) {
 
   // ------------------------------------------------------------------- the sources
 
-  if (row.sources !== undefined && row.sources !== null) {
-    if (!Array.isArray(row.sources)) {
-      add('Sources', 'not-a-list', 'Sources is a list of what was actually read.')
-    } else {
-      for (const source of row.sources) {
-        if (!source || typeof source.what !== 'string' || !source.what.trim()) {
-          add('Sources', 'source-unnamed', 'A source with no name cannot be checked by a reader, which is the only thing the section is for.')
-          continue
-        }
-        if (typeof source.contributed !== 'string' || !source.contributed.trim()) {
-          add(
-            'Sources',
-            'source-uncontributed',
-            `"${source.what}" is listed with no line saying what it contributed. A Sources section that cannot be trusted is worse than none, because a reader has no way to tell which lines are real.`
-          )
-        }
-      }
-    }
-  }
+  found.push(...sourceProblems(row.sources))
 
   return found
 }
@@ -600,6 +618,7 @@ module.exports = {
   personIdFrom,
   problems,
   concerns,
+  sourceProblems,
   sourcesSection,
   properties,
   body,
