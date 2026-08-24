@@ -4379,3 +4379,38 @@ not been given the treatment.
 
 The text-but-wrong case it was originally written for is unchanged and pinned: a
 Sources section that disagrees with the record it was built from is still caught.
+
+### Review round 28, finding two: the duplicate gate could not read the candidate the flow hands it
+
+**Codex, and it is the most consequential finding of the whole review**, because
+it is the documented guarantee rather than an edge case.
+
+`candidates` emits `what` and `type`. `duplicates` and `judge` read `Name` and
+`Type`. The note printed beside every candidate list says to run both on each
+candidate and calls that the thing which makes backfill safe to re-run. Handed one
+verbatim, `duplicates` reported "this artifact has no name", returned no query,
+and **exited zero**, and `judge` compared an empty subject against every row and
+matched nothing however close the library row was.
+
+So the check that stops a second pass rewriting a page did nothing and said
+nothing, on the exact call the skill instructs. A second pass over the same folder
+could offer and create a page that already existed.
+
+**Both shapes are read, rather than a translation step in between.** The skill
+documents this exact call, and a step it does not mention is a step somebody
+skips. `subjectName` and `subjectText` are the one home for the question, `Name`
+winning over `what` when both are present because an artifact is the more specific
+thing.
+
+**And a duplicate check that cannot run now exits non-zero.** Printing no query
+and exiting zero is the same shape as `check` printing `writable: false` and
+exiting zero in round 12, and as a refused `fill` exiting zero in round 11. Third
+time on this branch: a command that declines to do its job while its status says
+it did.
+
+**Two rounds running now, the productive finding came from asking about the
+documented promise rather than about the code.** Round 27 asked whether re-running
+was safe and got a clean answer; round 28 asked the same question of the specific
+call the skill prescribes and found this.
+
+811 checks. 126 mutations, all landed, all 93 backfill checks reached.
