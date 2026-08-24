@@ -3937,3 +3937,37 @@ on. A green check with zero bugs is not the end of the reading.
 
 793 checks, up from 792. 88 mutations, all landed, none surviving, all 77 checks
 reached, plus six written against these two fixes and every one red.
+
+### Review round 19 on pull request 16: the one scope value that defaults to reading
+
+Devin's CLI came back clean, its second consecutive. Codex found one.
+
+**Codex: `email.mailbox` conflated a malformed value with an absent one.** It is
+the only scope value whose absence means read anyway, with "own" as the default.
+Everywhere else in `plan` an unreadable value refuses and nothing is read, so
+conflating the two costs a refusal there and bought one here: `text()` returns
+null for a list, a number, an object or a boolean, so
+`mailbox: ["boss@corp.com"]`, which is the shape a model produces when it thinks
+it can name more than one, fell through to the default and came back `ok: true`
+reading the user's own mailbox. A scope somebody set was replaced by a different
+one with nothing said.
+
+A plain string that is not "own" was refused correctly all along, which is why
+this survived nineteen rounds: every check and every reader tried the readable
+wrong answer and none tried the unreadable one.
+
+**What made it serious rather than untidy is where it sits.** There is no
+approval gate in front of a read. By the time a person sees the candidates the
+reading has happened, which is the whole argument the scope step is built on, and
+this was the one field where a supplied value could be quietly swapped.
+
+**Its pairs were checked rather than assumed.** `documents.where` and
+`recordings.recorder` both refuse a non-text value, so no read escapes there. But
+both refusal messages said the field had not been named when it had been named
+with something unreadable, which is the misdescription round 18 fixed in the date
+refusal. Both say what was supplied now.
+
+794 checks, up from 793. 88 mutations, all landed, none surviving, all 78 checks
+reached, plus six written against this fix and every one red, including one that
+confirms an absent mailbox still means "own" and one that confirms a named
+non-own mailbox keeps its own refusal rather than being folded into the new one.

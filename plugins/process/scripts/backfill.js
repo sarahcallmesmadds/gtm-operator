@@ -247,7 +247,7 @@ function plan (request) {
     const holder = req.documents || {}
     const where = text(holder.where)
     if (!where) {
-      add('documents', 'unlocated', 'The document source does not say where it is. Name the Drive folder, the Notion database or the space, because "the documents" is not somewhere this can be pointed at.')
+      add('documents', 'unlocated', `The document source does not say where it is${holder.where === undefined || holder.where === null ? '' : `: \`where\` is ${JSON.stringify(holder.where)}, which names nowhere`}. Name the Drive folder, the Notion database or the space, because "the documents" is not somewhere this can be pointed at.`)
     } else {
       reading.documents = { where }
     }
@@ -316,7 +316,27 @@ function plan (request) {
     const window = range('email', holder)
     const mailbox = text(holder.mailbox)
 
-    if (mailbox && mailbox !== 'own') {
+    /*
+     * ABSENT AND MALFORMED ARE NOT THE SAME ANSWER, AND THIS IS THE ONE FIELD
+     * WHERE THAT DECIDES A READ.
+     *
+     * `mailbox` is the only scope value whose absence means read anyway, with
+     * "own" as the default. Everywhere else an unreadable value refuses and
+     * nothing is read, so conflating the two costs a refusal. Here it bought
+     * one: `text()` returns null for a number, an object, a list or a boolean,
+     * so `mailbox: ["boss@corp.com", "legal@corp.com"]`, which is the shape a
+     * model produces when it thinks it can name more than one, fell through to
+     * the default and came back `ok: true` reading the user's own mailbox. A
+     * scope somebody set was silently replaced by a different one.
+     *
+     * There is no approval gate in front of a read. By the time a person sees
+     * the candidates, the reading has happened.
+     */
+    const askedFor = holder.mailbox !== undefined && holder.mailbox !== null
+
+    if (askedFor && !mailbox) {
+      add('email', 'mailbox-not-a-name', `\`mailbox\` is ${JSON.stringify(holder.mailbox)}, which does not name a mailbox. It is refused rather than read as "own": a value somebody set being replaced by a default is a scope nobody agreed to, and the reading has already happened by the time anybody sees the result. Set it to "own" or leave it out.`)
+    } else if (mailbox && mailbox !== 'own') {
       add('email', 'mailbox-not-own', `The mailbox is "${mailbox}". Backfill reads the user's own mailbox and no other: reading somebody else's mail is not something an approval gate on the output makes acceptable, because the reading has already happened by then. Set \`mailbox\` to "own" or leave it out.`)
     } else if (window) {
       reading.email = { mailbox: 'own', ...window }
@@ -333,7 +353,7 @@ function plan (request) {
     const recorder = text(holder.recorder)
 
     if (!recorder) {
-      add('recordings', 'recorder-unnamed', 'Call recordings were named with no recorder. The plugin reads transcripts from whatever recorder the environment exposes rather than integrating with one by name, so it has to be told which one is connected. Setup asks and does not assume.')
+      add('recordings', 'recorder-unnamed', `Call recordings were named with no recorder${holder.recorder === undefined || holder.recorder === null ? '' : `: \`recorder\` is ${JSON.stringify(holder.recorder)}, which names none`}. The plugin reads transcripts from whatever recorder the environment exposes rather than integrating with one by name, so it has to be told which one is connected. Setup asks and does not assume.`)
     } else if (window) {
       reading.recordings = { recorder, ...window }
     }

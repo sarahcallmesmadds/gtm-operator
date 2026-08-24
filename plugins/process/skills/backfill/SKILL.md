@@ -59,6 +59,7 @@ What it will refuse:
 | A conversation source with no date range, or half a range | There is no unbounded read. "All of Slack" is the absence of a scope, not a wide one |
 | `"dms": "all"` | Direct messages are named one by one or not read. A public channel is somewhere people chose to speak in front of the workspace; a direct message is not |
 | Anyone's mailbox but the user's own | An approval gate on the output does not make reading somebody else's mail acceptable, because the reading already happened |
+| A `mailbox` that is set to something unreadable, such as a list | Absent means the user's own. Something supplied and unreadable is a scope somebody set, and replacing it with the default reads a mailbox nobody agreed to |
 | Call recordings with no recorder named | Setup asks whether one is connected and does not assume |
 | Slack with no channels said out loud | "All" and a named list are both offered. Neither is assumed |
 | Topics without choosing that way of looking, or the other way round | Turning a mode on quietly is how a run reads more than was agreed |
