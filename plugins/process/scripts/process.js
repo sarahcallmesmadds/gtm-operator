@@ -155,9 +155,22 @@ function pageKey (value) {
   const withoutTail = String(value).split('#')[0].split('?')[0]
   const segments = withoutTail.split('/').filter(Boolean)
   const last = segments.length ? segments[segments.length - 1] : withoutTail
-  const hex = last.replace(/[^0-9a-fA-F]/g, '')
-  if (hex.length < 32) return null
-  return hex.slice(-32).toLowerCase()
+
+  // THE ID IS MATCHED, NOT ASSEMBLED. The first version stripped every non-hex
+  // character out of the segment and took the last 32 of whatever was left, so
+  // the letters of the title were being concatenated with the id. That happens
+  // to give the right answer when an id is there, and invents one out of the
+  // title when it is not: `.../decafbad-coffee-faced-a-facade-of-beef` has no
+  // id in it at all and would still have produced a key, which then matched
+  // nothing and read as a memo pointing at no artifact.
+  //
+  // Both forms are anchored to the end of the segment, which is where Notion
+  // puts the id in `Some-Title-<id>` and in a bare page link.
+  const bare = last.match(/([0-9a-fA-F]{32})$/)
+  if (bare) return bare[1].toLowerCase()
+  const dashed = last.match(/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/)
+  if (dashed) return dashed[1].replace(/-/g, '').toLowerCase()
+  return null
 }
 
 /**
@@ -1249,8 +1262,15 @@ const commands = {
       archiveNote: archiving
         ? 'THIS ARCHIVES THE ARTIFACT. Ask before sending it. Nothing here archives without a yes.'
         : null,
-      body: after.body ? artifact.body(after, { partialBody: true }) : null,
-      headings: after.body ? artifact.expectedHeadings(after, { partialBody: true }) : null,
+      // BUILT FROM THE MERGED ROW, NOT THE AFTER ROW. The sections a body has
+      // are decided by the `Type`, and an edit that changes only the body is not
+      // changing the type, so under the rule that an absent key means untouched
+      // the after row has no reason to carry one. Built from `after` alone it
+      // threw "No template for undefined" on exactly the edit this command is
+      // most for. `merged.body` is `after.body`, so what gets written is still
+      // only what was sent.
+      body: after.body ? artifact.body(merged, { partialBody: true }) : null,
+      headings: after.body ? artifact.expectedHeadings(merged, { partialBody: true }) : null,
       bodyNote: after.body
         ? 'The body is included because one was passed. Send only the sections that changed. Rewriting a body ' +
           'wholesale when one section changed loses the wording of everything else.'
