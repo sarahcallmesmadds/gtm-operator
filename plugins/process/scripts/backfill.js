@@ -730,8 +730,58 @@ function draft (candidate, { today } = {}) {
  * `update` leaves all three verification fields alone on a false.
  */
 function fill (existing, candidate) {
-  const before = existing || {}
-  const given = candidate || {}
+  /*
+   * BOTH CONTAINERS ARE JUDGED BEFORE ANYTHING IS READ OUT OF THEM.
+   *
+   * The third of these on this branch, after a mailbox that arrived as a list
+   * became the default mailbox and a body that arrived as a string became an
+   * untouched body. Same shape every time: the wrong-but-readable value was
+   * handled and the unreadable one read as absent.
+   *
+   * Here it went two ways at once. A candidate of `[]` has none of the fillable
+   * fields, so nothing was refused, nothing was filled, and the run called itself
+   * a finished answer and exited zero: an approved fill dropped in silence, which
+   * is indistinguishable from a candidate that genuinely offered nothing. A
+   * candidate that was a string, a number or a boolean did not get that far and
+   * threw a raw `TypeError` out of the `in` operator, which is the one failure
+   * mode this file has no wording for.
+   *
+   * The row side refused all four already, as `url:missing`, which is true and
+   * unhelpful: a row that is not a row has not mislaid its url, and telling
+   * somebody to keep the url on it sends them to fix the wrong thing.
+   */
+  const looksLikeARow = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+  if (!looksLikeARow(existing)) {
+    return {
+      ok: false,
+      after: null,
+      refusals: [{
+        field: 'existing',
+        kind: 'not-a-row',
+        message: `The existing artifact is ${JSON.stringify(existing)}, which is not a row. It is read as a set of ` +
+          'fields, one key per field, and anything else has no fields at all, so every blank would read as filled ' +
+          'and nothing would be written. Pass the row you fetched, keyed by logical name.'
+      }]
+    }
+  }
+
+  if (!looksLikeARow(candidate)) {
+    return {
+      ok: false,
+      after: null,
+      refusals: [{
+        field: 'candidate',
+        kind: 'not-a-candidate',
+        message: `The candidate is ${JSON.stringify(candidate)}, which is not a set of offered fields. Read as one ` +
+          'it offers nothing, so the fill would report that there was nothing to fill and exit zero, and the values ' +
+          'somebody approved would be dropped without a word. Pass an object keyed by logical name.'
+      }]
+    }
+  }
+
+  const before = existing
+  const given = candidate
 
   if (!text(before.url)) {
     return {

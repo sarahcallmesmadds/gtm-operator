@@ -4031,3 +4031,43 @@ and it is run by hand. What it does not do is written at the top: it catches a
 check nothing reaches, which is one of the seven varieties found here, and it is
 scoped to one suite, so a survivor means this suite does not watch that line
 rather than that nothing does.
+
+### Review round 21 on pull request 16: the same shape a third time, on both sides at once
+
+**Codex: neither side of `fill` was checked for being a row before fields were
+read out of it.** `candidate || {}` accepts anything. A candidate of `[]` carries
+none of the fillable fields, so nothing was refused, nothing was filled, and the
+run called itself a finished answer and exited zero: an approved fill dropped in
+silence, indistinguishable from a candidate that genuinely offered nothing. A
+candidate that was a string, a number or a boolean never got that far and threw a
+raw `TypeError` out of the `in` operator, which is the one failure mode this file
+has no wording for.
+
+**The row side already refused all four, and for the wrong reason.** It reported
+`url:missing`, which is true and sends somebody to fix the wrong thing: a row that
+is not a row has not mislaid its url. Both containers are judged now, each with
+its own refusal, before anything is read out of either.
+
+**Three rounds, three instances of one shape, and it is now written where the
+next person will hit it.** A mailbox that arrived as a list became the default
+mailbox. A body that arrived as a string became an untouched body. A candidate
+that arrived as a list became an empty one. Every time, the wrong-but-readable
+value was handled and the unreadable one was read as absent. The question that
+finds these is not "what if this value is wrong" but "what if it is the wrong
+type, and does that differ from it not arriving at all".
+
+**What was pinned so the fix cannot swallow the cases it should not.** `{}` is a
+real candidate carrying no fields and is still a finished answer that exits zero.
+A real row with no url still gets `url:missing` rather than the new refusal. A
+real fill still fills.
+
+**This round has one reviewer, not two.** The Devin CLI run was killed before it
+produced anything, and it was compromised anyway: `backfill.js` and the suite were
+edited while it was reading them. A review of a tree that moves under it reports
+on code that no longer exists and misses what arrived after it looked. Round 22
+runs both reviewers on a stable head, and no file is touched until both have
+finished.
+
+797 checks, up from 796. 95 mutations, all landed, all 81 backfill checks reached,
+and the one survivor is the `wantsAPerson` inversion that `process-audit-update`
+catches.
