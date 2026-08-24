@@ -227,7 +227,7 @@ function plan (request) {
     const end = (which, value, parsed) => {
       if (parsed) return
       if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        add(source, 'range-not-a-day', `${source} is scoped \`${which}\` ${value}, which is written as a date and is not one. Parsed loosely it rolls forward into the next month and reads a window nobody set, so it is refused rather than carried through.`)
+        add(source, 'range-not-a-day', `${source} is scoped \`${which}\` ${value}, which is written as a date and is not one. A day past the end of its month rolls forward and reads a window nobody set; a month past 12 does not resolve at all. Both are refused rather than guessed at, because which of the two this is changes what would have been read.`)
         return
       }
       add(source, 'range-open', `${source} has no usable \`${which}\` date, so this is an unbounded read. There is no unbounded read: a conversation source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
@@ -411,10 +411,26 @@ function plan (request) {
    */
   const ok = refusals.length === 0
 
+  /*
+   * AND `notReading` IS THE FOURTH FIELD OF A THREE-FIELD RULE.
+   *
+   * The emptying above named `reading`, `ways` and `topics` and left this
+   * standing, so a refused plan came back reading nothing and still listing
+   * which sources it was leaving out. That list is written to be shown to a
+   * person before a run starts, and a run that lists its exclusions is a run
+   * that is reading the rest. On a refusal the honest answer is not the
+   * complement of an empty plan, it is that there is no plan.
+   *
+   * Said rather than emptied, because this is the field a person is told to
+   * read and handing them an empty list says nothing at all.
+   */
   return {
     ok,
     reading: ok ? reading : {},
-    notReading,
+    notReading: ok
+      ? notReading
+      : ['Nothing. The scope was refused, so no source and no way of looking is being read at all. What each refusal ' +
+         'says has to be answered before there is a plan to show.'],
     ways: ok ? ways : [],
     topics: ok && topics ? topics : [],
     refusals
