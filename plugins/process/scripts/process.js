@@ -1626,7 +1626,27 @@ const commands = {
     // the page-binding check found no target to compare and the property loop
     // found no properties to walk, so it printed a clean proof having looked at
     // nothing. A proof that passes on the wrong input is worse than no proof.
-    if (!intended || typeof intended !== 'object' || !intended.target || !intended.properties) {
+    /*
+     * AND `properties` HAS TO BE A SET OF PROPERTIES, NOT MERELY TRUTHY.
+     *
+     * `[]` is truthy, so a payload carrying an empty list walked through this
+     * guard, `Object.entries([])` walked nothing, and the command reported
+     * `proved: true`, `checked: []` and "Every property sent came back matching"
+     * having compared not one property. That is the exact failure the guard
+     * above was written to stop, one type short: it asked whether the field was
+     * there and not whether it was the thing it is read as.
+     *
+     * EMPTY IS NOT THE SAME AS THE WRONG SHAPE, and the first version of this
+     * fix conflated them and broke two existing checks that were right. A
+     * body-only edit changes no property, so `update` prints `properties: {}`
+     * with headings beside it, and that is a real payload. What is not a real
+     * payload is a list. The emptiness is handled where it belongs, at the
+     * verdict below: a run that compared nothing is not a proof.
+     */
+    const carriesProperties = intended && intended.properties !== null &&
+      typeof intended.properties === 'object' && !Array.isArray(intended.properties)
+
+    if (!intended || typeof intended !== 'object' || !intended.target || !carriesProperties) {
       throw new Error(
         'That file is not the output of `update`. It needs the `target` and `properties` that `update` printed. ' +
         'Passing the before or after row here would rebuild a payload with no record of what was cleared, ' +
@@ -1798,17 +1818,33 @@ const commands = {
       unchecked.push(`whether ${intended.clearing.join(', ')} read as empty for the right reason rather than never having been set`)
     }
 
+    /*
+     * A RUN THAT COMPARED NOTHING IS NOT A PROOF.
+     *
+     * `proved` was `problems.length === 0`, so a payload carrying nothing to
+     * compare came back proved, `checked: []`, and "Every property sent came
+     * back matching" having looked at not one thing. Every real payload has
+     * something: a property edit has properties, a body-only edit has headings,
+     * a non-review edit has the three verification fields carried for exactly
+     * this reason. Nothing at all means the payload was not one.
+     */
+    const comparedNothing = checked.length === 0
+
     console.log(JSON.stringify({
-      proved: problems.length === 0,
+      proved: problems.length === 0 && !comparedNothing,
       target: intended.target || null,
       problems,
       checked,
       unchecked,
       note: problems.length
         ? 'The update did not land as sent. Do not report it as done.'
-        : 'Every property sent came back matching. The list above says what was not looked at.'
+        : comparedNothing
+          ? 'Nothing was compared, so nothing is proved. A real update carries properties, or headings, or the ' +
+            'verification fields a non-review edit is checked by. A payload with none of those is not one, and ' +
+            'reporting it as a clean write would be the failure this command exists to catch.'
+          : 'Every property sent came back matching. The list above says what was not looked at.'
     }, null, 2))
-    if (problems.length) process.exitCode = 1
+    if (problems.length || comparedNothing) process.exitCode = 1
   },
 
   /**

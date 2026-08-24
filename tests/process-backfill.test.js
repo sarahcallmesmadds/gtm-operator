@@ -1192,6 +1192,67 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`prove-update` PROVES NOTHING WHEN IT COMPARED NOTHING', () => {
+  // The guard checked that `target` and `properties` were truthy, and an empty
+  // ARRAY is truthy. Object.entries([]) then walks nothing, so the command
+  // reported proved: true, checked: [], and "Every property sent came back
+  // matching" having compared not one property. A proof that passes on the wrong
+  // input is worse than no proof, and this is the command whose only job is
+  // saying whether a write landed.
+
+  // THE WRONG SHAPE IS REFUSED AT THE DOOR. A list is not a set of properties.
+  for (const properties of [[], 'not a record', 42, true]) {
+    assert.throws(
+      () => capture(() => command.commands['prove-update'](
+        write('bad-sent.json', { target: URL_A, properties }),
+        write('bad-back.json', { url: URL_A, properties: {}, headings: [] })
+      )),
+      /not the output of `update`/,
+      `prove-update accepted properties of ${JSON.stringify(properties)}`
+    )
+  }
+
+  // AN EMPTY SET OF PROPERTIES IS A REAL SHAPE AND NOT A REAL PAYLOAD. A
+  // body-only edit changes no property, so `update` prints `{}` with headings
+  // beside it, which is why this is judged at the verdict rather than the door.
+  // With nothing to compare, the answer is that nothing is proved.
+  // Built from a REAL update output with its contents emptied, so the page
+  // binding still holds and what is being tested is the emptiness rather than a
+  // hand-made payload failing an earlier check.
+  const realSent = capture(() => command.commands.update(
+    write('empty-before.json', EXISTING),
+    write('empty-after.json', backfill.fill(EXISTING, { Domain: 'Customer Success' }).after),
+    '2026-08-23'
+  ))
+  process.exitCode = 0
+  const nothing = capture(() => command.commands['prove-update'](
+    write('empty-sent.json', { ...realSent, properties: {}, body: null, headings: null, verificationBefore: null }),
+    write('empty-back.json', { url: URL_A, properties: {} })
+  ))
+  assert.strictEqual(nothing.proved, false, 'a payload with nothing to compare was reported as proved')
+  assert.deepStrictEqual(nothing.checked, [])
+  assert.ok(/Nothing was compared/.test(nothing.note), nothing.note)
+  assert.strictEqual(process.exitCode, 1, 'a proof that compared nothing exited zero')
+  process.exitCode = 0
+
+  // A REAL UPDATE OUTPUT STILL PROVES, or the loop above is a command that
+  // refuses everything.
+  const context = contextNow()
+  const after = backfill.fill(EXISTING, { Domain: 'Customer Success' }).after
+  const sent = capture(() => command.commands.update(
+    write('ok-before.json', EXISTING),
+    write('ok-after.json', after),
+    '2026-08-23'
+  ))
+  const proved = capture(() => command.commands['prove-update'](
+    write('ok-sent.json', sent),
+    write('ok-back.json', { url: URL_A, properties: { ...sent.properties } })
+  ))
+  assert.strictEqual(proved.proved, true, JSON.stringify(proved.problems))
+  assert.ok(proved.checked.length > 0, 'a real proof checked nothing')
+  void context
+})
+
 check('THE SAME ASKINGS GIVE THE SAME ANSWER IN ANY ORDER', () => {
   // Similarity is not transitive: A can resemble B and B resemble C while A and
   // C have nothing in common. The cluster loop puts each asking in the FIRST
