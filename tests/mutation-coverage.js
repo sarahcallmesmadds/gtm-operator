@@ -37,6 +37,8 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "    if (req[source] === undefined || req[source] === null) continue", "    if (true) continue"],
+  [B, "    if (named(source)) continue\n    if (req[source] === undefined", "    if (false) continue\n    if (req[source] === undefined"],
   [B, "    if (isRecord(value)) return value", "    if (true) return value"],
   [B, "function isRecord (value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value)", "function isRecord (value) {\n  return value !== null && typeof value === 'object'"],
   [B, "    if (!isRecord(one)) {\n      add(`askings[${index}]`", "    if (false) {\n      add(`askings[${index}]`"],
