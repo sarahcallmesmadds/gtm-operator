@@ -13,7 +13,9 @@
  */
 
 const assert = require('assert')
-const memo = require('../plugins/memos/scripts/memo')
+// The builder's source. The copy each plugin runs is held identical to this by
+// tests/vendor-copies-current.test.js, so testing the source tests the copies.
+const memo = require('../shared/memo-write')
 const schema = require('../shared/memos-schema')
 
 let failures = 0

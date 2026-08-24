@@ -41,7 +41,10 @@ const path = require('path')
 
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'memos-schema'))
-const memo = require(path.join(__dirname, 'memo'))
+// The memo builder is vendored from `shared/memo-write.js` since 2026-08-24,
+// because `projects` writes three of the seven memo types and the shapes must
+// be one definition in every plugin that writes them.
+const memo = require(path.join(__dirname, 'vendor', 'memo-write'))
 const { compareProperty, listOfNames, cameBackEmpty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 const { pageIdentity } = require(path.join(__dirname, 'vendor', 'page-id'))
 
@@ -996,32 +999,9 @@ const commands = {
   }
 }
 
-/**
- * Which Notion type each written Memos column holds, keyed by the column name
- * the payload actually uses, so the proof compares through the right reader.
- */
-function propertyTypes (context) {
-  const types = {}
-  const simple = {
-    Name: 'title',
-    Description: 'rich_text',
-    Type: 'select',
-    Status: 'select',
-    Domain: 'select',
-    Audience: 'multi_select',
-    Segment: 'multi_select',
-    'L2C Lifecycle': 'multi_select',
-    Tags: 'multi_select',
-    Author: 'people'
-  }
-  for (const [logical, type] of Object.entries(simple)) types[context.property(logical)] = type
-  for (const logical of ['Published date', 'Period covered']) {
-    const name = context.property(logical)
-    types[`date:${name}:start`] = 'date'
-    types[`date:${name}:end`] = 'date'
-  }
-  return types
-}
+// Which Notion type each written Memos column holds. Lives in the vendored
+// memo builder since 2026-08-24, beside the `properties` it has to agree with.
+const propertyTypes = memo.propertyTypes
 
 /**
  * The one proof for a create, shared by `prove` and `prove-task`.
