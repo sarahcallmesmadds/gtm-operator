@@ -93,7 +93,7 @@ function contextOrExit () {
  * exist, return nothing, and read as an artifact with no memos, which is exactly
  * what a healthy artifact looks like.
  */
-const MEMOS_PROPERTIES = ['Artifacts', 'Published date']
+const MEMOS_PROPERTIES = ['Artifacts', 'Published date', 'Status']
 
 function memosContextOrExit () {
   const raw = config.readRaw()
@@ -121,7 +121,19 @@ function memosContextOrExit () {
     )
     process.exit(1)
   }
-  return { property: name => recorded[name] }
+  const recordedValues = (entry.values && entry.values.Status) || {}
+  if (!recordedValues.Published) {
+    console.error(
+      'The Memos map records no name for the "Published" status, so a draft or a canceled memo could not be told ' +
+      'apart from an announced one. A canceled memo driving the newer-related-memo signal sends somebody to re-read ' +
+      'an artifact because of something that was retracted. Run the `setup` plugin\'s `check` skill, which records it.'
+    )
+    process.exit(1)
+  }
+  return {
+    property: name => recorded[name],
+    value: (property, logical) => ((entry.values && entry.values[property]) || {})[logical]
+  }
 }
 
 /**
@@ -138,6 +150,26 @@ function pageKey (value) {
   const hex = value.replace(/[^0-9a-fA-F]/g, '')
   if (hex.length < 32) return null
   return hex.slice(-32).toLowerCase()
+}
+
+/**
+ * Whether a person property actually names anybody.
+ *
+ * `[]` and the string `"[]"` are both truthy, and they are the two shapes an
+ * empty person property arrives in. A bare `!value` test called both of them
+ * filled.
+ */
+function anyPerson (value) {
+  if (value === null || value === undefined || value === '' || value === '[]') return false
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (text.startsWith('[')) {
+      try { return Array.isArray(JSON.parse(text)) ? JSON.parse(text).length > 0 : true } catch (_) { return true }
+    }
+    return text.length > 0
+  }
+  return true
 }
 
 /** The pages a relation column names, however the surface encoded them. */
@@ -826,18 +858,22 @@ const commands = {
       memoColumns: {
         url: 'url',
         Artifacts: memos.property('Artifacts'),
-        'Published date': `date:${memos.property('Published date')}:start`
+        'Published date': `date:${memos.property('Published date')}:start`,
+        Status: memos.property('Status')
       },
       memoSql:
         `SELECT m.url, m.${identifier(memos.property('Artifacts'))}, ` +
         `m.${identifier(`date:${memos.property('Published date')}:start`)}\n` +
         'FROM <memos-ds> AS m\n' +
         `WHERE m.${identifier(memos.property('Artifacts'))} IS NOT NULL\n` +
+        `  AND m.${identifier(memos.property('Status'))} = ${literal(memos.value('Status', 'Published'))}\n` +
         `ORDER BY m.${identifier(`date:${memos.property('Published date')}:start`)} DESC`,
       note:
         'Replace <process-ds> and <memos-ds> with the quoted data source urls. Run both, then pass what came back to ' +
         '`flags`. THE MEMO QUERY IS NOT OPTIONAL: run it and pass an empty list only if it genuinely returned nothing, ' +
-        'because skipping it turns the strongest signal off without saying so. This command writes nothing and never will.'
+        'because skipping it turns the strongest signal off without saying so. Only Published memos are read: a draft ' +
+        'was never announced and a canceled one was retracted, and either driving the signal sends somebody to re-read ' +
+        'an artifact over something that never stood. This command writes nothing and never will.'
     }, null, 2))
   },
 
@@ -870,14 +906,27 @@ const commands = {
     // it saw as the newest.
     const memoProperty = memosCtx.property('Artifacts')
     const publishedColumn = `date:${memosCtx.property('Published date')}:start`
+    // BOTH SIDES COMPARED AS DAYS. `Published date` can come back carrying a
+    // time and `Last checked for accuracy` does not, so comparing the raw
+    // strings made a memo published on the morning of the check read as newer
+    // than the check itself. Everything checked that day would be flagged.
+    const day = value => String(value).slice(0, 10)
     const newestMemo = new Map()
+    const statusColumn = memosCtx.property('Status')
+    const publishedValue = memosCtx.value('Status', 'Published')
     for (const memo of memoRows) {
       const published = memo[publishedColumn]
       if (!published) continue
+      // The query already asks for Published only. This checks anyway, because
+      // the rows can arrive from a hand-written query and a canceled memo
+      // driving this signal sends somebody to re-read an artifact over something
+      // that was retracted. A row with no Status column at all is accepted: that
+      // is the shipped query, which does not select it back.
+      if (statusColumn in memo && memo[statusColumn] !== publishedValue) continue
       for (const target of relatedUrls(memo[memoProperty])) {
         const held = newestMemo.get(target)
-        if (!held || String(published) > String(held.published)) {
-          newestMemo.set(target, { published: String(published), url: memo.url })
+        if (!held || day(published) > day(held.published)) {
+          newestMemo.set(target, { published: day(published), url: memo.url })
         }
       }
     }
@@ -895,7 +944,7 @@ const commands = {
       // 2. A memo newer than the last check. THE STRONGEST OF THE FOUR.
       const memo = newestMemo.get(pageKey(row.url))
       const checked = row['Last checked for accuracy']
-      if (memo && (!checked || String(memo.published) > String(checked))) {
+      if (memo && (!checked || day(memo.published) > day(checked))) {
         flag(
           row,
           'memo-newer',
@@ -908,7 +957,11 @@ const commands = {
       // 4. Backfilled and never verified. Signal 1 cannot catch these: an empty
       // date does not match a "before" filter in Notion, so they escape it
       // entirely, which is why this signal exists.
-      if (!row['Verified by']) {
+      // AN EMPTY LIST IS EMPTY. `!value` is false for `[]` and for the string
+      // `"[]"`, which are the two shapes a person property with nobody in it
+      // actually arrives as, so the signal missed exactly the rows it exists to
+      // catch and reported the library as fully verified.
+      if (!anyPerson(row['Verified by'])) {
         flag(row, 'never-verified', 'Verified by is empty, so nobody is recorded as having read this. Signal 1 cannot catch it: an empty date matches no "before" filter.')
       }
     }
@@ -984,6 +1037,25 @@ const commands = {
     const before = readJson(beforeFile, 'the artifact as it is now')
     const after = readJson(afterFile, 'the artifact as it would be')
 
+    // THE ROWS HAVE TO BE KEYED LOGICALLY, AND THAT IS CHECKED.
+    //
+    // A page fetched from Notion comes back keyed by the workspace's own
+    // property names, and `normaliseRows` is what turns those into logical ones.
+    // Handed a raw fetch on a renamed workspace, every logical lookup below
+    // returns undefined: nothing looks changed, nothing is sent, and `update`
+    // reports a clean no-op for an edit the person asked for. Silent, and it
+    // looks like the edit was already applied.
+    const looksLogical = row => UPDATABLE_FIELDS.some(logical => logical in row)
+    const looksRenamed = row => UPDATABLE_FIELDS.some(logical => context.property(logical) !== logical && context.property(logical) in row)
+    for (const [what, row] of [['before', before], ['after', after]]) {
+      if (looksLogical(row) || !looksRenamed(row)) continue
+      throw new Error(
+        `The ${what} artifact is keyed by this workspace's own property names rather than the logical ones. ` +
+        'Pass rows that have been through `normaliseRows`, or rename the keys yourself. Left as they are, every ' +
+        'field would read as unchanged and this would report a clean no-op for an edit that was asked for.'
+      )
+    }
+
     const target = pageKey(before.url)
     if (!target) {
       throw new Error(
@@ -1033,10 +1105,20 @@ const commands = {
 
     // Which logical fields actually differ. Compared logically, before the
     // workspace's names are put back on, so a rename cannot read as a change.
+    //
+    // AN ABSENT KEY IS NOT A CLEARED FIELD. Leaving `Description` out of the
+    // after row used to read as emptying it: the comparison saw undefined
+    // against the old text, called it a change, found no value to send and sent
+    // an explicit empty instead. So a caller that built the after row by hand
+    // and forgot a field deleted it, and the output called that a clear as if it
+    // had been asked for. Clearing is now something you say, with an explicit
+    // null or empty list, the same rule the body already follows.
     const changedFields = []
     const unchangedFields = []
+    const untouchedFields = []
     for (const logical of UPDATABLE_FIELDS) {
       if (schema.VERIFICATION_FIELDS.includes(logical)) continue
+      if (!(logical in after)) { untouchedFields.push(logical); continue }
       if (sameValue(before[logical], after[logical])) unchangedFields.push(logical)
       else changedFields.push(logical)
     }
@@ -1076,6 +1158,11 @@ const commands = {
       properties,
       changed: changedFields,
       unchanged: unchangedFields,
+      untouched: untouchedFields,
+      untouchedNote: untouchedFields.length
+        ? 'These were not in the after artifact at all, so they are being left exactly as they are. To empty one, ' +
+          'put it in the after artifact with an explicit null. Leaving it out never clears anything.'
+        : null,
       clearing: cleared,
       reviewed: after.reviewed,
       verificationFields: verification,
@@ -1183,10 +1270,27 @@ const commands = {
       }
     }
 
+    // THE HEADINGS ARE CHECKED WHEN THEY CAME BACK. `update` says which headings
+    // it is writing and this used to list the whole body as unchecked without
+    // looking at any of it, including the part it could check. A Notion page can
+    // come back with a heading missing on a silent partial failure, which is the
+    // same failure `new` proves against after a create.
+    if ((intended.headings || []).length) {
+      const back = (readback.headings || []).map(one => String(one).trim())
+      if (!back.length) {
+        unchecked.push('the headings, because the page came back without a heading list. Save the whole page, not a summary of it.')
+      } else {
+        for (const heading of intended.headings) {
+          if (back.includes(String(heading).trim())) checked.push(`heading "${heading}"`)
+          else problems.push(`The "${heading}" heading was written and is not in the page that came back.`)
+        }
+      }
+    }
+
     // WHAT WAS NOT CHECKED, EVERY TIME, INCLUDING ON A PASS. A report wider than
     // the check behind it is the thing this plugin refuses in other people's
     // data, so it does not do it in its own output.
-    if (intended.body) unchecked.push('the body sections, which are not compared here')
+    if (intended.body) unchecked.push('the TEXT under each section, which is not compared here. Only the headings are.')
     if ((intended.clearing || []).length) {
       unchecked.push(`whether ${intended.clearing.join(', ')} read as empty for the right reason rather than never having been set`)
     }

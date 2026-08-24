@@ -219,6 +219,60 @@ check('the newest memo wins even if the rows arrive out of order', () => {
   assert.ok(signals(out).includes('memo-newer'), 'it trusted the first row it saw rather than the newest')
 })
 
+check('ONLY PUBLISHED MEMOS ARE QUERIED, not drafts or canceled ones', () => {
+  const out = capture(() => command.commands.audit())
+  assert.ok(/"Status" = 'Published'/.test(out.memoSql), `a retracted memo could drive the signal:\n${out.memoSql}`)
+})
+
+check('and a canceled memo handed in anyway is skipped', () => {
+  const out = runFlags(
+    [artifactRow({ 'date:Last checked for accuracy:start': '2026-01-01' })],
+    [memoRow({ Status: 'Canceled' })]
+  )
+  assert.ok(!signals(out).includes('memo-newer'), 'a retracted memo sent somebody to re-read an artifact')
+})
+
+check('a memo published the SAME DAY as the check is not newer than it', () => {
+  // Published date can come back carrying a time and the check date cannot, so
+  // comparing the raw strings flagged everything checked that morning.
+  const out = runFlags(
+    [artifactRow({ 'date:Last checked for accuracy:start': '2026-08-20' })],
+    [memoRow({ 'date:Published date:start': '2026-08-20T09:00:00.000Z' })]
+  )
+  assert.ok(!signals(out).includes('memo-newer'), 'a same-day memo read as unfolded work')
+})
+
+check('a memo published the day AFTER still is', () => {
+  const out = runFlags(
+    [artifactRow({ 'date:Last checked for accuracy:start': '2026-08-20' })],
+    [memoRow({ 'date:Published date:start': '2026-08-21T09:00:00.000Z' })]
+  )
+  assert.ok(signals(out).includes('memo-newer'), 'a genuinely newer memo stopped being caught')
+})
+
+check('AN EMPTY PERSON LIST IS EMPTY, in both shapes it arrives in', () => {
+  // `!value` is false for `[]` and for `"[]"`, which are the two shapes a person
+  // property with nobody in it actually arrives as, so signal 4 missed exactly
+  // the rows it exists to catch and called the library fully verified.
+  for (const empty of [[], '[]', '', null, undefined]) {
+    const out = runFlags([artifactRow({ 'Verified by': empty })], [])
+    assert.ok(
+      signals(out).includes('never-verified'),
+      `Verified by as ${JSON.stringify(empty)} was read as verified`
+    )
+  }
+})
+
+check('and somebody actually named is not flagged', () => {
+  for (const filled of [['person-1'], '["person-1"]', 'person-1']) {
+    const out = runFlags([artifactRow({ 'Verified by': filled })], [])
+    assert.ok(
+      !signals(out).includes('never-verified'),
+      `Verified by as ${JSON.stringify(filled)} was read as empty`
+    )
+  }
+})
+
 check('signal 4: never verified', () => {
   const out = runFlags([artifactRow({ 'Verified by': null })], [])
   assert.ok(signals(out).includes('never-verified'), JSON.stringify(signals(out)))
@@ -260,6 +314,10 @@ check('flags refuses to run without the memo rows at all', () => {
 const BODY = { Scope: 'a', 'Trigger Condition': 'b', Steps: 'c', 'System Behavior': 'd', Exceptions: 'none known' }
 const BEFORE = {
   url: URL_A, Name: 'Lead routing', Type: 'SOP/ROE', Status: 'Active',
+  // Description is here on purpose. Without it the omit and clear checks below
+  // both passed whatever the code did, because there was nothing to omit or
+  // clear: another fixture that could not fail.
+  Description: 'the original description',
   Domain: 'Deal Execution', Tags: ['AI', 'Data'], 'Review cadence': 'Quarterly',
   'Last checked for accuracy': '2026-01-01',
   Owner: '11111111-2222-3333-4444-555555555555'
@@ -317,6 +375,43 @@ check('every field a person can edit is reachable', () => {
     const out = runUpdate({ ...BEFORE, [field]: value, body: BODY, reviewed: false })
     assert.deepStrictEqual(out.changed, [field], `${field} cannot be changed by update`)
   }
+})
+
+check('OMITTING A FIELD LEAVES IT ALONE, and never clears it', () => {
+  // Leaving Description out used to read as emptying it: the comparison saw
+  // undefined against the old text, called it a change, found no value to send
+  // and sent an explicit empty. A caller that built the after row by hand and
+  // forgot a field deleted it, and the output called that a clear as if it had
+  // been asked for.
+  const { Description, ...omitted } = { ...BEFORE, reviewed: false }
+  const out = runUpdate(omitted)
+  assert.deepStrictEqual(out.changed, [], `an omitted field was treated as an edit: ${JSON.stringify(out.changed)}`)
+  assert.deepStrictEqual(out.clearing, [], 'an omitted field was cleared')
+  assert.ok(out.untouched.includes('Description'), 'the omitted field was not reported as untouched')
+})
+
+check('and clearing is still something you can say out loud', () => {
+  const out = runUpdate({ ...BEFORE, Description: null, reviewed: false })
+  assert.deepStrictEqual(out.clearing, ['Description'], 'an explicit null stopped clearing')
+})
+
+check('A ROW KEYED BY THE WORKSPACE NAMES IS REFUSED, not read as no change', () => {
+  // A page fetched from Notion is keyed by the workspace's own property names.
+  // Handed one on a renamed workspace, every logical lookup returns undefined,
+  // nothing looks changed, and update reports a clean no-op for an edit that was
+  // asked for. Silent, and it reads as already applied.
+  command = writeConfig({ process: rename(processNames) })
+  const raw = { url: URL_A, 'R Name': 'Lead routing', 'R Type': 'R SOP/ROE', 'R Status': 'R Active' }
+  assert.throws(
+    () => capture(() => command.commands.update(
+      write('braw.json', raw),
+      write('araw.json', { ...raw, 'R Status': 'R Archive', reviewed: false }),
+      '2026-08-23'
+    )),
+    /keyed by this workspace's own property names/,
+    'a raw Notion fetch was accepted and would have reported a clean no-op'
+  )
+  command = writeConfig()
 })
 
 check('AN EMPTIED FIELD IS SENT AS AN EXPLICIT EMPTY VALUE', () => {
@@ -497,6 +592,53 @@ check('A PROPERTY WHOSE TYPE IS UNKNOWN IS UNCHECKED, never quietly passed', () 
   ))
   assert.ok(out.unchecked.some(u => /Some Rollup/.test(u)), JSON.stringify(out.unchecked))
   assert.ok(!out.checked.includes('Some Rollup'), 'an uncomparable property was reported as checked')
+})
+
+check('TWO OPTIONS ARE NOT ONE OPTION WITH A SPACE IN IT', () => {
+  // Joined on a space, ["AI Data"] and ["AI","Data"] both rendered as "AI Data",
+  // so a multi-select split into two options proved clean against the one it
+  // came from.
+  //
+  // THE VALUES HERE ARE IN ALPHABETICAL ORDER ON PURPOSE. The render sorts
+  // before joining, so a pair that sorts into a different order does not
+  // collide however it is joined, and the first version of this check used one
+  // of those: it passed on a space join and proved nothing.
+  const compare = require('../shared/notion-compare')
+  assert.strictEqual(
+    compare.compareProperty('multi_select', ['AI Data'], JSON.stringify(['AI', 'Data'])).state,
+    'different',
+    'a split option compared equal to the one it came from'
+  )
+  // And the ordinary reorder still has to read as the same value.
+  assert.strictEqual(
+    compare.compareProperty('multi_select', ['AI', 'Data'], JSON.stringify(['Data', 'AI'])).state,
+    'same',
+    'a reordered multi-select read as a failed write'
+  )
+})
+
+check('A MISSING HEADING IS CAUGHT, not filed under "not checked"', () => {
+  // A Notion page can come back with a heading missing on a silent partial
+  // failure. This used to list the whole body as unchecked without looking at
+  // the part it could check.
+  const sent = runUpdate({ ...BEFORE, body: { Steps: 'new text' }, reviewed: false })
+  const out = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: sent.properties, headings: [] })
+  ))
+  assert.ok(out.unchecked.some(u => /heading/.test(u)), JSON.stringify(out.unchecked))
+
+  const landed = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: sent.properties, headings: ['Steps'] })
+  ))
+  assert.ok(landed.checked.some(c => /heading "Steps"/.test(c)), JSON.stringify(landed.checked))
+
+  const wrong = capture(() => command.commands['prove-update'](
+    write('sent.json', sent),
+    write('back.json', { url: URL_A, properties: sent.properties, headings: ['Scope'] })
+  ))
+  assert.strictEqual(wrong.proved, false, 'a heading that never landed passed as a clean write')
 })
 
 check('THE WRONG FILE IS REFUSED, rather than proving nothing cleanly', () => {
