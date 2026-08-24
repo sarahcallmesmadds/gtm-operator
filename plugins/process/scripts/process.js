@@ -920,6 +920,34 @@ const commands = {
       else problems.push({ what: heading, why: 'The section heading is not on the page. Write it again rather than reporting success.' })
     }
 
+    // A BACKFILLED PAGE IS PROVED BY WHAT IS NOT ON IT, and the loop above cannot
+    // do that. It walks the properties that were intended, and on a backfill the
+    // four that matter are intended to be absent, so a page that came back
+    // carrying a stamp passed this as a clean write. That is the one outcome the
+    // whole mode exists to prevent: a stamped import is indistinguishable from an
+    // artifact somebody read, and it drops silently out of the never-verified
+    // audit signal.
+    //
+    // The write side has been guarded since the mode was built. This is the read
+    // side, and a guard on one of those two is the fault this branch has now hit
+    // four times.
+    if (final.backfill === true) {
+      for (const logical of backfill.REFUSED_ON_A_BACKFILL) {
+        const name = context.property(logical)
+        const got = readback.properties[name]
+        if (got === undefined || got === null || got === '' || (Array.isArray(got) && got.length === 0)) {
+          checked.push({ what: name, type: 'absent, which is what a backfill requires' })
+          continue
+        }
+        problems.push({
+          what: name,
+          why: `${logical} is on the page that came back and a backfill writes none of the four. Something put it there. ` +
+            'Clear it before reporting this write: an artifact stamped by the import that created it is indistinguishable ' +
+            'from one a person actually checked, and it drops out of the never-verified audit signal without saying so.'
+        })
+      }
+    }
+
     unchecked.push({
       what: 'the body text',
       why: 'Only the headings were compared. What is written under them was not read back, so a heading with nothing under it passes this check.'
@@ -1407,6 +1435,19 @@ const commands = {
       clearing: cleared,
       reviewed: after.reviewed,
       verificationFields: verification,
+      // CARRIED SO `prove-update` CAN CHECK THE OTHER DIRECTION. On a
+      // `reviewed: false` edit these three are supposed to stay exactly where
+      // they are, and nothing checked that they did: `prove-update` walks what
+      // was sent, and on this path none of them is sent. `fill` depends on that
+      // promise for every artifact it touches, so the promise needed something
+      // watching it. The values are the workspace's own names, which is how they
+      // come back.
+      verificationBefore: Object.fromEntries(
+        schema.VERIFICATION_FIELDS
+          .filter(logical => logical in before)
+          .map(logical => [context.property(logical), before[logical]])
+      ),
+      verificationUnknown: schema.VERIFICATION_FIELDS.filter(logical => !(logical in before)),
       verificationNote: after.reviewed === true
         ? `Recorded as a review, so ${verification.join(', ')} all move together to today's stamp.`
         : 'NOT recorded as a review, so Last checked for accuracy, Verified by and Verified date are all left where they are. ' +
@@ -1497,6 +1538,66 @@ const commands = {
         // through the logical name that name belongs to.
         const logicalOf = {}
         for (const logical of Object.keys(PROPERTY_TYPES)) logicalOf[context.property(logical)] = logical
+
+        /*
+         * THE THREE THAT WERE SUPPOSED NOT TO MOVE.
+         *
+         * On a `reviewed: false` edit none of them is sent, so the loop below
+         * never looks at them and a page that came back freshly stamped read as
+         * a clean write. That is the promise `update` prints in as many words,
+         * and until now nothing checked it. `fill` leans on it for every
+         * artifact it touches.
+         *
+         * Compared through the type like everything else, because a date comes
+         * back carrying a time and a person comes back prefixed, and compared
+         * raw both read as a change nobody made.
+         */
+        if (intended.reviewed !== true && intended.verificationBefore) {
+          for (const [name, was] of Object.entries(intended.verificationBefore)) {
+            const now = back[name]
+            const logical = logicalOf[name]
+            const verdict = compareProperty(PROPERTY_TYPES[logical], was, now)
+            if (verdict.state === 'same') {
+              checked.push(`${name} (unchanged, as a non-review edit requires)`)
+              continue
+            }
+            const empty = value => value === undefined || value === null || value === '' ||
+              (Array.isArray(value) && value.length === 0)
+
+            if (empty(now) && empty(was)) {
+              checked.push(`${name} (empty before and after, which a non-review edit requires)`)
+              continue
+            }
+
+            // ABSENT IS NOT A CHANGE, BECAUSE ABSENT HAS TWO CAUSES. Notion
+            // leaves an empty property off a page rather than returning it
+            // holding nothing, and a read-back that was saved as a summary
+            // rather than a whole page looks exactly the same. Calling either
+            // one a cleared field reports a clean edit as a failure, which is
+            // the false positive this file has been corrected for before.
+            //
+            // The direction that CAN be told apart is the dangerous one: a value
+            // appearing where there was none. That is a stamp landing on an edit
+            // that was not a review, and it is what this check is for.
+            if (empty(now)) {
+              unchecked.push(
+                `${name} was not on the page that came back. Notion leaves an empty property off a page and a summary ` +
+                'read-back leaves everything off, so this cannot tell an emptied field from an unsaved one. Save the ' +
+                'whole page if it matters.'
+              )
+              continue
+            }
+
+            problems.push(
+              `"${name}" ${empty(was) ? 'was empty and now holds' : 'changed on an edit that was not recorded as a review. It held ' + JSON.stringify(was) + ' and now holds'} ${JSON.stringify(now)}. ` +
+              'Nothing here sent it, so something else did. Last checked for accuracy drives the staleness check, and moving it on an ' +
+              'edit that was not a review makes a stale document look freshly checked with nothing downstream able to tell.'
+            )
+          }
+        }
+        for (const logical of (intended.verificationUnknown || [])) {
+          unchecked.push(`${logical} was not on the artifact that was fetched, so there is no before value to compare it against.`)
+        }
 
         for (const [name, sent] of Object.entries(intended.properties)) {
           if (!(name in back)) {
