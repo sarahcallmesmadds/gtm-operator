@@ -1248,7 +1248,19 @@ const commands = {
     // is not its logical one AND the logical key is absent. Both halves matter:
     // without the second, a workspace whose name for one property happens to
     // equal another's logical name would refuse a row that is perfectly fine.
-    refuseRawKeys(context, [['before', before], ['after', after]], 'read as unchanged and this reports a clean no-op for an edit that was asked for')
+    // THE VERIFICATION FIELDS ARE IN THE LIST BECAUSE THIS COMMAND NOW READS
+    // THEM. They are not updatable and never were, so the guard was built
+    // without them, and then `verificationBefore` started reading them off the
+    // same row. On a raw-keyed row all three come back absent, get recorded as
+    // empty, and `prove-update` then reports a stamp that never moved as one
+    // that appeared out of nowhere. Same shape as round 5: a reader added to a
+    // row whose guard was not told about it.
+    refuseRawKeys(
+      context,
+      [['before', before], ['after', after]],
+      'read as unchanged and this reports a clean no-op for an edit that was asked for',
+      [...UPDATABLE_FIELDS, ...schema.VERIFICATION_FIELDS]
+    )
 
     const target = pageKey(before.url)
     if (!target) {

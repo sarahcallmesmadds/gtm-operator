@@ -90,6 +90,21 @@ const NONE_KNOWN = 'none known'
 
 const PERSON_ID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i
 
+/**
+ * Whether a field was left alone rather than filled in.
+ *
+ * AN EMPTY LIST IS NOBODY, AND THAT IS THE WHOLE POINT HERE. `[]` is what
+ * `update` writes to clear a person field and what `wantsAPerson` already reads
+ * as asking for no one. The backfill refusals skipped `undefined`, `null` and
+ * `''` and treated `[]` as a real value, so an artifact whose owner had been
+ * deliberately cleared was refused with a message saying an owner was set on it.
+ * Refusing somebody for asking for exactly the state backfill produces.
+ */
+function askedForNothing (value) {
+  return value === undefined || value === null || value === '' ||
+    (Array.isArray(value) && value.length === 0)
+}
+
 function personIdFrom (value) {
   const id = String(value).trim()
   if (!PERSON_ID.test(id)) {
@@ -376,7 +391,7 @@ function problems (final, { parentType, partialBody = false } = {}) {
       )
     } else if (row.backfill === true) {
       for (const field of PERSON_FIELDS) {
-        if (row[field] === undefined || row[field] === null || row[field] === '') continue
+        if (askedForNothing(row[field])) continue
         add(
           field,
           'backfill-person',
@@ -387,7 +402,7 @@ function problems (final, { parentType, partialBody = false } = {}) {
       }
       for (const field of VERIFICATION_FIELDS) {
         if (PERSON_FIELDS.includes(field)) continue
-        if (row[field] === undefined || row[field] === null || row[field] === '') continue
+        if (askedForNothing(row[field])) continue
         add(
           field,
           'backfill-verification',
@@ -616,6 +631,7 @@ module.exports = {
   saysNoneKnown,
   peopleAsked,
   personIdFrom,
+  askedForNothing,
   problems,
   concerns,
   sourceProblems,
