@@ -1191,6 +1191,50 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('`readJson` REFUSES A FILE OF THE WRONG SHAPE, and refuses nothing unless asked', () => {
+  // Valid JSON of the wrong shape is the failure this plugin has been corrected
+  // for five times. A list where a set of fields was expected has none of those
+  // fields, every one reads as absent, and absent means leave it alone nearly
+  // everywhere here, so the run reports there was nothing to do and exits zero.
+  const asFields = write('shape-fields.json', { Domain: 'Customer Success' })
+  const asList = write('shape-list.json', ['Customer Success'])
+  const asText = write('shape-text.json', 'Customer Success')
+  const asNull = write('shape-null.json', null)
+
+  // ASKED NOTHING, REFUSES NOTHING. A caller that does not declare a shape gets
+  // exactly what it got before, which is what makes declaring it safe to do one
+  // command at a time rather than as a sweep nobody reviewed.
+  for (const file of [asFields, asList, asText, asNull]) {
+    assert.doesNotThrow(() => command.readJson(file, 'the thing'))
+  }
+
+  assert.doesNotThrow(() => command.readJson(asFields, 'the candidate', 'fields'))
+  assert.doesNotThrow(() => command.readJson(asList, 'the rows', 'list'))
+
+  for (const [file, what] of [[asList, 'a list'], [asText, 'a piece of text'], [asNull, 'null']]) {
+    assert.throws(
+      () => command.readJson(file, 'the candidate', 'fields'),
+      one => one.message.includes(what) && one.message.includes('set of fields'),
+      `${what} was accepted where a set of fields was expected`
+    )
+  }
+
+  for (const [file, what] of [[asFields, 'a set of fields'], [asText, 'a piece of text'], [asNull, 'null']]) {
+    assert.throws(
+      () => command.readJson(file, 'the rows', 'list'),
+      one => one.message.includes(what) && one.message.includes('read as a list'),
+      `${what} was accepted where a list was expected`
+    )
+  }
+
+  // AND IT STILL SAYS WHICH OF THE THREE THINGS WENT WRONG, rather than folding
+  // a missing file and unparseable text into the new answer.
+  assert.throws(() => command.readJson('nowhere.json', 'the candidate', 'fields'), /Could not read/)
+  const broken = path.join(SANDBOX, 'shape-broken.json')
+  fs.writeFileSync(broken, '{ not json')
+  assert.throws(() => command.readJson(broken, 'the candidate', 'fields'), /not valid JSON/)
+})
+
 check('NEITHER SIDE OF `fill` IS READ AS A ROW UNLESS IT IS ONE', () => {
   // Third of this shape on the branch, after the mailbox and the body. It went
   // two ways at once: a candidate of [] has none of the fillable fields, so

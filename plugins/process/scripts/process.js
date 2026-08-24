@@ -407,18 +407,66 @@ function sameValue (logical, a, b) {
   return norm(a) === norm(b)
 }
 
-function readJson (file, what) {
+/**
+ * A file read, parsed, and checked for being the shape the caller reads it as.
+ *
+ * THE SHAPE IS THE THIRD THING WORTH CHECKING AND NOTHING WAS CHECKING IT.
+ * Valid JSON of the wrong shape is the failure this plugin has been corrected
+ * for five times: a list where a set of fields was expected has none of those
+ * fields, so every one of them reads as absent, and "absent" means "leave it
+ * alone" nearly everywhere here. The run then reports that there was nothing to
+ * do and exits zero, having silently dropped what somebody approved.
+ *
+ * Refused at the door rather than in each command, because a rule every future
+ * command has to remember is one a future command will forget. `expected` is
+ * optional and a caller that does not say gets the old behaviour, so declaring
+ * it is a decision per command rather than a sweep nobody reviewed.
+ */
+function readJson (file, what, expected) {
   let raw
   try {
     raw = fs.readFileSync(file, 'utf8')
   } catch (err) {
     throw new Error(`Could not read ${what} at ${file}: ${err.message}`)
   }
+
+  let parsed
   try {
-    return JSON.parse(raw)
+    parsed = JSON.parse(raw)
   } catch (err) {
     throw new Error(`${file} is not valid JSON, so ${what} could not be read: ${err.message}`)
   }
+
+  if (expected === undefined) return parsed
+
+  const isList = Array.isArray(parsed)
+  const isFields = parsed !== null && typeof parsed === 'object' && !isList
+
+  if (expected === 'list' && !isList) {
+    throw new Error(
+      `${file} holds ${describeShape(parsed)}, and ${what} is read as a list. ` +
+      'Every entry would be missed and the run would report there was nothing to do.'
+    )
+  }
+
+  if (expected === 'fields' && !isFields) {
+    throw new Error(
+      `${file} holds ${describeShape(parsed)}, and ${what} is read as a set of fields, one key per field. ` +
+      'Read that way it has no fields at all, so every one would look absent and the run would report there was ' +
+      'nothing to do rather than that it could not read this.'
+    )
+  }
+
+  return parsed
+}
+
+/** What a value is, in words a person can act on rather than a type name. */
+function describeShape (value) {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'a list'
+  if (typeof value === 'object') return 'a set of fields'
+  if (typeof value === 'string') return 'a piece of text'
+  return `a ${typeof value}`
 }
 
 /**
@@ -1942,6 +1990,8 @@ if (require.main === module) {
 
 module.exports = {
   commands,
+  readJson,
+  describeShape,
   DEFAULT_THRESHOLD,
   THRESHOLD_IS_MEASURED,
   SELECTED,
