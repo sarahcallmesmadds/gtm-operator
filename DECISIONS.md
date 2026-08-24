@@ -2894,3 +2894,29 @@ to a logical constant. Recorded rather than changed.
 
 **"Two-payload person-default split holds up."** Not a defect. A reviewer
 confirming the round 1 fix survived everything since.
+
+### Review round 8 on pull request 15
+
+**The guard against raw rows had the fault it was written to prevent, inside
+it.** It asked whether the row carried ANY logical key and let it through if it
+did. A workspace that renamed some properties and not others produces a row
+carrying both, so a raw fetch with an unrenamed `Name` on it passed, and the
+renamed field it was actually editing stayed invisible. Reproduced: a Status edit
+on a workspace calling that property "Workflow State" came back reporting nothing
+changed.
+
+It asks per field now. A field counts as raw when its workspace name is present
+under a key that is not its logical one AND the logical key is absent. Both
+halves earn their place, and the second one is not theoretical: a workspace whose
+name for `Domain` is "Segment", which is a real logical name for a different
+field, produces normalised rows that a one-sided guard would refuse. Refusing a
+row that is fine is the mirror of letting a raw one through, and there is now a
+check for each.
+
+**Two of my own checks were wrong rather than weak, which is a different
+failure.** Both asserted against the old refusal wording, so tightening the guard
+turned them red while the code was right. Worth separating: a weak check passes
+when it should fail, and these failed when they should have passed. The first
+kind hides a defect, the second wastes a round. Matching on a sentence fragment
+is what made them brittle, and the narrower of the two was matching on singular
+wording that goes plural as soon as more than one field is raw.
