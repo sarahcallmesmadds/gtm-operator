@@ -519,7 +519,24 @@ function problems (final, { parentType, partialBody = false } = {}) {
           'backfill makes about it cannot be checked by the person reading it.'
         )
       } else {
-        const written = ((row.body || {}).Sources || '').trim()
+        // NOT TEXT IS A REFUSAL, NOT A CRASH. `Name` and `Description` were both
+        // taught to tell a malformed value from an absent one, and the Sources
+        // section this branch generates was left calling `.trim()` on whatever
+        // arrived, so a number or a list threw a raw TypeError out of the gate
+        // instead of being refused by it. A gate that crashes reports nothing at
+        // all, which is worse than a gate that reports the wrong thing.
+        const givenSources = (row.body || {}).Sources
+        if (givenSources !== undefined && givenSources !== null && typeof givenSources !== 'string') {
+          add(
+            'Sources',
+            'not-text',
+            `The Sources section is ${JSON.stringify(givenSources)}, which is not text. It is generated from what was ` +
+            'actually read and compared against that record, and a value that is not text cannot be either.'
+          )
+          return found
+        }
+
+        const written = (givenSources || '').trim()
         const expected = sourcesSection(row.sources).trim()
         if (written !== expected) {
           add(
