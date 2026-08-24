@@ -820,6 +820,40 @@ function fill (existing, candidate) {
     }
   }
 
+  /*
+   * A NEVER-FILLED REFUSAL EMPTIES THE ANSWER. IT DOES NOT NARROW IT.
+   *
+   * Round 11 taught the exit code to read `neverFilled` and taught nothing else
+   * to, so the list moved the exit code and left the answer alone. Offered
+   * alongside a fillable field, `{ Domain, Verified date }` came back `ok: true`
+   * carrying a runnable `after` holding the Domain change, with the refusal
+   * beside it: the person approved one candidate and a smaller one ran, which is
+   * the single thing the approval gate cannot catch. Offered alone it was worse
+   * again, because the command exited non-zero while `emptyNote` called the run
+   * a finished answer rather than a failure, and gave a reason that was not the
+   * one that applied.
+   *
+   * THIS IS THE RULE A REFUSED `plan` ALREADY CARRIES, and it is emptied here at
+   * the return for the reason it is emptied there: removing the refused field
+   * where it is refused is a rule every future field has to remember, and the
+   * one that forgets is the one that ships.
+   */
+  if (neverFilled.length) {
+    const names = neverFilled.map(one => one.field)
+    return {
+      ok: false,
+      after: null,
+      filling: [],
+      refused,
+      neverFilled: names,
+      note:
+        `Nothing is being sent. The candidate offered ${names.join(', ')}, which backfill never writes, so the whole ` +
+        'update is refused rather than narrowed down to the rest of it. Approving a candidate and having something ' +
+        'smaller run is the one failure the approval gate cannot see. Offer the fields backfill fills, without ' +
+        'these, and the rest goes through.'
+    }
+  }
+
   return {
     ok: filling.length > 0,
     after,

@@ -203,7 +203,12 @@ genuinely empty on the row as it stands.
 - **It never overwrites.** A field that already holds something is reported and
   left alone. A machine replacing what a person wrote is the one kind of damage
   the approval gate cannot undo.
-- **It fills no person field**, on a blank row as much as on a full one.
+- **It fills no person field**, on a blank row as much as on a full one, and
+  it never marks anything verified. Offering it one of those four refuses the
+  whole update rather than quietly dropping the field and filling the rest:
+  approving a candidate and having something smaller run is the one failure
+  the approval gate cannot see. Take the refused fields off the candidate and
+  run it again.
 - **`reviewed` is false and stays false.** Nobody re-read the artifact, so
   `update` leaves all three verification fields where they are.
 - **Pass both the row and the candidate through logical names.** A raw fetch from
@@ -217,7 +222,8 @@ genuinely empty on the row as it stands.
   that was empty and comes back holding something is reported rather than
   passed.
 
-Filling nothing is a finished answer, not a failure.
+Filling nothing is a finished answer, not a failure, and it exits zero. Being
+refused is neither: it exits non-zero and says which field stopped it.
 
 ---
 
