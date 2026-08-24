@@ -1191,6 +1191,35 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('A SUPPLIED MAILBOX IS NEVER READ AS THE DEFAULT ONE', () => {
+  // `mailbox` is the only scope value whose absence means read anyway. Every
+  // other unreadable value refuses and nothing is read, so conflating absent
+  // with malformed costs a refusal there and bought one here: text() returns
+  // null for a list, so mailbox: ["boss@corp.com"] fell through to the default
+  // and came back ok:true reading the user's own mailbox. There is no approval
+  // gate in front of a read.
+  const base = { sources: ['email'], ways: ['topics'], topics: ['refunds'] }
+  for (const supplied of [42, {}, ['boss@corp.com'], true, '']) {
+    const out = backfill.plan({ ...base, email: { mailbox: supplied, ...WINDOW } })
+    assert.strictEqual(out.ok, false, `mailbox ${JSON.stringify(supplied)} produced a runnable plan`)
+    assert.strictEqual(out.reading.email, undefined, `mailbox ${JSON.stringify(supplied)} was read as "own"`)
+    assert.deepStrictEqual(faults(out), ['email:mailbox-not-a-name'], JSON.stringify(supplied))
+  }
+
+  // ABSENT STILL MEANS OWN, or the check above passes against a plan that
+  // refuses email outright, and a named mailbox that is not "own" keeps its own
+  // refusal rather than being folded into this one.
+  const absent = backfill.plan({ ...base, email: { ...WINDOW } })
+  assert.strictEqual(absent.ok, true, JSON.stringify(absent.refusals))
+  assert.strictEqual(absent.reading.email.mailbox, 'own')
+
+  const own = backfill.plan({ ...base, email: { mailbox: 'own', ...WINDOW } })
+  assert.strictEqual(own.ok, true, JSON.stringify(own.refusals))
+
+  const other = backfill.plan({ ...base, email: { mailbox: 'boss@corp.com', ...WINDOW } })
+  assert.deepStrictEqual(faults(other), ['email:mailbox-not-own'])
+})
+
 check('A MONTH PAST 12 IS REFUSED FOR THE RIGHT REASON, not for the rollover one', () => {
   // Round 4 taught this refusal to name the rollover, and a month past 12 does
   // not roll: it does not resolve at all. One wording for two faults is what the
