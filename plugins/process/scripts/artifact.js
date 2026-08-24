@@ -266,7 +266,21 @@ function problems (final, { parentType, partialBody = false } = {}) {
 
   // ------------------------------------------------------------------ identity
 
-  if (typeof row.Name !== 'string' || !row.Name.trim()) {
+  // MISSING AND MALFORMED ARE DIFFERENT ANSWERS, and this function already knew
+  // that for `Description` and not for the title. A `Name` that arrived as an
+  // object was reported as no name at all, which sends somebody to supply one
+  // they can see is already there, and `properties` writes the title with
+  // `String(...)`, so an object would have reached Notion as the literal
+  // "[object Object]" as a page title.
+  if (row.Name !== undefined && row.Name !== null && typeof row.Name !== 'string') {
+    add(
+      'Name',
+      'not-text',
+      `Name is ${JSON.stringify(row.Name)}, which is not text. It is the title property, written with \`String()\`, ` +
+      'so as it stands it would become the page\'s title as whatever that makes of it: for an object, the literal ' +
+      '"[object Object]".'
+    )
+  } else if (typeof row.Name !== 'string' || !row.Name.trim()) {
     add('Name', 'missing', 'Every artifact needs a name. It is the title property and Notion will not create a page without one.')
   }
 
