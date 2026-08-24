@@ -139,6 +139,25 @@ function saysNoneKnown (text) {
 }
 
 /**
+ * The Sources section, rendered from the sources that were actually read.
+ *
+ * ONE SOURCE OF TRUTH FOR A SECTION THAT HAS TWO. `sources` is a structured
+ * list this file already validates, and `body.Sources` is free text a caller
+ * writes. Nothing tied them together, so an artifact could list one thing in
+ * its Sources section and carry a different set in `sources`, and both passed.
+ * That is survivable on a create somebody wrote by hand. It is not survivable
+ * on a backfill, where the whole claim being made is "this came from there",
+ * so on a backfill `problems` refuses a Sources section that is not this.
+ */
+function sourcesSection (sources) {
+  if (!Array.isArray(sources)) return ''
+  return sources
+    .filter(source => source && typeof source.what === 'string' && source.what.trim())
+    .map(source => `- ${source.what.trim()}: ${String(source.contributed || '').trim()}`)
+    .join('\n')
+}
+
+/**
  * Everything wrong with this artifact that makes it unwritable.
  *
  * Returns a list of `{ field, kind, message }`. Empty means the row can be
@@ -294,6 +313,78 @@ function problems (final, { parentType, partialBody = false } = {}) {
     }
   }
 
+  // ------------------------------------------------------------------ backfill
+
+  /**
+   * A backfill is a machine pulling content in that no person has read.
+   *
+   * REFUSED RATHER THAN DROPPED. `properties` could quietly ignore an owner on
+   * a backfill row and write the page anyway, and the caller would have every
+   * reason to believe the field was set. The three verification fields are the
+   * same case: nothing reads them off the row today, so setting one has never
+   * done anything, and on a backfill that silence is the difference between an
+   * artifact `audit` flags as never-verified and one it passes over.
+   */
+  if (row.backfill !== undefined) {
+    if (typeof row.backfill !== 'boolean') {
+      // NOT A TRUTHINESS TEST. `backfill: "false"` is a string, it is not
+      // `true`, and read loosely it turns the mode off while reading as though
+      // it were on. Everything below keys off `=== true`, so the one shape that
+      // must never be guessed at is refused here instead.
+      add(
+        'backfill',
+        'not-a-boolean',
+        `\`backfill\` is ${JSON.stringify(row.backfill)}, which is neither true nor false. It decides whether a person ` +
+        'field and the verification stamp are written, so it is refused rather than read as truthy: "false" is a ' +
+        'string and would turn the mode off while looking like it was on.'
+      )
+    } else if (row.backfill === true) {
+      for (const field of PERSON_FIELDS) {
+        if (row[field] === undefined || row[field] === null || row[field] === '') continue
+        add(
+          field,
+          'backfill-person',
+          `${field} is set on a backfilled artifact. Backfill never fills a person field: a machine pulled this in and ` +
+          'guessing at who owns or verified it is worse than an empty field. Leave it empty, and set it with `update` ' +
+          'once a real person has read the artifact.'
+        )
+      }
+      for (const field of VERIFICATION_FIELDS) {
+        if (PERSON_FIELDS.includes(field)) continue
+        if (row[field] === undefined || row[field] === null || row[field] === '') continue
+        add(
+          field,
+          'backfill-verification',
+          `${field} is set on a backfilled artifact. Nobody has read this, so all three verification fields stay empty. ` +
+          'Empty is the honest value here and it is what makes the never-verified audit signal mean something: an ' +
+          'artifact stamped by the import that created it is indistinguishable from one a person actually checked.'
+        )
+      }
+
+      const suppliedSources = Array.isArray(row.sources) ? row.sources : []
+      if (!suppliedSources.length) {
+        add(
+          'Sources',
+          'backfill-unsourced',
+          'A backfilled artifact records where it came from. There are no sources on this one, so the only claim ' +
+          'backfill makes about it cannot be checked by the person reading it.'
+        )
+      } else {
+        const written = ((row.body || {}).Sources || '').trim()
+        const expected = sourcesSection(row.sources).trim()
+        if (written !== expected) {
+          add(
+            'Sources',
+            'backfill-sources-disagree',
+            'The Sources section does not match the sources this artifact was built from, so the section says one ' +
+            'thing and the record says another. On a backfill the section is generated from what was actually read ' +
+            'rather than written alongside it. Expected:\n' + expected
+          )
+        }
+      }
+    }
+  }
+
   // ------------------------------------------------------------------- the sources
 
   if (row.sources !== undefined && row.sources !== null) {
@@ -409,22 +500,32 @@ function properties (context, final, { defaultsPerson = true, parentType, today,
    *
    * `today` is passed rather than read from the clock so a caller can write a
    * row dated to when the work was done, and so a test can pin it.
+   *
+   * A BACKFILL SETS NONE OF THEM, AND NO PERSON EITHER. `problems` above refuses
+   * a row that carries one; this is the other half of that pair, and the two are
+   * deliberately next to each other. Split across files they drift, and the way
+   * they drift is the dangerous direction: a refusal that stops nothing while
+   * the payload still writes the stamp, so an unread import reads as verified.
    */
-  const stamp = today || new Date().toISOString().slice(0, 10)
-  put('Last checked for accuracy', stamp)
-  put('Verified date', stamp)
+  const backfilled = final.backfill === true
 
-  for (const field of PERSON_FIELDS) {
-    const value = final[field]
-    const asked = peopleAsked(value)
+  if (!backfilled) {
+    const stamp = today || new Date().toISOString().slice(0, 10)
+    put('Last checked for accuracy', stamp)
+    put('Verified date', stamp)
 
-    if (asked === null) {
-      if ((value === 'me' || defaultsPerson) && context.personId) put(field, [context.personId])
-      continue
+    for (const field of PERSON_FIELDS) {
+      const value = final[field]
+      const asked = peopleAsked(value)
+
+      if (asked === null) {
+        if ((value === 'me' || defaultsPerson) && context.personId) put(field, [context.personId])
+        continue
+      }
+      if (!asked.length) continue
+
+      put(field, asked.map(one => personIdFrom(one)))
     }
-    if (!asked.length) continue
-
-    put(field, asked.map(one => personIdFrom(one)))
   }
 
   return out
@@ -499,6 +600,7 @@ module.exports = {
   personIdFrom,
   problems,
   concerns,
+  sourcesSection,
   properties,
   body,
   expectedHeadings

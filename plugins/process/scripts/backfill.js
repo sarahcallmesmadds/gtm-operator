@@ -1,0 +1,620 @@
+'use strict'
+
+/**
+ * Filling the library from material that already exists.
+ *
+ * PURE, like `artifact.js`. It reads nothing and sends nothing. It decides what
+ * a reader is allowed to be pointed at, judges what came back into candidates a
+ * person can scan, and turns an approved candidate into a draft. The skill does
+ * the reading and the writing.
+ *
+ * THE APPROVAL GATE IS THE WHOLE DESIGN, and everything permissive here rests
+ * on it. `SKILLS-process.md` argues that all three discovery modes are
+ * shippable precisely because a candidate that turns out to be junk costs one
+ * "no": a weak detector produces noise rather than damage. So the judgments
+ * below are allowed to be roughly right, and the things that are NOT allowed to
+ * be roughly right are the two that survive a "no": what the plugin was
+ * permitted to read, and what it writes onto a page.
+ *
+ * WHICH IS WHY SCOPE REFUSES RATHER THAN NARROWS. A scope this file quietly
+ * trims reads less than the person asked for and says it read what they asked
+ * for. There is no approval gate in front of a read: by the time a candidate
+ * list exists, the reading already happened.
+ */
+
+const path = require('path')
+
+const artifact = require(path.join(__dirname, 'artifact'))
+const { similarity } = require(path.join(__dirname, 'similar'))
+const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
+
+/**
+ * The sources a scope may name. Anything else is refused rather than ignored.
+ *
+ * `documents` is a body of writing somebody already keeps: a Drive folder, an
+ * older Notion database, a Confluence space. The other three are conversations,
+ * and they are the ones that carry a date range.
+ */
+const SOURCES = ['documents', 'slack', 'email', 'recordings']
+
+/**
+ * The sources that are conversations rather than documents.
+ *
+ * EVERY ONE OF THESE CARRIES A DATE RANGE AND THERE IS NO WAY TO OPT OUT.
+ * `SKILLS-process.md`: "There is no unbounded read." A document store is a
+ * place somebody chose to put things and its size is knowable before you start.
+ * A conversation source is a firehose, and "all of Slack" is not a scope, it is
+ * the absence of one.
+ */
+const CONVERSATION_SOURCES = ['slack', 'email', 'recordings']
+
+/** The three ways of looking through conversations. Any combination, or none. */
+const WAYS = ['topics', 'repeats', 'sweep']
+
+/**
+ * How many times a question has to be asked before it counts as repeated.
+ *
+ * Three, from `SKILLS-process.md`, on the reasoning that anything asked that
+ * often should have been written down. Twice is a coincidence.
+ */
+const REPEAT_MIN = 3
+
+/**
+ * The similarity above which two askings are treated as the same question.
+ *
+ * NOTHING HAS MEASURED THIS, and `SKILLS-process.md` says so in as many words:
+ * whether "how do we do refunds" and "what is the refund process" count as the
+ * same question needs tuning against real workspaces, which do not exist yet.
+ * It is acceptable here and only here, because the output is a candidate list
+ * rather than a document. It is reported alongside every result for the same
+ * reason `process.js` reports its duplicate threshold: so nobody reads a score
+ * as calibrated.
+ */
+const REPEAT_SIMILARITY = 0.5
+const REPEAT_SIMILARITY_IS_MEASURED = false
+
+/** A YYYY-MM-DD day, or null. Refusals are collected here, never thrown. */
+function day (value) {
+  if (typeof value !== 'string') return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  if (Number.isNaN(Date.parse(`${value}T00:00:00Z`))) return null
+  return value
+}
+
+/** A trimmed string, or null where there is nothing there. */
+function text (value) {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
+/** A non-empty list of non-empty strings, or null. */
+function nameList (value) {
+  if (!Array.isArray(value)) return null
+  const names = value.map(one => text(one)).filter(Boolean)
+  return names.length ? names : null
+}
+
+/**
+ * The read plan, or every reason this scope is not one.
+ *
+ * Returns `{ ok, reading, notReading, ways, refusals }`. `ok` is false when
+ * anything was refused, and the caller sends nothing.
+ *
+ * THE DEFAULTS LEAN CLOSED AND `notReading` IS HOW A PERSON SEES THAT. A plugin
+ * that quietly did not look at direct messages, and a plugin that looked at all
+ * of them, produce the same candidate list when the direct messages happened to
+ * hold nothing. Saying what was left out is the only way the difference is
+ * visible from the outside.
+ */
+function plan (request) {
+  const refusals = []
+  const add = (field, kind, message) => refusals.push({ field, kind, message })
+  const req = request || {}
+
+  // ------------------------------------------------------------------- sources
+
+  let asked = []
+  if (req.sources === undefined || req.sources === null) {
+    add('sources', 'missing', `No source was named. Backfill reads what it is pointed at and nothing else, so with no source there is nothing to point it at. One or more of: ${SOURCES.join(', ')}.`)
+  } else if (!Array.isArray(req.sources)) {
+    add('sources', 'not-a-list', `\`sources\` is ${JSON.stringify(req.sources)}. It is a list, because a backfill run reads any combination of ${SOURCES.join(', ')}.`)
+  } else {
+    asked = req.sources.map(one => text(one)).filter(Boolean)
+    if (!asked.length) {
+      add('sources', 'missing', 'The source list is empty, so there is nothing to read.')
+    }
+    for (const one of asked) {
+      if (!SOURCES.includes(one)) {
+        add('sources', 'unknown-source', `"${one}" is not a source this plugin knows how to read. One or more of: ${SOURCES.join(', ')}. It is refused rather than skipped, because a run that silently drops a source reports on less material than the person asked about and does not say so.`)
+      }
+    }
+  }
+
+  const named = source => asked.includes(source)
+  const reading = {}
+  const notReading = []
+
+  // ------------------------------------------------------------- the date range
+  //
+  // ASKED OF EVERY CONVERSATION SOURCE SEPARATELY. A single range at the top
+  // would read as covering whichever sources happened to be named, and the
+  // range that is right for a mailbox is rarely the one that is right for a
+  // year of meeting recordings.
+
+  const range = (source, holder) => {
+    const from = day(holder.from)
+    const to = day(holder.to)
+    if (!from) {
+      add(source, 'range-open', `${source} has no usable \`from\` date, so this is an unbounded read. There is no unbounded read: a conversation source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
+    }
+    if (!to) {
+      add(source, 'range-open', `${source} has no usable \`to\` date, so this is an unbounded read. Use YYYY-MM-DD.`)
+    }
+    if (from && to && from > to) {
+      add(source, 'range-backwards', `${source} is scoped from ${from} to ${to}, which is backwards. Read as it is written it covers nothing, and a run that reads nothing looks exactly like a workspace with nothing in it.`)
+      return null
+    }
+    return from && to ? { from, to } : null
+  }
+
+  // ----------------------------------------------------------------- documents
+
+  if (named('documents')) {
+    const holder = req.documents || {}
+    const where = text(holder.where)
+    if (!where) {
+      add('documents', 'unlocated', 'The document source does not say where it is. Name the Drive folder, the Notion database or the space, because "the documents" is not somewhere this can be pointed at.')
+    } else {
+      reading.documents = { where }
+    }
+  } else {
+    notReading.push('Documents. No document store was named, so no existing knowledge base is being sorted.')
+  }
+
+  // --------------------------------------------------------------------- slack
+
+  if (named('slack')) {
+    const holder = req.slack || {}
+    const window = range('slack', holder)
+
+    let channels = null
+    if (holder.channels === 'all') {
+      channels = 'all'
+    } else if (Array.isArray(holder.channels)) {
+      channels = nameList(holder.channels)
+      if (!channels) {
+        add('slack', 'channels-empty', 'The Slack channel list is empty. Either name the channels to read, or say "all" deliberately. An empty list reads as nothing and is more likely to be a mistake than a request.')
+      }
+    } else {
+      add('slack', 'channels-unset', 'Slack was named with no channels. Either "all" or a list of the ones to read. Both are offered on purpose, because a small workspace may want everything and a large one certainly does not, but neither is assumed.')
+    }
+
+    /*
+     * DIRECT MESSAGES ARE NAMED ONE BY ONE OR NOT READ.
+     *
+     * `SKILLS-process.md`: never, unless the user names specific ones. Not "all
+     * DMs" as an option, not a checkbox to include them. This is the one place
+     * in the plugin where a wide read is refused outright rather than offered
+     * with a warning, because a public channel is a place people chose to speak
+     * in front of the workspace and a direct message is not.
+     */
+    let dms = []
+    if (holder.dms !== undefined && holder.dms !== null) {
+      if (holder.dms === 'all' || holder.dms === true) {
+        add('slack', 'dms-all', 'Direct messages cannot be read as a group. There is no "all DMs" option and this is not an oversight: a public channel is somewhere people chose to speak in front of the workspace and a direct message is not. Name the specific conversations, or leave them out.')
+      } else if (!Array.isArray(holder.dms)) {
+        add('slack', 'dms-not-a-list', `\`dms\` is ${JSON.stringify(holder.dms)}. It is a list of specific conversations, named one by one.`)
+      } else {
+        dms = nameList(holder.dms) || []
+      }
+    }
+
+    if (channels && window) {
+      reading.slack = { channels, dms, ...window }
+    }
+    if (!dms.length) {
+      notReading.push('Slack direct messages. None were named, and they are never read as a group.')
+    }
+  } else {
+    notReading.push('Slack. It was not named, so no channels and no direct messages are being read.')
+  }
+
+  // --------------------------------------------------------------------- email
+
+  if (named('email')) {
+    const holder = req.email || {}
+    const window = range('email', holder)
+    const mailbox = text(holder.mailbox)
+
+    if (mailbox && mailbox !== 'own') {
+      add('email', 'mailbox-not-own', `The mailbox is "${mailbox}". Backfill reads the user's own mailbox and no other: reading somebody else's mail is not something an approval gate on the output makes acceptable, because the reading has already happened by then. Set \`mailbox\` to "own" or leave it out.`)
+    } else if (window) {
+      reading.email = { mailbox: 'own', ...window }
+    }
+  } else {
+    notReading.push('Email. It was not named, so no mailbox is being read.')
+  }
+
+  // ---------------------------------------------------------------- recordings
+
+  if (named('recordings')) {
+    const holder = req.recordings || {}
+    const window = range('recordings', holder)
+    const recorder = text(holder.recorder)
+
+    if (!recorder) {
+      add('recordings', 'recorder-unnamed', 'Call recordings were named with no recorder. The plugin reads transcripts from whatever recorder the environment exposes rather than integrating with one by name, so it has to be told which one is connected. Setup asks and does not assume.')
+    } else if (window) {
+      reading.recordings = { recorder, ...window }
+    }
+  } else {
+    notReading.push('Call recordings. No recorder was named, so no transcripts are being read. This is where process decisions most often get made and least often get written down, so it is worth knowing it is off.')
+  }
+
+  // ---------------------------------------------------------------------- ways
+
+  const conversational = CONVERSATION_SOURCES.some(one => named(one))
+  let ways = []
+  if (req.ways === undefined || req.ways === null) {
+    ways = []
+  } else if (!Array.isArray(req.ways)) {
+    add('ways', 'not-a-list', `\`ways\` is ${JSON.stringify(req.ways)}. It is a list, because any combination of ${WAYS.join(', ')} can run, and which ones is chosen per run rather than at install time.`)
+  } else {
+    ways = req.ways.map(one => text(one)).filter(Boolean)
+    for (const one of ways) {
+      if (!WAYS.includes(one)) {
+        add('ways', 'unknown-way', `"${one}" is not a way of looking through conversations. Any combination of: ${WAYS.join(', ')}.`)
+      }
+    }
+  }
+
+  const topics = nameList(req.topics)
+  if (ways.includes('topics') && !topics) {
+    add('topics', 'missing', 'Looking by topic means naming the topics. Without them there is nothing to look for, and this mode is the one that finds exactly what was asked for rather than guessing.')
+  }
+  if (topics && !ways.includes('topics')) {
+    add('ways', 'topics-unused', 'Topics were given and `ways` does not include "topics", so they would be read and never used. It is refused rather than added, because choosing how to look is the person\'s call and quietly turning a mode on is how a run reads more than was agreed.')
+  }
+
+  if (conversational && !ways.length && !refusals.some(one => one.field === 'ways')) {
+    add('ways', 'missing', `A conversation source was named and no way of looking through it was. One or more of: ${WAYS.join(', ')}.`)
+  }
+  if (!conversational && ways.length) {
+    add('ways', 'nothing-to-look-through', `\`ways\` names ${ways.join(', ')} and no conversation source was given, so there is nothing to look through. These three read conversations; a document store is sorted rather than searched.`)
+  }
+
+  for (const one of WAYS) {
+    if (!ways.includes(one)) notReading.push(`The "${one}" way of looking was not chosen.`)
+  }
+
+  return {
+    ok: refusals.length === 0,
+    reading,
+    notReading,
+    ways,
+    topics: topics || [],
+    refusals
+  }
+}
+
+/**
+ * Questions asked three or more times, clustered.
+ *
+ * Takes `[{ question, where, when }]` and gives back the clusters that reached
+ * the threshold, each one carrying every asking behind it. `where` is required
+ * on every asking and there is no default: this is the one mode that reads
+ * things people said rather than things they wrote down for the record, and a
+ * candidate nobody can trace back is a candidate nobody can check.
+ *
+ * IMPRECISE ON PURPOSE, AND ONLY HERE. Whether two wordings are the same
+ * question needs tuning against real workspaces. The output is a list somebody
+ * scans, so a cluster that is wrong costs one "no".
+ */
+function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } = {}) {
+  const refusals = []
+  const add = (field, kind, message) => refusals.push({ field, kind, message })
+
+  if (!Array.isArray(askings)) {
+    return {
+      ok: false,
+      clusters: [],
+      below: [],
+      refusals: [{ field: 'askings', kind: 'not-a-list', message: `The askings are ${JSON.stringify(askings)}. This takes a list of \`{ question, where, when }\`, one per time the question was asked.` }]
+    }
+  }
+
+  const usable = []
+  askings.forEach((one, index) => {
+    const question = text(one && one.question)
+    const where = text(one && one.where)
+    if (!question) {
+      add(`askings[${index}]`, 'question-missing', 'An asking with no question text cannot be compared with anything.')
+      return
+    }
+    if (!where) {
+      add(`askings[${index}]`, 'provenance-missing', `"${question}" does not say where it was asked. Every candidate says where it came from, down to the channel, the thread or the meeting and date. Nothing is absorbed anonymously, and this mode is the one where that matters most.`)
+      return
+    }
+    usable.push({ question, where, when: text(one && one.when) })
+  })
+
+  if (refusals.length) return { ok: false, clusters: [], below: [], refusals }
+
+  /*
+   * GREEDY, AND COMPARED AGAINST THE FIRST ASKING IN THE CLUSTER.
+   *
+   * Comparing against every member and taking the best would chain: A is near
+   * B, B is near C, and C joins a cluster it has nothing to do with A about.
+   * The first asking is the cluster's subject, which is also what gets shown to
+   * the person, so the thing they judge is the thing that decided membership.
+   */
+  const clusters = []
+  for (const asking of usable) {
+    const home = clusters.find(cluster => similarity(cluster.question, asking.question) >= threshold)
+    if (home) home.askings.push(asking)
+    else clusters.push({ question: asking.question, askings: [asking] })
+  }
+
+  const scored = clusters.map(cluster => ({
+    question: cluster.question,
+    asked: cluster.askings.length,
+    wordings: [...new Set(cluster.askings.map(one => one.question))],
+    where: cluster.askings.map(one => ({ where: one.where, when: one.when }))
+  })).sort((a, b) => b.asked - a.asked)
+
+  return {
+    ok: true,
+    threshold,
+    thresholdIsMeasured: REPEAT_SIMILARITY_IS_MEASURED,
+    min,
+    clusters: scored.filter(one => one.asked >= min),
+    below: scored.filter(one => one.asked < min),
+    refusals: []
+  }
+}
+
+/**
+ * What was found, turned into candidate lines a person can go through.
+ *
+ * Takes `[{ what, where, kind, type, why }]`. `what` and `where` are required.
+ * `type` is a judgment and may be absent: an absent one is reported as needing
+ * an answer, and a wrong one is a refusal, because Notion rejects an unknown
+ * select value and takes the whole write down with it.
+ *
+ * NOTHING HERE DECIDES ANYTHING. It numbers the candidates, says what it would
+ * make each one, and hands the list over. `SKILLS-process.md`: backfill's job
+ * is to be usefully wrong in a list you can scan, rather than confidently wrong
+ * in your library.
+ */
+function candidates (found) {
+  const refusals = []
+  const add = (field, kind, message) => refusals.push({ field, kind, message })
+
+  if (!Array.isArray(found)) {
+    return {
+      ok: false,
+      candidates: [],
+      refusals: [{ field: 'found', kind: 'not-a-list', message: `What was found is ${JSON.stringify(found)}. This takes a list, one entry per thing that might belong in the library.` }]
+    }
+  }
+
+  const out = []
+  found.forEach((one, index) => {
+    const what = text(one && one.what)
+    const where = text(one && one.where)
+    const type = text(one && one.type)
+
+    if (!what) {
+      add(`found[${index}]`, 'what-missing', 'A candidate with nothing in `what` is a line nobody can judge.')
+      return
+    }
+    if (!where) {
+      add(`found[${index}]`, 'provenance-missing', `"${what}" does not say where it came from. Every candidate says where it came from, down to the channel, the thread, or the meeting and date.`)
+      return
+    }
+    if (type && !schema.TYPES.includes(type)) {
+      add(`found[${index}]`, 'unknown-type', `"${what}" is proposed as a "${type}", which is not a type this database has. One of: ${schema.TYPES.join(', ')}. An unknown select value takes the whole write down with it, so it is refused here rather than at write time with a drafted artifact already lost.`)
+      return
+    }
+
+    out.push({
+      id: `c${index + 1}`,
+      what,
+      where,
+      kind: text(one && one.kind) || 'unknown',
+      type: type || null,
+      why: text(one && one.why) || null,
+      needs: type ? [] : ['type']
+    })
+  })
+
+  if (refusals.length) return { ok: false, candidates: [], refusals }
+
+  /*
+   * CANDIDATES ARE COMPARED WITH EACH OTHER, NOT WITH THE LIBRARY.
+   *
+   * The library check is `duplicates` and `judge`, the same one `new` uses, and
+   * it runs per candidate before any of them is offered. That is one mechanism
+   * rather than two, and it is why no import-tracking field exists. This pass
+   * only catches the other case: the same process described in three different
+   * channels, arriving as three candidates in one run, which the library check
+   * cannot see because none of them is in the library yet.
+   */
+  const near = []
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      const score = Number(similarity(out[i].what, out[j].what).toFixed(3))
+      if (score >= REPEAT_SIMILARITY) near.push({ a: out[i].id, b: out[j].id, score })
+    }
+  }
+
+  return {
+    ok: true,
+    candidates: out,
+    withinRunNearMatches: near,
+    threshold: REPEAT_SIMILARITY,
+    thresholdIsMeasured: REPEAT_SIMILARITY_IS_MEASURED,
+    needType: out.filter(one => !one.type).map(one => one.id)
+  }
+}
+
+/**
+ * An approved candidate, as an artifact ready for `check` and `create`.
+ *
+ * The caller supplies the content it drafted from what it read. This adds the
+ * three things a backfilled artifact is defined by: `backfill: true`, sources
+ * built from where it came from, and a Sources section generated from those
+ * sources rather than written beside them.
+ *
+ * IT FILLS NO PERSON AND NO VERIFICATION FIELD, and `artifact.js` refuses the
+ * row if one turns up anyway. That is not belt and braces: this is one of two
+ * callers and the other is a person writing a JSON file by hand.
+ */
+function draft (candidate, { today } = {}) {
+  const given = candidate || {}
+  const refusals = []
+  const add = (field, kind, message) => refusals.push({ field, kind, message })
+
+  const name = text(given.Name) || text(given.what)
+  if (!name) add('Name', 'missing', 'The draft has no name. Either `Name`, or the candidate\'s `what` to start from.')
+
+  const type = text(given.Type) || text(given.type)
+  if (!type) add('Type', 'missing', `The draft has no type, so there is no template to write. One of: ${schema.TYPES.join(', ')}.`)
+
+  const sources = Array.isArray(given.sources) ? given.sources : []
+  if (!sources.length) {
+    add('sources', 'missing', 'A backfilled artifact records where it came from, and this one carries no sources. Build them from the candidate\'s `where`: that line is the only claim backfill makes that a reader can check.')
+  }
+
+  for (const field of schema.PERSON_FIELDS) {
+    if (given[field] === undefined || given[field] === null || given[field] === '') continue
+    add(field, 'backfill-person', `${field} was passed to a backfill draft. Backfill never fills a person field: notify the real person instead, and set it with \`update\` once they have read it.`)
+  }
+
+  if (refusals.length) return { ok: false, artifact: null, refusals }
+
+  const body = { ...(given.body || {}) }
+  body.Sources = artifact.sourcesSection(sources)
+
+  const out = {
+    backfill: true,
+    Name: name,
+    Type: type,
+    body,
+    sources
+  }
+  for (const field of ['Description', 'Domain', 'Review cadence', 'Status', ...schema.MULTI_SELECT_FIELDS]) {
+    if (given[field] !== undefined) out[field] = given[field]
+  }
+
+  const problems = artifact.problems(out, { parentType: given.parentType })
+
+  return {
+    ok: problems.length === 0,
+    artifact: out,
+    today: today || null,
+    problems,
+    concerns: artifact.concerns(out),
+    leftEmpty: [...schema.VERIFICATION_FIELDS, 'Owner'],
+    leftEmptyNote:
+      'Owner, Verified by, Verified date and Last checked for accuracy are all empty, and that is the point rather ' +
+      'than an omission. A machine pulled this in and no human has read it, so empty is the honest value. `audit` ' +
+      'will flag it as never-verified until somebody does, which is the signal working.',
+    refusals: []
+  }
+}
+
+/**
+ * The blanks on an artifact that already exists, filled from a candidate.
+ *
+ * Gives back an `after` row for `update`, holding only the fields that are
+ * genuinely empty on the row as it stands. Anything the candidate would change
+ * rather than fill is reported and left alone.
+ *
+ * NEVER OVERWRITES, AND IT GOES THROUGH `update` RATHER THAN WRITING ITSELF.
+ * A second write path would be a second place for the clearing rules, the
+ * verification grouping and the person defaults to be got wrong, and those are
+ * the three things `update` was corrected on most. `reviewed` is forced to
+ * false here: a machine filled these in and nobody re-read the artifact, and
+ * `update` leaves all three verification fields alone on a false.
+ */
+function fill (existing, candidate) {
+  const before = existing || {}
+  const given = candidate || {}
+
+  if (!text(before.url)) {
+    return {
+      ok: false,
+      after: null,
+      refusals: [{ field: 'url', kind: 'missing', message: 'The existing artifact has no `url`, so nothing can say which page these blanks belong to. Keep the url on the row you fetched.' }]
+    }
+  }
+
+  const blank = value => value === undefined || value === null || value === '' ||
+    (Array.isArray(value) && value.length === 0)
+
+  const FILLABLE = ['Description', 'Domain', 'Review cadence', ...schema.MULTI_SELECT_FIELDS]
+
+  const after = { url: before.url, reviewed: false }
+  const filling = []
+  const refused = []
+
+  for (const field of FILLABLE) {
+    if (!(field in given)) continue
+    if (blank(given[field])) continue
+    if (!blank(before[field])) {
+      refused.push({
+        field,
+        holding: before[field],
+        offered: given[field],
+        why: 'Backfill fills blanks and never overwrites. This field already holds something a person may have put there, and a machine replacing it is exactly the damage the approval gate cannot undo.'
+      })
+      continue
+    }
+    after[field] = given[field]
+    filling.push(field)
+  }
+
+  for (const field of schema.PERSON_FIELDS) {
+    if (given[field] === undefined || given[field] === null || given[field] === '') continue
+    refused.push({
+      field,
+      holding: before[field],
+      offered: given[field],
+      why: 'Backfill never fills a person field, on a blank row as much as on a full one. Guessing at an owner is worse than an empty field.'
+    })
+  }
+
+  return {
+    ok: filling.length > 0,
+    after,
+    filling,
+    refused,
+    note:
+      'Pass this to `update` as the after artifact, with the row you fetched as the before. `reviewed` is false and ' +
+      'stays false: nobody re-read this artifact, so Last checked for accuracy, Verified by and Verified date are all ' +
+      'left where they are.',
+    emptyNote: filling.length
+      ? null
+      : 'Nothing was filled. Every field the candidate offered is either empty on it or already holds something, so ' +
+        'there is no update to send. That is a finished answer rather than a failure.'
+  }
+}
+
+module.exports = {
+  SOURCES,
+  CONVERSATION_SOURCES,
+  WAYS,
+  REPEAT_MIN,
+  REPEAT_SIMILARITY,
+  REPEAT_SIMILARITY_IS_MEASURED,
+  day,
+  text,
+  nameList,
+  plan,
+  repeats,
+  candidates,
+  draft,
+  fill
+}

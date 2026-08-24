@@ -3053,3 +3053,196 @@ it was fetched, and `sameValue` reads both. The AFTER row is authored rather tha
 fetched, so it carries real lists and the refusal keeps it that way.
 
 716 checks.
+
+## process, plugin three: `backfill`
+
+The last of the five skills `SKILLS-process.md` designs, and the only one that
+reads things people said rather than things they wrote down for the record.
+
+### The approval gate decides where being wrong is affordable, and where it is not
+
+`SKILLS-process.md` argues that all three discovery modes are shippable
+precisely because a candidate that turns out to be junk costs one "no": a weak
+detector produces noise rather than damage. That is the right argument and it
+has a limit, and the limit is what shaped this build.
+
+The gate sits between the reading and the writing. Everything downstream of it
+is allowed to be roughly right, and two things upstream of it are not:
+
+- **What the plugin was permitted to read.** There is no approval gate in front
+  of a read. By the time a candidate list exists, the reading already happened.
+- **What goes onto a page.** A person saying yes to a candidate line has not
+  reviewed the artifact that line becomes.
+
+So `scope` refuses rather than narrowing, and backfill mode writes no person
+field and no verification stamp. Both are refusals in code. The skill document
+says so too, but prose is advice and this had to be a gate.
+
+### `scope` refuses rather than narrows, and says what it is not reading
+
+A scope quietly trimmed reads less than the person asked for and then reports
+that it read what they asked for. Every refusal is listed in the skill document,
+and the three that are not obvious:
+
+- **A conversation source carries its own date range**, rather than one range at
+  the top of the request. A single range would read as covering whichever
+  sources happened to be named, and the window that is right for a mailbox is
+  rarely the one that is right for a year of meeting recordings.
+- **Half a range is refused as hard as none.** An open-ended `to` is still an
+  unbounded read.
+- **A backwards range is refused rather than swapped.** Read as written it
+  covers nothing, and a run that reads nothing looks exactly like a workspace
+  with nothing in it.
+
+`notReading` exists because a source that was left out and a source that held
+nothing produce the same empty candidate list, and only one of them is worth
+saying out loud.
+
+### Direct messages are named one by one, and that is not a setting
+
+There is no "all DMs" option, not as a flag and not as a checkbox. A public
+channel is somewhere people chose to speak in front of the workspace and a
+direct message is not, and no approval gate on the output changes that, because
+the reading has already happened by the time the output exists.
+
+The same reasoning refuses any mailbox but the user's own.
+
+### Backfill mode lives on the artifact, not in the command's arguments
+
+`create` and `prove` both need to know whether an artifact is a backfill:
+`create` to leave the stamp off, `prove` to not go looking for one. Passing it
+as a flag to each would be the symmetric-pair fault this repository has now hit
+three times, where the write path is defended and the read path is not, or the
+other way round.
+
+`backfill: true` sits on the artifact JSON instead. `prove` is handed the same
+file `create` was, so the two cannot disagree about which mode this is.
+
+`backfill: "false"` is refused rather than read as truthy. Everything keys off
+`=== true`, so a loose read would turn the mode off while every line printed
+still said backfill.
+
+### Nothing is written into a person field, and nothing is stamped
+
+`Owner`, `Verified by`, `Verified date` and `Last checked for accuracy` are all
+left empty. Empty is the honest value: a machine pulled the content in and
+nobody has read it.
+
+This is what makes `audit`'s fourth signal mean something. An artifact stamped
+by the import that created it is indistinguishable from one a person actually
+checked, and signal 4 keys on `Verified by` being empty precisely because signal
+1 cannot catch these: an empty date matches no "before" filter.
+
+A person field passed to a backfill row is **refused rather than dropped**.
+`properties` could ignore it and write the page anyway, and the caller would
+have every reason to believe the field was set.
+
+### The Sources section is generated, not written alongside the sources
+
+`sources` is a structured list `artifact.js` already validated, and
+`body.Sources` was free text a caller wrote. Nothing tied them together, so an
+artifact could list one set in its section and carry a different set in the
+record, and both passed.
+
+That is survivable on a create somebody wrote by hand. It is not survivable on a
+backfill, where "this came from there" is the only claim being made and the only
+one a reader can check. On a backfill the section has to be exactly what
+`sourcesSection` renders from the list, and anything else is refused.
+
+### `fill` never overwrites, and it writes through `update` rather than itself
+
+Filling blanks on an artifact that already exists is a write, and a second write
+path would be a second place for the clearing rules, the verification grouping
+and the person defaults to be got wrong. Those are the three things `update` was
+corrected on most across pull request 15.
+
+So `fill` produces an `after` row and `update` sends it. `reviewed` is forced to
+false, which is the mechanism `update` already has for "nobody re-read this".
+
+**The raw-key guard is shared rather than copied.** `update` refused a row keyed
+by the workspace's own property names because every logical lookup comes back
+undefined and nothing looks changed. `fill` reads the same fetched row and the
+same undefined means something worse: every field reads as empty, so a row that
+is entirely filled in reads as entirely blank and the never-overwrite rule stops
+meaning anything. One guard, two callers, and the consequence sentence is passed
+in because it differs.
+
+### The repeated-question threshold is uncalibrated and says so
+
+Whether "how do we do refunds" and "what is the refund process" are the same
+question needs tuning against real workspaces, which do not exist yet.
+`SKILLS-process.md` accepts that imprecision here and only here, because the
+output is a candidate list rather than a document.
+
+Measured while building: those two example wordings score **0.000** against each
+other on the token overlap this uses. That is not a reason to raise or lower the
+number, it is a reason the number is reported with every result and the person
+sees the wordings.
+
+Clustering is greedy and compares against the **first** asking in a cluster
+rather than the best match in it. Comparing against every member chains: A is
+near B, B is near C, and C joins a cluster it has nothing to do with A about.
+The first asking is what gets shown to the person, so the thing they judge is
+the thing that decided membership.
+
+### One duplicate check, not two
+
+Every candidate goes through `duplicates` and `judge`, the same pair `new` uses.
+That is what makes backfill safe to re-run and it is why no import-tracking
+field exists anywhere in the schema: a second pass over the same folder finds
+the same documents and the check recognises them.
+
+`withinRunNearMatches` is a different question and does not overlap. It catches
+the same process described in two channels, arriving as two candidates in one
+run, neither of them in the library yet, which the library check cannot see.
+
+### `similarity` moved out of `process.js`
+
+`backfill.js` compares one asking of a question against another, which is the
+same job `process.js` does against the library. It cannot require `process.js`
+back without a cycle, and a second copy would drift the way `CLAUDE.md` says
+every copy drifts: two callers calling the same number "similarity" and meaning
+different things by it. It is in `similar.js`, and `process.js` still re-exports
+both functions because its own commands and tests name them there.
+
+### What was proved by breaking it
+
+Forty-eight mutations across `backfill.js`, `artifact.js` and `process.js`, all
+forty-eight asserted onto disk before the suite ran, because three mutations in
+the previous session applied to the wrong place or matched nothing and each
+would have reported a check as proved while touching nothing it watches. One of
+these did not land on its first attempt for exactly that reason.
+
+Coverage was measured rather than claimed: all fifty-two checks in
+`tests/process-backfill.test.js` are reached by at least one mutation, and no
+mutation survives. Getting there took three rounds, and each round found
+something the round before it had not:
+
+- **Round one left a third of the checks unexercised**, because the mutations
+  were written against the guards rather than against the checks. The list a
+  green suite produces is not the list of what it watches.
+- **Round two surfaced two real gaps**, below.
+- **Round three found a check nothing could reach**, because three separate
+  refusals share the kind `missing` and three assertions matched on the kind
+  alone. Each would have gone green for a fault in a field it does not name.
+  They are scoped to the field now.
+
+The two gaps round two found:
+
+- **The sourceless-backfill refusal in `artifact.js` was never reached**,
+  because `draft` refuses first. It could have been deleted with the suite still
+  green. It is the gate for the other caller, a person writing the JSON by hand
+  and running `create`, and there is a test for that caller now.
+- **The field list `draft` copies through is a whitelist**, and nothing asserted
+  that a person field could not ride it. `Owner: ''` reads as nobody asking for
+  anything, which is the convention everywhere else, and the copy-through would
+  then have put the key on the artifact anyway.
+
+The suite is 768 checks, up from 716.
+
+### Not run against Notion
+
+Nothing in `backfill` has been sent. It reads a document store, Slack, a mailbox
+and a call recorder, and this build has read none of them: what is proved is
+what the plugin is allowed to ask for and what it would write, not that any of
+those surfaces answers the way it expects. The install remains torn down.
