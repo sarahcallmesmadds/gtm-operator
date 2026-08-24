@@ -1,0 +1,27 @@
+{
+  "name": "memos",
+  "version": "0.1.0",
+  "description": "Writes and reads the Memos database that the gtm-operator setup plugin created: time-stamped communication, append-only. Writes one memo of any of the seven types from free-form notes, turns a meeting into a record of what it decided, assembles the recurring team update from Projects, Calendar, Memos and Tasks rather than from memory, and finds what was said about something and when, following corrections to the end of the chain. There is no update skill and there never will be: a correction is a new memo, and a retraction is a person's move in Notion. Creates no database and writes no config.",
+  "author": {
+    "name": "Sarah Madden",
+    "url": "https://github.com/sarahcallmesmadds"
+  },
+  "homepage": "https://github.com/sarahcallmesmadds/gtm-operator/tree/main/plugins/memos",
+  "repository": "https://github.com/sarahcallmesmadds/gtm-operator",
+  "license": "MIT",
+  "keywords": [
+    "notion",
+    "gtm",
+    "memos",
+    "communication",
+    "meeting-notes"
+  ],
+  "gtmOperator": {
+    "vendor": [
+      "config-read.js",
+      "memos-schema.js",
+      "page-id.js",
+      "notion-compare.js"
+    ]
+  }
+}

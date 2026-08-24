@@ -1,12 +1,12 @@
 'use strict'
 
 /**
- * The two copies of the multi-select helpers answer identically.
+ * Every copy of the multi-select helpers answers identically.
  *
- * `shared/calendar-schema.js` and `shared/process-schema.js` each carry
- * `listProblem` and `listValues`. They are a copy, on purpose: the two plugins
- * are separate releases, neither can require the other, and a fourth vendored
- * file for eleven lines buys less than it costs.
+ * `shared/calendar-schema.js`, `shared/process-schema.js` and
+ * `shared/memos-schema.js` each carry `listProblem` and `listValues`. They are
+ * a copy, on purpose: the plugins are separate releases, none can require
+ * another, and a vendored file for eleven lines buys less than it costs.
  *
  * A copy nothing checks is the thing this repository distrusts most, so this
  * runs both implementations over the same inputs and asserts the same answer.
@@ -21,6 +21,10 @@ const assert = require('assert')
 
 const calendar = require('../shared/calendar-schema')
 const process_ = require('../shared/process-schema')
+const memos = require('../shared/memos-schema')
+
+/** Process is the reference; every other copy is compared against it. */
+const OTHERS = [['calendar', calendar], ['memos', memos]]
 
 let failures = 0
 const check = (name, fn) => {
@@ -34,7 +38,7 @@ const check = (name, fn) => {
   }
 }
 
-console.log('\nthe two copies of the multi-select helpers agree\n')
+console.log('\nevery copy of the multi-select helpers agrees\n')
 
 const CASES = [
   undefined,
@@ -68,12 +72,14 @@ const show = value => {
 }
 
 check('listProblem answers the same on every case', () => {
-  for (const value of CASES) {
-    assert.deepStrictEqual(
-      process_.listProblem(value),
-      calendar.listProblem(value),
-      `the two copies disagree about ${show(value)}`
-    )
+  for (const [name, copy] of OTHERS) {
+    for (const value of CASES) {
+      assert.deepStrictEqual(
+        process_.listProblem(value),
+        copy.listProblem(value),
+        `the process and ${name} copies disagree about ${show(value)}`
+      )
+    }
   }
 })
 
@@ -85,12 +91,14 @@ check('listValues answers the same on every case the contract allows', () => {
   const allowed = CASES.filter(v => process_.listProblem(v) === null)
   assert.ok(allowed.length >= 6, 'too few allowed cases for this to prove anything')
 
-  for (const value of allowed) {
-    assert.deepStrictEqual(
-      process_.listValues(value),
-      calendar.listValues(value),
-      `the two copies disagree about ${show(value)}`
-    )
+  for (const [name, copy] of OTHERS) {
+    for (const value of allowed) {
+      assert.deepStrictEqual(
+        process_.listValues(value),
+        copy.listValues(value),
+        `the process and ${name} copies disagree about ${show(value)}`
+      )
+    }
   }
 })
 
@@ -102,10 +110,12 @@ check('outside the contract, both copies fail the same way', () => {
   const refused = CASES.filter(v => process_.listProblem(v) !== null)
   assert.ok(refused.length >= 3, 'too few refused cases for this to prove anything')
 
-  for (const value of refused) {
-    const one = (() => { try { return { value: process_.listValues(value) } } catch (err) { return { threw: err.constructor.name } } })()
-    const two = (() => { try { return { value: calendar.listValues(value) } } catch (err) { return { threw: err.constructor.name } } })()
-    assert.deepStrictEqual(one, two, `the two copies behave differently on ${show(value)}`)
+  for (const [name, copy] of OTHERS) {
+    for (const value of refused) {
+      const one = (() => { try { return { value: process_.listValues(value) } } catch (err) { return { threw: err.constructor.name } } })()
+      const two = (() => { try { return { value: copy.listValues(value) } } catch (err) { return { threw: err.constructor.name } } })()
+      assert.deepStrictEqual(one, two, `the process and ${name} copies behave differently on ${show(value)}`)
+    }
   }
 })
 

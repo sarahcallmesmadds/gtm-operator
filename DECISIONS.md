@@ -4763,3 +4763,77 @@ byte-identical pair of lines and a two-line anchor stopped being unique.
 
 824 checks. 142 mutations, all landed, one survivor and it is the known
 `wantsAPerson` inversion `process-audit-update` catches.
+
+---
+
+## The memos plugin, built at 0.1.0, 2026-08-24
+
+Plugin four. Four skills, the ones `SKILLS-memos.md` names and no others:
+`new`, `meeting-notes`, `team-update`, `find`. The build decisions that are not
+already in the design documents, recorded here so review starts from what was
+decided rather than reconstructing it.
+
+**No relation is written, anywhere.** `Corrects`, `Artifacts` and `Projects`
+are relations, and no plugin in this marketplace has measured a relation write
+on the connected client's surface. `calendar` and `process` both made the same
+cut and said so in their outputs; `memos` follows them. The cost is real and
+stated in every affected output: `new`'s correction branch checks the target
+and then tells the person to make the link by hand, and a task written from
+meeting actions is an orphan the Tasks "Needs attention" view will surface
+until somebody links it. The write-time half of the correction rules (one
+target, an identifiable page) is enforced on the request anyway, so the day a
+relation write is measured, the gate is already standing.
+
+**Only `Published` is writable.** `Draft` is a person's to set, same argument
+as `Active` on Process. `Canceled` is a retraction, a person makes it, and it
+requires a correcting memo, so a skill writing it would retract on nobody's
+word. `WRITABLE_STATUSES` is a one-element list and the schema-agrees test
+pins it.
+
+**No partial-body mode in the builder.** Process's `artifact.js` carries one
+because `update` sends only changed sections. Memos has no update, so
+`memo.js` judges every required section on every write, with no second mode
+for a fault to hide in.
+
+**No `neverEmpty` flag in the memos schema, where Process has one.** The
+design gives four sections whose empty case is information, each with its own
+phrase ("nothing this week", "nothing was settled", and so on). Every one is a
+required section, so blank is already refused; the phrase is the skill's to
+teach. One mechanism fewer, and the schema file says why.
+
+**`Period covered` is enforced in both directions.** Required on a Team
+Update, with both ends, the right way round; refused on every other type
+rather than dropped, because the field is the only thing separating a Team
+Update from a Project Update and a silently dropped value looks saved.
+
+**`team-update` fetches whole tables and partitions in the script.** The only
+date SQL measured on this surface is calendar's own window query. Duplicating
+its shape against Projects, Memos and Tasks would be sending unmeasured SQL,
+and an unmeasured filter that silently matches nothing reads as a quiet week.
+The `window` command partitions by ISO string comparison in JS and counts
+everything it leaves out, so a quiet report can be told from a report that
+dropped things. If these tables ever get big enough to hurt, the bound gets
+measured first, same rule as calendar's duplicate query.
+
+**`find` excludes Draft and Canceled by default and says so**, with flags to
+include them, because "what did we retract" is a real question. The
+correction walk (`chain` + `follow`) runs on the unfiltered table: a chain
+crosses types, domains and statuses, and a chain followed through filtered
+rows ends wherever the filter ran out. `follow` reports branches, cycles,
+multi-target corrections and links leaving the table, and resolves none of
+them, because each is a judgment about what somebody meant.
+
+**Reading a relation column in SQL is treated as measured.** The live run on
+2026-08-24 ran `process`'s audit memo query, which selects `Memos.Artifacts`,
+against the real workspace. `find` and `follow` select `Corrects` and
+`Corrected by` the same way. The envelope (`{ results: [...] }`) and the JSON
+array-in-a-string relation encoding are the measured shapes from that run and
+2026-08-19.
+
+**What the new tests do not prove, stated in their headers**: no SQL in
+`memos-command.test.js` has been sent to Notion, and the schema-agrees test
+compares this checkout against itself, not against installed copies. Three
+hand mutations were run before the first commit (the period-wrong-type
+refusal, `follow`'s branch stop, `prove`'s page binding) and each went red in
+exactly the check that watches it; the mutation harness itself still covers
+only the backfill suite, and extending it to memos is open work.
