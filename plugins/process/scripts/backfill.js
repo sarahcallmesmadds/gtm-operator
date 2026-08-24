@@ -641,8 +641,28 @@ function draft (candidate, { today } = {}) {
   const type = text(given.Type) || text(given.type)
   if (!type) add('Type', 'missing', `The draft has no type, so there is no template to write. One of: ${schema.TYPES.join(', ')}.`)
 
+  /*
+   * NORMALISING TO `[]` HERE ANSWERED A QUESTION NOBODY ASKED. `sourceProblems`
+   * already refuses a `sources` that is not a list, with a message saying so, and
+   * this line turned every such value into an empty list before it could ever
+   * see one. So `sources: "Drive/GTM"` came back as `sources:missing`, telling
+   * somebody they recorded no sources when they had recorded one in the wrong
+   * shape, and the refusal written for exactly that case was unreachable from
+   * this caller.
+   */
+  const listed = given.sources !== undefined && given.sources !== null
+  if (listed && !Array.isArray(given.sources)) {
+    add(
+      'sources',
+      'not-a-list',
+      `\`sources\` is ${JSON.stringify(given.sources)}, which is not a list. It is a list of what was actually read, ` +
+      'one entry per source. Read as it stands it records nothing, and a backfilled artifact whose only checkable ' +
+      'claim is empty is worse than one that says so.'
+    )
+  }
+
   const sources = Array.isArray(given.sources) ? given.sources : []
-  if (!sources.length) {
+  if (!listed || (Array.isArray(given.sources) && !sources.length)) {
     add('sources', 'missing', 'A backfilled artifact records where it came from, and this one carries no sources. Build them from the candidate\'s `where`: that line is the only claim backfill makes that a reader can check.')
   }
 

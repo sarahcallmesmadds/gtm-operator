@@ -4169,3 +4169,17 @@ The same fault as the mailbox, the body, the candidate and the person field:
 missing and malformed given one answer. This one is notable for sitting six lines
 from a field that got it right, which is what a rule enforced by hand rather than
 by a shared test looks like.
+
+### Review round 23, finding two: a `sources` that is not a list was reported as none
+
+**Devin.** `sourceProblems` already refuses a `sources` that is not a list, with a
+message saying exactly that. `draft` normalised every such value to `[]` one step
+before calling it, so the refusal was unreachable from this caller and
+`sources: "Drive/GTM"` came back as `sources:missing`: you recorded no sources,
+when what happened is that you recorded one in the wrong shape.
+
+**A normalisation is an answer, and this one answered a question nobody asked.**
+Turning a malformed value into an empty one is the same move as reading it as
+absent, written in a different place. It is the fifth time on this branch, and the
+second where the correct refusal already existed and something upstream made it
+unreachable.
