@@ -821,7 +821,7 @@ const commands = {
 
   check (file) {
     if (!file) throw new Error('Usage: node process.js check <proposed.json>')
-    const proposed = readJson(file, 'the proposed artifact')
+    const proposed = readJson(file, 'the proposed artifact', 'fields')
 
     const problems = artifact.problems(proposed, { parentType: proposed.parentType })
     const concerns = artifact.concerns(proposed)
@@ -847,7 +847,7 @@ const commands = {
 
   duplicates (file) {
     if (!file) throw new Error('Usage: node process.js duplicates <proposed.json>')
-    const proposed = readJson(file, 'the proposed artifact')
+    const proposed = readJson(file, 'the proposed artifact', 'fields')
     const context = contextOrExit()
 
     const name = subjectName(proposed)
@@ -885,8 +885,8 @@ const commands = {
     if (!proposedFile || !rowsFile) {
       throw new Error('Usage: node process.js judge <proposed.json> <rows.json> [threshold]')
     }
-    const proposed = readJson(proposedFile, 'the proposed artifact')
-    const rows = readJson(rowsFile, 'the rows that came back')
+    const proposed = readJson(proposedFile, 'the proposed artifact', 'fields')
+    const rows = readJson(rowsFile, 'the rows that came back', 'list')
     const context = contextOrExit()
 
     const threshold = thresholdArg === undefined ? DEFAULT_THRESHOLD : Number(thresholdArg)
@@ -985,7 +985,7 @@ const commands = {
     if (!artifactFile || !readbackFile) {
       throw new Error('Usage: node process.js prove <artifact.json> <readback.json> <created-url>')
     }
-    const final = readJson(artifactFile, 'the artifact')
+    const final = readJson(artifactFile, 'the artifact', 'fields')
     const readback = readJson(readbackFile, 'the page as it came back', 'fields')
     const context = contextOrExit()
 

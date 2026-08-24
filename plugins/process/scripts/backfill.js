@@ -323,6 +323,14 @@ function plan (request) {
       if (!channels && !notNames(holder.channels).length) {
         add('slack', 'channels-empty', 'The Slack channel list is empty. Either name the channels to read, or say "all" deliberately. An empty list reads as nothing and is more likely to be a mistake than a request.')
       }
+    } else if (holder.channels !== undefined && holder.channels !== null) {
+      // THE ONE LIST IN THIS FUNCTION THAT NEVER GOT ITS OWN REFUSAL. `dms`,
+      // `ways`, `topics` and `sources` were each taught to tell a malformed
+      // value from an absent one, and `channels` was left falling through to the
+      // unset branch, so `channels: "#gtm"` and leaving channels out entirely
+      // came back identical. A caller told it named no channels, while looking
+      // at the channel it named, goes and adds a second one.
+      add('slack', 'channels-not-a-list', `\`slack.channels\` is ${JSON.stringify(holder.channels)}. It is either "all" or a list of the channels to read, named one per entry. As it stands it names none, and reading it as none would be reading a scope nobody set.`)
     } else {
       add('slack', 'channels-unset', 'Slack was named with no channels. Either "all" or a list of the ones to read. Both are offered on purpose, because a small workspace may want everything and a large one certainly does not, but neither is assumed.')
     }
