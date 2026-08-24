@@ -593,6 +593,14 @@ check('A NAMED PARENT IS CARRIED INTO THE DRAFT, so the rule Notion cannot check
   })
   assert.strictEqual(right.ok, true, JSON.stringify(right.problems))
   assert.strictEqual(right.artifact.parent, 'https://notion.so/parent')
+
+  // AND IT HAS TO SURVIVE THE NEXT GATE, which is where checking that the key
+  // is present stops being enough. `draft` validates with the `parentType` it
+  // was handed and `create` re-validates with the artifact's own, so copying
+  // the parent and not its type let a valid parent pass here and be refused one
+  // step later for a type that had been supplied and checked.
+  const sent = capture(() => command.commands.create(write('parented.json', right.artifact)))
+  assert.strictEqual(sent.parentRelation, 'https://notion.so/parent')
 })
 
 check('`backfill: "false"` IS REFUSED RATHER THAN READ AS TRUTHY', () => {
