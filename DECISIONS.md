@@ -4217,3 +4217,33 @@ asserts every mutation onto disk for exactly this reason and reported it as `did
 not land: 1` rather than as a pass.
 
 804 checks. 113 mutations, all landed, all 86 backfill checks reached.
+
+### Review round 24: a request that disagrees with itself was narrowed, not refused
+
+Devin came back clean. Codex found one, and it is the first from a class nothing
+had looked at, which is why the prompt was redirected away from the wrong-type
+question after eight findings at three depths.
+
+**Each source's settings were only ever read inside `if (named(source))`.** So
+`sources: ["documents"]` beside a fully scoped `slack` block came back `ok: true`,
+read documents alone, and reported "Slack. It was not named, so no channels and no
+direct messages are being read." Slack was named, in the same request, with
+channels and a date range on it.
+
+**The false sentence went into `notReading`**, which the skill tells you to show
+somebody before the run starts. So the one output written to be read out loud was
+the one giving a confident and wrong account of what was about to be read, and the
+scope was narrowed to something nobody agreed to, which is the single thing this
+function exists to refuse.
+
+**Refused rather than resolved, because the two repairs are opposite.** Somebody
+either forgot to list the source or forgot to delete its settings. Picking either
+one would be the narrowing again, in a different coat.
+
+**What this says about the remaining risk.** Eight of the last nine findings were
+one value or one container being misread, and the prompt had been tuned to hunt
+exactly that. Pointing it somewhere else produced a finding immediately, in code
+that twenty-three rounds had read. A clean round says clean against what the
+prompt asks about.
+
+805 checks. 115 mutations, all landed, all 87 backfill checks reached.

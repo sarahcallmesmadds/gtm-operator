@@ -56,6 +56,7 @@ What it will refuse:
 | | Why |
 |---|---|
 | No source, or one it does not know | A run that quietly drops a source reports on less than was asked about |
+| Settings for a source that is not in `sources` | The request disagrees with itself. Either the source was left off the list or its settings were left behind, and those want opposite repairs |
 | A conversation source with no date range, or half a range | There is no unbounded read. "All of Slack" is the absence of a scope, not a wide one |
 | `"dms": "all"` | Direct messages are named one by one or not read. A public channel is somewhere people chose to speak in front of the workspace; a direct message is not |
 | Anyone's mailbox but the user's own | An approval gate on the output does not make reading somebody else's mail acceptable, because the reading already happened |
