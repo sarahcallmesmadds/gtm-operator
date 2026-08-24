@@ -2,8 +2,8 @@
 
 A Claude Code marketplace that builds a go-to-market operating system in Notion.
 The design is one plugin per foundation object under `plugins/`, built from the
-design documents at the root. `setup`, `calendar`, `process` and `memos` are
-built.
+design documents at the root. `setup`, `calendar`, `process`, `memos` and
+`projects` are built.
 
 **The design lives in the root documents, not in this file.** `DECISIONS.md`
 holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
@@ -17,8 +17,9 @@ would be a copy, and copies drift.
   config file the others read. The only plugin that creates anything or writes
   config
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
-- `plugins/calendar/`, `plugins/process/`: writing plugins. Each reads config
-  through its vendored copy of `shared/config-read.js` and creates nothing
+- `plugins/calendar/`, `plugins/process/`, `plugins/memos/`,
+  `plugins/projects/`: writing plugins. Each reads config through its vendored
+  copy of `shared/config-read.js` and creates nothing
 - `shared/`: the source of every vendored file. `node scripts/vendor.js` copies
   it into each plugin, which declares what it wants in its own manifest under
   `gtmOperator.vendor`. **Re-vendor after touching `shared/`**, or a plugin runs
