@@ -437,11 +437,21 @@ check('a draft with nothing to substantiate it is refused', () => {
   assert.deepStrictEqual(faults(backfill.draft({ what: 'x', type: 'SOP/ROE', body: SOP_BODY })), ['sources:missing'])
 })
 
-check('an owner offered to a draft is refused, not dropped', () => {
-  const out = draftOf({ Owner: ['11111111-1111-1111-1111-111111111111'] })
-  assert.strictEqual(out.ok, false)
-  assert.deepStrictEqual(faults(out), ['Owner:backfill-person'])
-  assert.strictEqual(out.artifact, null, 'a draft carrying an owner was still handed back')
+check('EVERY FIELD A BACKFILL WILL NOT TAKE IS REFUSED BY `draft`, not just the person half', () => {
+  // Iterated rather than named, because naming one is how this was missed:
+  // `draft` refused the two person fields and then dropped `Verified date` and
+  // `Last checked for accuracy` through a whitelist that did not include them.
+  // The refusal in `artifact.js` was correct and unreachable from here.
+  assert.ok(backfill.REFUSED_ON_A_BACKFILL.length >= 4, 'the refused list shrank')
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    const out = draftOf({ [field]: field === 'Owner' || field === 'Verified by' ? ['11111111-1111-1111-1111-111111111111'] : '2026-08-23' })
+    assert.strictEqual(out.ok, false, `${field} was accepted by draft`)
+    assert.strictEqual(out.artifact, null, `a draft carrying ${field} was still handed back`)
+    assert.ok(
+      faults(out).some(one => one.startsWith(`${field}:backfill-`)),
+      `${field} was dropped rather than refused: ${JSON.stringify(faults(out))}`
+    )
+  }
 })
 
 check('A HAND-WRITTEN BACKFILL ROW IS REFUSED TOO, not only one `draft` built', () => {
@@ -581,10 +591,15 @@ check('an empty list counts as blank, and a filled one does not', () => {
   assert.deepStrictEqual(full.refused.map(one => one.field), ['Tags'])
 })
 
-check('a person field is refused on a blank row as much as on a full one', () => {
-  const out = backfill.fill(EXISTING, { Owner: ['11111111-1111-1111-1111-111111111111'] })
-  assert.deepStrictEqual(out.refused.map(one => one.field), ['Owner'])
-  assert.strictEqual(out.after.Owner, undefined, 'backfill filled a person field')
+check('`fill` REFUSES THE SAME LIST `draft` DOES, on a blank row as much as on a full one', () => {
+  // The same missed pair, on the other path. `fill` looked at the person fields
+  // and ignored the other two, so offering `Verified date` came back as a
+  // finished no-op with an empty `refused` list.
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    const out = backfill.fill(EXISTING, { [field]: '2026-08-23' })
+    assert.deepStrictEqual(out.refused.map(one => one.field), [field], `${field} was ignored rather than refused`)
+    assert.strictEqual(out.after[field], undefined, `backfill filled ${field}`)
+  }
 })
 
 check('`reviewed` is false, because nobody re-read anything', () => {
