@@ -3238,7 +3238,7 @@ The two gaps round two found:
   anything, which is the convention everywhere else, and the copy-through would
   then have put the key on the artifact anyway.
 
-The suite is 776 checks, up from 716.
+The suite is 782 checks, up from 716.
 
 ### Not run against Notion
 
@@ -3602,3 +3602,60 @@ branch:**
 Only the first is caught by measuring mutation coverage, which this branch did
 from the start and which still let the other four through. The other four need
 somebody asking what the check would still pass on.
+
+### Review round 10 on pull request 16, from Devin's GitHub reviewer
+
+**The check was green and the review was not, exactly as `CLAUDE.md` warns.**
+The status came back `SUCCESS` and the comment body underneath said "found 1
+potential issue". The web page carried a bug, a flag and two informational
+findings that reached no status and no summary.
+
+**How much of each was readable.** The bug's full text came back from
+`/pulls/16/comments`, which is a different endpoint from `/pulls/16/reviews` and
+does carry the inline findings. The other three exist only on the Devin page as a
+title and a line range: the page will not render their bodies into the DOM, and
+the clipboard route froze the tab twice. So three of the four were acted on from
+their title, their line range and the code at it, rather than from their prose.
+That is worth writing down because the previous session recorded the same
+shortcut as an assumption, and this time it is a limit of the page rather than a
+corner cut.
+
+**Bug: an emptied person field was refused as though somebody had filled it in.**
+`[]` is what `update` writes to clear a person field and what `wantsAPerson`
+already reads as asking for nobody. The backfill refusals skipped `undefined`,
+`null` and `''` and treated `[]` as a real value, so an artifact whose owner had
+been deliberately cleared was refused with a message saying an owner was set on
+it. Refusing somebody for asking for exactly the state backfill produces.
+
+The three-way test was written out three times and the copies disagreed, which is
+what let this survive nine rounds. There is one `askedForNothing` now and all
+three callers ask it.
+
+**Flag: `update`'s raw-key guard did not watch the fields `update` had started
+reading.** The verification fields are not updatable and never were, so the guard
+was built without them, and then round 6 added `verificationBefore` reading them
+off the same row. On a raw-keyed row all three come back absent, get recorded as
+empty, and `prove-update` reports a stamp that never moved as one that appeared
+out of nowhere.
+
+**That is the seventh instance of the same fault and the third to arrive inside
+an earlier fix.** It is the exact shape of round 5, a reader added to a row whose
+guard was not told about it, in the other command. Round 5 fixed `fill` and left
+`update` alone, because at that point `update` had no reader outside the list.
+Round 6 gave it one.
+
+**Informational: `draft` dropped a candidate's parent.** It was not on the
+copy-through whitelist, so `problems` saw no parent, the only-a-Strategy-Decision
+rule never ran, and the person who named one had every reason to think it had
+been taken. `create` still writes no relation and says so in as many words, which
+is a different thing from never having looked at it.
+
+**Informational: `dayOrRefuse` still accepts a rolled-over date.** Already
+recorded under round 2 as deliberately out of scope for this branch, and it
+stays that way.
+
+**The fix for the flag survived its first mutation pass**, which is to say
+nothing in the suite was watching it. That is the sixth check-that-passes-without-
+checking in this branch and the first found by mutating a fix rather than by a
+reviewer, which is the argument for running the mutation pass after every round
+rather than at the end.

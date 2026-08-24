@@ -549,6 +549,52 @@ check('a verification field on a backfill row is refused', () => {
   assert.deepStrictEqual(found.map(one => one.kind), ['backfill-verification'])
 })
 
+check('AN EMPTIED PERSON FIELD IS ASKING FOR NOBODY, which is what a backfill is', () => {
+  // `[]` is what `update` writes to clear a person field and what `wantsAPerson`
+  // already reads as asking for no one. The backfill refusals skipped only
+  // undefined, null and '', so an artifact whose owner had been deliberately
+  // cleared was refused with a message saying an owner was set on it.
+  const row = draftOf().artifact
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    for (const emptied of [[], null, '']) {
+      assert.deepStrictEqual(
+        artifact.problems({ ...row, [field]: emptied }),
+        [],
+        `${field} set to ${JSON.stringify(emptied)} was refused as though somebody had filled it in`
+      )
+    }
+    // And a real value is still refused, so the line above is not just off.
+    assert.ok(
+      artifact.problems({ ...row, [field]: ['11111111-1111-1111-1111-111111111111'] }).length,
+      `${field} carrying a value was accepted`
+    )
+  }
+})
+
+check('A NAMED PARENT IS CARRIED INTO THE DRAFT, so the rule Notion cannot check still runs', () => {
+  // Dropped, `problems` saw no parent, the only-a-Strategy-Decision rule never
+  // ran, and the person who named one had every reason to think it was taken.
+  const wrong = backfill.draft({
+    what: 'Refund handling', type: 'SOP/ROE', sources: SOURCES, body: SOP_BODY,
+    parent: 'https://notion.so/parent', parentType: 'Enablement'
+  })
+  assert.strictEqual(wrong.ok, false, 'an Enablement was accepted as a parent')
+  assert.ok(wrong.problems.some(one => one.kind === 'parent-wrong-type'), JSON.stringify(wrong.problems))
+
+  const unTyped = backfill.draft({
+    what: 'Refund handling', type: 'SOP/ROE', sources: SOURCES, body: SOP_BODY,
+    parent: 'https://notion.so/parent'
+  })
+  assert.ok(unTyped.problems.some(one => one.kind === 'parent-type-unknown'), JSON.stringify(unTyped.problems))
+
+  const right = backfill.draft({
+    what: 'Refund handling', type: 'SOP/ROE', sources: SOURCES, body: SOP_BODY,
+    parent: 'https://notion.so/parent', parentType: 'Strategy Decision'
+  })
+  assert.strictEqual(right.ok, true, JSON.stringify(right.problems))
+  assert.strictEqual(right.artifact.parent, 'https://notion.so/parent')
+})
+
 check('`backfill: "false"` IS REFUSED RATHER THAN READ AS TRUTHY', () => {
   // A truthiness test would turn the mode off here while everything printed
   // still said backfill, which is the one shape that must never be guessed at.
@@ -865,6 +911,39 @@ check('AN ABSENT PROPERTY IS NOT REPORTED AS A CLEARED ONE', () => {
     `it passed without saying it could not check the stamp: ${JSON.stringify(out.unchecked)}`
   )
 })
+
+check('draft and fill agree with it, rather than each carrying their own copy', () => {
+  for (const field of backfill.REFUSED_ON_A_BACKFILL) {
+    assert.strictEqual(draftOf({ [field]: [] }).ok, true, `draft refused an emptied ${field}`)
+    assert.deepStrictEqual(backfill.fill(EXISTING, { [field]: [] }).refused, [], `fill refused an emptied ${field}`)
+  }
+})
+
+check('`update` REFUSES A RAW-KEYED ROW FOR THE FIELDS IT ONLY READS', () => {
+  // The three verification fields are not updatable and never were, so the
+  // guard was built without them, and then `verificationBefore` started reading
+  // them off the same row. On a raw-keyed row all three come back absent, get
+  // recorded as empty, and `prove-update` reports a stamp that never moved as
+  // one that appeared out of nowhere.
+  const renamed = {
+    properties: Object.fromEntries(Object.keys(processNames.properties).map(k => [k, `R ${k}`])),
+    values: processNames.values
+  }
+  const renamedCommand = writeConfig({ names: renamed })
+  for (const field of schema.VERIFICATION_FIELDS) {
+    assert.throws(
+      () => renamedCommand.commands.update(
+        write('raw-before-v.json', { url: URL_A, [`R ${field}`]: '2026-01-01' }),
+        write('after-raw-v.json', { reviewed: false, Domain: 'Customer Success' }),
+        '2026-08-23'
+      ),
+      /normaliseRows/,
+      `a raw-keyed ${field} was read as empty and recorded as the before value`
+    )
+  }
+  command = writeConfig()
+})
+
 
 console.log(failures ? `\n${failures} failed.\n` : '\nAll passed.\n')
 process.exit(failures ? 1 : 0)

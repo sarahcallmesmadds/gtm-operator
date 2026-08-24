@@ -610,7 +610,10 @@ function draft (candidate, { today } = {}) {
   }
 
   for (const field of REFUSED_ON_A_BACKFILL) {
-    if (given[field] === undefined || given[field] === null || given[field] === '') continue
+    // Asked through `artifact.js` rather than repeated, because this is the
+    // third copy of the same three-way test and the first two disagreed with
+    // each other about `[]`.
+    if (artifact.askedForNothing(given[field])) continue
     add(
       field,
       schema.PERSON_FIELDS.includes(field) ? 'backfill-person' : 'backfill-verification',
@@ -639,6 +642,16 @@ function draft (candidate, { today } = {}) {
   }
   for (const field of ['Description', 'Domain', 'Review cadence', 'Status', ...schema.MULTI_SELECT_FIELDS]) {
     if (given[field] !== undefined) out[field] = given[field]
+  }
+
+  // THE PARENT IS CARRIED, BECAUSE DROPPING IT SKIPS THE ONE RULE NOTION CANNOT
+  // CHECK. A candidate that named a parent lost it here: it was not on the
+  // whitelist, so `problems` saw no parent, the only-a-Strategy-Decision rule
+  // never ran, and the person who named it had every reason to believe it had
+  // been taken. `create` still writes no relation and says so in as many words,
+  // which is a different thing from never having looked at it.
+  if (given.parent !== undefined && given.parent !== null && given.parent !== '') {
+    out.parent = given.parent
   }
 
   const problems = artifact.problems(out, { parentType: given.parentType })
@@ -713,7 +726,7 @@ function fill (existing, candidate) {
   // two silently is what let a caller offer `Verified date` and be told there
   // was nothing to fill.
   for (const field of REFUSED_ON_A_BACKFILL) {
-    if (given[field] === undefined || given[field] === null || given[field] === '') continue
+    if (artifact.askedForNothing(given[field])) continue
     refused.push({
       field,
       kind: 'never-filled',
