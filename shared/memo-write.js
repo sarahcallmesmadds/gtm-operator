@@ -3,6 +3,14 @@
 /**
  * Building and validating one memo.
  *
+ * THIS FILE IS THE SOURCE. It is vendored into plugins by `scripts/vendor.js`,
+ * beside the files it requires, and `tests/vendor-copies-current.test.js`
+ * fails when a copy has drifted. It lived at `plugins/memos/scripts/memo.js`
+ * until 2026-08-24, when `projects` gained three skills that write Memos rows
+ * (`problem-statement`, `comms`, `ship`) and `SKILLS-memos.md` open item 2
+ * came due: the memo shapes must be one definition in every plugin that
+ * writes them, not a hand copy per plugin.
+ *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
  * gate. `SCHEMA-memos.md` defines the fields, the values and the templates;
@@ -31,9 +39,15 @@ const path = require('path')
 // here rather than restating it is the same rule `CLAUDE.md` states for
 // counts: a value written beside the thing it defines is a copy, and copies
 // drift.
-const schema = require(path.join(__dirname, 'vendor', 'memos-schema'))
-const { cameBackEmpty } = require(path.join(__dirname, 'vendor', 'notion-compare'))
-const { pageIdentity } = require(path.join(__dirname, 'vendor', 'page-id'))
+//
+// SIBLING REQUIRES, NOT `vendor/` ONES. In `shared/` these three files sit
+// beside this one, and in every plugin's `scripts/vendor/` they do too, so the
+// same path works in both places. A plugin that vendors this file has to
+// vendor its three siblings with it, and `vendor.js` fails on a name that
+// does not exist.
+const schema = require(path.join(__dirname, 'memos-schema'))
+const { cameBackEmpty } = require(path.join(__dirname, 'notion-compare'))
+const { pageIdentity } = require(path.join(__dirname, 'page-id'))
 
 const {
   TYPES, WRITABLE_STATUSES, PERSON_FIELDS, TAGS_MAX, MULTI_SELECT_FIELDS,
@@ -618,6 +632,38 @@ function expectedHeadings (final) {
   return body(final).map(section => section.heading)
 }
 
+/**
+ * Which Notion type each written Memos column holds, keyed by the column name
+ * the payload actually uses, so a proof compares through the right reader.
+ *
+ * Moved here from the memos command layer on 2026-08-24, when `projects`
+ * became the second plugin proving memo writes: the map has to agree with
+ * `properties` above about which columns exist, and one file holding both is
+ * how they cannot disagree.
+ */
+function propertyTypes (context) {
+  const types = {}
+  const simple = {
+    Name: 'title',
+    Description: 'rich_text',
+    Type: 'select',
+    Status: 'select',
+    Domain: 'select',
+    Audience: 'multi_select',
+    Segment: 'multi_select',
+    'L2C Lifecycle': 'multi_select',
+    Tags: 'multi_select',
+    Author: 'people'
+  }
+  for (const [logical, type] of Object.entries(simple)) types[context.property(logical)] = type
+  for (const logical of ['Published date', 'Period covered']) {
+    const name = context.property(logical)
+    types[`date:${name}:start`] = 'date'
+    types[`date:${name}:end`] = 'date'
+  }
+  return types
+}
+
 module.exports = {
   TYPE_TREE,
   MEMO_OR_ARTIFACT,
@@ -635,5 +681,6 @@ module.exports = {
   concerns,
   properties,
   body,
-  expectedHeadings
+  expectedHeadings,
+  propertyTypes
 }
