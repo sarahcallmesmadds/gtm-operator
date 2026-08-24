@@ -1209,7 +1209,25 @@ const commands = {
     // The body is deliberately NOT merged. `after.body` is what is being
     // written, and pulling the before body in would validate and then send
     // sections nobody edited, which is the fault round 3 fixed.
-    const merged = { ...before, ...after }
+    // ONLY WHAT IS BEING WRITTEN IS VALIDATED, plus the identity needed to read
+    // it. Merging the whole before artifact in put every pre-existing value
+    // through the gates again, so an edit was refused for the state of fields it
+    // was not touching:
+    //
+    //   - A `Draft` artifact could not be edited at all. Draft is a status only
+    //     a person can set, and skills may write only Active or Archive, so the
+    //     rule that stops a skill drafting also stopped it correcting a draft.
+    //   - A value retired from the schema since the page was written blocked
+    //     every later edit to that page, and the message named a field the
+    //     person had not touched.
+    //
+    // `Name` and `Type` are carried across because nothing can be judged without
+    // them: the type decides which sections a body has. Everything else comes
+    // from the after artifact alone, which is exactly what is going to be sent.
+    const merged = { ...after }
+    for (const field of ['Name', 'Type']) {
+      if (!(field in merged) && field in before) merged[field] = before[field]
+    }
     delete merged.body
     if (after.body !== undefined) merged.body = after.body
 
