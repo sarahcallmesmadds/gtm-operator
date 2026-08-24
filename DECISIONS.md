@@ -3338,3 +3338,34 @@ known thing rather than a discovered one.
 missed this. The reviewer's own reasoning found something its report did not
 mention, which is the same lesson as the green Devin check whose body said it had
 found something, arriving from the other direction: the summary is not the review.
+
+### Review round 3 on pull request 16, from the Devin CLI
+
+One finding, no code defect: a check still matching on a refusal kind without
+naming the field. `draft` emits `missing` for `Name`, `Type` and `sources`, so
+the check that a sourceless draft is refused would have passed for a refusal
+about either of the other two.
+
+**Fixed at the helper rather than at the line.** Round 2 had already found three
+of these and scoped those three by hand, which left the reasoning "this kind
+happens to be unique today" standing behind every other assertion in the file. A
+kind that is unique today becomes shared the next time one is added, and nothing
+goes red when it does. Every assertion in the suite now matches on `field:kind`,
+and the helper that produced bare kinds is gone, so a new check cannot be written
+the old way by accident.
+
+Proved by changing the field on that refusal from `sources` to `Name` and
+confirming the check goes red.
+
+**This is the fourth variety of check-that-passes-without-checking found in one
+branch**, and the four are worth keeping together because none of them is caught
+by rereading the test:
+
+1. Unreachable: nothing in the suite exercised it.
+2. Scoped wider than the thing it names: matching on a kind three fields share.
+3. Stopping one step short: asserting the refusal was recorded while saying
+   nothing about what came back alongside it.
+4. Proving one half of a pair: a raw `existing` row and a clean candidate.
+
+Only the first is found by measuring mutation coverage. The other three need
+somebody asking what the check would still pass on.
