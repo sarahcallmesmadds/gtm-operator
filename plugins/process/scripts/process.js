@@ -908,7 +908,13 @@ const commands = {
       throw new Error('Usage: node process.js judge <proposed.json> <rows.json> [threshold]')
     }
     const proposed = readJson(proposedFile, 'the proposed artifact', 'fields')
-    const rows = readJson(rowsFile, 'the rows that came back', 'list')
+    // No 'list' expectation, deliberately. The query surface answers with an
+    // envelope, `{ results: [...] }`, and `duplicates` tells the caller to pass
+    // what came back straight in. `rowList` inside `normaliseRows` is the one
+    // reader that knows the measured envelopes and it refuses anything else, so
+    // guarding for a bare array here refused the documented flow at the door
+    // while `trust` and `flags` accepted it. One reader, not two opinions.
+    const rows = readJson(rowsFile, 'the rows that came back')
     const context = contextOrExit()
 
     const threshold = thresholdArg === undefined ? DEFAULT_THRESHOLD : Number(thresholdArg)

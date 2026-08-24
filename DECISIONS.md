@@ -4720,3 +4720,46 @@ and held exactly the six recorded databases and nothing else, was emptied with
 `allow_deleting_content`, and fetched back as a blank page. The config file at
 `~/.claude/gtm-operator.config.json` was removed. Nothing of the install
 remains on this machine or in the workspace.
+
+### Review round 35 on pull request 16: the flow the live run quietly stepped around
+
+Devin's check on the head was green with no review body, and the finding was on
+the web page only, read there by Sarah: **`judge` refused the raw query result
+it documents itself as taking.** It read its rows file with
+`readJson(..., 'list')`, which throws on anything but a top-level array, while
+the query surface answers `{ results: [...] }`, the envelope `rowList` accepts
+and `duplicates`' own note says to pass straight in. `trust` and `flags` both
+read their rows without the guard and let `rowList` judge the shape; `judge` was
+the one outlier, so the documented `new` and backfill flows failed at the door
+with "read as a list".
+
+**The live run missed it by not following the instructions it was checking.**
+The empty duplicates result was hand-unwrapped into a bare `[]` before being
+handed to `judge`, so the run exercised the working shape and not the documented
+one. A live run proves the path actually walked, and this one walked around the
+bug. Worth carrying: the earlier session's calendar faults were all found by
+running rather than reading, and this one was missed by running with quiet
+corrections a script would not make.
+
+**The fix moves the shape question to the one reader that knows the measured
+envelopes.** The `'list'` expectation is gone and `rowList` refuses what it does
+not recognise, so nothing is guessed at: a bare array and the three measured
+envelopes pass, null and anything else refuse with the wording that names the
+real problem.
+
+**The old pin asserted the bug.** A backfill-suite check fed `judge` a fields
+object and demanded "read as a list", which is the door-front refusal, and no
+test anywhere fed it the envelope the surface actually returns. The pin now
+demands `rowList`'s refusal on a non-envelope object, and a new check runs
+`judge` end to end on `{ results: [...] }`. The old-guard form was restored once
+to prove the new check goes red under it, and it does, with exactly the error
+the finding quoted.
+
+**One mutation flipped direction rather than dying.** The harness mutated the
+guarded line into the unguarded one; the unguarded form is the code now, so the
+mutation restores the guard and the envelope check catches it. Its anchor
+carries the comment line above the read, because `trust` reads its rows with the
+byte-identical pair of lines and a two-line anchor stopped being unique.
+
+824 checks. 142 mutations, all landed, one survivor and it is the known
+`wantsAPerson` inversion `process-audit-update` catches.

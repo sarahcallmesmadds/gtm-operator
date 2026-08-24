@@ -224,6 +224,67 @@ check('and the supersede prompt actually fires, run the way a user runs it', () 
   assert.strictEqual(out.possibleReplacements.length, 1, `no supersede was detected on a renamed workspace: ${JSON.stringify(out.possibleReplacements)}`)
 })
 
+check('judge accepts the envelope the query surface actually returns', () => {
+  // The documented flow: `duplicates` says to pass what came back straight in,
+  // and the SQL surface answers `{ results: [...] }`. Until 2026-08-24 judge
+  // guarded for a bare array one line before `rowList` would have unwrapped the
+  // envelope, so the flow both skills document failed with "read as a list".
+  // Every earlier test wrote its rows file as a bare array, which is why no
+  // test ever saw it.
+  const proposedFile = path.join(SANDBOX, 'proposed-envelope.json')
+  const rowsFile = path.join(SANDBOX, 'rows-envelope.json')
+  fs.writeFileSync(proposedFile, JSON.stringify({
+    Name: 'Lead routing rules', Description: 'how inbound leads are routed', Type: schema.PARENT_TYPE
+  }))
+  fs.writeFileSync(rowsFile, JSON.stringify({
+    results: [{
+      url: 'u', Name: 'Lead routing rules', Description: 'how inbound leads are routed',
+      Type: schema.PARENT_TYPE, Status: 'Active'
+    }],
+    has_more: false,
+    data_source_ids: ['ds']
+  }))
+  contextFor(identity)
+  const printed = []
+  const real = console.log
+  console.log = (...args) => printed.push(args.join(' '))
+  try { command.commands.judge(proposedFile, rowsFile) } finally { console.log = real }
+  const out = JSON.parse(printed.join('\n'))
+  assert.strictEqual(out.compared, 1, `the row inside the envelope was not compared: ${printed.join('\n')}`)
+  assert.strictEqual(out.matches.length, 1, 'the identical row inside the envelope was not matched')
+})
+
+check('judge still refuses rows in a shape nothing measured', () => {
+  // Dropping the bare-array guard hands the shape question to `rowList`, and
+  // this pins that the question is still being asked: a guess that returns
+  // nothing reads exactly like an empty library.
+  const proposedFile = path.join(SANDBOX, 'proposed-badrows.json')
+  const rowsFile = path.join(SANDBOX, 'rows-badrows.json')
+  fs.writeFileSync(proposedFile, JSON.stringify({ Name: 'x', Description: 'y' }))
+  fs.writeFileSync(rowsFile, JSON.stringify({ nope: true }))
+  contextFor(identity)
+  assert.throws(
+    () => command.commands.judge(proposedFile, rowsFile),
+    /shape this does not recognise/,
+    'an unrecognised rows shape was accepted rather than refused'
+  )
+})
+
+check('judge still refuses rows saved as null', () => {
+  // A missing result is not an empty one: null is a query that was never sent,
+  // and `rowList` refuses it rather than reporting a library with nothing in it.
+  const proposedFile = path.join(SANDBOX, 'proposed-nullrows.json')
+  const rowsFile = path.join(SANDBOX, 'rows-nullrows.json')
+  fs.writeFileSync(proposedFile, JSON.stringify({ Name: 'x', Description: 'y' }))
+  fs.writeFileSync(rowsFile, 'null')
+  contextFor(identity)
+  assert.throws(
+    () => command.commands.judge(proposedFile, rowsFile),
+    /no rows to read/,
+    'null rows were accepted rather than refused'
+  )
+})
+
 // ------------------------------------------------------------------ similarity
 
 check('similarity is 1 for the same words and 0 for none in common', () => {
