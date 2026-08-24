@@ -2957,3 +2957,31 @@ which is the lesson from the round before this work started, and the reason each
 one is diffed against the original before the suite runs.
 
 706 checks.
+
+### Review round 10 on pull request 15
+
+Both findings are one root cause, and it is the round 5 fix reaching too far.
+Merging the whole before artifact in so that `Name` and `Type` could be inherited
+also put every pre-existing value back through the gates, so an edit was refused
+for the state of fields it was not touching.
+
+**A `Draft` artifact could not be edited at all.** Draft is a status only a
+person can set in Notion, and a skill may write only Active or Archive. The rule
+that stops a skill drafting was therefore also stopping it correcting a draft,
+which is the one state most likely to need correcting.
+
+**A value retired from the schema since the page was written blocked every later
+edit to that page**, and named a field the person had not touched.
+
+Only what is being written is validated now, plus `Name` and `Type`, which are
+carried across because nothing can be judged without them: the type decides which
+sections a body has. Both halves of each rule have a check, because the danger in
+narrowing a gate is narrowing it past the thing it was for. A skill still cannot
+write a Draft, and a retired value sent in the edit is still refused.
+
+Three mutations, each confirmed to have landed: the whole row merged again, the
+identity not carried at all, and `Type` dropped from the identity while `Name`
+stayed. The last one is the interesting one, because it fails a check written two
+rounds earlier for a different reason.
+
+710 checks.

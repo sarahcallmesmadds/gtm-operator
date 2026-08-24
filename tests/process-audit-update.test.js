@@ -447,6 +447,50 @@ check('A PROPERTY-ONLY EDIT NEED NOT REPEAT THE NAME AND TYPE', () => {
   assert.ok(out.untouched.includes('Name'), 'Name was not reported as untouched')
 })
 
+check('A DRAFT ARTIFACT CAN BE CORRECTED', () => {
+  // Draft is a status only a person can set in Notion, and skills may write only
+  // Active or Archive. Validating the whole before row meant the rule that stops
+  // a skill drafting also stopped it correcting a draft, which is the one state
+  // most likely to need one.
+  const draft = { ...BEFORE, Status: 'Draft' }
+  const out = capture(() => command.commands.update(
+    write('bdraft.json', draft),
+    write('adraft.json', { url: URL_A, Description: 'a correction', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Description'], JSON.stringify(out.changed))
+})
+
+check('but a skill still cannot WRITE a Draft', () => {
+  // The rule itself has to survive the fix. Reading it off the page is allowed;
+  // setting it is not.
+  assert.throws(
+    () => runUpdate({ ...BEFORE, Status: 'Draft', reviewed: false }),
+    /Draft/,
+    'a skill was able to write a Draft status'
+  )
+})
+
+check('A VALUE RETIRED SINCE THE PAGE WAS WRITTEN DOES NOT BLOCK LATER EDITS', () => {
+  // The message named a field the person had not touched, on a page that was
+  // valid when it was written.
+  const legacy = { ...BEFORE, Domain: 'Some Retired Domain' }
+  const out = capture(() => command.commands.update(
+    write('blegacy.json', legacy),
+    write('alegacy.json', { url: URL_A, Description: 'a correction', reviewed: false }),
+    '2026-08-23'
+  ))
+  assert.deepStrictEqual(out.changed, ['Description'], JSON.stringify(out.changed))
+})
+
+check('and a retired value SENT in the edit is still refused', () => {
+  assert.throws(
+    () => runUpdate({ ...BEFORE, Domain: 'Some Retired Domain', reviewed: false }),
+    /not a Domain this database has/,
+    'an invalid value was accepted because it was only being validated on the way in'
+  )
+})
+
 check('but a genuinely unknown type is still refused', () => {
   assert.throws(
     () => capture(() => command.commands.update(
