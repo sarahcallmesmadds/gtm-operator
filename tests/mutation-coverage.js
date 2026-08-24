@@ -37,6 +37,8 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [B, "  if (!artifact.bodyIsMap(given.body)) {", "  if (false) {"],
+  [B, "  if (!artifact.bodyIsMap(given.body)) {", "  if (!artifact.bodyIsMap({ ...(given.body || {}) })) {"],
   [B, "  if (!looksLikeARow(existing)) {", "  if (false) {"],
   [B, "  if (!looksLikeARow(candidate)) {", "  if (false) {"],
   [B, "  const looksLikeARow = value => value !== null && typeof value === 'object' && !Array.isArray(value)", "  const looksLikeARow = value => value !== null && typeof value === 'object'"],

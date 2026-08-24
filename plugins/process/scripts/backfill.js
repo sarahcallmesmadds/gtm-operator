@@ -658,6 +658,33 @@ function draft (candidate, { today } = {}) {
     )
   }
 
+  /*
+   * THE BODY IS JUDGED BEFORE IT IS SPREAD, BECAUSE SPREADING REPAIRS IT.
+   *
+   * Round 20 added a refusal for a `body` that is not a set of sections, and
+   * this line defeated it: `{ ...'a string' }` is a map of character index to
+   * character, `{ ...[1, 2] }` is a map of numeric index, and `{ ...42 }` is
+   * `{}`. So a malformed body arrived at `problems` already converted into
+   * something that looks valid, the refusal could never fire through here, and
+   * what came back instead was five `section-missing` problems naming the wrong
+   * fault entirely, beside an artifact whose body held twenty-six character
+   * keys.
+   *
+   * A GUARD IS NOT PROVED UNTIL EVERY PATH THAT REACHES IT HAS BEEN TRIED. The
+   * check written for round 20 called `problems` directly and never came through
+   * this caller, which is the proving-one-half-of-a-pair fault the branch has
+   * been catching all along, in the check written to stop it.
+   */
+  if (!artifact.bodyIsMap(given.body)) {
+    add(
+      'body',
+      'not-a-section-map',
+      `\`body\` is ${JSON.stringify(given.body)}, which is not a set of sections. It is read as heading to text, ` +
+      'one key per heading. Spread into an artifact it becomes a map of index to character and the refusal that ' +
+      'watches for this cannot see it, so it is refused here, before anything copies it.'
+    )
+  }
+
   // ASKED BEFORE THE SECTION IS BUILT. `sourcesSection` drops an entry it cannot
   // render, so building first and validating after handed back an artifact whose
   // Sources section and whose `sources` record disagreed, alongside a refusal
