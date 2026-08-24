@@ -37,6 +37,9 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [P, "readJson(file, 'the scope', 'fields')", "readJson(file, 'the scope')"],
+  [P, "readJson(file, 'what was found', 'list')", "readJson(file, 'what was found')"],
+  [P, "readJson(candidateFile, 'the candidate', 'fields')", "readJson(candidateFile, 'the candidate')"],
   [P, "  if (expected === 'list' && !isList) {", "  if (false) {"],
   [P, "  if (expected === 'fields' && !isFields) {", "  if (false) {"],
   [P, "  if (expected === undefined) return parsed", "  if (true) return parsed"],
