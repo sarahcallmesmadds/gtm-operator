@@ -3246,3 +3246,32 @@ Nothing in `backfill` has been sent. It reads a document store, Slack, a mailbox
 and a call recorder, and this build has read none of them: what is proved is
 what the plugin is allowed to ask for and what it would write, not that any of
 those surfaces answers the way it expects. The install remains torn down.
+
+### Review round 1 on pull request 16, from the Devin CLI
+
+One finding, and it was real.
+
+**The raw-key guard was applied to one of two arguments.** `update` guards both
+its `before` and its `after` row. `fill` takes two rows as well and guarded only
+`existing`, so a raw-keyed **candidate** walked straight past it. Every value on
+it is invisible to the logical lookups, nothing gets filled, and the output says
+there was nothing to fill and exits zero. That is the quieter of the two
+failures and the harder one to notice, because "nothing to fill" is a legitimate
+answer this command gives all the time.
+
+**The test that was supposed to cover this passed without checking the half it
+did not name.** It handed `fill` a raw `existing` and a clean candidate, so it
+proved the guard on one side and said nothing about the other. That is the same
+fault as the four fixtures in the previous session: a check written so it could
+not fail on the case it was named for.
+
+Both halves are guarded now, the consequence sentence differs per side because
+the failure differs, and a mutation that removes only the candidate half turns
+the suite red.
+
+**Worth noticing about the review itself.** Four of the five design claims put to
+the reviewer came back confirmed and the fifth came back with this. The claim
+that failed was the one about a shared guard, which is the shape this repository
+gets wrong most: a fix landed in one place and its pair missed in another. The
+question that found it was not "is this correct" but "is the guard reachable on
+every path into `fill`".

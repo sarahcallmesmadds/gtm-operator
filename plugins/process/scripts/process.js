@@ -1651,10 +1651,23 @@ const commands = {
     const candidate = readJson(candidateFile, 'the candidate')
 
     // THE SAME GUARD `update` USES, AND FOR A WORSE FAILURE. On a raw-keyed row
-    // every logical lookup is undefined, which this reads as "empty", so a row
-    // whose every field is filled reads as a row whose every field is blank and
-    // the fill-blanks-only rule stops meaning anything.
-    refuseRawKeys(context, [['existing', existing]], 'read as empty, so a row that is entirely filled in reads as entirely blank and the never-overwrite rule stops meaning anything')
+    // every logical lookup is undefined, and what that means depends on which
+    // side it is on. Both sides are guarded, because `update` guards both and a
+    // guard applied to one of two arguments is the shape of a fix whose pair
+    // was missed:
+    //
+    //   - `existing` read raw makes a row whose every field is filled read as a
+    //     row whose every field is blank, and the never-overwrite rule stops
+    //     meaning anything.
+    //   - `candidate` read raw makes a candidate carrying values read as a
+    //     candidate offering nothing, so nothing is filled and the output says
+    //     there was nothing to fill. That is reported as a finished answer and
+    //     exits zero, which is the quieter of the two failures and the harder
+    //     one to notice.
+    refuseRawKeys(context, [
+      ['existing', existing],
+      ['candidate', candidate]
+    ], 'read as empty, so nothing is filled and this reports that there was nothing to fill')
 
     const out = backfill.fill(existing, candidate)
     console.log(JSON.stringify(out, null, 2))

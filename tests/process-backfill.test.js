@@ -537,17 +537,28 @@ check('filling nothing is a finished answer rather than a failure', () => {
   assert.ok(/finished answer/.test(out.emptyNote), out.emptyNote)
 })
 
-check('A RAW-KEYED ROW IS REFUSED, or every field on it reads as blank', () => {
+check('A RAW-KEYED ROW IS REFUSED ON BOTH SIDES, not just the one that was fetched', () => {
+  // Asserting only the `existing` side is a check that passes without checking
+  // the half it does not name. A raw-keyed CANDIDATE is the quieter failure:
+  // every value on it is invisible, nothing is filled, and the output says
+  // there was nothing to fill and exits zero.
   const renamed = {
     properties: Object.fromEntries(Object.keys(processNames.properties).map(k => [k, `R ${k}`])),
     values: processNames.values
   }
   const renamedCommand = writeConfig({ names: renamed })
-  const raw = { url: URL_A, 'R Description': 'The version a person wrote.' }
+  const rawRow = { url: URL_A, 'R Description': 'The version a person wrote.' }
+  const logicalRow = { url: URL_A, Description: 'The version a person wrote.' }
+
   assert.throws(
-    () => renamedCommand.commands.fill(write('raw.json', raw), write('cand.json', { Description: 'machine text' })),
+    () => renamedCommand.commands.fill(write('raw-existing.json', rawRow), write('cand-ok.json', { Domain: 'Customer Success' })),
     /normaliseRows/,
-    'a raw-keyed row was read as blank and offered for filling'
+    'a raw-keyed existing row was read as blank and offered for filling'
+  )
+  assert.throws(
+    () => renamedCommand.commands.fill(write('row-ok.json', logicalRow), write('raw-cand.json', { 'R Domain': 'Customer Success' })),
+    /normaliseRows/,
+    'a raw-keyed candidate offered nothing and that was reported as nothing to fill'
   )
   command = writeConfig()
 })
