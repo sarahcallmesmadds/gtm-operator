@@ -37,6 +37,7 @@ const P = path.join(ROOT, 'plugins/process/scripts/process.js')
 const T = path.join(ROOT, 'tests/process-backfill.test.js')
 
 const M = [
+  [P, "  return String(one.Type || one.type || '').trim()", "  return String(one.Type || '').trim()"],
   [P, "  return String(one.Name || one.what || '').trim()", "  return String(one.Name || '').trim()"],
   [P, "  return `${subjectName(one)} ${one.Description || one.why || ''}`.trim()", "  return `${one.Name || ''} ${one.Description || ''}`.trim()"],
   [P, "      process.exitCode = 1\n      return\n    }\n\n    console.log(JSON.stringify({\n      columns: columnMap(context),", "      return\n    }\n\n    console.log(JSON.stringify({\n      columns: columnMap(context),"],

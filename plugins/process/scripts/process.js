@@ -783,6 +783,21 @@ function subjectName (row) {
   return String(one.Name || one.what || '').trim()
 }
 
+/**
+ * What type a thing is, from either shape.
+ *
+ * THE PAIR OF `subjectName`, AND IT WAS MISSED THE ROUND `subjectName` WAS
+ * ADDED. Teaching `judge` to read a candidate's `what` and leaving its type check
+ * on `proposed.Type` meant a candidate that would supersede an existing Strategy
+ * Decision matched it and was never offered as a replacement, so the side-by-side
+ * prompt never appeared and a decision would have been duplicated rather than
+ * superseded. Half a fix reads exactly like a whole one from the side that works.
+ */
+function subjectType (row) {
+  const one = row || {}
+  return String(one.Type || one.type || '').trim()
+}
+
 /** The description to compare on, from either shape. A candidate has no description. */
 function subjectText (row) {
   const one = row || {}
@@ -895,7 +910,7 @@ const commands = {
     // problem is a supersede: show both decisions side by side, ask, and only on
     // a yes set the relation and archive the old one.
     const replacements = matches.filter(
-      row => row.type === schema.PARENT_TYPE && proposed.Type === schema.PARENT_TYPE
+      row => row.type === schema.PARENT_TYPE && subjectType(proposed) === schema.PARENT_TYPE
     )
 
     console.log(JSON.stringify({

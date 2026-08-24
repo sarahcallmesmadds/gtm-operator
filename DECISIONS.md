@@ -4414,3 +4414,21 @@ was safe and got a clean answer; round 28 asked the same question of the specifi
 call the skill prescribes and found this.
 
 811 checks. 126 mutations, all landed, all 93 backfill checks reached.
+
+### Review round 29, finding one: half of round 28's fix
+
+**Codex.** Round 28 taught `judge` to read a candidate's `what` and left its type
+check reading `proposed.Type` alone. So a candidate that would supersede an
+existing Strategy Decision matched it and was never offered as a replacement: the
+side-by-side prompt never appeared and the decision would have been duplicated
+rather than superseded.
+
+**Sixteenth instance of a rule applied to one half of a pair, and the third where
+the missing half was in the previous round's fix.** The check written for round 28
+is the other half of the same mistake: it asserted `matches` and said nothing
+about `possibleReplacements`, so it proved the half that had been fixed.
+
+**The rule this branch has now earned:** a fix to one side of a pair is not
+finished until the other side has been tried, and the test for it is not finished
+until it asserts the weaker half. Half a fix reads exactly like a whole one from
+the side that works.
