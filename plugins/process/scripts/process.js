@@ -762,6 +762,33 @@ function refuseRawKeys (context, rows, consequence, fields = UPDATABLE_FIELDS) {
 
 // --------------------------------------------------------------------- commands
 
+/**
+ * What a thing is called, whichever of the two shapes it arrived in.
+ *
+ * THE DUPLICATE GATE COULD NOT READ THE CANDIDATE THE FLOW HANDS IT. `candidates`
+ * emits `what` and `type`; `duplicates` and `judge` read `Name` and `Type`; and
+ * the note printed beside the candidate list tells the caller to run both on
+ * every candidate and calls that the thing which makes backfill safe to re-run.
+ * Handed one verbatim, `duplicates` reported "this artifact has no name",
+ * returned no query and exited zero, so the check that stops a second pass
+ * rewriting a page did nothing and said nothing.
+ *
+ * Both shapes read here rather than a translation step in between, because the
+ * skill documents this exact call and a step it does not mention is a step
+ * somebody will skip. `Name` wins when both are present, since an artifact is
+ * the more specific thing.
+ */
+function subjectName (row) {
+  const one = row || {}
+  return String(one.Name || one.what || '').trim()
+}
+
+/** The description to compare on, from either shape. A candidate has no description. */
+function subjectText (row) {
+  const one = row || {}
+  return `${subjectName(one)} ${one.Description || one.why || ''}`.trim()
+}
+
 const commands = {
   context () {
     const context = contextOrExit()
@@ -808,12 +835,17 @@ const commands = {
     const proposed = readJson(file, 'the proposed artifact')
     const context = contextOrExit()
 
-    const name = String(proposed.Name || '').trim()
+    const name = subjectName(proposed)
     if (!name) {
       console.log(JSON.stringify({
         sql: null,
-        why: 'This artifact has no name, so there is nothing to look for a near match of.'
+        why: 'This has no name, under either `Name` or a candidate\'s `what`, so there is nothing to look for a near ' +
+          'match of. A duplicate check that cannot run is not a duplicate check that passed.'
       }, null, 2))
+      // AND IT EXITS NON-ZERO. It printed no query and exited zero, so a caller
+      // reading the status carried on to the write with the check that stops a
+      // re-run rewriting a page having done nothing.
+      process.exitCode = 1
       return
     }
 
@@ -847,7 +879,7 @@ const commands = {
       throw new Error(`"${thresholdArg}" is not a threshold. It is a number between 0 and 1.`)
     }
 
-    const subject = `${proposed.Name || ''} ${proposed.Description || ''}`
+    const subject = subjectText(proposed)
     const scored = normaliseRows(context, rows).map(row => ({
       url: row.url,
       name: row.Name,

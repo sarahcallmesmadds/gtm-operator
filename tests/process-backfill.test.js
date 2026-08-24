@@ -1192,6 +1192,59 @@ check('A ROW WITH NO IDENTITY IS REFUSED, not filtered down to nothing', () => {
 })
 
 
+check('THE DUPLICATE CHECK CAN READ THE CANDIDATE THE FLOW HANDS IT', () => {
+  // `candidates` emits `what` and `type`. `duplicates` and `judge` read `Name`
+  // and `Type`. The note printed beside the candidate list says to run both on
+  // each candidate and calls that the thing which makes backfill safe to re-run.
+  // Handed one verbatim, `duplicates` said "this artifact has no name", returned
+  // no query, and exited zero, so a second pass over the same folder could offer
+  // or create a page that already exists.
+  const list = capture(() => command.commands.candidates(
+    write('rr-found.json', [{ what: 'Refund policy', where: 'Drive/GTM', type: 'SOP/ROE' }])
+  ))
+  const candidate = list.candidates[0]
+  assert.ok(candidate.what, 'the candidate shape changed; this check is about what candidates emits')
+
+  process.exitCode = 0
+  const dup = capture(() => command.commands.duplicates(write('rr-cand.json', candidate)))
+  assert.ok(dup.sql, `the duplicate check produced no query for the candidate the flow hands it: ${dup.why}`)
+  assert.strictEqual(process.exitCode, 0)
+
+  // AND IT STILL READS AN ARTIFACT, which is the other caller and the shape
+  // `new` hands it.
+  const asArtifact = capture(() => command.commands.duplicates(
+    write('rr-art.json', { Name: 'Refund policy', Type: 'SOP/ROE' })
+  ))
+  assert.ok(asArtifact.sql)
+
+  // A THING WITH NEITHER NAME IS STILL REFUSED, and now says so with a non-zero
+  // exit rather than reporting no query and passing.
+  process.exitCode = 0
+  const nameless = capture(() => command.commands.duplicates(write('rr-none.json', { where: 'Drive/GTM' })))
+  assert.strictEqual(nameless.sql, null)
+  assert.strictEqual(process.exitCode, 1, 'a duplicate check that could not run exited zero')
+  process.exitCode = 0
+
+  // `judge` COMPARES THE CANDIDATE'S NAME TOO. Built from `Name` alone the
+  // subject was empty, matched nothing however close the library row was, and
+  // reported a clean no-duplicates answer for a page that already existed.
+  const context = contextNow()
+  const existingRow = {
+    url: URL_A,
+    [context.property('Name')]: 'Refund policy',
+    [context.property('Type')]: 'SOP/ROE',
+    [context.property('Status')]: 'Active'
+  }
+  const judged = capture(() => command.commands.judge(
+    write('rr-cand2.json', candidate),
+    write('rr-rows.json', [existingRow])
+  ))
+  assert.ok(
+    judged.matches.some(one => one.name === 'Refund policy'),
+    `judge did not recognise the page the candidate would duplicate: ${JSON.stringify(judged.matches)}`
+  )
+})
+
 check('A Sources SECTION THAT IS NOT TEXT IS REFUSED, not crashed on', () => {
   // Name and Description were both taught to tell a malformed value from an
   // absent one, and the Sources section this branch generates was left calling
