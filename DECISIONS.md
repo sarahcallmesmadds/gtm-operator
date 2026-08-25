@@ -4933,3 +4933,64 @@ then not built, or neither, but a priority hanging on nothing is the exact
 value the rule exists to keep out of the database. Pinned by a test naming
 the flag rather than changed, the same handling as the disputed slop-check
 finding of 2026-08-18.
+
+## The software plugin, built at 0.1.0, 2026-08-25
+
+Plugin six, the last of the foundation. Four of its five designed skills:
+`new`, `update`, `review` and `contracts`. `backfill` ships as its own
+release, the same split `process` used, because it reads somebody's mailbox
+and needs the most care, and a pull request carrying all five would be too
+large to review well.
+
+**The build followed `projects` deliberately.** A pure gate file
+(`tool.js`), a command layer that builds queries and payloads and sends
+nothing (`software.js`), the vendored `memo-write` for the measured day,
+person and body-map shapes, `prove-create` for every write, and the null
+clear measured in `calendar` on 2026-08-19 for `update`'s emptied fields.
+
+**`Last reviewed` at creation is a recorded disagreement between two design
+documents, and needs Sarah's ruling.** The fill-event table in
+`SCHEMA-software.md` says it is set by `software:new` at creation and by
+`software:review` on a full pass ("named now so the skills have to honour
+them"). The shared rules in `SKILLS-software.md`, written the same day, say
+"`review` is the only skill here that writes it." The build follows the
+fill-event table, on the reasoning that creation is a full pass by
+definition: the person just answered every group in conversation, so an
+unstamped new row would immediately read as never-reviewed when it is the
+freshest row in the directory. The other reading keeps one writer and one
+rule. Both are pinned: `LAST_REVIEWED_WRITERS` in
+`shared/software-schema.js` is the one edit that changes the answer, and
+`tests/software-schema-agrees.test.js` holds the implemented reading so a
+silent drift shows as a red test. If the ruling goes the other way, the
+edit is that constant, the stamp in `newProperties`, and the two documents
+brought into agreement.
+
+**`review` in batch mode stays undesigned and the skill says so**: one row
+at a time, each with its own confirmation, and the shortcut of one
+confirmation covering forty rows is refused in prose, because forty stamped
+dates with nothing confirmed is the failure the skill exists to prevent.
+
+**The `contracts` judgment is arithmetic plus honesty rather than a
+threshold.** Automatic renewals inside the window are deadlines ordered by
+annual cost, then importance, then date; manual and non-renewing ones are a
+diary. Every row it cannot assess is counted with its reasons, because an
+empty date does not match a date filter in Notion, and a report that
+silently omits half the directory reads as "nothing is due". The whole-table
+read plus in-script filtering is the same shape `projects` uses for
+`unfinished`, and it dodges the empty-date trap by construction.
+
+**The duplicate check is by name, and the cost is recorded where it was
+decided**: `Name` is the vendor's own spelling, a rename keeps no former
+name (Sarah's call, 2026-08-18), so a renamed product can re-arrive as a
+candidate and costs one "no". Exact match and containment are the script's;
+everything subtler is the skill's judgment over the whole directory listing.
+
+**What the tests do not prove, stated in their headers**: no SQL in
+`software-command.test.js` has been sent to Notion, and none of `new`,
+`update`, `review` or `contracts` has run against the live workspace. The
+number and checkbox read-back shapes are unmeasured on this surface, so the
+proof reports those properties unchecked rather than guessing. Three hand
+mutations were run before the first commit, each asserted landed before the
+suite ran (the 2026-08-23 lesson): the Last-reviewed refusal, the review
+stamp, and the ceiling, in both its copies. All went red in the right
+check and were restored.
