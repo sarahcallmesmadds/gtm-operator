@@ -5286,7 +5286,8 @@ not a bot, so the person id was recorded without guessing.
   made each of the six filtered views non-empty; view-mode queries and the
   SQL agreed by page identity everywhere. `verify` passed on the first
   attempt and `complete` accepted it: the first recorded install to reach
-  `state: complete` (the 2026-08-19 install never passed verify).
+  `state: complete` (the 2026-08-19 install never passed verify, measured
+  from its config in the no-standing-install section of 2026-08-21).
 - **A wrong view id fails loudly.** One view-mode query was sent with a
   mistyped id and returned a view-not-found error rather than empty rows, so
   that mistake cannot masquerade as an unproved view.
