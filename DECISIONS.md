@@ -5467,3 +5467,16 @@ DECISIONS write-contract paragraph still restated combination behaviour and
 now points only at where the answers live. And the hand counts round 1
 claimed to have removed survived in two headers and the README, the same
 search-narrower-than-the-claim fault this file has recorded before, removed.
+
+### Round 4 on the design pull request, Devin CLI confirming, 2026-08-25: four findings, all taken
+
+Per-file coverage stated, every file whole, including both manifests. All
+four were the round-3 scoping surviving somewhere the search did not reach:
+the README's plugin table row, the marketplace manifest's setup description
+(which also read "every other gtm-operator plugin" as the config's readers),
+the setup plugin manifest whose own two halves disagreed after round 3
+scoped only the second, and the hand counts (six databases, twelve
+relations, five questions rather than twelve) sitting in both manifest
+descriptions. Both descriptions now carry the scoped rule with no counts,
+and the round confirmed the read inventories, the version pair and the
+identity checks clean.

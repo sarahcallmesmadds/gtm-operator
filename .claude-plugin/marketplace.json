@@ -11,7 +11,7 @@
     {
       "name": "setup",
       "source": "./plugins/setup",
-      "description": "Creates the six Notion databases every other gtm-operator plugin reads and writes, wires the relations between them, and writes the one config file they all share. Explains the model before it asks anything, and asks five questions rather than twelve.",
+      "description": "Creates the Notion databases the foundation plugins read and write, wires the relations between them, and writes the foundation's config. Nothing else in the marketplace creates a database, and nothing else writes the foundation's config. install explains the model before it asks anything, asks only the questions that are genuinely the user's to decide, and reads everything it created back out of Notion before calling itself done.",
       "version": "1.0.1",
       "author": {
         "name": "Sarah Madden"
