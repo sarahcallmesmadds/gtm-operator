@@ -176,15 +176,25 @@ function existingRow (page, what) {
 /** The columns `directory` and `duplicates` read, in one place. */
 const DIRECTORY_COLUMNS = ['Name', 'Status', 'Domain', 'Description']
 
-/** A day argument, refused before any input file is read. */
+/**
+ * A day argument, refused before any input file is read.
+ *
+ * ROUND-TRIPPED, NOT SHAPE-CHECKED. `2026-02-30` matches the shape and
+ * `Date.parse` quietly hands back the 2nd of March, which would shift every
+ * deadline in the report while looking exactly like a real run. The same
+ * round trip `memo-write`'s dayProblem learned the hard way.
+ */
 function dayArgument (value, name) {
   if (!value) {
     throw new Error(`Pass ${name} as YYYY-MM-DD. The script does not read the clock: the caller says what day it is.`)
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-    throw new Error(`${name} is ${JSON.stringify(value)}, and it is a day, YYYY-MM-DD, nothing more.`)
+  const text = String(value)
+  const parsed = Date.parse(`${text}T00:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(parsed) ||
+      new Date(parsed).toISOString().slice(0, 10) !== text) {
+    throw new Error(`${name} is ${JSON.stringify(value)}, and it is a day that exists, YYYY-MM-DD. Parsed loosely a day like 2026-02-30 rolls into March, and every deadline in the report shifts with it.`)
   }
-  return String(value)
+  return text
 }
 
 /** Days between two YYYY-MM-DD days, positive when `to` is later. */
@@ -489,6 +499,14 @@ const commands = {
    */
   contracts (rowsFile, ...flags) {
     if (!rowsFile) throw new Error('Usage: node software.js contracts <rows.json> --today YYYY-MM-DD [--window days]')
+    // Flags are judged before any input is read, and one this does not
+    // recognise is refused rather than skipped: `--widnow 30` silently
+    // running the default window is a valid-looking report for a window
+    // nobody set.
+    const unknown = flags.filter(f => f.startsWith('--') && !['--today', '--window'].includes(f))
+    if (unknown.length) {
+      throw new Error(`Unknown flag ${unknown.join(', ')}. This takes --today YYYY-MM-DD and --window days, nothing else.`)
+    }
     const todayAt = flags.indexOf('--today')
     const today = dayArgument(todayAt >= 0 ? flags[todayAt + 1] : null, '--today')
     const windowAt = flags.indexOf('--window')
@@ -521,7 +539,13 @@ const commands = {
 
     const deadlines = []
     const diary = []
-    const couldNotAssess = []
+    // EVERY row with missing contract data lands here, with its reasons —
+    // including rows whose deadline could still be ordered. The design's
+    // three reasons are "no notice deadline, no contract dates, or Renews
+    // unknown", and a row missing only its contract range was assessed for
+    // ordering while still being incomplete; counting only the unorderable
+    // ones understates the gap.
+    const incomplete = []
     const beyondWindow = []
     let retired = 0
     let rejected = 0
@@ -553,10 +577,13 @@ const commands = {
       if (!row.renews || row.renews === 'Unknown') reasons.push('Renews unknown')
       if (badCost.length) reasons.push(`Annual cost is ${JSON.stringify(badCost[0])}, which is not a number`)
 
-      if (!row.noticeDeadline || !row.renews || row.renews === 'Unknown') {
-        couldNotAssess.push({ url: row.url, name: row.name, reasons })
-        continue
+      // Orderable needs a deadline and a known renewal mode; incomplete is
+      // wider, and a row can be both.
+      const orderable = Boolean(row.noticeDeadline && row.renews && row.renews !== 'Unknown')
+      if (reasons.length) {
+        incomplete.push({ url: row.url, name: row.name, reasons, ordered: orderable })
       }
+      if (!orderable) continue
 
       const inDays = daysBetween(today, row.noticeDeadline)
       if (inDays > window) { beyondWindow.push(row); continue }
@@ -597,9 +624,10 @@ const commands = {
       diaryNote: diary.length ? 'Manual and non-renewing contracts inside the window. The same date without an automatic renewal is a diary note, not a deadline.' : null,
       beyondWindow: beyondWindow.length,
       leftOut: { retired, rejected, note: 'Retired and Rejected rows carry no live commitment. Counted rather than silent.' },
-      couldNotAssess,
-      couldNotAssessNote:
-        `${couldNotAssess.length} row${couldNotAssess.length === 1 ? '' : 's'} could not be assessed, for the reasons listed per row. ` +
+      incomplete,
+      incompleteNote:
+        `${incomplete.length} row${incomplete.length === 1 ? ' has' : 's have'} incomplete contract data, for the reasons listed per row. ` +
+        'Rows marked ordered: false could not be placed in the lists above at all; ones marked ordered: true appear above AND here, because a deadline that could be ordered is still a contract nobody has fully recorded. ' +
         'THIS LINE IS HALF THE ANSWER: an empty date does not match a date filter in Notion, so these rows are exactly the ones any filtered view silently omits, and a report without this count reads as "nothing is due".',
       note: 'Read-only. Nothing was changed, nothing was cancelled, no vendor was contacted, and Last reviewed did not move: reading a list is not reviewing a row. Hand what needs attention to `review`.'
     }, null, 2))

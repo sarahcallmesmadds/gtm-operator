@@ -35,9 +35,9 @@ const schema = require(path.join(__dirname, 'vendor', 'software-schema'))
 const memoWrite = require(path.join(__dirname, 'vendor', 'memo-write'))
 const {
   STATUSES, IMPORTANCE, RENEWS,
-  PERSON_FIELDS, MULTI_SELECT_FIELDS, URL_FIELDS, CHECKBOX_FIELDS,
+  PERSON_FIELDS, SINGLE_PERSON_FIELDS, MULTI_SELECT_FIELDS, URL_FIELDS, CHECKBOX_FIELDS,
   SECTIONS, WORD_CEILING, REQUIRED_AT_CREATE, NEVER_CLEARED,
-  IDENTITY_VALUES, listProblem, listValues
+  AUDIENCES, IDENTITY_VALUES, listProblem, listValues
 } = schema
 
 const { dayProblem, bodyIsMap, personIdFrom, words } = memoWrite
@@ -59,8 +59,19 @@ const SELECT_FIELDS = {
  * Reference: a department is not a person and 6pm does not know who to call.
  * "Ask Priya" is an answer, so only the literal department shapes are
  * refused; the judgment beyond that is the skill's.
+ *
+ * THE DEPARTMENT LIST IS THE SCHEMA'S OWN TEAM VOCABULARY — the Audience
+ * values — plus the handful of names those values spell differently. Not a
+ * tuned word list: tuning one is the approach slop-check spent six rounds
+ * proving wrong, and the Audience list is already the one set of team names
+ * this design maintains. A department it still cannot see costs a weak row,
+ * not damage, and the skill's judgment covers the rest.
  */
-const ACCESS_DISMISSALS = /^ask\s+(it|revops|ops|eng(?:ineering)?|the\s+[a-z][a-z ]*\bteam)[.!]?$/i
+const DEPARTMENT_NAMES = [...AUDIENCES, 'IT', 'Ops', 'Eng', 'Engineering', 'Support', 'HR']
+const ACCESS_DISMISSALS = new RegExp(
+  `^ask\\s+(?:the\\s+)?(?:${DEPARTMENT_NAMES.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|[a-z][a-z ]*\\bteam)[.!]?$`,
+  'i'
+)
 
 /**
  * A contract link pointing into Notion itself. Not refused, because a Notion
@@ -220,6 +231,12 @@ function valueProblems (row) {
     const value = row[field]
     if (isEmpty(value)) continue
     const entries = Array.isArray(value) ? value : [value]
+    // Owner, Technical owner and Billing owner hold exactly one person.
+    // Shared ownership reads as nobody's, and a list written here would make
+    // the schema's promise of one accountable person quietly false.
+    if (SINGLE_PERSON_FIELDS.includes(field) && entries.length > 1) {
+      add(field, 'several-people', `${field} names ${entries.length} people and it holds exactly one: ${field === 'Billing owner' ? 'who approves the spend' : field === 'Technical owner' ? 'who can explain how it works' : 'whose call it is'}. Admins is the list field; everyone else goes in the body if they matter.`)
+    }
     for (const one of entries) {
       if (one === 'me') continue
       try {
@@ -277,6 +294,20 @@ function newProblems (final) {
     add('Last reviewed', 'not-yours-to-set', 'Last reviewed is not passed as a field. `create` stamps it from `today` at creation, `review` moves it on a confirmed pass, and nothing else touches it.')
   }
 
+  // A FIELD THIS GATE DOES NOT KNOW IS REFUSED, NOT DROPPED. Without this,
+  // `Plan: "Enterprise"` passed validation, `newProperties` silently left it
+  // out, and `prove` rebuilt the same lossy payload and reported success —
+  // approved content disappearing with nothing anywhere saying so.
+  const known = new Set([...Object.keys(FIELD_TYPES), 'today', 'body'])
+  for (const field of Object.keys(row)) {
+    if (known.has(field)) continue
+    if (field === 'Artifacts' || field === 'Integrates with') {
+      add(field, 'relation-not-written', `${field} is a relation, and no plugin in this marketplace has measured a relation write on this surface. It is refused rather than dropped; name what should be linked and a person makes the link in Notion.`)
+    } else {
+      add(field, 'unknown-field', `"${field}" is not a field this plugin writes. The fields are the schema's; anything else is a typo or belongs in the body's Notes.`)
+    }
+  }
+
   found.push(...valueProblems(row))
 
   const today = row.today
@@ -295,10 +326,17 @@ function newProblems (final) {
     )
   } else {
     const body = row.body || {}
-    const known = SECTIONS.map(s => s.heading)
+    const knownHeadings = SECTIONS.map(s => s.heading)
     for (const heading of Object.keys(body)) {
-      if (!known.includes(heading)) {
-        add(heading, 'unknown-section', `"${heading}" is not a section the Software template has. The sections are: ${known.join(', ')}. Anything that does not fit goes in Notes.`)
+      if (!knownHeadings.includes(heading)) {
+        add(heading, 'unknown-section', `"${heading}" is not a section the Software template has. The sections are: ${knownHeadings.join(', ')}. Anything that does not fit goes in Notes.`)
+        continue
+      }
+      // Every section that is present holds text, conditional ones included.
+      // A Notes holding an object passed the old gate and was then silently
+      // dropped by the renderer, which is approved content disappearing.
+      if (body[heading] !== undefined && body[heading] !== null && typeof body[heading] !== 'string') {
+        add(heading, 'not-text', `The ${heading} section is ${JSON.stringify(body[heading])}, which is not text. It would render to nothing without a word, so it is refused rather than dropped.`)
       }
     }
     for (const section of SECTIONS) {
@@ -306,6 +344,7 @@ function newProblems (final) {
       const text = body[section.heading]
       const filled = typeof text === 'string' && text.trim()
       if (!filled) {
+        if (text !== undefined && text !== null && typeof text !== 'string') continue // already refused as not-text above
         add(
           section.heading,
           'section-missing',
@@ -529,6 +568,11 @@ function updateProblems (changes, { stamping = false } = {}) {
       for (const heading of Object.keys(row.body || {})) {
         if (!knownHeadings.includes(heading)) {
           add(heading, 'unknown-section', `"${heading}" is not a section the Software template has. The sections are: ${knownHeadings.join(', ')}.`)
+          continue
+        }
+        const value = row.body[heading]
+        if (typeof value !== 'string' || !value.trim()) {
+          add(heading, 'not-text', `The ${heading} section is ${JSON.stringify(value)}, and a body edit carries the section's new text. Emptying a section is a person's edit in Notion, not an update here, so nothing that is not text is accepted.`)
         }
       }
       if (!Object.keys(row.body || {}).length && !fields.length) {
@@ -544,14 +588,21 @@ function updateProblems (changes, { stamping = false } = {}) {
  * The update payload: the sets and the clears, in one object the way the
  * connected client takes them.
  *
- * EVERY TYPE CLEARS WITH `null`. Measured on 2026-08-19 in the calendar
- * plugin: a rich_text, a select and a multi-select were emptied in one call
- * by sending null for each, and all three read back null. Title, url, date,
- * number and people follow the client's own null convention by extension. A
- * date clears through both its columns, because that is where it is written.
+ * TWO CLEAR SHAPES, BOTH FROM MEASUREMENT, AND MIXING THEM UP IS SILENT.
+ * A person property clears with an EMPTY LIST, the same as a multi-select:
+ * both hold several values and Notion returns and takes them as arrays.
+ * Sent a null, the write is ACCEPTED and the old person stays — measured on
+ * the process plugin and recorded in DECISIONS.md, which is exactly the
+ * offboarding path failing with nothing anywhere saying so. Everything else
+ * clears with null: a rich_text, a select and a multi-select were measured
+ * clearing that way in calendar on 2026-08-19, and list-shaped fields use []
+ * here because that is the shape the person measurement proved against this
+ * client. A date clears through both its columns, because that is where it
+ * is written.
  *
  * A person field explicitly emptied is a clear: an owner who left is cleared
- * or replaced by name, never guessed at.
+ * or replaced by name, never guessed at. The read-back proof is what catches
+ * a clear that did not land.
  */
 function updateProperties (context, changes) {
   const found = updateProblems(changes)
@@ -571,7 +622,10 @@ function buildUpdate (context, changes) {
       putDate(out, context, logical, null, null)
       return
     }
-    out[context.property(logical)] = null
+    // People and multi-selects are list-shaped and clear with []. A person
+    // sent null is accepted and NOT cleared, measured; see the header.
+    const listShaped = FIELD_TYPES[logical] === 'people' || FIELD_TYPES[logical] === 'multi_select'
+    out[context.property(logical)] = listShaped ? [] : null
   }
   const row = changes || {}
 

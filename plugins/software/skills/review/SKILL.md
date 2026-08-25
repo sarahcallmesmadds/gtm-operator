@@ -1,6 +1,6 @@
 ---
 name: review
-description: A full pass over one tool in the Software directory, confirming everything on the row is still true, and the only thing that moves Last reviewed. Use before a renewal, when somebody who owned a tool leaves, when a row's freshness stamp is old, or when the user says "review this tool", "is this row still right", "sweep the directory". Stamps the date only on a confirmed pass; writes nothing without an explicit yes.
+description: A full pass over one tool in the Software directory, confirming everything on the row is still true, and the only skill that moves Last reviewed after creation stamped it. Use before a renewal, when somebody who owned a tool leaves, when a row's freshness stamp is old, or when the user says "review this tool", "is this row still right", "sweep the directory". Stamps the date only on a confirmed pass; writes nothing without an explicit yes.
 allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page
 ---
 
@@ -35,7 +35,11 @@ about each:
 4. **Whether it is still in use.** Status, audience, what is wired to it. A
    tool being wound down moves to `Sunsetting`, the one state somebody
    outside the owning team needs to see. A tool that is gone goes to
-   `Retired`; the row stays.
+   `Retired`; the row stays. **A change to `Integrates with` is reported,
+   never written**: it is a relation, no plugin here has measured a relation
+   write on this surface, and the script refuses the field. Name what should
+   be linked or unlinked so a person can make the change in Notion — the
+   blast-radius map is maintained by people, through what a review surfaces.
 
 ## The stamp
 

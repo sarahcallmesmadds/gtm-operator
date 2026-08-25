@@ -4994,3 +4994,31 @@ mutations were run before the first commit, each asserted landed before the
 suite ran (the 2026-08-23 lesson): the Last-reviewed refusal, the review
 stamp, and the ceiling, in both its copies. All went red in the right
 check and were restored.
+
+### Round 1, Codex CLI, 2026-08-25: nine findings, all taken
+
+High: (1) person clears were sent as null, the shape this repository's own
+measurement says is accepted while the old person stays; the clear now sends
+the empty list for people and multi-selects, and the test that required the
+wrong payload required the right one after the fix was proved by mutation.
+(2) `new` had no top-level allowlist, so an unknown field or a non-text
+section passed the gate, was dropped by the builders, and `prove` rebuilt the
+same lossy payload and reported success; both are refusals now, relations
+refused by name.
+
+Medium: `review` was instructed to maintain `Integrates with` while the
+script refuses the field, resolved as report-and-hand-to-a-person, matching
+the standing no-relation-writes rule; a contracts row missing only its
+contract range was counted as fully assessed, and the report now counts every
+incomplete row, ordered or not; `--today` accepted 2026-02-30 and `contracts`
+ignored a misspelled flag, both refused before any input is read; the skills'
+`Last reviewed` prose contradicted the implemented reading and now matches
+it, with the agreement test reading the fill-event table instead of
+hardcoding the answer; the three single-accountability person fields accepted
+lists; update and review body values were not type-checked; and the
+bare-department access gate now builds its list from the schema's own
+Audience vocabulary rather than a tuned word list.
+
+Every fix that closes a silent-loss path was proved by mutation with the
+mutation asserted landed first: the person clear reverted to null and the
+allowlist removed both went red in exactly the named test.

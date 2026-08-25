@@ -31,12 +31,13 @@ with today's date. The window defaults to ninety days.
   carries its `why`; report it, not just the date.
 - **`diary` is the same dates without the automatic renewal**: doing nothing
   means those lapse rather than renew. Worth a line, not an alarm.
-- **`couldNotAssess` is half the answer, and it is never dropped from the
+- **`incomplete` is half the answer, and it is never dropped from the
   report.** An empty date does not match a date filter in Notion, so the
-  rows with no contract data are exactly the ones any filtered view silently
-  omits, and a report without this count reads as "nothing is due". Each row
-  says why it could not be assessed: no notice deadline, no contract dates,
-  or Renews unknown. Offer them to `review` — they are the work list.
+  rows with missing contract data are exactly the ones any filtered view
+  silently omits, and a report without this count reads as "nothing is due".
+  Each row says what is missing — no notice deadline, no contract dates, or
+  Renews unknown — and whether it could still be ordered above despite the
+  gap. Offer them to `review`; they are the work list.
 - An overdue automatic deadline is reported as already committed, unless the
   vendor says otherwise. Do not soften it.
 
