@@ -5528,3 +5528,12 @@ this pull request: it posted a real review body reading No Issues Found,
 with no hidden-findings line and no inline comments, where PRs 20 and 21 got
 no body at all and PR 22's check description admitted the review was
 skipped. The open question from the fifth live run is answered.
+
+### Round 7 on the design pull request, the Devin GitHub app, 2026-08-25: one finding, taken
+
+The app's second review of the branch, its first real findings on any
+gtm-operator pull request since the credits were re-added, and it caught
+what six CLI rounds read past: the CLAUDE.md layout bullet ended "defines
+the first" with its noun implied, an unfinished sentence. Fixed with the
+noun. The two channels finding different things is the recorded reason both
+run.
