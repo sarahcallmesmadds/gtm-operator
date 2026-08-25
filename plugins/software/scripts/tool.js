@@ -263,11 +263,26 @@ function wordCount (final) {
 
 /**
  * Everything wrong with a new row that makes it unwritable.
+ *
+ * `personId` is the configured person, or null when config records nobody.
+ * Passed so "me" can be refused AT THE GATE: without it, `check` reported a
+ * row writable and `create` then threw on the same row, which is a preview
+ * green-lighting a write the builder refuses. Omit it (undefined) only where
+ * no config exists to consult, and the builder's own throw is the backstop.
  */
-function newProblems (final) {
+function newProblems (final, { personId } = {}) {
   const found = []
   const add = (field, kind, message) => found.push({ field, kind, message })
   const row = final || {}
+
+  if (personId === null) {
+    for (const field of PERSON_FIELDS) {
+      const entries = Array.isArray(row[field]) ? row[field] : [row[field]]
+      if (entries.includes('me')) {
+        add(field, 'me-unresolvable', `${field} says "me" and the config records no person, so there is nobody to write. Search the workspace users for the person and pass their id.`)
+      }
+    }
+  }
 
   found.push(...textProblems(row, 'Name', {
     required: true,
@@ -458,7 +473,7 @@ function putDate (out, context, logical, start, end) {
  * command layer says so.
  */
 function newProperties (context, final) {
-  const found = newProblems(final)
+  const found = newProblems(final, { personId: context.personId ?? null })
   if (found.length) {
     throw new Error(`This tool cannot be written yet:\n  ${found.map(p => p.message).join('\n  ')}`)
   }
@@ -467,7 +482,7 @@ function newProperties (context, final) {
   const put = (logical, value) => { out[context.property(logical)] = value }
 
   put('Name', String(final.Name).trim())
-  put('Description', String(final.Description))
+  put('Description', String(final.Description).trim())
   for (const field of Object.keys(SELECT_FIELDS)) {
     if (!isEmpty(final[field])) put(field, context.value(field, final[field]))
   }
@@ -476,7 +491,7 @@ function newProperties (context, final) {
     if (values.length) put(field, values.map(v => context.value(field, v)))
   }
   for (const field of URL_FIELDS) {
-    if (!isEmpty(final[field])) put(field, String(final[field]))
+    if (!isEmpty(final[field])) put(field, String(final[field]).trim())
   }
   for (const field of CHECKBOX_FIELDS) {
     if (typeof final[field] === 'boolean') put(field, final[field])
@@ -551,7 +566,11 @@ function updateProblems (changes, { stamping = false } = {}) {
   }
 
   for (const field of NEVER_CLEARED) {
-    if (field in row && isEmpty(row[field])) {
+    // Whitespace is a clear wearing a value's shape: '   ' passes isEmpty,
+    // writes as text, and produces an unfindable page while the gate reports
+    // the required field intact.
+    const blank = isEmpty(row[field]) || (typeof row[field] === 'string' && !row[field].trim())
+    if (field in row && blank) {
       add(field, 'never-cleared', `${field} is being emptied, and it is required: a row without it is unreadable or unfindable. Change it to a new value, or leave it alone.`)
     }
   }
@@ -635,13 +654,13 @@ function buildUpdate (context, changes) {
 
     if (isEmpty(value)) { clear(field); continue }
 
-    if (field === 'Name' || field === 'Description') { put(field, String(value)); continue }
+    if (field === 'Name' || field === 'Description') { put(field, String(value).trim()); continue }
     if (field in SELECT_FIELDS) { put(field, context.value(field, value)); continue }
     if (MULTI_SELECT_FIELDS.includes(field)) {
       put(field, listValues(value).map(v => context.value(field, v)))
       continue
     }
-    if (URL_FIELDS.includes(field)) { put(field, String(value)); continue }
+    if (URL_FIELDS.includes(field)) { put(field, String(value).trim()); continue }
     if (CHECKBOX_FIELDS.includes(field)) { put(field, value); continue }
     if (field === 'Annual cost') { put(field, value); continue }
     if (field === 'Notice deadline') { putDate(out, context, field, String(value), null); continue }

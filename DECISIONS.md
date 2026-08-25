@@ -5022,3 +5022,21 @@ Audience vocabulary rather than a tuned word list.
 Every fix that closes a silent-loss path was proved by mutation with the
 mutation asserted landed first: the person clear reverted to null and the
 allowlist removed both went red in exactly the named test.
+
+### Round 2, Devin CLI, 2026-08-25: six findings, all taken
+
+Coverage was stated per file in the report itself, every file whole. High:
+`update` accepted a whitespace-only Name or Description, which passes the
+emptiness test, writes as text, and produces an unfindable page while the
+never-cleared gate reports the field intact; whitespace now counts as a
+clear for the required fields and both builders trim on write. Medium:
+`check` ran without the config, so a row saying "me" in a workspace with no
+recorded person previewed as writable and then threw at create; `check` now
+loads the context and the gate refuses an unresolvable "me" at the preview.
+Low: Description and URL values now travel trimmed on both builders, and
+three weak tests were fixed — a leftOut assertion that read the actual note
+back into its own expectation and so could never fail on it, a widened-window
+check that asserted the counter emptied without asserting the row arrived in
+the list, and a payload-map check that skipped Renews and Description. Both
+new gates were proved by mutation, asserted landed first, red in the named
+check, restored.

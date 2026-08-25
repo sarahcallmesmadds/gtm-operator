@@ -220,6 +220,20 @@ const cleanTool = () => ({
   }
 })
 
+check('check refuses "me" when the config records no person, instead of green-lighting a row create throws on', () => {
+  const config = configWith(identity)
+  config.notion.personId = null
+  fs.writeFileSync(process.env.GTM_OPERATOR_CONFIG, JSON.stringify(config, null, 2))
+  try {
+    const result = capture(() => command.commands.check(save('me.json', { ...cleanTool(), Owner: 'me' })))
+    assert.strictEqual(result.writable, false)
+    assert.ok(result.problems.some(p => p.kind === 'me-unresolvable'))
+    process.exitCode = 0
+  } finally {
+    writeConfig(identity)
+  }
+})
+
 check('check reports writable with the word count, and a broken row non-zero with the reasons', () => {
   const good = capture(() => command.commands.check(save('good.json', cleanTool())))
   assert.strictEqual(good.writable, true)
@@ -374,11 +388,17 @@ check('contracts leaves Retired and Rejected out, counted, and respects the wind
     contractRow('d')
   ]
   const out = capture(() => command.commands.contracts(save('rows.json', rows), '--today', '2026-08-25'))
-  assert.deepStrictEqual(out.leftOut, { retired: 1, rejected: 1, note: out.leftOut.note })
+  // The counts and the note are asserted separately: a deepStrictEqual whose
+  // right side reads the actual note back can never fail on the note.
+  assert.strictEqual(out.leftOut.retired, 1)
+  assert.strictEqual(out.leftOut.rejected, 1)
+  assert.ok(/Counted rather than silent/.test(out.leftOut.note))
   assert.strictEqual(out.beyondWindow, 1)
   assert.deepStrictEqual(out.deadlines.map(r => r.name), ['Tool D'])
   const wide = capture(() => command.commands.contracts(save('rows.json', rows), '--today', '2026-08-25', '--window', '400'))
   assert.strictEqual(wide.beyondWindow, 0)
+  assert.deepStrictEqual(wide.deadlines.map(r => r.name).sort(), ['Tool C', 'Tool D'],
+    'widening the window must bring the far-out row into the list, not merely zero the counter')
 })
 
 check('contracts reads a renamed workspace back through the map', () => {

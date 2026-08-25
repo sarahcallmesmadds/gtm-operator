@@ -219,12 +219,27 @@ check('a contract link into Notion is raised, because an upload is the one form 
 
 check('the payload writes through the map, and a raw name would show', () => {
   const row = clean(); row.Renews = 'Manually'; row['Annual cost'] = 42000
+  row.Description = '  Records calls; Sales depends on it.  '
+  row.Login = ' https://app.vendor.example '
   const out = tool.newProperties(context, row)
   assert.strictEqual(out['W Name'], 'Gong')
   assert.strictEqual(out['W Status'], 'V Active')
+  assert.strictEqual(out['W Renews'], 'V Manually')
+  assert.strictEqual(out['W Description'], 'Records calls; Sales depends on it.', 'Description travels trimmed, through the map')
+  assert.strictEqual(out['W Login'], 'https://app.vendor.example', 'a URL travels trimmed')
   assert.deepStrictEqual(out['W Audience'], ['V Sales', 'V RevOps'])
   assert.strictEqual(out['W Annual cost'], 42000)
   assert.ok(!('Name' in out), 'a payload keyed by the logical name bypassed the map')
+})
+
+check('me is refused at the gate when the config records nobody, not first at the builder', () => {
+  const row = clean(); row.Owner = 'me'
+  assert.deepStrictEqual(tool.newProblems(row, { personId: PERSON }), [])
+  const refused = tool.newProblems(row, { personId: null }).map(p => `${p.field}:${p.kind}`)
+  assert.ok(refused.includes('Owner:me-unresolvable'), 'check green-lights a row create will throw on')
+  // Without a config to consult, the gate stays quiet and the builder's own
+  // throw is the backstop, already covered below.
+  assert.deepStrictEqual(tool.newProblems(row), [])
 })
 
 check('creation stamps Last reviewed from today, through its date columns', () => {
@@ -262,9 +277,23 @@ check('update refuses Last reviewed by name, whatever else it touches', () => {
 check('update refuses an unknown field, an empty change set, and clearing a required field', () => {
   assert.ok(updateKinds({ Plan: 'Enterprise' }).includes('Plan:unknown-field'))
   assert.ok(updateKinds({}).includes('changes:empty'))
+  // Pinned by value first, so an emptied NEVER_CLEARED cannot pass this loop
+  // vacuously — the lesson the backfill suite's mutation run taught.
+  assert.deepStrictEqual(schema.NEVER_CLEARED, ['Name', 'Description', 'Status', 'Importance', 'Domain', 'Audience'])
   for (const field of schema.NEVER_CLEARED) {
     assert.ok(updateKinds({ [field]: null }).includes(`${field}:never-cleared`), `clearing ${field} was not refused`)
   }
+})
+
+check('whitespace is a clear wearing a value\'s shape, and it is refused for the required fields', () => {
+  // '   ' passes isEmpty, writes as text, and produces an unfindable page
+  // while the gate reports the required field intact.
+  for (const field of ['Name', 'Description']) {
+    assert.ok(updateKinds({ [field]: '   ' }).includes(`${field}:never-cleared`), `a whitespace ${field} got through`)
+  }
+  const built = tool.updateProperties(context, { Name: '  Gong Revenue AI  ', Description: ' Renamed at the acquisition. ' })
+  assert.strictEqual(built.properties['W Name'], 'Gong Revenue AI', 'update writes Name trimmed')
+  assert.strictEqual(built.properties['W Description'], 'Renamed at the acquisition.', 'update writes Description trimmed')
 })
 
 check('update carries the same value gates as new', () => {

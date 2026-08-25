@@ -283,7 +283,12 @@ const commands = {
     if (!file) throw new Error('Usage: node software.js check <proposed.json>')
     const proposed = readJson(file, 'the proposed tool', 'fields')
 
-    const problems = tool.newProblems(proposed)
+    // The context is loaded here too, not just at create: a "me" nobody can
+    // resolve has to be refused at the preview, or check green-lights a row
+    // that create then throws on. Refusing without config also matches the
+    // skill's own step 0.
+    const context = contextOrExit()
+    const problems = tool.newProblems(proposed, { personId: context.personId ?? null })
     const concerns = tool.newConcerns(proposed)
 
     console.log(JSON.stringify({
