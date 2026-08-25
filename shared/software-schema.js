@@ -121,9 +121,9 @@ const WORD_CEILING = 400
 
 /**
  * The skills allowed to write `Last reviewed`, per the fill-event table in
- * `SCHEMA-software.md`. See the file header: the SKILLS document disagrees,
- * both readings are in `DECISIONS.md`, and this constant is the one edit that
- * changes the answer.
+ * `SCHEMA-software.md`. See the file header: Sarah ruled for this reading on
+ * 2026-08-25, the design documents agree, and this constant is still the one
+ * edit that would change the answer.
  */
 const LAST_REVIEWED_WRITERS = ['new', 'review']
 

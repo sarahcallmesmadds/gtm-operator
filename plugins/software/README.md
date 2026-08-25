@@ -20,7 +20,7 @@ than trims at it.
 |---|---|
 | `new` | Adds one tool, filled in conversation, after checking for a duplicate. Asks what breaks and how fast rather than how important it feels |
 | `update` | Changes the facts that changed, one row at a time, with no sweep in the way. Never moves `Last reviewed` |
-| `review` | The full pass, walking the four groups in order, and the only skill that moves `Last reviewed` — on an explicit confirmation |
+| `review` | The full pass, walking the four groups in order, and the only skill after creation that moves `Last reviewed` — on an explicit confirmation |
 | `contracts` | What is coming up and what happens if you do nothing, ordered by consequence rather than by date, ending with a count of the rows it could not assess |
 | `backfill` | Finds the tools you already pay for, from a folder of contracts and your own mailbox, offered as candidates approved one at a time. Never fills a person, an importance, or the review stamp, and the proof checks those absences |
 
