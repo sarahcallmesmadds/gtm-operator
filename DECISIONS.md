@@ -5511,3 +5511,20 @@ expires the day import-leads is built**, and the sweep is that build's first
 task, recorded in the build order rather than left to be rediscovered. This
 file has already logged twice what happens when a deferral's reason expires
 silently.
+
+### Round 6 on the design pull request, Devin CLI confirming, 2026-08-25: nothing found
+
+The confirming round the review order requires. It verified the round-5
+edits agree with each other, that the recorded deferral names exactly the
+files whose comments still carry the unscoped rule, and that the diff is
+clean on contradictions, identity leakage, measurement claims and hand
+counts, with per-file coverage stated. Six rounds in all: fifteen, five,
+seven, four, six findings, then nothing, every finding real and none needing
+her, which is the pipeline running the way the 2026-08-25 rule says it
+should.
+
+**The Devin GitHub app reviews again now that credits exist**, measured on
+this pull request: it posted a real review body reading No Issues Found,
+with no hidden-findings line and no inline comments, where PRs 20 and 21 got
+no body at all and PR 22's check description admitted the review was
+skipped. The open question from the fifth live run is answered.
