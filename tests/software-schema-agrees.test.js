@@ -188,12 +188,11 @@ check('the required-at-create and never-cleared lists name fields the database h
 
 check('Last reviewed is written by exactly the skills the fill-event table names', () => {
   // The fill-event table in SCHEMA-software.md names software:new and
-  // software:review; the shared rules in SKILLS-software.md say review alone.
-  // DECISIONS.md records both readings; the implementation follows the
-  // fill-event table, and this reads that table rather than hardcoding the
-  // answer, so the constant tracks the document it claims to follow. If
-  // Sarah's ruling goes the other way, the table, the constant and the
-  // builders change together or this goes red.
+  // software:review, the reading Sarah ruled for on 2026-08-25 (creation is a
+  // full pass). This reads that table rather than hardcoding the answer, so
+  // the constant tracks the document it claims to follow: change the table
+  // without the constant, or the constant without the table, and this goes
+  // red.
   const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
   // Anchored on the fill-event row's own wording, because "| Last reviewed |"
   // also opens a row in the field table, whose third cell names no skill.

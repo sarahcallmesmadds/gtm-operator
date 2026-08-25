@@ -24,13 +24,11 @@
  * staleness warning for a whole cadence period, which is the correction
  * `process:update` needed on 2026-08-17.
  *
- * WHO STAMPS AT CREATION IS A RECORDED DISAGREEMENT. `SCHEMA-software.md`'s
- * fill-event table names `software:new` and `software:review`; the shared
- * rules in `SKILLS-software.md` say `review` is the only skill that writes it.
- * This file follows the fill-event table, because it is the explicit contract
- * ("named now so the skills have to honour them"), and both readings are
- * recorded in `DECISIONS.md` for Sarah's ruling. Changing the answer is one
- * edit to `LAST_REVIEWED_WRITERS`.
+ * WHO STAMPS AT CREATION WAS RULED BY SARAH ON 2026-08-25: creation stamps
+ * it, because creation is a full pass. That is `SCHEMA-software.md`'s
+ * fill-event table, which this file follows, and `SKILLS-software.md` now
+ * says the same. The ruling and the history of the disagreement are in
+ * `DECISIONS.md`. Changing the answer is one edit to `LAST_REVIEWED_WRITERS`.
  */
 
 /** The tool lifecycle, in the option order Notion sorts by. */

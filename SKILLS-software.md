@@ -96,7 +96,8 @@ sections that changed, and shows a before and after first. **It never writes
 
 **What it does not do.**
 - **Never moves `Last reviewed`.** Not on a rename, not on a cost change, not on
-  a retirement. `review` is the only skill in this plugin that moves it. An edit
+  a retirement. After creation, `review` is the only skill in this plugin that
+  moves it. An edit
   that resets the freshness stamp suppresses the staleness warning for a whole
   cadence period, which is the same fault `process:update` was corrected for on
   2026-08-17.
@@ -128,7 +129,8 @@ edit.
 
 **Why it is a separate skill from `review`.** `update` changes facts you already
 know changed. `review` confirms a whole row is still true, and is the only thing
-that moves `Last reviewed`. Somebody correcting one cost should not have to sit
+after creation that moves `Last reviewed`. Somebody correcting one cost should
+not have to sit
 through a four group sweep, and that friction at the exact moment somebody was
 willing to record something is what this skill removes.
 

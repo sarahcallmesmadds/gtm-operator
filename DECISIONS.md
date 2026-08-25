@@ -5275,15 +5275,17 @@ not a bot, so the person id was recorded without guessing.
   extraction: Process 23 properties / 56 option values, Memos 17/52,
   Projects 17/33, Tasks 10/5, Software 28/52 with exactly one description
   (Contract link, the value the end-to-end test quotes), Calendar 18/63 with
-  all six views found. Provenance matched config for every key.
-- **The generated SQL runs on Notion's query surface.** No writing plugin had
-  ever sent one. All six row-proof rules from `views.js` were accepted in
-  exactly the printed dialect and returned the expected rows, including the
-  three-clause empty-date test.
+  its five planned views plus Notion's automatic default all found.
+  Provenance matched config for every key.
+- **The generated SQL runs on Notion's query surface.** The suites only ever
+  assert these statements as strings, and no recorded run had sent one. All
+  six row-proof rules from `views.js` were accepted in exactly the printed
+  dialect and returned the expected rows, including the three-clause
+  empty-date test.
 - **Every row-expecting view was proved by its rows.** Five throwaway rows
   made each of the six filtered views non-empty; view-mode queries and the
   SQL agreed by page identity everywhere. `verify` passed on the first
-  attempt and `complete` accepted it: the first install ever to reach
+  attempt and `complete` accepted it: the first recorded install to reach
   `state: complete` (the 2026-08-19 install never passed verify).
 - **A wrong view id fails loudly.** One view-mode query was sent with a
   mistyped id and returned a view-not-found error rather than empty rows, so
@@ -5310,11 +5312,14 @@ Creation stamps it. Her words: creating a software row should stamp it,
 because technically that is being reviewed. That is the fill-event table's
 reading, which is what the build implemented, so no code changes:
 `LAST_REVIEWED_WRITERS` stays `new` and `review`, and the agreement test
-already reads the fill-event table. The one edit is documentary:
-`SKILLS-software.md` carried the review-only wording and now states both
-writers, so the two design documents agree. Backfill creation still leaves
-the field empty, which is a different kind of creation and was not part of
-the disagreement.
+already reads the fill-event table. The edits are documentary, and the
+Codex round found the copies the first pass missed: the shared-rules bullet
+and two sentences in `update`'s section of `SKILLS-software.md` now say
+`review` is the only writer after creation, and the awaiting-ruling
+comments in `shared/software-schema.js` (re-vendored) and the agreement
+test now record the ruling instead of the open question. Backfill creation
+still leaves the field empty, which is a different kind of creation and was
+not part of the disagreement.
 
 The same message set the working rule that she is not a gate on pull
 requests: reviews run (Codex CLI, Devin CLI, the Devin app check) and the
