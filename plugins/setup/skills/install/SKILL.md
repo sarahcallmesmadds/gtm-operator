@@ -453,12 +453,18 @@ the step at all.
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" readback <envelope.json> <key> <ds-save.txt> <db-save.txt>
 ```
 
-Run it once per database. It refuses a clipped or edited save loudly (a paste
-that lost its tail stops being valid JSON), refuses saves from more than one
-database handed over as one, and prints what it extracted: the property count, the option-value
-count, how many carry descriptions, and the views it found. **Read those counts
-against the plan.** A database that should carry 23 properties arriving as 9 is
-a bad save, not a broken database: re-fetch that one database and save it again.
+Run it once per database. What it refuses loudly: a clipped save (the fetch
+wrapper loses its closing tag, or the JSON stops parsing), a save that is not a
+data-source or database fetch at all (a page fetch is refused outright, because
+a state blob inside page content is a document, not evidence), saves from more
+than one database handed over as one, and a view whose own provenance names a
+different data source. **What it cannot see: an edit that keeps the save
+well-formed and self-consistent**, which is indistinguishable from a real fetch
+of a different database. That is why it prints what it extracted — the property
+count, the option-value count, how many carry descriptions, and the views it
+found — and why you **read those counts against the plan**. A database that
+should carry 23 properties arriving as 9 is a bad save, not a broken database:
+re-fetch that one database and save it again.
 
 **Then add the rows halves to the same envelope by hand; they are short lists.**
 

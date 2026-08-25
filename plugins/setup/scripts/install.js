@@ -428,8 +428,19 @@ if (require.main === module) {
           if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
             throw new Error(`The envelope at ${envelopePath} is not a set of fields. It is not being overwritten; fix or remove it.`)
           }
+          // A databases value that exists and is the wrong shape is refused,
+          // not replaced: it may be five databases' evidence in a damaged
+          // form, and quietly writing {} over it is the exact loss the
+          // read-before-write guard exists to prevent. Only an ABSENT key is
+          // initialised.
+          if ('databases' in envelope && (!envelope.databases || typeof envelope.databases !== 'object' || Array.isArray(envelope.databases))) {
+            throw new Error(
+              `The envelope at ${envelopePath} has a "databases" entry that is not a set of fields keyed by database. ` +
+              'It is not being overwritten, because it may hold evidence in a damaged form. Fix or remove it.'
+            )
+          }
         }
-        if (!envelope.databases || typeof envelope.databases !== 'object' || Array.isArray(envelope.databases)) envelope.databases = {}
+        if (!('databases' in envelope)) envelope.databases = {}
         envelope.databases[key] = { schema: extracted, views: extractedViews }
         fs.writeFileSync(envelopePath, JSON.stringify(envelope, null, 2))
 

@@ -19,6 +19,11 @@
  *      red.
  *   3. the envelope merge replaced with a fresh envelope each run — the
  *      merge-preserves check went red.
+ * And after the Codex round's fixes: 4. the wrapper check disabled — the
+ * truncation-after-state and page-fetch checks went red. 5. the view
+ * provenance check disabled — the foreign-view check went red. 6. the
+ * envelope databases-shape guard disabled — the damaged-envelope check went
+ * red.
  *
  * Run: node tests/install-readback.test.js
  */
@@ -85,26 +90,71 @@ check('both saves together merge to one schema and the views, nothing doubled', 
 
 // -------------------------------------------------------------------- refusals
 
+const wrapState = state => `<data-source url="{{collection://x}}">\n<data-source-state>\n${state}\n</data-source-state>\n</data-source>`
+
 check('a clipped save is refused loudly, not read as a database missing things', () => {
-  // Clipping inside the JSON blob: the tag closes but the JSON does not parse.
+  // Clipping inside the JSON blob: the braces never balance again.
   const insideJson = DS_FIXTURE.replace(/"Status":\{[\s\S]*?"type":"select"\}\}/, '"Status":{')
-  assert.throws(() => readback.extract(insideJson), /not valid JSON|clipped/i, 'a clip inside the blob got through')
-  // Clipping the tail: the closing tag is gone, so no state is found at all.
+  assert.throws(() => readback.extract(insideJson), /lost its tail|not valid JSON/i, 'a clip inside the blob got through')
+  // Clipping the tail entirely: the fetch wrapper loses its closing tag.
   const tail = DS_FIXTURE.slice(0, DS_FIXTURE.indexOf('"Owner"'))
-  assert.throws(() => readback.extract(tail), /No <data-source-state> block|carries a <data-source-state>|schema evidence/, 'a lost tail got through')
+  assert.throws(() => readback.extract(tail), /missing its closing/, 'a lost tail got through')
 })
 
-check('a save with no state at all, and an empty schema, are both refused', () => {
-  assert.throws(() => readback.extract('Here is a page fetch with nothing in it.'), /no schema evidence|No <data-source-state>|carries a <data-source-state>/i)
+check('a save clipped just after a complete schema is refused, not read as a database with no views', () => {
+  // The Codex probe that disproved the first draft's claim: everything up to
+  // and including the state parses cleanly, and the views and the closing
+  // wrapper are gone. Eleven properties and zero views used to be accepted.
+  const afterState = DB_FIXTURE.slice(0, DB_FIXTURE.indexOf('</data-source-state>') + '</data-source-state>'.length)
+  assert.throws(() => readback.extract(afterState), /missing its closing <\/database>/, 'truncation after a complete state got through')
+})
+
+check('a page fetch is refused outright, even when its content carries a state blob', () => {
+  // A state blob written into page content is a document, not evidence, and
+  // treating it as evidence would verify a workspace against a page.
+  const page = `<page url="https://app.notion.com/p/${'a'.repeat(32)}">\n<properties>{"title":"Notes"}</properties>\nSomebody pasted this into a doc:\n\`\`\`\n${DS_FIXTURE}\n\`\`\`\n</page>`
+  assert.throws(() => readback.extract(page), /page fetch/, 'page content was accepted as schema evidence')
+})
+
+check('a literal closing tag inside a JSON string is legal content, not a clip', () => {
+  // The tag-search this scanner replaced stopped at it and refused a real
+  // blob as clipped: the safe direction, and still a false refusal.
+  const state = '{"name":"x","schema":{"Name":{"description":"mentions </data-source-state> literally","name":"Name","type":"title"}},"url":"collection://x"}'
+  const { schema } = readback.extract(wrapState(state))
+  assert.strictEqual(schema.Name.description, 'mentions </data-source-state> literally')
+})
+
+check('a save with no fetch in it, and an empty schema, are both refused', () => {
+  assert.throws(() => readback.extract('Here is a shell transcript with nothing in it.'), /no <data-source> or <database> fetch/i)
   assert.throws(
-    () => readback.extract('<data-source-state>{"name":"x","schema":{},"url":"collection://x"}</data-source-state>'),
+    () => readback.extract(wrapState('{"name":"x","schema":{},"url":"collection://x"}')),
     /empty schema/
+  )
+})
+
+check('a state with no data source url is refused, not counted around', () => {
+  // A url-less state used to be filtered OUT of the one-database check, which
+  // is the check it most needed to face.
+  assert.throws(
+    () => readback.extract(wrapState('{"name":"x","schema":{"Name":{"name":"Name","type":"title"}}}')),
+    /no data source url/
   )
 })
 
 check('two databases\' saves mixed together are refused, not merged into either', () => {
   const other = DS_FIXTURE.split('facadefa-cade-4000-8000-facadefacade').join('0therdb0-0000-4000-8000-000000000000')
   assert.throws(() => readback.extract([DS_FIXTURE, other]), /different data sources/)
+})
+
+check('foreign view evidence is refused: a view proves only the database whose schema is in hand', () => {
+  // A state from database A plus a pasted view from database B used to merge
+  // cleanly, proving view configuration from the wrong database — worst for
+  // the unfiltered Calendar view, which has no row comparison to catch it.
+  const foreignView = DB_FIXTURE.split('{{collection://facadefa-cade-4000-8000-facadefacade}}","displayProperties')
+    .join('{{collection://0therdb0-0000-4000-8000-000000000000}}","displayProperties')
+  assert.throws(() => readback.extract(foreignView), /another database's view|names data source/)
+  const orphanView = DB_FIXTURE.replace('"dataSourceUrl":"{{collection://facadefa-cade-4000-8000-facadefacade}}",', '')
+  assert.throws(() => readback.extract(orphanView), /no dataSourceUrl/)
 })
 
 check('the same view twice is one view when identical and a refusal when it is not', () => {
@@ -161,6 +211,17 @@ check('an unreadable existing envelope is refused and not overwritten', () => {
   assert.strictEqual(fs.readFileSync(broken, 'utf8'), '{ not json', 'the envelope was clobbered')
 })
 
+check('a parseable envelope whose databases entry is the wrong shape is refused, not replaced', () => {
+  // Valid JSON with databases as an array used to be silently reset to {},
+  // which is exactly the evidence loss the read-before-write guard exists
+  // to prevent.
+  const damaged = save('damaged.json', '{"databases": ["evidence", "in", "a", "damaged", "form"]}')
+  const result = run(['readback', damaged, 'software', dsFile])
+  assert.notStrictEqual(result.status, 0)
+  assert.ok(/not being overwritten/.test(result.out))
+  assert.ok(fs.readFileSync(damaged, 'utf8').includes('"evidence"'), 'the damaged evidence was clobbered')
+})
+
 check('an unknown key and missing arguments are refused before anything is read', () => {
   const unknown = run(['readback', path.join(SANDBOX, 'e2.json'), 'crm', dsFile])
   assert.notStrictEqual(unknown.status, 0)
@@ -180,6 +241,14 @@ check('the extracted evidence flows into verify and is compared for real', () =>
   const result = run(['verify', envelope])
   assert.notStrictEqual(result.status, 0)
   assert.ok(/Importance/.test(result.out), 'verify never compared the extracted schema: the probe lacks Importance and nothing said so')
+  // The probe's own description VALUE quoted back in the mismatch report is
+  // something only the comparator reading the extracted schema can produce:
+  // it proves the values flow through, where a missing-property line would
+  // pass for an empty or fabricated schema too.
+  assert.ok(result.out.includes('Put the contract PDF in Google Drive and paste the link here.'),
+    'the extracted description value never reached the comparator')
+  assert.ok(/option "AE" is missing/.test(result.out),
+    'the extracted option lists never reached the comparator')
   assert.ok(/nothing was read back/.test(result.out), 'the five unread databases must be named, not passed')
 })
 
