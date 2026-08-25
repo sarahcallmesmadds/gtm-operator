@@ -5078,3 +5078,32 @@ the `NEVER_CLEARED` loop in the tool suite before anything proved it wrong.
 **What the tests do not prove**: no source has actually been read — which
 Drive and mail surfaces the skill drives, and how their results arrive, is a
 live-run question — and no SQL has been sent, the standing constraint.
+
+### Round 1 on the backfill pull request, Codex CLI, 2026-08-25: six findings, all taken
+
+High: the scope gate accepted any non-empty string as a mailbox while
+claiming the read was restricted to the user's own — and no approval gate
+follows a read — so the mailbox setting now does not exist at all: the only
+honest shapes are the default (their own) and a refusal. And the candidate's
+top level had no allowlist, so { Owner, row } passed with the Owner silently
+dropped, the refused-not-dropped invariant breaking one layer above the gate
+that enforces it; the top level is allowlisted now and a never-filled name
+there refuses the draft.
+
+Medium: nothing connected the evidence kind to the fields it may fill, so a
+receipt could carry the whole contract group through create against the
+design's own line that email fills the name and honestly little else; the
+kind is settled by draft time and the contract group is refused from any
+non-contract kind. The payload and renamed-workspace tests overstated their
+coverage and were widened: every fillable field asserted through the map,
+one held renamed field per shape (number, select, multi-select, date), and
+the forbidden-name check uses named alternatives after /Owner/ was shown to
+never match the lowercase o in Technical owner.
+
+Low: backfill-fill now reverse-maps multi-select values entry by entry, so
+alreadyHeld shows a person Sales rather than the workspace's rename; and the
+README distinguishes a new creation, which stamps Last reviewed, from a
+backfill creation, which deliberately leaves it empty.
+
+Three mutations, each asserted landed first: the mailbox gate, the top-level
+allowlist and the kind gate each removed, each red in its named check.
