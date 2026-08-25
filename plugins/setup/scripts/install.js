@@ -417,11 +417,18 @@ if (require.main === module) {
         // the counts a person reads would all look right. Where config
         // records nothing for the key, that is said rather than silently
         // unchecked.
+        // BOTH SIDES ARE NORMALIZED THE SAME WAY. Notion hands the data
+        // source id back as a bare uuid, as collection://uuid, and as
+        // {{collection://uuid}}, and `record` stores whatever the operator
+        // pasted. Stripping only the save's side made a correctly recorded
+        // braced id refuse a correct save as "another database's", which is
+        // the misleading message this check exists to avoid.
+        const bareId = value => String(value).replace(/^\{\{/, '').replace(/\}\}$/, '').replace(/^collection:\/\//, '').toLowerCase()
         const recordedIds = config.ids()[key]
-        const provenance = summary.dataSource ? String(summary.dataSource).replace(/^collection:\/\//, '') : null
+        const provenance = summary.dataSource ? bareId(summary.dataSource) : null
         let provenanceNote
         if (recordedIds && recordedIds.dataSourceId && provenance) {
-          if (provenance.toLowerCase() !== String(recordedIds.dataSourceId).toLowerCase()) {
+          if (provenance !== bareId(recordedIds.dataSourceId)) {
             throw new Error(
               `This save is for data source ${provenance}, and config records ${byKey(key).title} as ${recordedIds.dataSourceId}. ` +
               'That is another database\'s save handed over under this key, and writing it would verify the wrong database. ' +

@@ -292,6 +292,15 @@ check('a save for another database cannot be filed under this key once config re
   const matched = go(['readback', path.join(SANDBOX, 'swap.json'), 'calendar', dsFile])
   assert.strictEqual(matched.status, 0, matched.out)
   assert.ok(/matches the one config records/.test(matched.out))
+
+  // Notion hands the id back braced and prefixed as well as bare, and
+  // `record` stores whatever was pasted, so the comparison has to normalize
+  // BOTH sides: a correctly recorded {{collection://...}} id used to refuse
+  // a correct save as another database's.
+  go(['record', 'memos', 'db-id-memos', '{{collection://FACADEFA-cade-4000-8000-facadefacade}}'])
+  const braced = go(['readback', path.join(SANDBOX, 'swap.json'), 'memos', dsFile])
+  assert.strictEqual(braced.status, 0, braced.out)
+  assert.ok(/matches the one config records/.test(braced.out), 'a braced recorded id refused a correct save')
 })
 
 check('with no config recorded, the unchecked provenance is said rather than silent', () => {
