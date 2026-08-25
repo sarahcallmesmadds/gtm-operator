@@ -19,7 +19,10 @@ that actually builds lists.
 ## What this is a rebuild of
 
 The reference set contains a lead-list import skill that ran this pipeline in
-production and worked well. The rebuild rule, Sarah's call on 2026-08-25:
+production. That it worked well and is worth rebuilding is Sarah's own
+account, and that account is the whole of the evidence, which is why the
+rebuild changes as little as it can rather than improving on what it cannot
+measure. The rebuild rule, her call on 2026-08-25:
 **change the least possible.** The pipeline shape, the ordering, the gates and
 the hard-won refinements carry over as they are. What moves is identity, not
 logic, and identity moves into three homes:
@@ -139,12 +142,14 @@ download export, a vendor handoff, a spreadsheet somebody kept.
 or a Notion page or database, never a search. Reads Salesforce to match
 accounts and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
-above. Writes the approved plan and nothing else: contact creates and
-updates, account creates, campaigns and campaign memberships, all behind one
-confirmation. Writes back to a Notion source only into blank fields.
+above. Writes what the approved plan names and nothing else: contact creates
+and updates, account creates, campaigns and campaign memberships, and the
+writeback to a Notion source, into blank fields only. All of it sits behind
+one confirmation.
 
 **The pipeline, kept from the reference in order. Everything before the
-confirmation plans; only the push writes.**
+confirmation plans; the push and the writeback after it are the only writes,
+and both execute only what the approved plan names.**
 
 1. **Scope.** One named source. The scope gate refuses rather than narrows,
    because there is no approval gate in front of a read: half a scope is
@@ -170,8 +175,9 @@ confirmation plans; only the push writes.**
 9. **Campaigns matched, or planned for creation**, member statuses from the
    grid.
 10. **The confirmation summary**: the whole plan, account creates, contact
-    creates and updates, exclusions, campaign creates and memberships, shown
-    in full, with an explicit yes before any push.
+    creates and updates, exclusions, campaign creates and memberships, and
+    the writeback the run will make to the source, shown in full, with an
+    explicit yes before any push.
 11. **Push, executing exactly the approved plan**, in batches with
     partial-success semantics. A duplicate campaign membership failing
     individually is expected, not an error.
@@ -192,8 +198,9 @@ confirmation plans; only the push writes.**
 - Never pads a row to pass the floor or the required-fields rule. A row that
   cannot meet them is refused with the gap named.
 - Never reads rows from anywhere but the one named source: no second list, no
-  mailbox, no search. The CRM it writes and the Process artifacts it follows
-  are the only other things it opens.
+  mailbox, no search. The CRM it writes, the Process artifacts it follows,
+  its own config and the alias map that config names are the only other
+  things it opens.
 - Never sends email, and never posts anywhere. The reference posted summaries
   to chat; that is cut, because announcing is not the plugin's job and the
   default has to work for someone with nothing else connected. The run's own

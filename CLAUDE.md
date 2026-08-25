@@ -14,8 +14,10 @@ would be a copy, and copies drift.
 ## Layout
 
 - `plugins/setup/`: creates every database, wires the relations, writes the one
-  config file the others read. The only plugin that creates anything or writes
-  config
+  config file the other foundation plugins read. The only plugin that creates
+  anything in Notion or touches the foundation's config. A job plugin may keep
+  a private config file of its own, which no other plugin reads or writes;
+  `SKILLS-import-leads.md` defines the first
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
 - `plugins/calendar/`, `plugins/process/`, `plugins/memos/`,
   `plugins/projects/`, `plugins/software/`: writing plugins. Each reads config

@@ -5348,7 +5348,8 @@ were proposed and the plugin rename made `import` a stutter. The
 ### A rebuild of the reference lead-list skill, changed as little as possible
 
 The reference set holds a lead-list import skill that ran this pipeline in
-production and worked well. Sarah's rule for the rebuild: keep it as close to
+production; that it worked well is Sarah's own account, and that account is
+the whole of the evidence. Her rule for the rebuild: keep it as close to
 the reference as possible and move out only what identifies the organisation.
 The pipeline order, the gates and the baked-in refinements carry over; the
 org's picklist values, record type ids, field names, routing and tenant ids
@@ -5387,13 +5388,10 @@ The first draft of this section restated the full field roster here, which
 broke this file's own rule that a field list lives in exactly one place.
 `SKILLS-import-leads.md` is that place: the plugin writes to a database it
 does not own, so its skills file states the write contract, the same rule
-`SKILLS-projects.md` follows. What this file records is the shape of the
-decision: the plugin carries its own floor (a row needs a first and last
-name, and a contact is never pushed without an account), the org's
-required-fields artifact adds to that floor and cannot subtract from it, the
-lead-source value lives in that artifact and is shown at run time, the owner
-moves only through routing or explicit confirmation, and a row that cannot
-meet the rules is refused with the gap named rather than padded.
+`SKILLS-projects.md` follows. What this file records is only where the
+answers live: the plugin carries a floor of its own, the org's
+required-fields artifact adds to that floor and cannot subtract from it, and
+the write contract in the skills file is the one enumeration of both.
 
 ### Salesforce, with no way to measure it today
 
@@ -5430,3 +5428,22 @@ a one-plugin repository and is brought up to the built state; and
 hand-written counts sitting beside the lists they count were removed from
 both new documents. Coverage was stated per file and identity leakage was
 checked and absent.
+
+### Round 2 on the design pull request, Devin CLI, 2026-08-25: five findings, all taken
+
+Per-file coverage was stated in the report, every file whole. The one that
+reached outside the pull request: `CLAUDE.md` said `setup` is the only plugin
+that writes config, written when the marketplace was six foundation plugins
+sharing one file, and the job-plugin private config contradicted it; the rule
+is now scoped to the foundation's config, with a job plugin's private file
+allowed and nothing else reading or writing it. The rest were round-1 fixes
+leaving a pair open, the fault this repository is worst at: the Notion
+writeback sat outside both "writes nothing else" and "only the push writes",
+and is now inside the plan, the confirmation summary and the writes sentence;
+the refusal narrowed to "rows" in round 1 still claimed the CRM and the
+artifacts were the only other things opened, when the config and the alias
+map are opened too; the reference claim softened in round 1 still asserted
+unmeasured quality, and now attributes it to Sarah's own account as the whole
+of the evidence; and the DECISIONS paragraph written to stop restating the
+write contract restated a third of it, and now records only where the
+answers live.
