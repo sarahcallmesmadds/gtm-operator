@@ -12,7 +12,7 @@
       "name": "setup",
       "source": "./plugins/setup",
       "description": "Creates the six Notion databases every other gtm-operator plugin reads and writes, wires the relations between them, and writes the one config file they all share. Explains the model before it asks anything, and asks five questions rather than twelve.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": {
         "name": "Sarah Madden"
       },

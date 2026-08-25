@@ -1,7 +1,7 @@
 {
   "name": "setup",
-  "version": "1.0.0",
-  "description": "Creates the six Notion databases every other gtm-operator plugin reads and writes, wires the twelve relations between them, and writes the one config file they all share. Nothing else in the marketplace creates a database and nothing else writes config.",
+  "version": "1.0.1",
+  "description": "Creates the six Notion databases every other gtm-operator plugin reads and writes, wires the twelve relations between them, and writes the one config file they all share. Nothing else in the marketplace creates a database, and nothing else writes the foundation's config.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"

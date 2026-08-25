@@ -1,13 +1,14 @@
 # import-leads: what each skill does
 
 Part 3 for `import-leads`, the first job plugin: what each skill does, in the
-same five slots as the other skill files. What it does, when it runs, what it
+same slots as the other skill files. What it does, when it runs, what it
 reads and writes, what it does not do, and the judgment it carries.
 
 This plugin owns no database and no schema file. A job plugin is named for its
 job, and this one's job is taking a lead list from wherever it lives and landing
-it in the CRM correctly. It reads the source list, reads its judgment from
-Process artifacts, and reads and writes Salesforce.
+it in the CRM correctly. It reads the source list, its own config and the alias
+map that config names, reads its judgment from Process artifacts, and reads and
+writes Salesforce.
 
 Written 2026-08-25. The plugin and skill names are Sarah's, confirmed the same
 day: the tier-2 placeholder name `list-building` is retired, because this
@@ -25,7 +26,7 @@ rebuild changes as little as it can rather than improving on what it cannot
 measure. The rebuild rule, her call on 2026-08-25:
 **change the least possible.** The pipeline shape, the ordering, the gates and
 the hard-won refinements carry over as they are. What moves is identity, not
-logic, and identity moves into three homes:
+logic, and identity moves into these homes:
 
 - **Config holds identifiers.** The org, the field-name map, file paths.
 - **Process holds judgment.** The rules the organisation decided, written as
@@ -68,10 +69,11 @@ actually opened. More belong to this plugin.
 
 Config sits at `~/.claude/import-leads.config.json` and holds identifiers
 only: the org, the field-name map including any custom fields the org wants
-filled (a LinkedIn URL field, a persona field), and the path to the company
-alias map. The alias map itself is a user-owned file at a configurable path,
-the same pattern as the artifact-type taxonomy, so a team can keep it in a
-repo and change it by pull request.
+filled (a LinkedIn URL field, a persona field), the record-type ids the org's
+campaign types use, and the path to the company alias map. The alias map
+itself is a user-owned file at a configurable path, the same pattern as the
+artifact-type taxonomy, so a team can keep it in a repo and change it by pull
+request.
 
 **This plugin writes its own config, once, with confirmation.** On a first run
 with no config, either skill stops, says what it needs (the org, the field
@@ -142,8 +144,9 @@ download export, a vendor handoff, a spreadsheet somebody kept.
 or a Notion page or database, never a search. Reads Salesforce to match
 accounts and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
-above. Writes what the approved plan names and nothing else: contact creates
-and updates, account creates, campaigns and campaign memberships, and the
+above, its own config, and the alias map that config names. Writes what the
+approved plan names and nothing else: contact creates and updates, account
+creates, campaigns and campaign memberships, and the
 writeback to a Notion source, into blank fields only. All of it sits behind
 one confirmation.
 
@@ -198,9 +201,10 @@ and both execute only what the approved plan names.**
 - Never pads a row to pass the floor or the required-fields rule. A row that
   cannot meet them is refused with the gap named.
 - Never reads rows from anywhere but the one named source: no second list, no
-  mailbox, no search. The CRM it writes, the Process artifacts it follows,
-  its own config and the alias map that config names are the only other
-  things it opens.
+  mailbox, no search. Beyond it, the run opens only the CRM it writes, the
+  Process artifacts it follows, its own config, the alias map that config
+  names, and, when the person says yes to enrichment, the connected tool
+  that answers.
 - Never sends email, and never posts anywhere. The reference posted summaries
   to chat; that is cut, because announcing is not the plugin's job and the
   default has to work for someone with nothing else connected. The run's own
@@ -234,8 +238,8 @@ or the required-fields rule, with the failing field named per row.
 rules changes, and before a big list where finding out mid-run would be
 expensive.
 
-**What it reads and writes.** Reads the config, the Process artifacts and the
-CRM, and reads a list only when handed one. **Writes nothing at all**,
+**What it reads and writes.** Reads the config, the alias map, the Process
+artifacts and the CRM, and reads a list only when handed one. **Writes nothing at all**,
 anywhere, and never runs a paid step. The one exception is the first-run
 config write both skills share, which happens only on an explicit yes.
 

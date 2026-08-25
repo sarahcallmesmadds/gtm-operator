@@ -16,7 +16,7 @@ run against a live workspace is recorded in `DECISIONS.md`.
 
 ## Read this before anything else
 
-**All six foundation plugins are built.** `setup` builds the foundation, and
+**The foundation plugins are all built.** `setup` builds the foundation, and
 that flow has been run end to end against a live Notion workspace. The
 writing plugins are built and reviewed, and what each one has and has not run
 against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
@@ -44,7 +44,7 @@ install fails.
 
 Then ask Claude to set up gtm-operator. `install` explains the model before it
 asks anything, asks five questions, creates everything, reads all of it back out
-of Notion, and writes the config file every other plugin will read.
+of Notion, and writes the config file the foundation plugins read.
 
 You need a Notion connection that can insert, update, and read user information.
 **A read-only connection authenticates perfectly and then fails on the first

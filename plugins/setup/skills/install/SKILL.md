@@ -1,6 +1,6 @@
 ---
 name: install
-description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
+description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other foundation plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
 allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-pages, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
 ---
 
@@ -9,8 +9,8 @@ allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-
 Build the foundation. Explain what it is, ask the five things that are genuinely
 the user's to decide, create everything, and write config.
 
-**Nothing else in this marketplace creates a database and nothing else writes
-config.** If you are reading this from another plugin, you are in the right place.
+**Nothing else in this marketplace creates a database, and nothing else writes
+the foundation's config.** If you are reading this from another plugin, you are in the right place.
 
 ## How this skill works
 

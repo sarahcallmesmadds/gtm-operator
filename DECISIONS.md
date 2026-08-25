@@ -1125,7 +1125,7 @@ is the one that ships without the file it needs.
 ### The reader is read-only and has one entry point
 
 `shared/config-read.js` cannot write. There is no `begin`, no `complete`, no
-`recordDatabase`. `setup` is the only thing that writes config, and the surest
+`recordDatabase`. `setup` is the only thing that writes the foundation's config, and the surest
 way to keep that true is for the code every other plugin carries to have no way
 of doing it.
 
@@ -5389,9 +5389,9 @@ broke this file's own rule that a field list lives in exactly one place.
 `SKILLS-import-leads.md` is that place: the plugin writes to a database it
 does not own, so its skills file states the write contract, the same rule
 `SKILLS-projects.md` follows. What this file records is only where the
-answers live: the plugin carries a floor of its own, the org's
-required-fields artifact adds to that floor and cannot subtract from it, and
-the write contract in the skills file is the one enumeration of both.
+answers live: in the write contract in the skills file, which is the one
+statement of the plugin's own floor, the org's additions, and how the two
+combine.
 
 ### Salesforce, with no way to measure it today
 
@@ -5447,3 +5447,23 @@ unmeasured quality, and now attributes it to Sarah's own account as the whole
 of the evidence; and the DECISIONS paragraph written to stop restating the
 write contract restated a third of it, and now records only where the
 answers live.
+
+### Round 3 on the design pull request, Codex CLI confirming, 2026-08-25: seven findings, all taken
+
+The confirming round asked whether round 2's fixes left pairs open, and five
+of the seven were exactly that. The config-writer scoping reached one file of
+six: the unscoped rule still stood in the README, twice in `SKILLS-setup.md`,
+in this file's calendar section, and twice in the shipped install skill, all
+now scoped to the foundation's config, with `setup` bumped to 1.0.1 for the
+wording in its own manifest and skill. The scoped CLAUDE.md wording had
+itself grown a new overbreadth, the only plugin that creates anything in
+Notion, contradicting every writing plugin's row creates; it now claims the
+foundation's databases only, and the writing-plugin bullet says creates no
+databases rather than creates nothing. The opens list corrected in round 2
+was still narrower in three other read inventories, and still omitted the
+connected enrichment tool, both fixed. Record-type ids were promised a home
+in two documents and given one in neither; they live in config. The
+DECISIONS write-contract paragraph still restated combination behaviour and
+now points only at where the answers live. And the hand counts round 1
+claimed to have removed survived in two headers and the README, the same
+search-narrower-than-the-claim fault this file has recorded before, removed.
