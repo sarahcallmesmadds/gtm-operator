@@ -313,7 +313,7 @@ check('whitespace text is refused as nothing wearing a value\'s shape, and real 
   assert.ok(kindsOf(backfill.draft(candidate({ Description: '   ' }))).includes('Description:blank'))
   assert.ok(kindsOf(backfill.draft(candidate({ 'Contract link': '  ' }))).includes('Contract link:blank'))
   const padded = backfill.properties(context, candidate({ Description: '  Records calls.  ' }))
-  assert.strictEqual(padded['W Description'], 'Records calls.', 'backfill writes Description untrimmed while new trims it')
+  assert.strictEqual(padded['W Description'], 'Records calls.', 'a failure here means the backfill payload carried Description untrimmed, where new trims it')
   assert.strictEqual(padded['W Contract link'], 'https://drive.google.com/file/d/abc/view')
 })
 
