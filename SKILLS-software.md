@@ -28,12 +28,16 @@ Three more belong to this plugin.
 - **Never guess a person.** Four fields here are people. An agent guessing at an
   owner is worse than an empty field, because an empty field asks a question and a
   wrong one answers it.
-- **`Last reviewed` moves only when a review happened.** Not on a rename, not on
-  anything else `update` does, not when `contracts` reads the row, not when
-  `backfill` creates it. **`review` is the only skill here that writes it.** This
-  is the same correction `process:update` needed on 2026-08-17, where fixing a
-  typo was resetting the review clock and suppressing the staleness warning for a
-  whole cadence period.
+- **`Last reviewed` moves only when a real pass happened.** Not on a rename, not
+  on anything else `update` does, not when `contracts` reads the row, and never on
+  a `backfill` creation, which deliberately leaves it empty. **Two writers exist:
+  `new` stamps it at creation, because creation is a full pass (the person just
+  answered every group), and `review` stamps it on a confirmed pass.** Ruled by
+  Sarah on 2026-08-25, settling this document's earlier review-only wording in
+  favour of the fill-event table in `SCHEMA-software.md`. This is the same
+  correction `process:update` needed on 2026-08-17, where fixing a typo was
+  resetting the review clock and suppressing the staleness warning for a whole
+  cadence period.
 
 ---
 
