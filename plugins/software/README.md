@@ -41,10 +41,11 @@ than trims at it.
 
 ## The rules the scripts hold
 
-- `Last reviewed` moves at creation and on a confirmed review, and nothing
-  else moves it: not `update` whatever it changed, not `contracts` reading
-  the row. An edit that resets the freshness stamp suppresses the staleness
-  warning for a whole cadence period.
+- `Last reviewed` moves at a `new` creation and on a confirmed review, and
+  nothing else moves it: not `update` whatever it changed, not `contracts`
+  reading the row, and not a backfill creation, which deliberately leaves it
+  empty so the row shows up for review. An edit that resets the freshness
+  stamp suppresses the staleness warning for a whole cadence period.
 - A person is never guessed. Four fields here are people, and an empty
   person field asks a question where a wrong one answers it.
 - No credentials, tokens or keys, ever. This database holds the login URL,

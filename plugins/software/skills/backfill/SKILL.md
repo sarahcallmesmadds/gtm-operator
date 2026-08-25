@@ -59,7 +59,9 @@ The rules it holds:
   everything they can see.
 - **The user's own mailbox, with a date range.** There is no unbounded read.
   Offer a year as the default, because it catches one full renewal cycle, and
-  let them say yes out loud.
+  let them say yes out loud. **There is no mailbox setting at all**: the
+  scope command refuses a request that names one, because the only honest
+  shapes are the default (their own) and a refusal.
 - **Email is read-only.** Never send, reply, label, archive, move or mark
   anything. Read to find vendors and do nothing else.
 - Show `notReading` before starting: a source left out and a source that held

@@ -138,9 +138,15 @@ check('email needs a whole range of real days, forwards, and half a range is no 
   assert.ok(kindsOf(backfill.plan(backwards)).includes('email:range-backwards'))
 })
 
-check('a mailbox that is not an address is refused rather than replaced with the default', () => {
-  const scope = cleanScope(); scope.email.mailbox = ['everyone@example.com']
-  assert.ok(kindsOf(backfill.plan(scope)).includes('email:unreadable-mailbox'))
+check('there is no mailbox setting: naming one refuses the scope, whatever it names', () => {
+  // The earlier gate accepted any non-empty string and held the ownership
+  // question in prose, which made the scope advertise a guarantee it did
+  // not hold: finance@example.com came back ok while claiming the read was
+  // restricted to the user's own mailbox. No approval gate follows a read.
+  for (const mailbox of ['finance@example.com', 'all', ['everyone@example.com'], '']) {
+    const scope = cleanScope(); scope.email.mailbox = mailbox
+    assert.ok(kindsOf(backfill.plan(scope)).includes('email:mailbox-not-a-setting'), `${JSON.stringify(mailbox)} got through`)
+  }
 })
 
 check('a refused scope carries no plan at all, not the half that was fine', () => {
@@ -230,6 +236,32 @@ check('a field outside the fillable set is refused, and so is a missing name, st
   assert.ok(kindsOf(backfill.draft(anonymous)).includes('where:missing'))
 })
 
+check('the candidate top level has its own allowlist, so nothing outside row is silently dropped', () => {
+  // { Owner: ..., row: validRow } used to pass with the Owner silently
+  // dropped: the refused-not-dropped invariant breaking one layer above the
+  // gate that enforces it.
+  const owned = candidate(); owned.Owner = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+  assert.ok(kindsOf(backfill.draft(owned)).includes('Owner:never-filled'))
+  const stamped = candidate(); stamped['Last reviewed'] = '2026-08-25'
+  assert.ok(kindsOf(backfill.draft(stamped)).includes('Last reviewed:never-filled'))
+  const stranger = candidate(); stranger.Plan = 'Enterprise'
+  assert.ok(kindsOf(backfill.draft(stranger)).includes('Plan:unknown-candidate-field'))
+  assert.throws(() => backfill.properties(context, owned), /never fills|refused/)
+})
+
+check('the kind is settled by draft time, and the contract group comes from a contract only', () => {
+  const unkinded = candidate(); delete unkinded.kind
+  assert.ok(kindsOf(backfill.draft(unkinded)).includes('kind:missing'))
+  const receipt = candidate(); receipt.kind = 'receipt'
+  const refused = kindsOf(backfill.draft(receipt))
+  for (const field of backfill.CONTRACT_GROUP) {
+    assert.ok(refused.includes(`${field}:not-from-this-evidence`), `${field} from a receipt got through`)
+  }
+  // The honest receipt row: the name and little else.
+  const thin = { what: 'Loom', where: 'receipt, 2026-07-02', kind: 'receipt', row: { Name: 'Loom', Status: 'Active' } }
+  assert.strictEqual(backfill.draft(thin).ok, true)
+})
+
 check('the shared value gates run at draft time, with the candidate still on the table', () => {
   assert.ok(kindsOf(backfill.draft(candidate({ Renews: 'Auto' }))).includes('Renews:unknown-value'))
   assert.ok(kindsOf(backfill.draft(candidate({ 'Notice deadline': '2026-02-30' }))).includes('Notice deadline:not-a-day'))
@@ -237,13 +269,27 @@ check('the shared value gates run at draft time, with the candidate still on the
 
 // ------------------------------------------------------------------ the payload
 
-check('the payload writes through the map and never carries the review stamp', () => {
-  const out = backfill.properties(context, candidate())
+check('the payload writes every fillable field through the map and never carries the review stamp', () => {
+  const out = backfill.properties(context, candidate({
+    Description: 'Records calls; Sales depends on it.',
+    Domain: 'Sales Enablement',
+    Audience: ['Sales', 'RevOps']
+  }))
   assert.strictEqual(out['W Name'], 'Gong')
   assert.strictEqual(out['W Status'], 'V Active')
+  assert.strictEqual(out['W Description'], 'Records calls; Sales depends on it.')
+  assert.strictEqual(out['W Domain'], 'V Sales Enablement')
+  assert.deepStrictEqual(out['W Audience'], ['V Sales', 'V RevOps'])
+  assert.strictEqual(out['W Renews'], 'V Automatically')
+  assert.strictEqual(out['W Annual cost'], 60000)
+  assert.strictEqual(out['W Contract link'], 'https://drive.google.com/file/d/abc/view')
+  assert.strictEqual(out['date:W Notice deadline:start'], '2026-11-14')
   assert.strictEqual(out['date:W Contract dates:start'], '2026-01-01')
+  assert.strictEqual(out['date:W Contract dates:end'], '2026-12-31')
+  // Named alternatives, not a substring net: /Owner/ never matched the
+  // lowercase o in "Technical owner" or "Billing owner".
   for (const key of Object.keys(out)) {
-    assert.ok(!/Last reviewed|Importance|Owner|Admins/.test(key), `the payload carries ${key}`)
+    assert.ok(!/Last reviewed|Importance|W Owner|Technical owner|Billing owner|Admins/.test(key), `the payload carries ${key}`)
   }
 })
 
@@ -323,16 +369,31 @@ check('backfill-fill maps a renamed workspace back before deciding what is blank
   try {
     // On a renamed workspace the fetched page carries R-prefixed names and
     // values. Read raw, every field would look blank and the fill would
-    // offer everything; mapped, the held cost is seen and left alone.
+    // offer everything; mapped, the held cost is seen and left alone. One
+    // held field per shape: a number, a select, a multi-select and a date,
+    // because deleting the reverse mapping for any one of them must go red
+    // here, and alreadyHeld is shown to a person, who reads logical values.
     const page = {
       url: URL('a'),
-      properties: { 'R Name': 'Gong', 'R Status': 'R Active', 'R Annual cost': 58000 }
+      properties: {
+        'R Name': 'Gong',
+        'R Status': 'R Active',
+        'R Annual cost': 58000,
+        'R Renews': 'R Manually',
+        'R Audience': '["R Sales"]',
+        'date:R Notice deadline:start': '2026-10-01'
+      }
     }
-    const out = capture(() => command.commands['backfill-fill'](save('existing.json', page), save('candidate.json', candidate())))
+    const out = capture(() => command.commands['backfill-fill'](save('existing.json', page), save('candidate.json', candidate({ Audience: ['Sales'] }))))
     assert.strictEqual(out.ok, true)
-    assert.ok(!('Annual cost' in out.changes), 'a held field read as blank through the raw names')
-    assert.ok(out.alreadyHeld.some(h => h.field === 'Annual cost'))
-    assert.strictEqual(out.changes.Renews, 'Automatically')
+    for (const field of ['Annual cost', 'Renews', 'Audience', 'Notice deadline']) {
+      assert.ok(!(field in out.changes), `held ${field} read as blank through the raw names`)
+    }
+    const held = Object.fromEntries(out.alreadyHeld.map(h => [h.field, h.holds]))
+    assert.strictEqual(held.Renews, 'Manually', 'alreadyHeld shows the workspace value, not the logical one')
+    assert.deepStrictEqual(held.Audience, ['Sales'], 'a held multi-select is not reverse-mapped')
+    assert.strictEqual(held['Notice deadline'], '2026-10-01')
+    assert.strictEqual(out.changes['Contract link'], 'https://drive.google.com/file/d/abc/view', 'a genuinely blank field is still offered')
   } finally {
     writeConfig(identity)
   }

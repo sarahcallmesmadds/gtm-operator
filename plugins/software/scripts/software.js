@@ -755,7 +755,11 @@ const commands = {
       }
       const raw = page.properties[context.property(logical)]
       if (type === 'multi_select') {
-        values[logical] = listOfNames(raw)
+        // Mapped entry by entry, the same as a select: fill's contract is
+        // logical values throughout, and alreadyHeld is shown to a person,
+        // who should read Sales rather than whatever this workspace renamed
+        // it to.
+        values[logical] = listOfNames(raw).map(one => toLogical(back, logical, one))
       } else if (type === 'select') {
         values[logical] = cameBackEmpty(raw) ? '' : toLogical(back, logical, raw)
       } else {

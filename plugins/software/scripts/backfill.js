@@ -74,6 +74,13 @@ const FILLABLE = [
 ]
 
 /**
+ * The subset of FILLABLE only a contract may carry. The fill-event table
+ * names the contract group's backfill route as "from a contract", and the
+ * source table says email fills the name and honestly little else.
+ */
+const CONTRACT_GROUP = ['Contract dates', 'Notice deadline', 'Renews', 'Annual cost', 'Contract link']
+
+/**
  * The fields whose presence on a candidate refuses the whole draft. Not
  * silently dropped: a field that vanished quietly would leave the person
  * believing it was set.
@@ -155,13 +162,18 @@ function plan (request) {
       if (isDay(settings.from) && isDay(settings.to) && settings.from > settings.to) {
         add('email', 'range-backwards', `The email range runs from ${settings.from} to ${settings.to}, which is backwards.`)
       }
-      // THE USER'S OWN MAILBOX AND NOBODY ELSE'S. Absent means their own. A
-      // mailbox supplied and unreadable is a scope somebody set, and replacing
-      // it with the default reads a mailbox nobody agreed to. Whether a
-      // supplied address IS the user's own is the skill's to hold, said out
-      // loud in the conversation; what is enforceable here is the shape.
-      if (settings.mailbox !== undefined && !text(settings.mailbox)) {
-        add('email', 'unreadable-mailbox', `email.mailbox is ${JSON.stringify(settings.mailbox)}, which is not an address. Leave it out for the user's own mailbox, which is the only one this skill reads.`)
+      // THE USER'S OWN MAILBOX AND NOBODY ELSE'S, AND SO NO MAILBOX SETTING
+      // EXISTS. An earlier draft accepted any non-empty string here and held
+      // the ownership question in the skill's prose, which made this gate
+      // advertise a guarantee it did not hold: a request naming
+      // finance@example.com came back ok while claiming the read was
+      // restricted. There is no approval gate in front of a read, so the
+      // only honest shapes are the default (their own) and a refusal. A
+      // request that names a mailbox is either naming their own, which is
+      // the default and needs no saying, or somebody else's, which is
+      // refused outright.
+      if (settings.mailbox !== undefined) {
+        add('email', 'mailbox-not-a-setting', `email.mailbox is set, and there is no mailbox setting: this skill reads the user's own mailbox and nothing else. Remove it. A request that needs to name a different mailbox is a request this skill refuses by design.`)
       }
     }
   }
@@ -263,9 +275,48 @@ function draft (candidate) {
   }
 
   const problems = []
+
+  // THE CANDIDATE'S TOP LEVEL HAS ITS OWN ALLOWLIST. Without one, a
+  // candidate shaped { Owner: "...", row: validRow } passed and the Owner
+  // was silently dropped, which is the refused-not-dropped invariant
+  // breaking at the layer above the one that enforces it. The three
+  // annotations are this module's own outputs from `candidates`, accepted
+  // back rather than silently ignored.
+  const knownTop = ['what', 'where', 'kind', 'row', 'evidence', 'proves', 'strength']
+  for (const key of Object.keys(candidate)) {
+    if (knownTop.includes(key)) continue
+    if (NEVER_FILLED.includes(key)) {
+      problems.push(refuse(key, 'never-filled', `${key} is on the candidate itself, outside the row, and backfill never fills it anywhere. It is refused rather than dropped.`))
+    } else {
+      problems.push(refuse(key, 'unknown-candidate-field', `"${key}" is not part of a candidate. A candidate is what, where, kind and row; a property belongs inside row, where the gates can see it.`))
+    }
+  }
+
+  // THE KIND IS SETTLED BY DRAFT TIME, because it is what decides which
+  // fields the evidence can honestly fill. `candidates` lets a missing kind
+  // through as a question; an approved candidate has had it answered.
+  if (!KINDS[candidate.kind]) {
+    problems.push(refuse('kind', candidate.kind === undefined || candidate.kind === null || candidate.kind === '' ? 'missing' : 'unknown-kind',
+      `The candidate's kind is ${JSON.stringify(candidate.kind)}, and by draft time it is settled: one of ${Object.keys(KINDS).join(', ')}. The kind is what decides which fields the evidence can honestly fill.`))
+  }
+
   const row = candidate.row
   if (!row || typeof row !== 'object' || Array.isArray(row)) {
-    return { ok: false, problems: [refuse('row', 'not-a-record', `The candidate carries ${JSON.stringify(row)} as its row, and this reads a set of fields, one key per property.`)] }
+    return { ok: false, problems: [...problems, refuse('row', 'not-a-record', `The candidate carries ${JSON.stringify(row)} as its row, and this reads a set of fields, one key per property.`)] }
+  }
+
+  // THE CONTRACT GROUP COMES FROM A CONTRACT AND NOWHERE ELSE. The
+  // fill-event table says so ("software:backfill from a contract"), and the
+  // source table's other half is "Email: the name, and honestly little
+  // else". A receipt carrying Contract dates is a guess wearing evidence's
+  // clothes, and a thin row that looks finished is worse than not finding
+  // it.
+  if (KINDS[candidate.kind] && KINDS[candidate.kind].source !== 'contracts') {
+    for (const field of CONTRACT_GROUP) {
+      if (row[field] !== undefined) {
+        problems.push(refuse(field, 'not-from-this-evidence', `${field} is filled from a ${candidate.kind}, and the contract group is filled from a contract and nowhere else. An email proves the tool is in use and honestly fills the name and little more; put the document that actually states the terms in the contracts folder and let it carry them.`))
+      }
+    }
   }
 
   for (const field of NEVER_FILLED) {
@@ -464,6 +515,7 @@ module.exports = {
   SOURCES,
   KINDS,
   FILLABLE,
+  CONTRACT_GROUP,
   NEVER_FILLED,
   plan,
   candidates,
