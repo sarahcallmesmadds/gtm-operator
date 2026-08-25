@@ -5223,3 +5223,21 @@ read-before-write guard exists to prevent, now refused; and the end-to-end
 test could not tell exact extraction from a fabricated schema, so it now
 asserts the probe's own description value is quoted back by the comparator.
 Three further mutations, each asserted landed, each red in its named checks.
+
+### Round 2 on the readback pull request, Devin CLI, 2026-08-25: four findings, all taken
+
+The High was the repeated-class find it was asked to hunt: the previous
+round moved the inner blobs to a balanced scanner and left the wrapper check
+a naive text search, so a literal `<page` in a description refused a real
+save as a page fetch, and a clipped save carrying a literal `</database>` in
+a string slipped the closing-tag check — the exact clip the wrapper was
+added to catch, back through the check itself. The blobs and the
+sqlite-table bodies are now blanked before any tag is looked for, and view
+discovery runs over the state-masked text with a no-structure-between-tag-
+and-JSON rule, so the `<views>` container and literal `<view` text cannot
+mislead it. Multiple states in one file gained the test their code path
+never had. And the readback command now refuses a save whose data source is
+not the one `record` wrote for the key at phase A — the swap verify would
+otherwise catch late and confusingly — saying plainly when config records
+nothing to check against. Two mutations, each asserted landed, each red in
+its named check.

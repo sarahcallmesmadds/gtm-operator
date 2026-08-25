@@ -75,8 +75,54 @@ function jsonObjectAt (text, start) {
 }
 
 /**
- * What kind of fetch a saved file is, judged from its outermost structure,
- * with the whole file refused when it is not a fetch this step uses.
+ * The text with every JSON blob and every opaque block blanked out, so tag
+ * logic sees only structure.
+ *
+ * THE WRAPPER CHECK GETS THE SAME COURTESY AS THE SCANNER, and this exists
+ * because the first version did not: the inner blobs moved to a balanced
+ * scanner precisely because literal tag text inside a JSON string is legal
+ * content, while the wrapper check stayed a naive search over the whole
+ * file. A literal `<page` in a description then refused a real save as a
+ * page fetch, and a clipped save carrying a literal `</database>` in a
+ * string slipped the closing-tag check — the exact clip the wrapper was
+ * added to catch, back through the check itself. So the blobs (found with
+ * the balanced scanner, tolerantly: one that never closes masks to the end,
+ * which the wrapper check then reports as the clip it is) and the
+ * <sqlite-table> bodies are blanked before any tag is looked for.
+ */
+function maskOpaque (text, opens = [STATE_OPEN, '<view']) {
+  const body = String(text)
+  const spans = []
+  for (const open of opens) {
+    let from = 0
+    while (true) {
+      const start = body.indexOf(open, from)
+      if (start === -1) break
+      const tagEnd = body.indexOf('>', start)
+      if (tagEnd === -1) { spans.push([start, body.length]); break }
+      const brace = body.indexOf('{', tagEnd)
+      if (brace === -1) { from = tagEnd + 1; continue }
+      const blob = jsonObjectAt(body, brace)
+      if (blob === null) { spans.push([brace, body.length]); break }
+      spans.push([brace, brace + blob.length])
+      from = brace + blob.length
+    }
+  }
+  const sqlite = /<sqlite-table>[\s\S]*?<\/sqlite-table>/g
+  let match
+  while ((match = sqlite.exec(body)) !== null) spans.push([match.index, match.index + match[0].length])
+
+  let masked = body
+  for (const [start, end] of spans.sort((a, b) => b[0] - a[0])) {
+    masked = masked.slice(0, start) + ' '.repeat(end - start) + masked.slice(end)
+  }
+  return masked
+}
+
+/**
+ * What kind of fetch a saved file is, judged from its outermost structure
+ * with the blobs blanked out, and the whole file refused when it is not a
+ * fetch this step uses.
  *
  * A page fetch is refused OUTRIGHT, even when its content happens to carry a
  * state blob: a blob inside page content is something somebody wrote on a
@@ -87,8 +133,9 @@ function jsonObjectAt (text, start) {
  * be accepted as a database that had no views.
  */
 function wrapperProblem (text) {
+  const masked = maskOpaque(text)
   const at = tag => {
-    const index = String(text).search(tag)
+    const index = masked.search(tag)
     return index === -1 ? Infinity : index
   }
   const page = at(/<page[\s>]/)
@@ -102,7 +149,7 @@ function wrapperProblem (text) {
     return 'this save carries no <data-source> or <database> fetch at all. Fetch the data source or the database and save the whole output, without editing it.'
   }
   const closing = database < dataSource ? '</database>' : '</data-source>'
-  if (!String(text).includes(closing)) {
+  if (!masked.includes(closing)) {
     return `the ${closing === '</database>' ? 'database' : 'data-source'} fetch is missing its closing ${closing} tag, which is what a save that lost its tail looks like — including one clipped after a complete schema, which would otherwise read as a database with no views. Re-fetch and save the output whole.`
   }
   return null
@@ -182,19 +229,37 @@ function extractStates (text) {
   return states
 }
 
-/** Every <view> blob in the text, parsed the same balanced way. */
+/**
+ * Every <view> blob in the text, parsed the same balanced way.
+ *
+ * Discovery is over the text with the STATE blobs blanked out, so a literal
+ * `<view` inside a schema description cannot mislead it, and a tag whose
+ * next `{` is not adjacent (the `<views>` container, whose gap holds the
+ * real view tag) is stepped past rather than paired with whatever JSON
+ * happens to follow.
+ */
 function extractViews (text) {
   const views = []
   const body = String(text)
+  const discover = maskOpaque(body, [STATE_OPEN])
   const opener = /<view[\s>]/g
   let match
-  while ((match = opener.exec(body)) !== null) {
-    const tagEnd = body.indexOf('>', match.index)
+  while ((match = opener.exec(discover)) !== null) {
+    const tagEnd = discover.indexOf('>', match.index)
     if (tagEnd === -1) break
-    const brace = body.indexOf('{', tagEnd)
+    const brace = discover.indexOf('{', tagEnd)
     if (brace === -1) {
       throw new Error('A <view> tag opens and no JSON follows it, which is what a clipped save looks like. Re-fetch the database and save the output whole.')
     }
+    if (discover.slice(tagEnd + 1, brace).trim()) {
+      // Structure between the tag and the JSON: this match is a container
+      // like <views>, not a view blob's own tag. Step inside it.
+      opener.lastIndex = tagEnd + 1
+      continue
+    }
+    // The blob is read from the ORIGINAL text at the same offset, because the
+    // mask blanks only state blobs and sqlite bodies, which never overlap a
+    // view blob, so offsets agree between the two.
     const blob = jsonObjectAt(body, brace)
     if (blob === null) {
       throw new Error('A <view> blob starts and never closes: the save lost its tail mid-view. Re-fetch the database and save the output whole.')
