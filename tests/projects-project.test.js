@@ -284,7 +284,7 @@ check('the advance writes the timeline through its date columns, under the works
 // --------------------------------------------------------------------- tasks
 
 const fourTasks = [
-  { what: 'Wire the Clay webhook', due: '2026-09-01', who: 'me' },
+  { what: 'Wire the enrichment webhook', due: '2026-09-01', who: 'me' },
   { what: 'Map the segment field' },
   { what: 'Review and confirm the routing table with RevOps' },
   { what: 'Verify a live lead routes end to end' }

@@ -567,7 +567,7 @@ across, because none of it is about the design.
 | Plan / Edition as a property | Free text no view can filter |
 | Department and End-Users as relations to a Teams database | No Teams database exists in the foundation, and Domain plus Audience already carry it |
 | A tag list, in any form | A tag is what a row is about, and a tool is not about anything |
-| The Tool Changelog database | Right idea, wrong version. It needs unattended watchers, so it is tier two |
+| The Tool Changelog database | Right idea, wrong version. Its unattended watchers keep it out of v1; when it ships it is a foundation plugin, because it owns a database |
 | Named individuals, internal database ids, and one company's Slack domain | Not portable, and not ours to ship |
 
 ---

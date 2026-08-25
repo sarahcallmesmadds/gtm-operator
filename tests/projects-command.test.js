@@ -510,7 +510,7 @@ check('a release names the artifacts note, and the memo payload resolves renamed
     today: '2026-08-24',
     body: {
       'What This Lets You Do': 'Stop routing by hand.',
-      'What Shipped': 'Wired the Clay webhook to the Segment field on Leads.',
+      'What Shipped': 'Wired the enrichment webhook to the Segment field on Leads.',
       'How To Get It': 'Nothing, it is already live.',
       'Known Gaps': 'Outbound is untouched; keep the old sheet for it.'
     }

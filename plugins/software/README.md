@@ -36,8 +36,9 @@ than trims at it.
   unattended runs anywhere in the marketplace.
 - **No delete.** A tool that is gone goes to `Retired` and the row stays,
   which is what keeps the record of what was dropped.
-- **No Tool Changelog.** Right idea, wrong version: it needs unattended
-  watchers, so it is tier two.
+- **No Tool Changelog.** Right idea, wrong version: its unattended watchers
+  keep it out of v1, and when it ships it is a foundation plugin, because it
+  owns a database.
 
 ## The rules the scripts hold
 
