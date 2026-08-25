@@ -27,6 +27,12 @@
  *   node software.js prove-update <output.json> <readback.json>
  *   node software.js contracts-survey                         the whole-table read contracts runs
  *   node software.js contracts <rows.json> --today YYYY-MM-DD [--window days]
+ *   node software.js backfill-scope <request.json>            what may be read, or a refusal with no plan
+ *   node software.js backfill-candidates <found.json>         findings judged into candidates with strengths
+ *   node software.js backfill-draft <candidate.json>          the row an approval previews
+ *   node software.js backfill-create <candidate.json>         the creation payload, stamp-free
+ *   node software.js prove-backfill <candidate.json> <readback.json> <created-url>
+ *   node software.js backfill-fill <existing.json> <candidate.json>   blanks only, never overwrites
  *
  * WHAT NO COMMAND HERE DOES: create a database, write config, delete or
  * archive a row, fill a person field nobody named, or move `Last reviewed`
@@ -40,8 +46,10 @@ const path = require('path')
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'software-schema'))
 const tool = require(path.join(__dirname, 'tool'))
+const backfill = require(path.join(__dirname, 'backfill'))
 const { proveCreate } = require(path.join(__dirname, 'vendor', 'prove-create'))
 const { pageIdentity } = require(path.join(__dirname, 'vendor', 'page-id'))
+const { cameBackEmpty, listOfNames } = require(path.join(__dirname, 'vendor', 'notion-compare'))
 
 const KEY = 'software'
 
@@ -636,6 +644,134 @@ const commands = {
         'THIS LINE IS HALF THE ANSWER: an empty date does not match a date filter in Notion, so these rows are exactly the ones any filtered view silently omits, and a report without this count reads as "nothing is due".',
       note: 'Read-only. Nothing was changed, nothing was cancelled, no vendor was contacted, and Last reviewed did not move: reading a list is not reviewing a row. Hand what needs attention to `review`.'
     }, null, 2))
+  },
+
+  // ------------------------------------------------------------- the backfill
+
+  'backfill-scope' (file) {
+    if (!file) throw new Error('Usage: node software.js backfill-scope <request.json>')
+    const plan = backfill.plan(readJson(file, 'the scope request', 'fields'))
+    console.log(JSON.stringify(plan, null, 2))
+    if (!plan.ok) process.exitCode = 1
+  },
+
+  'backfill-candidates' (file) {
+    if (!file) throw new Error('Usage: node software.js backfill-candidates <found.json>')
+    const judged = backfill.candidates(readJson(file, 'the findings', 'list'))
+    console.log(JSON.stringify(judged, null, 2))
+    if (!judged.ok) process.exitCode = 1
+  },
+
+  'backfill-draft' (file) {
+    if (!file) throw new Error('Usage: node software.js backfill-draft <candidate.json>')
+    const drafted = backfill.draft(readJson(file, 'the candidate', 'fields'))
+    console.log(JSON.stringify(drafted, null, 2))
+    if (!drafted.ok) process.exitCode = 1
+  },
+
+  'backfill-create' (file) {
+    if (!file) throw new Error('Usage: node software.js backfill-create <candidate.json>')
+    const candidate = readJson(file, 'the candidate', 'fields')
+    const context = contextOrExit()
+
+    const properties = backfill.properties(context, candidate)
+
+    console.log(JSON.stringify({
+      parent: { data_source_id: context.dataSourceId },
+      properties,
+      body: [],
+      headings: [],
+      bodyNote:
+        'NO BODY IS WRITTEN. The template sections are written for a reader by somebody who knows the tool, and a ' +
+        'backfilled row knows only what a document proved. Inventing What It Does For Us from a receipt is the kind ' +
+        'of content the approval gate cannot check.',
+      leftEmpty:
+        'No person field, no Importance, no Last reviewed. That is the design: an unstamped, ownerless, unweighted ' +
+        'row is what makes it show up for review. Say it is a backfill when you report the write.',
+      note:
+        'Create the page, then read it back and run `prove-backfill` with the url the create returned. The proof ' +
+        'checks absence as well as presence.'
+    }, null, 2))
+  },
+
+  'prove-backfill' (candidateFile, readbackFile, createdUrl) {
+    if (!candidateFile || !readbackFile) {
+      throw new Error('Usage: node software.js prove-backfill <candidate.json> <readback.json> <created-url>')
+    }
+    const candidate = readJson(candidateFile, 'the candidate', 'fields')
+    const readback = readJson(readbackFile, 'the page as it came back', 'fields')
+    const context = contextOrExit()
+
+    const result = proveCreate({
+      what: 'backfilled tool',
+      createdUrl,
+      readback,
+      intended: backfill.properties(context, candidate),
+      headings: [],
+      types: tool.propertyTypes(context)
+    })
+    // THE ABSENCE HALF. A backfilled page is proved by what is not on it as
+    // much as by what is: a page that arrived stamped, owned or weighted
+    // silently drops out of the review signal.
+    const absent = (readback && readback.properties && typeof readback.properties === 'object' && !Array.isArray(readback.properties))
+      ? backfill.proveAbsent(context, readback.properties, cameBackEmpty)
+      : []
+    const merged = {
+      ...result,
+      proved: result.proved && absent.length === 0,
+      problems: [...result.problems, ...absent.map(p => ({ what: p.field, why: p.message }))]
+    }
+    console.log(JSON.stringify(merged, null, 2))
+    if (!merged.proved) process.exitCode = 1
+  },
+
+  /**
+   * Blanks on a row that already exists, from a candidate the person chose
+   * to merge rather than duplicate. The fetched page is mapped to logical
+   * names HERE, because a raw fetch from a renamed workspace reads as blank
+   * in every field, which would turn "fill the blanks" into "fill
+   * everything".
+   */
+  'backfill-fill' (existingFile, candidateFile) {
+    if (!existingFile || !candidateFile) throw new Error('Usage: node software.js backfill-fill <existing.json> <candidate.json>')
+    const context = contextOrExit()
+    const page = readJson(existingFile, 'the existing row', 'fields')
+    const existing = existingRow(page, 'the existing row')
+    const candidate = readJson(candidateFile, 'the candidate', 'fields')
+
+    const back = reverseValues((context.names && context.names.values) || {})
+    const values = {}
+    for (const logical of backfill.FILLABLE) {
+      const type = tool.FIELD_TYPES[logical]
+      if (type === 'date') {
+        const name = context.property(logical)
+        const start = page.properties[`date:${name}:start`] ?? page.properties[name]
+        if (logical === 'Contract dates') {
+          values[logical] = cameBackEmpty(start) ? '' : { start, end: page.properties[`date:${name}:end`] }
+        } else {
+          values[logical] = cameBackEmpty(start) ? '' : start
+        }
+        continue
+      }
+      const raw = page.properties[context.property(logical)]
+      if (type === 'multi_select') {
+        values[logical] = listOfNames(raw)
+      } else if (type === 'select') {
+        values[logical] = cameBackEmpty(raw) ? '' : toLogical(back, logical, raw)
+      } else {
+        values[logical] = cameBackEmpty(raw) ? '' : raw
+      }
+    }
+
+    const result = backfill.fill({ url: existing.url, values }, candidate)
+    console.log(JSON.stringify({
+      ...result,
+      target: existing.identity,
+      note: result.ok && !result.nothingToFill
+        ? 'Show the changes with what each fills, wait for the yes, then send them through `update` and prove with `prove-update`. Fields under alreadyHeld were left alone: backfill never overwrites what a person wrote.'
+        : result.note
+    }, null, 2))
+    if (!result.ok) process.exitCode = 1
   }
 }
 
