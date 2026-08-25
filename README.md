@@ -94,7 +94,7 @@ named for the work it does, and owns no database.
 
 | Plugin | Owns | State |
 |---|---|---|
-| [`setup`](plugins/setup) | Creates every database, wires the relations, writes the config | `install` built and run. `check` built, not yet run against a live workspace. `add` designed |
+| [`setup`](plugins/setup) | Creates every database, wires the relations, writes the foundation's config | `install` built and run. `check` built, not yet run against a live workspace. `add` designed |
 | [`process`](plugins/process) | Process | Built |
 | [`memos`](plugins/memos) | Memos | Built |
 | [`projects`](plugins/projects) | Projects and Tasks | Built |
