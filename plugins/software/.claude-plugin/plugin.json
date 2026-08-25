@@ -1,0 +1,30 @@
+{
+  "name": "software",
+  "version": "0.1.0",
+  "description": "The Software directory in the databases the gtm-operator setup plugin created: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation, changes the facts when they change, confirms a whole row is still true, and reports which renewals are coming up ordered by consequence rather than by date, ending with what it could not see. Creates no database and writes no config.",
+  "author": {
+    "name": "Sarah Madden",
+    "url": "https://github.com/sarahcallmesmadds"
+  },
+  "homepage": "https://github.com/sarahcallmesmadds/gtm-operator/tree/main/plugins/software",
+  "repository": "https://github.com/sarahcallmesmadds/gtm-operator",
+  "license": "MIT",
+  "keywords": [
+    "notion",
+    "gtm",
+    "software",
+    "vendors",
+    "renewals"
+  ],
+  "gtmOperator": {
+    "vendor": [
+      "config-read.js",
+      "software-schema.js",
+      "memos-schema.js",
+      "memo-write.js",
+      "prove-create.js",
+      "page-id.js",
+      "notion-compare.js"
+    ]
+  }
+}

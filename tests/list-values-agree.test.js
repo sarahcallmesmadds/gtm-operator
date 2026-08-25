@@ -4,7 +4,8 @@
  * Every copy of the multi-select helpers answers identically.
  *
  * `shared/calendar-schema.js`, `shared/process-schema.js`,
- * `shared/memos-schema.js` and `shared/projects-schema.js` each carry
+ * `shared/memos-schema.js`, `shared/projects-schema.js` and
+ * `shared/software-schema.js` each carry
  * `listProblem` and `listValues`. They are a copy, on purpose: the plugins are
  * separate releases, none can require another, and a vendored file for eleven
  * lines buys less than it costs.
@@ -24,9 +25,10 @@ const calendar = require('../shared/calendar-schema')
 const process_ = require('../shared/process-schema')
 const memos = require('../shared/memos-schema')
 const projects = require('../shared/projects-schema')
+const software = require('../shared/software-schema')
 
 /** Process is the reference; every other copy is compared against it. */
-const OTHERS = [['calendar', calendar], ['memos', memos], ['projects', projects]]
+const OTHERS = [['calendar', calendar], ['memos', memos], ['projects', projects], ['software', software]]
 
 let failures = 0
 const check = (name, fn) => {
