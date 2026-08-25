@@ -5107,3 +5107,30 @@ backfill creation, which deliberately leaves it empty.
 
 Three mutations, each asserted landed first: the mailbox gate, the top-level
 allowlist and the kind gate each removed, each red in its named check.
+
+### Round 2 on the backfill pull request, Devin CLI, 2026-08-25: three findings, all taken
+
+The first Devin CLI attempt produced no review at all: a tool call needing
+confirmation in non-interactive mode ended the run with one warning line,
+which reads exactly like a quiet pass to anyone who only checks the exit
+code. Re-run and read whole, with per-file coverage stated in the report.
+
+Medium: the backfill commands were not composable on their own output — a
+saved `backfill-draft` result handed to `backfill-create` was refused for a
+missing kind plus fields draft itself had added, so the candidate identity
+now travels on the output and draft accepts its own annotations back.
+Medium: the backfill payload builder did not trim Description or Contract
+link where `new` does, so one field had two written shapes, and a
+whitespace-only value passed as content; whitespace text is refused as
+nothing wearing a value's shape, and real values travel trimmed. Low: the
+source tables in both design documents still said a contract can sometimes
+fill the billing owner from the signature, contradicting the fill-event
+table and the never-list one page later; both now say the signature may
+identify the person while the field is never filled.
+
+Two mutations, each asserted landed first, each red in its named check.
+
+The Devin GitHub app posted a green check on both heads of this pull request
+and no review comment on either, so the comment-body check for the hidden
+findings line could not be performed; the CLI round above is the Devin
+review of record for this pull request.

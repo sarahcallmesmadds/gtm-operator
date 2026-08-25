@@ -297,6 +297,26 @@ check('the payload builder refuses what draft refuses, rather than building arou
   assert.throws(() => backfill.properties(context, candidate({ Importance: 'Standard' })), /never-filled|Importance/)
 })
 
+check('the draft output composes: it can be handed straight back to the payload builder', () => {
+  // backfill-create and prove-backfill re-validate by calling draft again,
+  // and a saved draft output used to be refused for kind:missing plus the
+  // fields draft itself had added — the commands were not composable on
+  // their own output.
+  const drafted = backfill.draft(candidate())
+  assert.strictEqual(drafted.ok, true)
+  assert.strictEqual(drafted.kind, 'contract', 'the candidate identity must travel on the output')
+  const out = backfill.properties(context, drafted)
+  assert.strictEqual(out['W Name'], 'Gong')
+})
+
+check('whitespace text is refused as nothing wearing a value\'s shape, and real values travel trimmed', () => {
+  assert.ok(kindsOf(backfill.draft(candidate({ Description: '   ' }))).includes('Description:blank'))
+  assert.ok(kindsOf(backfill.draft(candidate({ 'Contract link': '  ' }))).includes('Contract link:blank'))
+  const padded = backfill.properties(context, candidate({ Description: '  Records calls.  ' }))
+  assert.strictEqual(padded['W Description'], 'Records calls.', 'backfill writes Description untrimmed while new trims it')
+  assert.strictEqual(padded['W Contract link'], 'https://drive.google.com/file/d/abc/view')
+})
+
 // ------------------------------------------------------------------- the proof
 
 check('a backfilled page is proved by what is absent, and an arrived stamp fails it', () => {

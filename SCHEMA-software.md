@@ -391,7 +391,7 @@ directory that can only be filled by hand does not get filled.
 
 | Source | What it proves | What it can fill |
 |---|---|---|
-| **A folder of contracts.** A Drive folder, or wherever agreements are kept | That a contract exists, on these terms | Name, the whole contract group, sometimes the billing owner from the signature |
+| **A folder of contracts.** A Drive folder, or wherever agreements are kept | That a contract exists, on these terms | Name and the whole contract group. A signature may identify the billing owner, but the field is never filled by backfill: name the person in the report instead |
 | **Email.** Vendor invoices, receipts, renewal notices, product announcements, support threads | That the tool is in use and somebody is paying for it or working with them | Name, and little else honestly |
 
 **A contract produces a strong candidate and an email produces a thin one**, and
