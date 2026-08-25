@@ -5303,3 +5303,20 @@ has still never been seen true (no table held more than three rows). A
 renamed property or option is still unexercised, this being the identity
 install. And no person property was written, because the install writes no
 content rows.
+
+## Sarah's ruling on `Last reviewed`, 2026-08-25
+
+Creation stamps it. Her words: creating a software row should stamp it,
+because technically that is being reviewed. That is the fill-event table's
+reading, which is what the build implemented, so no code changes:
+`LAST_REVIEWED_WRITERS` stays `new` and `review`, and the agreement test
+already reads the fill-event table. The one edit is documentary:
+`SKILLS-software.md` carried the review-only wording and now states both
+writers, so the two design documents agree. Backfill creation still leaves
+the field empty, which is a different kind of creation and was not part of
+the disagreement.
+
+The same message set the working rule that she is not a gate on pull
+requests: reviews run (Codex CLI, Devin CLI, the Devin app check) and the
+PR merges without her involvement. Recorded here because the previous
+session held PR 22 open waiting for her yes.
