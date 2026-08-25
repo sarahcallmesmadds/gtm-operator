@@ -15,6 +15,9 @@
  *   node install.js phase-b                 the relation statements, per database
  *   node install.js views                   the view calls
  *   node install.js record <key> <db> <ds>  store what phase A returned
+ *   node install.js readback <envelope.json> <key> <raw-save> [more saves]
+ *                                           extract one database's evidence from
+ *                                           verbatim fetch saves into the envelope
  *   node install.js verify <readback.json>  compare Notion against the manifest
  *   node install.js status                  where this install has got to
  *   node install.js parent-is <page>        is that page the recorded parent
@@ -32,6 +35,7 @@ const relations = require('./relations')
 const views = require('./views')
 const rules = require('./rules')
 const config = require('./config')
+const readbackFile = require('./readback')
 
 const { DATABASES, VIEWS, byKey } = manifest
 
@@ -382,6 +386,66 @@ if (require.main === module) {
         console.log(rest[0] ? `Recorded person ${rest[0]}.` : 'Recorded that there is no person id. Every person property will be left unset.')
         break
       }
+      case 'readback': {
+        const [envelopePath, key, ...rawFiles] = rest
+        if (!envelopePath || !key || !rawFiles.length) {
+          throw new Error('Usage: install.js readback <envelope.json> <key> <raw-save> [more saves]')
+        }
+        if (!byKey(key)) {
+          throw new Error(`"${key}" is not a database this install creates. One of: ${DATABASES.map(d => d.key).join(', ')}.`)
+        }
+
+        // THE SAVES ARE VERBATIM FETCH OUTPUT AND THE EXTRACTION IS MECHANICAL.
+        // This command exists so nobody re-keys two hundred option values into
+        // the envelope by hand, where one slip reads as a real mismatch. A
+        // clipped save stops being valid JSON inside its tag and is refused
+        // loudly by the extractor rather than arriving as plausible evidence
+        // with values quietly missing.
+        const raws = rawFiles.map(file => {
+          try {
+            return fs.readFileSync(file, 'utf8')
+          } catch (error) {
+            throw new Error(`Could not read the saved fetch at ${file}: ${error.message}`)
+          }
+        })
+        const { schema: extracted, views: extractedViews, summary } = readbackFile.extract(raws)
+
+        // The envelope is created on the first database and merged into after
+        // that. An existing file that will not parse is refused rather than
+        // overwritten: it may hold five databases' evidence already.
+        let envelope = { databases: {}, viewRows: {}, sqlRows: {} }
+        if (fs.existsSync(envelopePath)) {
+          let text
+          try {
+            text = fs.readFileSync(envelopePath, 'utf8')
+            envelope = JSON.parse(text)
+          } catch (error) {
+            throw new Error(
+              `The envelope at ${envelopePath} exists and could not be read as JSON: ${error.message}\n` +
+              '  It is not being overwritten, because it may already hold other databases\' evidence. Fix or remove it.'
+            )
+          }
+          if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+            throw new Error(`The envelope at ${envelopePath} is not a set of fields. It is not being overwritten; fix or remove it.`)
+          }
+        }
+        if (!envelope.databases || typeof envelope.databases !== 'object' || Array.isArray(envelope.databases)) envelope.databases = {}
+        envelope.databases[key] = { schema: extracted, views: extractedViews }
+        fs.writeFileSync(envelopePath, JSON.stringify(envelope, null, 2))
+
+        const still = DATABASES.map(d => d.key).filter(k => !envelope.databases[k])
+        console.log(
+          `${byKey(key).title}: extracted ${summary.properties} properties carrying ${summary.optionValues} option values ` +
+          `(${summary.withDescriptions} with a description), and ${summary.views.length} view${summary.views.length === 1 ? '' : 's'}` +
+          `${summary.views.length ? ` (${summary.views.join(', ')})` : ''}.`
+        )
+        console.log(
+          still.length
+            ? `Still unread: ${still.join(', ')}. Fetch each, save the output whole, and run readback for it.`
+            : 'Every database is in the envelope. Add the viewRows and sqlRows halves, then run verify.'
+        )
+        break
+      }
       case 'verify': {
         if (!rest[0]) throw new Error('Usage: install.js verify <readback.json>')
 
@@ -430,7 +494,7 @@ if (require.main === module) {
         break
       }
       default:
-        console.error('Usage: install.js plan | phase-a | phase-b | views | begin | record | person | verify | complete | status | parent-is')
+        console.error('Usage: install.js plan | phase-a | phase-b | views | begin | record | person | readback | verify | complete | status | parent-is')
         process.exit(2)
     }
   } catch (error) {

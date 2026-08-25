@@ -5150,3 +5150,47 @@ did: the CLI rejected its own git call in non-interactive mode and exited 0
 with one warning line, which reads exactly like a quiet pass. The working
 recipe, recorded for next time: tell it to read files as they are on disk
 and run no git or shell commands at all.
+
+## The install verify step stops asking for a transcription, 2026-08-25
+
+The finding from the 2026-08-23 live install, logged this morning as the
+thing blocking every first install: step 6 asked for the read-back to be
+written into verify's envelope by hand, roughly two hundred option values
+re-keyed per install, where one slip reads as a real mismatch. The
+2026-08-18 fixture is the disease on record: its own comment admits the
+transcription silently lost every property description.
+
+**Measured first, 2026-08-25, under the testing page**: a probe database
+with every property shape verify compares was created, fetched as a data
+source and as a database, and deleted, with the page read back blank. The
+schema arrives as ONE JSON blob inside a `<data-source-state>` tag,
+byte-identical across the create response, the data-source fetch and the
+database fetch; its `schema` object is exactly the shape `schema.inspect`
+compares, types reading back as `text` and `person` per READ_BACK_AS; and
+each view arrives as one JSON blob inside a `<view>` tag in the dialect
+`verifyView` reads. The raw captures are tests/fixtures/readback-*-fetch.txt
+with identifiers remapped, because this repository is public.
+
+**The fix**: saves are now verbatim fetch output, and `install.js readback`
+does the extraction mechanically into verify's envelope, one database at a
+time, printing the counts a person reads against the plan. A clipped save
+stops being valid JSON inside its tag and is refused loudly; so are saves
+from more than one database handed over as one, an empty schema, and an
+envelope that will not parse (never overwritten, it may hold five databases'
+evidence already). The end-to-end test proves extraction flows into verify
+by asserting the probe schema FAILS verification against the manifest.
+
+**What honestly did not change**: the channel still passes through the
+model, because nothing else connects the Notion client to the disk. What
+changed is that a re-keying became a verbatim block copy whose dominant
+failure, truncation, breaks the JSON and is refused, and whose remaining
+failure is triaged in the skill: many things missing on one database means
+re-fetch that one database before believing the mismatch.
+
+The prose-count guard caught this change's own first draft: "refuses two
+databases' saves" read as a count claim against the manifest's six, and was
+reworded rather than excepted.
+
+Three mutations, each asserted landed first: the parse refusal swallowed,
+the distinct-source refusal dropped, and the envelope merge replaced with a
+fresh file, each red in its named check.
