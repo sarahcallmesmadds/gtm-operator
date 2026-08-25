@@ -1,10 +1,10 @@
 # setup
 
-Creates the Notion databases every other `gtm-operator` plugin reads and writes,
-wires the relations between them, and writes the one config file they all share.
+Creates the Notion databases every other foundation plugin reads and writes,
+wires the relations between them, and writes the foundation's config.
 
 **Nothing else in this marketplace creates a database, and nothing else writes
-config.** That is the decision the whole architecture rests on.
+the foundation's config.** That is the decision the whole architecture rests on.
 
 ## Status
 
@@ -15,7 +15,7 @@ proved a second time by the rows it actually returns. The recording of that run
 is in `tests/fixtures/full-install-as-notion-returned-it.json` and the test suite
 checks against it.
 
-What does not exist: the `check` and `add` skills, and the other five plugins.
+What does not exist: the `add` skill.
 
 **It has not been run by anyone but its author, and never against a workspace
 with anything in it.** Every failure it has survived is one that was arranged.

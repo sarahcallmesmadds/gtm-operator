@@ -5,7 +5,7 @@
     "url": "https://github.com/sarahcallmesmadds"
   },
   "metadata": {
-    "description": "A GTM operating system in Notion, built by plugins rather than by a consultant. Six databases, created once, written to by six plugins that never call each other."
+    "description": "A GTM operating system in Notion, built by plugins rather than by a consultant. The databases are created once by setup and written to by the plugins that own them, and no plugin calls another."
   },
   "plugins": [
     {

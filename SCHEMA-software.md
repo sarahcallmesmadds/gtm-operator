@@ -470,7 +470,7 @@ what makes this schema real rather than aspirational.
 | Support/Help as a property | Became a body section, with the vendor contact. Names and email addresses of people at the vendor are not workspace users and do not belong in a person field |
 | Help centre URL | The fourth URL column, and the least reached for. It goes in the body under Links |
 | Domain Usage, Field Mappings, GTM Fields, Customer Tasks | Pointed at databases that existed in one organisation only. The same treatment these got in the other three schemas |
-| A separate Tool Changelog database | A good idea and out of scope. It is fed by scheduled watchers and email triage, and v1 has no unattended runs. When it ships it is a tier-two plugin, because it would own its own database and read this one |
+| A separate Tool Changelog database | A good idea and out of scope. It is fed by scheduled watchers and email triage, and v1 has no unattended runs. When it ships it is a foundation plugin, because a plugin that owns a database belongs in tier one, the same resolution `teammates` got; scheduled watchers stay out of v1 either way |
 
 ---
 

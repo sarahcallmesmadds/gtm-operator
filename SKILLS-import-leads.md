@@ -303,3 +303,8 @@ Edition org is the intended target for that run.
    installed. The plugin should work for someone using only Salesforce, and
    where that line sits (which halves of `check` still run) needs one
    deliberate pass in the build.
+5. **The build's first task is the config-comment sweep.** Comments in the
+   foundation's built code and its vendored copies still say nothing but
+   `setup` writes config, which is true while this plugin is design only and
+   stops being true the day it is built. The deferral and its expiry are
+   recorded in `DECISIONS.md`, round 5 of this design's review.
