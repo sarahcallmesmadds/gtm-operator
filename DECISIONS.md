@@ -5134,3 +5134,19 @@ The Devin GitHub app posted a green check on both heads of this pull request
 and no review comment on either, so the comment-body check for the hidden
 findings line could not be performed; the CLI round above is the Devin
 review of record for this pull request.
+
+### Round 3 on the backfill pull request, Devin CLI confirming, 2026-08-25: clean, one wording
+
+The round that confirms the previous round's fixes caused no next bug, the
+check this repository's history says to run. Nothing found in the code: a
+refused draft output cannot reach the payload builder, because it carries
+`problems` (not an accepted key) and no row, and the never-filled refusals
+still catch a person field at the candidate's top level. One Low taken: a
+test failure-message written to describe the fault a failure would reveal
+read equally as a claim about current behaviour, and now says which it is.
+
+The first attempt at this round also died the way round 2's first attempt
+did: the CLI rejected its own git call in non-interactive mode and exited 0
+with one warning line, which reads exactly like a quiet pass. The working
+recipe, recorded for next time: tell it to read files as they are on disk
+and run no git or shell commands at all.
