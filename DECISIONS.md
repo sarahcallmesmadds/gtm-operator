@@ -5241,3 +5241,15 @@ not the one `record` wrote for the key at phase A — the swap verify would
 otherwise catch late and confusingly — saying plainly when config records
 nothing to check against. Two mutations, each asserted landed, each red in
 its named check.
+
+### Round 3 on the readback pull request, Devin CLI confirming, 2026-08-25: one finding, taken
+
+The masking arithmetic, the earlier refusals and the literal-tag tests all
+held. One Medium: the provenance comparison normalized the save's side and
+not config's, and `record` stores whatever the operator pasted, which Notion
+hands back bare, prefixed and braced — so a correctly recorded braced id
+refused a correct save with the misleading "another database's save"
+message, introduced by the previous round's own fix. Both sides now pass
+through one normalizer, pinned by a test that records the id in the braced
+form and by a mutation that removed the config-side normalization and went
+red in the named check.
