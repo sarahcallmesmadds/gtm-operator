@@ -5173,19 +5173,28 @@ with identifiers remapped, because this repository is public.
 
 **The fix**: saves are now verbatim fetch output, and `install.js readback`
 does the extraction mechanically into verify's envelope, one database at a
-time, printing the counts a person reads against the plan. A clipped save
-stops being valid JSON inside its tag and is refused loudly; so are saves
-from more than one database handed over as one, an empty schema, and an
-envelope that will not parse (never overwritten, it may hold five databases'
-evidence already). The end-to-end test proves extraction flows into verify
-by asserting the probe schema FAILS verification against the manifest.
+time, printing the counts a person reads against the plan. Refused loudly: a
+clipped save (the fetch wrapper loses its closing tag, or the JSON stops
+parsing), a save that is not a data-source or database fetch at all (a page
+fetch is refused outright: a state blob inside page content is a document,
+not evidence), saves from more than one database handed over as one, view
+evidence whose own provenance names a different data source, an empty
+schema, and an envelope that will not parse or whose databases entry is the
+wrong shape (never overwritten, it may hold five databases' evidence
+already). The end-to-end test proves the extracted VALUES flow into verify:
+the probe's own Contract link description is quoted back in the mismatch
+report, which only the comparator reading the extracted schema can produce.
 
 **What honestly did not change**: the channel still passes through the
-model, because nothing else connects the Notion client to the disk. What
-changed is that a re-keying became a verbatim block copy whose dominant
-failure, truncation, breaks the JSON and is refused, and whose remaining
-failure is triaged in the skill: many things missing on one database means
-re-fetch that one database before believing the mismatch.
+model, because nothing else connects the Notion client to the disk. A
+clipped save is caught by the wrapper and the JSON; **an edit that keeps the
+save well-formed and self-consistent is not catchable here**, being
+indistinguishable from a real fetch of a different database, which is why
+the command prints its counts for a person to read against the plan and the
+skill says to believe a mismatch only after a fresh save. The first draft of
+this section claimed truncation necessarily breaks the JSON; the Codex round
+disproved that with a save clipped after a complete state, which parsed as a
+database with no views, and the wrapper check is the answer.
 
 The prose-count guard caught this change's own first draft: "refuses two
 databases' saves" read as a count claim against the manifest's six, and was
@@ -5194,3 +5203,23 @@ reworded rather than excepted.
 Three mutations, each asserted landed first: the parse refusal swallowed,
 the distinct-source refusal dropped, and the envelope merge replaced with a
 fresh file, each red in its named check.
+
+### Round 1 on the readback pull request, Codex CLI, 2026-08-25: five findings, all taken
+
+Three High, every one confirmed by a probe the reviewer actually ran. A save
+clipped immediately after a complete state parsed as a database with no
+views, disproving the section above's first-draft claim that truncation
+breaks the JSON; the outer fetch wrapper's closing tag is now required. A
+state from one database merged cleanly with a pasted view from another,
+proving view configuration from the wrong database, worst for the unfiltered
+Calendar view that has no row comparison; every view's own dataSourceUrl
+must now match the state's, a url-less state or view is refused rather than
+counted around, and a page fetch is refused outright because a state blob in
+page content is a document, not evidence. A literal closing tag inside a
+JSON string was falsely refused as clipped; the tag-search became a
+balanced-brace scanner. Medium: an envelope whose databases entry parsed but
+was the wrong shape was silently reset to empty, the exact loss the
+read-before-write guard exists to prevent, now refused; and the end-to-end
+test could not tell exact extraction from a fabricated schema, so it now
+asserts the probe's own description value is quoted back by the comparator.
+Three further mutations, each asserted landed, each red in its named checks.
