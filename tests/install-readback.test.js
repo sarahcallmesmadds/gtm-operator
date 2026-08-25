@@ -141,6 +141,45 @@ check('a state with no data source url is refused, not counted around', () => {
   )
 })
 
+check('literal tag text inside a JSON string cannot mislead the wrapper check either', () => {
+  // The Devin round's High: the inner blobs got a balanced scanner and the
+  // wrapper stayed a naive search, so a literal <page in a description
+  // refused a real save as a page fetch, and a clipped save carrying a
+  // literal </database> in a string slipped the closing-tag check — the
+  // exact clip the wrapper was added to catch, back through the check
+  // itself.
+  const pageLiteral = DS_FIXTURE.replace(
+    '"Contract link":{"description":"Put the contract PDF in Google Drive and paste the link here."',
+    '"Contract link":{"description":"See <page setup> in the handbook."'
+  )
+  const accepted = readback.extract(pageLiteral)
+  assert.strictEqual(accepted.summary.properties, 11, 'a literal <page in a description refused a real save')
+
+  const clipped = DB_FIXTURE.slice(0, DB_FIXTURE.indexOf('</data-source-state>') + '</data-source-state>'.length)
+  const clippedWithLiteral = clipped.replace(
+    '"Contract link":{"description":"Put the contract PDF in Google Drive and paste the link here."',
+    '"Contract link":{"description":"Mentions </database> literally."'
+  )
+  assert.throws(() => readback.extract(clippedWithLiteral), /missing its closing <\/database>/,
+    'a literal </database> inside a string satisfied the closing-tag check on a clipped save')
+})
+
+check('two states in one file are the same evidence twice, not a parse accident', () => {
+  const doubled = DS_FIXTURE.replace('</data-source>', '') +
+    DS_FIXTURE.slice(DS_FIXTURE.indexOf('<data-source-state>'))
+  const { summary } = readback.extract(doubled)
+  assert.strictEqual(summary.properties, 11, 'the sequential scan mishandled a second state in one file')
+})
+
+check('a literal <view inside a schema description cannot invent a view', () => {
+  const viewLiteral = DS_FIXTURE.replace(
+    '"Contract link":{"description":"Put the contract PDF in Google Drive and paste the link here."',
+    '"Contract link":{"description":"Open <view settings> first {no}"'
+  )
+  const { views } = readback.extract(viewLiteral)
+  assert.deepStrictEqual(views, [], 'view discovery read a description as a view tag')
+})
+
 check('two databases\' saves mixed together are refused, not merged into either', () => {
   const other = DS_FIXTURE.split('facadefa-cade-4000-8000-facadefacade').join('0therdb0-0000-4000-8000-000000000000')
   assert.throws(() => readback.extract([DS_FIXTURE, other]), /different data sources/)
@@ -229,6 +268,37 @@ check('an unknown key and missing arguments are refused before anything is read'
   const bare = run(['readback', path.join(SANDBOX, 'e2.json'), 'software'])
   assert.notStrictEqual(bare.status, 0)
   assert.ok(/Usage/.test(bare.out))
+})
+
+check('a save for another database cannot be filed under this key once config records the ids', () => {
+  // The swap verify would otherwise catch late and confusingly: readback
+  // refuses it at the door by comparing the save's own data source against
+  // what `record` wrote for the key at phase A.
+  const swapEnv = { ...process.env, GTM_OPERATOR_CONFIG: path.join(SANDBOX, 'swap-config.json') }
+  const go = args => {
+    try {
+      return { status: 0, out: execFileSync('node', [SCRIPT, ...args], { encoding: 'utf8', env: swapEnv }) }
+    } catch (err) {
+      return { status: err.status, out: `${err.stdout || ''}${err.stderr || ''}` }
+    }
+  }
+  go(['begin', 'a'.repeat(32)])
+  go(['record', 'software', 'db-id-software', '00000000-0000-4000-8000-000000000001'])
+  const refused = go(['readback', path.join(SANDBOX, 'swap.json'), 'software', dsFile])
+  assert.notStrictEqual(refused.status, 0)
+  assert.ok(/another database's save/.test(refused.out), refused.out)
+
+  go(['record', 'calendar', 'db-id-calendar', 'facadefa-cade-4000-8000-facadefacade'])
+  const matched = go(['readback', path.join(SANDBOX, 'swap.json'), 'calendar', dsFile])
+  assert.strictEqual(matched.status, 0, matched.out)
+  assert.ok(/matches the one config records/.test(matched.out))
+})
+
+check('with no config recorded, the unchecked provenance is said rather than silent', () => {
+  const envelope = path.join(SANDBOX, 'note-envelope.json')
+  const result = run(['readback', envelope, 'memos', dsFile])
+  assert.strictEqual(result.status, 0, result.out)
+  assert.ok(/provenance could not be checked/.test(result.out))
 })
 
 check('the extracted evidence flows into verify and is compared for real', () => {

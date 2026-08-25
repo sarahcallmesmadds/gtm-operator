@@ -410,6 +410,29 @@ if (require.main === module) {
         })
         const { schema: extracted, views: extractedViews, summary } = readbackFile.extract(raws)
 
+        // THE SAVE HAS TO BELONG TO THE KEY. `record` wrote each database's
+        // data source id at phase A, and a save whose provenance names a
+        // different one is another database's fetch handed over under this
+        // key: written anyway, verify would compare the wrong database and
+        // the counts a person reads would all look right. Where config
+        // records nothing for the key, that is said rather than silently
+        // unchecked.
+        const recordedIds = config.ids()[key]
+        const provenance = summary.dataSource ? String(summary.dataSource).replace(/^collection:\/\//, '') : null
+        let provenanceNote
+        if (recordedIds && recordedIds.dataSourceId && provenance) {
+          if (provenance.toLowerCase() !== String(recordedIds.dataSourceId).toLowerCase()) {
+            throw new Error(
+              `This save is for data source ${provenance}, and config records ${byKey(key).title} as ${recordedIds.dataSourceId}. ` +
+              'That is another database\'s save handed over under this key, and writing it would verify the wrong database. ' +
+              'Check which fetch this file holds, and run readback with the key it belongs to.'
+            )
+          }
+          provenanceNote = 'The save\'s data source matches the one config records for this key.'
+        } else {
+          provenanceNote = `Config records no data source id for ${key}, so the save's provenance could not be checked against it.`
+        }
+
         // The envelope is created on the first database and merged into after
         // that. An existing file that will not parse is refused rather than
         // overwritten: it may hold five databases' evidence already.
@@ -450,6 +473,7 @@ if (require.main === module) {
           `(${summary.withDescriptions} with a description), and ${summary.views.length} view${summary.views.length === 1 ? '' : 's'}` +
           `${summary.views.length ? ` (${summary.views.join(', ')})` : ''}.`
         )
+        console.log(provenanceNote)
         console.log(
           still.length
             ? `Still unread: ${still.join(', ')}. Fetch each, save the output whole, and run readback for it.`
