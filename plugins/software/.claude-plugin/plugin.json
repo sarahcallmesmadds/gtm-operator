@@ -1,7 +1,7 @@
 {
   "name": "software",
-  "version": "0.1.0",
-  "description": "The Software directory in the databases the gtm-operator setup plugin created: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation, changes the facts when they change, confirms a whole row is still true, and reports which renewals are coming up ordered by consequence rather than by date, ending with what it could not see. Creates no database and writes no config.",
+  "version": "0.2.0",
+  "description": "The Software directory in the databases the gtm-operator setup plugin created: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation, changes the facts when they change, confirms a whole row is still true, reports which renewals are coming up ordered by consequence rather than by date ending with what it could not see, and finds the tools you already pay for by reading a folder of contracts and your own mailbox, offered as candidates approved one at a time. Creates no database and writes no config.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"

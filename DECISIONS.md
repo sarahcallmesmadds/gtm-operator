@@ -5040,3 +5040,41 @@ check that asserted the counter emptied without asserting the row arrived in
 the list, and a payload-map check that skipped Renews and Description. Both
 new gates were proved by mutation, asserted landed first, red in the named
 check, restored.
+
+## software: `backfill`, the fifth skill, at 0.2.0, 2026-08-25
+
+The skill that makes the directory possible, mirroring `process:backfill`
+with a deliberately smaller source set: a folder of contracts the user
+names, and the user's own mailbox with an explicit date range. The scope
+gate refuses rather than narrows, and a refused scope carries no plan at
+all, because there is no approval gate in front of a read.
+
+**What a backfilled row never carries, refused rather than dropped**: any of
+the four person fields, `Importance`, and `Last reviewed`. The refusal shape
+matters — approving a candidate and having something smaller run is the one
+failure the approval gate cannot see. `prove-backfill` checks the absences
+on the read-back as well as the presences, because a page that arrived
+stamped or owned silently drops out of the review signal.
+
+**A backfilled row gets no body.** The template sections are written for a
+reader by somebody who knows the tool, and a backfilled row knows only what
+a document proved. Inventing What It Does For Us from a receipt is the kind
+of content the approval gate cannot check.
+
+**`backfill-fill` maps the fetched page to logical names in the command
+layer before the fill judgment runs**, because a raw fetch from a renamed
+workspace reads as blank in every field, which would turn "fill the blanks"
+into "fill everything" — the exact fault `process:backfill`'s fill was built
+against, held here by a test that runs the command against a fully renamed
+config.
+
+**The mutation run caught its own test.** Emptying `NEVER_FILLED` survived
+the first pass: the check iterated the emptied list zero times and passed
+vacuously — a test defeated by deleting the thing it tests, found by
+mutation and not by reading, again. The list is now pinned by value first
+and the re-run went red in the named check. The same pin was then added to
+the `NEVER_CLEARED` loop in the tool suite before anything proved it wrong.
+
+**What the tests do not prove**: no source has actually been read — which
+Drive and mail surfaces the skill drives, and how their results arrive, is a
+live-run question — and no SQL has been sent, the standing constraint.
