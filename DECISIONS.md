@@ -5253,3 +5253,53 @@ message, introduced by the previous round's own fix. Both sides now pass
 through one normalizer, pinned by a test that records the id in the braced
 form and by a mutation that removed the config-side normalization and went
 red in the named check.
+
+## The fifth live run: the first full install through the readback flow, 2026-08-25
+
+The watching condition on the install bug, run the same day the fix merged.
+A complete six-database install was driven from main at 689b14f, under a
+throwaway page beneath `Plugins testing`, with config at a non-default path
+through `GTM_OPERATOR_CONFIG` so nothing standing was created or touched.
+Preflight passed all three checks; the connection's `self` returned a person,
+not a bot, so the person id was recorded without guessing.
+
+**What the run proved.**
+
+- **Phase A, B and the views all landed as generated.** Six creates with both
+  ids recorded, twelve relations in six update calls with each self-relation
+  arriving as one pair rather than four properties, and all seven views
+  created, every payload sent verbatim from what the scripts printed.
+- **The readback flow works end to end, with zero values re-keyed.** Each
+  database was fetched both ways, saved verbatim, and extracted mechanically
+  by `install.js readback`. Every printed count matched the plan on first
+  extraction: Process 23 properties / 56 option values, Memos 17/52,
+  Projects 17/33, Tasks 10/5, Software 28/52 with exactly one description
+  (Contract link, the value the end-to-end test quotes), Calendar 18/63 with
+  all six views found. Provenance matched config for every key.
+- **The generated SQL runs on Notion's query surface.** No writing plugin had
+  ever sent one. All six row-proof rules from `views.js` were accepted in
+  exactly the printed dialect and returned the expected rows, including the
+  three-clause empty-date test.
+- **Every row-expecting view was proved by its rows.** Five throwaway rows
+  made each of the six filtered views non-empty; view-mode queries and the
+  SQL agreed by page identity everywhere. `verify` passed on the first
+  attempt and `complete` accepted it: the first install ever to reach
+  `state: complete` (the 2026-08-19 install never passed verify).
+- **A wrong view id fails loudly.** One view-mode query was sent with a
+  mistyped id and returned a view-not-found error rather than empty rows, so
+  that mistake cannot masquerade as an unproved view.
+
+**Teardown.** The testing page was read before emptying and held only this
+run's parent page; it was emptied with `allow_deleting_content` and read back
+blank. The run's config was renamed `config.json.done-2026-08-25` so a resume
+cannot target trashed databases; the saves and envelope are at
+`~/.planning/live-run-gtm-install/`, which never enters this repository.
+
+**What it did not prove.** The channel is still the model: each state blob
+was transcribed once into its save, and while a value-level slip would have
+surfaced as a verify mismatch against the manifest, the well-formed-edit
+blindspot stands exactly as documented in the readback section. Pagination
+has still never been seen true (no table held more than three rows). A
+renamed property or option is still unexercised, this being the identity
+install. And no person property was written, because the install writes no
+content rows.
