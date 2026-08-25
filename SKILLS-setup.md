@@ -67,7 +67,8 @@ what the five artifact types mean, asks the five things that are genuinely the
 user's to decide, creates every database and every relation, and writes config.
 
 **When it runs.** Once, at the start, and never on a schedule. Every skill in
-every other plugin routes here when config is absent. **Setup is discovered at the
+every other foundation plugin routes here when the foundation's config is
+absent; a job plugin initialises its own private config instead. **Setup is discovered at the
 moment of need, never at install time**, because nobody reads the README.
 
 **Re-running it on a complete config is refused**, and it does not fall through
@@ -670,11 +671,11 @@ fills them.
 
 ## The config file
 
-One file at `~/.claude/gtm-operator.config.json`, for the whole marketplace.
+One file at `~/.claude/gtm-operator.config.json`, for the whole foundation.
 
-**Named for the marketplace, not for a plugin.** Six plugins reading six config
-files is six chances for them to disagree about which database is Process
-Library.
+**Named for the marketplace, not for a plugin.** Separate per-plugin config
+files would be that many chances for the foundation plugins to disagree about
+which database is Process Library.
 
 ```
 configVersion      the shape of this file, so check can refuse one it cannot read

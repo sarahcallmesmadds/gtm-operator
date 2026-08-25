@@ -490,8 +490,10 @@ own setup. That is replaced by the structure below.
 
 ### Tier 2: jobs. Plugins named for the work they do.
 
-These own no database. They read and write the foundation's. Not started, and
-not in scope until the foundation ships.
+These own no database. They read the foundation's judgment and write wherever
+their job lives, the foundation's databases included; the first, `import-leads`,
+writes Salesforce (wording widened 2026-08-25, when the first design made the
+old reading too narrow). Not in scope until the foundation ships.
 
 `import-leads` (named `list-building` until 2026-08-25, when Sarah retired the
 placeholder because the plugin imports lists rather than builds them),
@@ -885,7 +887,9 @@ are copied in or referenced from `infra-plugins`.
   each plugin with no separate setup plugin. See "The marketplace: two tiers"
   above for why that stopped working.
 - **Setup is discovered at the moment of need, never at install time.** Every
-  skill routes to the `setup` plugin on first run when config is absent. Never
+  foundation skill routes to the `setup` plugin on first run when the
+  foundation's config is absent; a job plugin initialises its own private
+  config instead (2026-08-25). Never
   rely on the user reading the README. (Defect logged against `ip-inventory` for
   exactly this: queue entry `2026-08-07T16-08-16-ip-inventory`.) This survives
   the reversal, and matters more now that setup is a separate install.
@@ -1126,8 +1130,8 @@ is the one that ships without the file it needs.
 
 `shared/config-read.js` cannot write. There is no `begin`, no `complete`, no
 `recordDatabase`. `setup` is the only thing that writes the foundation's config, and the surest
-way to keep that true is for the code every other plugin carries to have no way
-of doing it.
+way to keep that true is for the code every other foundation plugin carries to
+have no way of doing it.
 
 **`contextFor` is the only production entry point.** `readRaw`, `inspectNames`,
 `propertyName` and `valueName` are still exported, for the contract test and for
@@ -5480,3 +5484,30 @@ relations, five questions rather than twelve) sitting in both manifest
 descriptions. Both descriptions now carry the scoped rule with no counts,
 and the round confirmed the read inventories, the version pair and the
 identity checks clean.
+
+### Round 5 on the design pull request, Codex CLI confirming, 2026-08-25: six findings, five taken whole and one split
+
+The round was asked to search the whole repository for anything the
+private-config model contradicts, and it did. Taken whole: the root
+marketplace description and its hand counts; the setup plugin README, which
+still said five plugins and the check skill do not exist; the tier-2
+definition, which said job plugins write the foundation's databases when
+import-leads writes Salesforce; the root README's "the others write to
+them"; the Tool Changelog note in `SCHEMA-software.md`, which said an
+object-owning plugin ships as tier two, the inverse of the rule this
+architecture runs on and the same contradiction `teammates` carried; and the
+doc-level halves of the config-rule sweep, in `SKILLS-setup.md`, the setup
+README, the install skill's description and two places in this file.
+
+**Split, and the deferral is recorded with its expiry.** The same unscoped
+wording lives in comments inside built code and its vendored copies:
+`plugins/setup/scripts/config.js`, `shared/config-read.js` and the five
+copies vendored from it, two test-file comments, and the calendar plugin
+README. Every one of those sentences is about the foundation's config file
+inside code whose only subject is that file, and is true of every plugin
+that exists as code today, because import-leads is design only. Sweeping
+them now would re-vendor five plugins for comment wording. **The reason
+expires the day import-leads is built**, and the sweep is that build's first
+task, recorded in the build order rather than left to be rediscovered. This
+file has already logged twice what happens when a deferral's reason expires
+silently.

@@ -1,6 +1,6 @@
 ---
 name: install
-description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other foundation plugin reads. Use on a first run, when another gtm-operator skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
+description: Build the gtm-operator foundation in Notion. Creates every database the marketplace needs, wires the relations between them, builds the views, and writes the one config file every other foundation plugin reads. Use on a first run, when another foundation plugin's skill says config is missing, or when the user says "set up gtm-operator", "create the Notion databases", "install gtm-operator". Re-running it on a complete config is refused, because there is no settings path yet: change an answer by editing the config file.
 allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-create-pages, mcp__*__notion-create-database, mcp__*__notion-update-data-source, mcp__*__notion-create-view, mcp__*__notion-query-data-sources, mcp__*__notion-get-users
 ---
 
