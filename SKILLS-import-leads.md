@@ -1,8 +1,8 @@
 # import-leads: what each skill does
 
-Part 3 for `import-leads`, the first job plugin. Two skills, in the same five
-slots as the other skill files: what it does, when it runs, what it reads and
-writes, what it does not do, and the judgment it carries.
+Part 3 for `import-leads`, the first job plugin: what each skill does, in the
+same five slots as the other skill files. What it does, when it runs, what it
+reads and writes, what it does not do, and the judgment it carries.
 
 This plugin owns no database and no schema file. A job plugin is named for its
 job, and this one's job is taking a lead list from wherever it lives and landing
@@ -18,12 +18,11 @@ that actually builds lists.
 
 ## What this is a rebuild of
 
-The reference set contains a lead-list import skill that ran this exact
-pipeline in production, and it is the most used and most refined thing in the
-reference. The rebuild rule, Sarah's call on 2026-08-25: **change the least
-possible.** The pipeline shape, the ordering, the gates and the hard-won
-refinements all carry over as they are. What moves is identity, not logic, and
-identity moves into three homes:
+The reference set contains a lead-list import skill that ran this pipeline in
+production and worked well. The rebuild rule, Sarah's call on 2026-08-25:
+**change the least possible.** The pipeline shape, the ordering, the gates and
+the hard-won refinements carry over as they are. What moves is identity, not
+logic, and identity moves into three homes:
 
 - **Config holds identifiers.** The org, the field-name map, file paths.
 - **Process holds judgment.** The rules the organisation decided, written as
@@ -41,9 +40,8 @@ the installing organisation fills with its own answers.
 ## Rules that apply to both skills
 
 The marketplace's shared rules apply where they reach: a hard confirmation gate
-before any write, previews shown in full inline, route to `setup` on first run
-when the foundation's config is absent, and record only sources actually
-opened. Five more belong to this plugin.
+before any write, previews shown in full inline, and record only sources
+actually opened. More belong to this plugin.
 
 - **Nothing is invented to complete a row.** Every filled value names its
   source: the list, the CRM, or an enrichment answer with the tool that gave
@@ -57,7 +55,9 @@ opened. Five more belong to this plugin.
 - **Anything metered or paid is named and confirmed before it runs.** The
   reference ran a paid email-verification pass only on an explicit yes, and
   that rule generalises to every step that costs money.
-- **No credentials, tokens or keys, ever**, in any file, property or preview.
+- **No credentials, tokens or keys**: not in a property, not in a body, not in
+  a preview, not in this plugin's config file. Name the vault or the variable
+  instead.
 
 ---
 
@@ -70,10 +70,19 @@ alias map. The alias map itself is a user-owned file at a configurable path,
 the same pattern as the artifact-type taxonomy, so a team can keep it in a
 repo and change it by pull request.
 
-Three Process artifacts carry the organisation's rules, read at run time:
+**This plugin writes its own config, once, with confirmation.** On a first run
+with no config, either skill stops, says what it needs (the org, the field
+names, the alias-map path), searches for what it can find rather than asking
+anyone to type what it could look up, shows what it will record, and writes
+the file on an explicit yes. The foundation's config stays `setup`'s alone;
+this file is this plugin's, and nothing else writes it.
 
-1. **The required-fields rule.** Which fields the org requires on a contact
-   before it may be created, and the value the org uses for the lead source.
+Process artifacts carry the organisation's rules, read at run time:
+
+1. **The required-fields rule.** What the org requires on a contact beyond
+   this plugin's own floor, and the value the org uses for the lead source,
+   shown at run time before anything is pushed. The artifact adds to the
+   floor and cannot subtract from it.
 2. **The campaign member-status grid.** Which member status a row gets, by
    campaign type and by what is known about the person's engagement.
 3. **Personas, optional.** The persona list and its title-mapping rules. When
@@ -81,7 +90,7 @@ Three Process artifacts carry the organisation's rules, read at run time:
    for review rather than guessed. When it does not exist, the step is skipped
    without complaint. Sarah's call, 2026-08-25.
 
-A routing artifact is a fourth, also optional: absent, every owner is
+A routing artifact is optional in the same way: absent, every owner is
 confirmed by hand, which is the honest default for an org that has no routing.
 
 A missing required artifact is named, not worked around. `check` says which
@@ -92,11 +101,36 @@ Process. No plugin calls another plugin's skill.
 
 ---
 
+## The write contract
+
+This plugin writes to a database it does not own, so this file states which
+fields it fills, the same rule `SKILLS-projects.md` follows. This section is
+the one home for that list.
+
+**The floor, this plugin's own:** a row without a first and last name is
+refused, and no contact is pushed without an account. From the list: first
+name, last name, email, phone, title, mailing city, state and country, the
+email opt-out when the list carries an opt-in column, and a LinkedIn URL
+where the org maps a field for it. From the flow: the account; campaign
+membership with its member status from the grid; the lead-source value from
+the required-fields artifact; the owner, only through routing or explicit
+confirmation; persona, only when the personas artifact exists. On an account
+the flow creates rather than matches: the name, and the website when the
+list carries a domain, because that is what makes the next import's matching
+better.
+
+Anything more comes from the org's own required-fields artifact. A row that
+cannot meet the rule is refused with the gap named, never padded.
+
+---
+
 ## run
 
 **What it does.** Takes one named list and lands the approved rows in
 Salesforce: cleaned, deduped, matched to accounts, on the right campaigns with
-the right member statuses, verified, and written back to the source.
+the right member statuses, verified by reading the writes back, and, when the
+source is a Notion page or database, written back to the source. A CSV source
+is never modified.
 
 **When it runs.** A lead list arrives: a conference follow-up, a content-
 download export, a vendor handoff, a spreadsheet somebody kept.
@@ -105,11 +139,12 @@ download export, a vendor handoff, a spreadsheet somebody kept.
 or a Notion page or database, never a search. Reads Salesforce to match
 accounts and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
-above. Writes contacts, accounts, campaigns and campaign memberships, each
-push behind the confirmation summary. Writes back to a Notion source only into
-blank fields.
+above. Writes the approved plan and nothing else: contact creates and
+updates, account creates, campaigns and campaign memberships, all behind one
+confirmation. Writes back to a Notion source only into blank fields.
 
-**The pipeline, kept from the reference in order:**
+**The pipeline, kept from the reference in order. Everything before the
+confirmation plans; only the push writes.**
 
 1. **Scope.** One named source. The scope gate refuses rather than narrows,
    because there is no approval gate in front of a read: half a scope is
@@ -123,23 +158,27 @@ blank fields.
 4. **Personas**, only when the artifact exists. Unclear titles are flagged,
    never guessed.
 5. **Company names normalised** against the alias map.
-6. **Accounts matched or created.** A created account gets its website set
-   when the list carries a domain, because that is what makes the next
-   import's matching better.
-7. **Dedupe against the CRM**, by email, in batched queries. Duplicates and
+6. **Accounts matched, or planned for creation.** A planned account carries
+   its name and, when the list has a domain, its website.
+7. **Dedupe against the CRM**, by email, in batched queries, and each row gets
+   its plan: create, update filling blanks only, or exclude. Duplicates and
    cross-account conflicts are always presented, never auto-resolved.
 8. **Multi-event detection, mandatory before campaign setup.** A list that
    covers several events or assets becomes several campaigns, and the signals
    (dates, locations, event names) are checked even outside the obvious
    column.
-9. **Campaigns matched or created**, member statuses from the grid.
-10. **The confirmation summary**: creates, updates, excluded rows and campaign
-    assignments, shown in full, with an explicit yes before any push.
-11. **Push in batches with partial-success semantics.** A duplicate campaign
-    membership failing individually is expected, not an error.
-12. **Verify** by querying back the records the creates returned, by id. The
-    reference verified through a custom provenance field; a generic org does
-    not have one, so the returned ids are the proof.
+9. **Campaigns matched, or planned for creation**, member statuses from the
+   grid.
+10. **The confirmation summary**: the whole plan, account creates, contact
+    creates and updates, exclusions, campaign creates and memberships, shown
+    in full, with an explicit yes before any push.
+11. **Push, executing exactly the approved plan**, in batches with
+    partial-success semantics. A duplicate campaign membership failing
+    individually is expected, not an error.
+12. **Verify.** Every created or updated record is fetched back by the id the
+    push returned, and the read-back is compared field by field against the
+    approved plan. An id is a locator, not a proof; the comparison is the
+    proof, and it says what it did not check.
 13. **Writeback** when the source was Notion: link each created record on its
     source row, fill email only if blank. A writeback failure is reported and
     never fails the run, because the CRM is the system of record.
@@ -150,16 +189,18 @@ blank fields.
 - Never guesses a person, an owner, or a persona.
 - Never overwrites a source-provided value, in the CRM or in the source.
 - Never auto-resolves a duplicate or a cross-account conflict.
-- Never pads a row to pass the required-fields rule. A row that cannot meet it
-  is refused with the gap named.
-- Never reads outside the one named source.
+- Never pads a row to pass the floor or the required-fields rule. A row that
+  cannot meet them is refused with the gap named.
+- Never reads rows from anywhere but the one named source: no second list, no
+  mailbox, no search. The CRM it writes and the Process artifacts it follows
+  are the only other things it opens.
 - Never sends email, and never posts anywhere. The reference posted summaries
   to chat; that is cut, because announcing is not the plugin's job and the
   default has to work for someone with nothing else connected. The run's own
   report is the record.
 - Never runs unattended. Nothing schedules it.
 
-**The judgment it carries.** Three things.
+**The judgment it carries.**
 
 1. **Whether two records are the same person or the same company.** Shown as a
    match with its evidence, decided by the person. The alias map holds the
@@ -176,18 +217,20 @@ blank fields.
 ## check
 
 **What it does.** Says whether an import would work, before anyone is
-mid-import, and what it would do. Two halves. The standing half: the required
-artifacts exist in Process, config points at an org, the connection is alive.
-The per-list half, when handed a list: how many rows would be new, how many
-match existing records, how many are ambiguous, and which rows fail the
-required-fields rule, with the failing field named per row.
+mid-import, and what it would do. The standing half: the required artifacts
+exist in Process, config points at an org, the connection is alive. The
+per-list half, only when handed a list: how many rows would be new, how many
+match existing records, how many are ambiguous, and which rows fail the floor
+or the required-fields rule, with the failing field named per row.
 
 **When it runs.** Before the first import ever, after anything about the org's
 rules changes, and before a big list where finding out mid-run would be
 expensive.
 
-**What it reads and writes.** Reads the config, the Process artifacts, the CRM
-and the list. **Writes nothing at all**, anywhere, and never runs a paid step.
+**What it reads and writes.** Reads the config, the Process artifacts and the
+CRM, and reads a list only when handed one. **Writes nothing at all**,
+anywhere, and never runs a paid step. The one exception is the first-run
+config write both skills share, which happens only on an explicit yes.
 
 **What it does not do.**
 
@@ -195,24 +238,24 @@ and the list. **Writes nothing at all**, anywhere, and never runs a paid step.
   as the place it gets written. A dead connection is reported, not repaired.
 - Never turns into the import. It hands its findings to `run` and stops.
 
-**The judgment it carries.** Telling the three kinds of not-ready apart: a row
-that can never import (refused, with the gap named), a row that needs a
-person's answer (ambiguous match, uncovered status), and a setup that is not
-ready at all (missing artifact, no org). Collapsing those into one number
-would make the preview useless, so they are reported separately, the same
-distinction the foundation's audit makes between empty and unknown.
+**The judgment it carries.** Telling the kinds of not-ready apart: a row that
+can never import (refused, with the gap named), a row that needs a person's
+answer (ambiguous match, uncovered status), and a setup that is not ready at
+all (missing artifact, no org). Collapsing those into one number would make
+the preview useless, so they are reported separately, the same distinction
+the foundation's audit makes between empty and unknown.
 
 ---
 
 ## Why there is no enrichment skill
 
 Enrichment providers ship their own plugins and skills, so a skill here that
-just enriches would duplicate what the vendor maintains. The seam is step 3 of
-`run`: the gaps are named, whatever is connected is offered them, and the gate
-does the rest. A filled value names its source or it is refused, and person
-fields stay empty whatever a tool claims. There is nothing to configure, so
-there is nothing to be locked into, and someone with no enrichment tool still
-gets a working import with its gaps named honestly.
+just enriches would duplicate what the vendor maintains. The seam is the
+enrichment step of `run`: the gaps are named, whatever is connected is offered
+them, and the gate does the rest. A filled value names its source or it is
+refused, and person fields stay empty whatever a tool claims. There is nothing
+to configure, so there is nothing to be locked into, and someone with no
+enrichment tool still gets a working import with its gaps named honestly.
 
 ---
 

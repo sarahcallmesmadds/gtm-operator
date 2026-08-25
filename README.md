@@ -11,14 +11,16 @@ The intent here is to build the same workspace and then keep working inside it:
 skills that write a project, a memo or a tool record, that know the schema, know
 the rules Notion cannot enforce, and check what the workspace returned rather
 than trusting that a write succeeded. The skill that builds the workspace exists
-and has been run. The ones that write into it are designed and not yet code.
+and has been run. The ones that write into it are built; how much of each has
+run against a live workspace is recorded in `DECISIONS.md`.
 
 ## Read this before anything else
 
-**One plugin exists, and one of its three skills runs.** `setup` builds the
-foundation, and that flow has been run end to end against a live Notion
-workspace. Everything else here is design: schema documents and skill
-specifications, written to be built from. There is no code behind them yet.
+**All six foundation plugins are built.** `setup` builds the foundation, and
+that flow has been run end to end against a live Notion workspace. The
+writing plugins are built and reviewed, and what each one has and has not run
+against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
+`import-leads`, is design only.
 
 **It has been run by its author and by nobody else**, and never against a
 workspace that already had something in it. Every failure it has survived was
@@ -93,11 +95,11 @@ named for the work it does, and owns no database.
 | Plugin | Owns | State |
 |---|---|---|
 | [`setup`](plugins/setup) | Creates every database, wires the relations, writes the config | `install` built and run. `check` built, not yet run against a live workspace. `add` designed |
-| `process` | Process | Schema and skills designed |
-| `memos` | Memos | Schema and skills designed |
-| `projects` | Projects and Tasks | Schema and skills designed |
-| `software` | Software | Schema and skills designed |
-| `calendar` | Calendar | Schema and skills designed |
+| [`process`](plugins/process) | Process | Built |
+| [`memos`](plugins/memos) | Memos | Built |
+| [`projects`](plugins/projects) | Projects and Tasks | Built |
+| [`software`](plugins/software) | Software | Built |
+| [`calendar`](plugins/calendar) | Calendar | Built |
 
 Job plugins come after the foundation ships, not alongside it. The first,
 [`import-leads`](SKILLS-import-leads.md), is designed and not yet built;
@@ -112,7 +114,7 @@ outbound email follows.
 | `SCHEMA-*.md` | One per database, except that `SCHEMA-projects.md` covers Projects and Tasks, which are one job. Field names, types, values and option order live here and nowhere else |
 | `SKILLS-*.md` | One per plugin. What each skill does, what it refuses to do, and why |
 | `TESTLOG-*.md` | What was run against a live workspace, and what came back |
-| [`plugins/setup`](plugins/setup) | The one plugin that exists |
+| [`plugins/`](plugins) | The plugins themselves |
 | `tests/` | The suite |
 
 ## Tests

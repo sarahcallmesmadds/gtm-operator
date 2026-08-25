@@ -5340,7 +5340,7 @@ Everything in this section is design; nothing is built.
 
 **`list-building` is retired as this plugin's name, Sarah's call.** The
 placeholder named the wrong job: this plugin imports lists that already exist,
-it does not build them. `import-leads` is the plugin, and its two skills are
+it does not build them. `import-leads` is the plugin, and its skills are
 `run` and `check`, her names, confirmed 2026-08-25 after `import` and `check`
 were proposed and the plugin rename made `import` a stutter. The
 `list-building` name stays free for a plugin that actually builds lists.
@@ -5357,7 +5357,7 @@ fill. `SKILLS-import-leads.md` is the design.
 
 ### Persona matching is optional
 
-The reference required a persona on every contact and its five values were the
+The reference required a persona on every contact and its values were the
 org's own. Here the step runs only when a personas artifact exists in Process,
 and is skipped without complaint otherwise. Sarah's call, 2026-08-25: an org
 without a persona model is not forced to invent one to import a list, and an
@@ -5373,7 +5373,7 @@ connected. The run's own report is the record.
 
 ### Enrichment is a seam with a gate, not an integration
 
-No enrichment skill and no vendor code, settled across three of her calls: it
+No enrichment skill and no vendor code, settled across her calls: it
 is critical but optional, nobody is locked into a provider, and providers ship
 their own plugins so a skill that just enriches would duplicate what the
 vendor maintains. The plugin's side is the moment in `run` where gaps are
@@ -5381,18 +5381,19 @@ named and whatever the session has connected is offered them, plus the gate: a
 filled value names its source or it is refused, person fields stay empty
 whatever a tool claims, and paid steps run only on a named yes.
 
-### The fields, settled
+### The write contract lives in the skills file
 
-From the list: first and last name, both required; email; phone; title;
-mailing city, state and country; the opt-out when the list carries an opt-in
-column; and a LinkedIn URL where the org maps a field for it. From the flow:
-the account, matched or created, with the website set on create when the list
-carries a domain; campaign membership with its status from the grid; the
-org's lead-source value, confirmed at run time; the owner, only through a
-routing artifact or an explicit confirmation; and persona, only when the
-artifact exists. Anything beyond that comes from the org's own
-required-fields artifact, and a row that cannot meet the rule is refused with
-the gap named rather than padded.
+The first draft of this section restated the full field roster here, which
+broke this file's own rule that a field list lives in exactly one place.
+`SKILLS-import-leads.md` is that place: the plugin writes to a database it
+does not own, so its skills file states the write contract, the same rule
+`SKILLS-projects.md` follows. What this file records is the shape of the
+decision: the plugin carries its own floor (a row needs a first and last
+name, and a contact is never pushed without an account), the org's
+required-fields artifact adds to that floor and cannot subtract from it, the
+lead-source value lives in that artifact and is shown at run time, the owner
+moves only through routing or explicit confirmation, and a row that cannot
+meet the rules is refused with the gap named rather than padded.
 
 ### Salesforce, with no way to measure it today
 
@@ -5406,3 +5407,26 @@ Developer Edition org as the measuring target, and the live acceptance run as
 the release gate, calendar's rule. Build order follows calendar too:
 everything provable by fixtures is built and reviewed first, and the live
 surface is measured before anything claims to work.
+
+### Round 1 on the design pull request, Codex CLI, 2026-08-25: fifteen findings, all taken
+
+Docs only, so every finding is a documentation defect, and none needed her.
+The clusters: the pipeline's numbered order implied writes before the
+confirmation gate, so planning and pushing are separated in as many words
+now, with the per-row write set defined at the dedupe step; the verification
+step claimed returned ids as proof, corrected to a field-by-field read-back
+comparison, which is the marketplace's own rule; the writeback promise did
+not say a CSV source cannot receive one; the plugin's config had no recorded
+writer, and both skills now write it on first run with confirmation; the
+field roster was restated in this file against its own one-home rule and
+moved to the skills file as the write contract; the two field-home
+contradictions (a fixed floor versus artifact-decides, the lead-source value
+in two places) were settled as floor-plus-artifact; two refusal wordings
+were wider than the skills can enforce (reads outside the source,
+credentials in any file) and are scoped to what they control; the reference
+was called most used and most refined on no recorded evidence and is now a
+pipeline that ran in production and worked well; the README still described
+a one-plugin repository and is brought up to the built state; and
+hand-written counts sitting beside the lists they count were removed from
+both new documents. Coverage was stated per file and identity leakage was
+checked and absent.
