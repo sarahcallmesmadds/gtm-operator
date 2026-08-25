@@ -75,6 +75,15 @@ const AUDIENCES = [
  */
 const PERSON_FIELDS = ['Owner', 'Technical owner', 'Admins', 'Billing owner']
 
+/**
+ * The person fields that hold exactly one person. `Admins` is the one
+ * designed as Person (multi) — "who holds an admin seat" is a list — and the
+ * other three are single accountability fields: whose call it is, who can
+ * explain it, who approves the money. Shared ownership reads as nobody's,
+ * the same reasoning as Projects' one-accountable-Owner.
+ */
+const SINGLE_PERSON_FIELDS = ['Owner', 'Technical owner', 'Billing owner']
+
 const MULTI_SELECT_FIELDS = ['Audience', 'AI access']
 
 /**
@@ -232,6 +241,7 @@ module.exports = {
   DOMAINS,
   AUDIENCES,
   PERSON_FIELDS,
+  SINGLE_PERSON_FIELDS,
   MULTI_SELECT_FIELDS,
   URL_FIELDS,
   CHECKBOX_FIELDS,

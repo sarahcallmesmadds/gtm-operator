@@ -47,15 +47,17 @@ Three cases arrive looking identical and only one of them is an edit.
 ## The rules the script holds
 
 - **`Last reviewed` never moves here.** Not on a rename, not on a cost
-  change, not on a retirement. An edit that resets the freshness stamp
-  suppresses the staleness warning for a whole cadence period. This
-  deliberately diverges from `process:update`, where an edit can count as a
-  re-read on an explicit yes: a software review goes to the contract in
-  Drive and to whether the tool is actually connected, and no edit does that
-  by accident. `review` is the sweep.
+  change, not on a retirement. It moves at creation and on a confirmed
+  `review`, and an edit that resets it suppresses the staleness warning for
+  a whole cadence period. This deliberately diverges from `process:update`,
+  where an edit can count as a re-read on an explicit yes: a software review
+  goes to the contract in Drive and to whether the tool is actually
+  connected, and no edit does that by accident. `review` is the sweep.
 - **An owner who left is cleared or replaced by name, never guessed.** Pass
-  the field as empty to clear it; every type clears with null, which is
-  measured.
+  the field as empty to clear it. The script sends the measured clear shape
+  for each type — a person clears with an empty list, and a null there is
+  accepted while the old person stays — and `prove-update` is what catches a
+  clear that did not land.
 - **A tool that is gone goes to `Retired` and the row stays**, which keeps
   the record of what was dropped. Nothing here deletes or archives.
 - **It changes what it was asked to change and leaves the rest alone**,
@@ -75,8 +77,8 @@ and a clear in particular is proved by the property coming back empty.
 ## What this skill does not do
 
 - **Does not create a row.** That is `new`.
-- **Does not stamp `Last reviewed`, ever.** `review` is the only skill in
-  this plugin that moves it.
+- **Does not stamp `Last reviewed`, ever.** It moves at creation and on a
+  confirmed `review`, and nowhere else.
 - **Does not delete anything.**
 - **Does not fill a person field the user did not name.**
 - **Does not re-confirm the rest of the row.** That is `review`, and the

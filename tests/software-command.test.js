@@ -142,6 +142,22 @@ check('contracts refuses its arguments before reading any input', () => {
   assert.ok(/--today/.test(result.out) && !/never-written/.test(result.out), 'the file was reached before the argument was judged')
 })
 
+check('contracts refuses a well-shaped day that does not exist', () => {
+  // 2026-02-30 matches the shape and Date.parse rolls it into March, which
+  // would shift every deadline while looking exactly like a real run.
+  const result = run(['contracts', path.join(SANDBOX, 'never-written.json'), '--today', '2026-02-30'])
+  assert.notStrictEqual(result.status, 0)
+  assert.ok(/--today/.test(result.out) && /2026-02-30/.test(result.out))
+})
+
+check('contracts refuses a flag it does not recognise rather than running the default', () => {
+  // --widnow 30 silently using the 90-day default is a valid-looking report
+  // for a window nobody set.
+  const result = run(['contracts', path.join(SANDBOX, 'never-written.json'), '--widnow', '30', '--today', '2026-08-25'])
+  assert.notStrictEqual(result.status, 0)
+  assert.ok(/--widnow/.test(result.out))
+})
+
 check('valid JSON of the wrong shape is refused at the door', () => {
   const result = run(['check', save('list.json', [1, 2])])
   assert.notStrictEqual(result.status, 0)
@@ -313,7 +329,7 @@ check('contracts orders by consequence: cost outranks date, and manual is a diar
   assert.ok(/diary note/.test(out.diary[0].why))
 })
 
-check('contracts counts every row it could not assess, with why, and never drops the line', () => {
+check('contracts counts every row with incomplete data, with why, and never drops the line', () => {
   const rows = [
     contractRow('a'),
     contractRow('b', { 'date:Notice deadline:start': null }),
@@ -321,12 +337,26 @@ check('contracts counts every row it could not assess, with why, and never drops
     contractRow('d', { Renews: null, 'date:Notice deadline:start': null, 'date:Contract dates:start': null, 'date:Contract dates:end': null })
   ]
   const out = capture(() => command.commands.contracts(save('rows.json', rows), '--today', '2026-08-25'))
-  assert.strictEqual(out.couldNotAssess.length, 3)
-  const reasons = Object.fromEntries(out.couldNotAssess.map(r => [r.name, r.reasons]))
+  assert.strictEqual(out.incomplete.length, 3)
+  const reasons = Object.fromEntries(out.incomplete.map(r => [r.name, r.reasons]))
   assert.deepStrictEqual(reasons['Tool B'], ['no notice deadline'])
   assert.deepStrictEqual(reasons['Tool C'], ['Renews unknown'])
   assert.deepStrictEqual(reasons['Tool D'], ['no notice deadline', 'no contract dates', 'Renews unknown'])
-  assert.ok(/HALF THE ANSWER/.test(out.couldNotAssessNote))
+  assert.ok(out.incomplete.every(r => r.ordered === false), 'none of these could be placed in the ordered lists')
+  assert.ok(/HALF THE ANSWER/.test(out.incompleteNote))
+})
+
+check('a row ordered despite missing contract dates is still counted as incomplete', () => {
+  // The design's three reasons include "no contract dates". A row with a
+  // deadline and a known renewal mode CAN be ordered — hiding a real
+  // deadline would be worse — and it is still a contract nobody has fully
+  // recorded, so it appears in both places.
+  const rows = [contractRow('a', { 'date:Contract dates:start': null, 'date:Contract dates:end': null })]
+  const out = capture(() => command.commands.contracts(save('rows.json', rows), '--today', '2026-08-25'))
+  assert.strictEqual(out.deadlines.length, 1, 'the deadline must still be ordered')
+  assert.strictEqual(out.incomplete.length, 1)
+  assert.deepStrictEqual(out.incomplete[0].reasons, ['no contract dates'])
+  assert.strictEqual(out.incomplete[0].ordered, true)
 })
 
 check('contracts flags an overdue automatic deadline as already committed', () => {

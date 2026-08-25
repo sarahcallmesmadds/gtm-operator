@@ -121,6 +121,27 @@ check('a person is an id or me, never a name', () => {
   assert.deepStrictEqual(tool.newProblems(fine), [])
 })
 
+check('the single-accountability person fields hold exactly one person; Admins is the list', () => {
+  for (const field of schema.SINGLE_PERSON_FIELDS) {
+    const row = clean(); row[field] = [PERSON, PERSON]
+    assert.ok(problemsOf(row).includes(`${field}:several-people`), `${field} accepted several people`)
+  }
+  const admins = clean(); admins.Admins = [PERSON, PERSON]
+  assert.ok(!problemsOf(admins).includes('Admins:several-people'), 'Admins is designed as the multi field')
+})
+
+check('a field the gate does not know is refused, not silently dropped', () => {
+  // The failure this closes: `Plan: "Enterprise"` passed, `newProperties`
+  // left it out, and `prove` rebuilt the same lossy payload and reported
+  // success. Approved content disappearing with nothing saying so.
+  const plan = clean(); plan.Plan = 'Enterprise'
+  assert.ok(problemsOf(plan).includes('Plan:unknown-field'))
+  for (const relation of ['Artifacts', 'Integrates with']) {
+    const row = clean(); row[relation] = ['https://www.notion.so/x-' + 'a'.repeat(32)]
+    assert.ok(problemsOf(row).includes(`${relation}:relation-not-written`), `${relation} was not refused as a relation`)
+  }
+})
+
 check('Last reviewed cannot be passed as a field, and today must be a real day', () => {
   const passed = clean(); passed['Last reviewed'] = '2026-01-01'
   assert.ok(problemsOf(passed).includes('Last reviewed:not-yours-to-set'))
@@ -141,8 +162,25 @@ check('the body is gated: shape, required sections, known headings, no bare-depa
   assert.ok(problemsOf(dismissed).includes('How To Get Access:access-dismissed'))
   const team = clean(); team.body['How To Get Access'] = 'ask the data team'
   assert.ok(problemsOf(team).includes('How To Get Access:access-dismissed'))
+  // The department list is the schema's own team vocabulary, so every
+  // Audience value is a dismissal when asked bare.
+  for (const dept of ['Ask Finance.', 'Ask Sales', 'ask people ops', 'Ask the RevOps team!']) {
+    const row = clean(); row.body['How To Get Access'] = dept
+    assert.ok(problemsOf(row).includes('How To Get Access:access-dismissed'), `${JSON.stringify(dept)} got through`)
+  }
   const person = clean(); person.body['How To Get Access'] = 'Ask Priya.'
   assert.deepStrictEqual(tool.newProblems(person), [], '"Ask Priya" names a person and is an answer')
+})
+
+check('a body section that is not text is refused, conditional ones included', () => {
+  // A Notes holding an object passed the old gate and was silently dropped
+  // by the renderer: approved content disappearing.
+  const notes = clean(); notes.body.Notes = { tier: 'Enterprise' }
+  assert.ok(problemsOf(notes).includes('Notes:not-text'))
+  const section = clean(); section.body['Vendor Contacts'] = 42
+  const kinds = problemsOf(section)
+  assert.ok(kinds.includes('Vendor Contacts:not-text'))
+  assert.ok(!kinds.includes('Vendor Contacts:section-missing'), 'one fault, one refusal')
 })
 
 // --------------------------------------------------------------- new: concerns
@@ -235,15 +273,23 @@ check('update carries the same value gates as new', () => {
   assert.ok(updateKinds({ Owner: 'Priya' }).includes('Owner:not-a-person-id'))
 })
 
-check('a body edit names known sections only, and only the named ones travel', () => {
+check('a body edit names known sections only, carries text only, and only the named ones travel', () => {
   assert.ok(updateKinds({ body: { Pricing: 'x' } }).includes('Pricing:unknown-section'))
+  assert.ok(updateKinds({ body: { Notes: { tier: 'Enterprise' } } }).includes('Notes:not-text'))
+  assert.ok(updateKinds({ body: { Notes: '' } }).includes('Notes:not-text'), 'emptying a section is a person\'s edit, not an update')
   assert.deepStrictEqual(tool.updateProblems({ body: { Notes: 'New tier.' } }), [])
 })
 
-check('an emptied field is a clear, sent as null, and a date clears through both columns', () => {
-  const built = tool.updateProperties(context, { Owner: null, 'Notice deadline': '', 'Annual cost': 9000 })
-  assert.deepStrictEqual(built.cleared.sort(), ['Notice deadline', 'Owner'])
-  assert.strictEqual(built.properties['W Owner'], null)
+check('an emptied field is a clear in the measured shape for its type', () => {
+  // A person clears with an EMPTY LIST: sent null, the write is accepted and
+  // the old person stays, measured on the process plugin and recorded in
+  // DECISIONS.md. Everything else clears with null, dates through both
+  // columns.
+  const built = tool.updateProperties(context, { Owner: null, 'AI access': [], 'Notice deadline': '', 'Annual cost': 9000, Login: null })
+  assert.deepStrictEqual(built.cleared.sort(), ['AI access', 'Login', 'Notice deadline', 'Owner'])
+  assert.deepStrictEqual(built.properties['W Owner'], [], 'a person cleared with null keeps its old person')
+  assert.deepStrictEqual(built.properties['W AI access'], [])
+  assert.strictEqual(built.properties['W Login'], null)
   assert.strictEqual(built.properties['date:W Notice deadline:start'], null)
   assert.strictEqual(built.properties['date:W Notice deadline:end'], null)
   assert.strictEqual(built.properties['W Annual cost'], 9000)

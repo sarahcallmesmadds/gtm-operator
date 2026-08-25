@@ -72,9 +72,10 @@ tracks and everybody can answer it.
 
 What It Does For Us (plain language, for somebody who has never heard of the
 tool, ending with what breaks if it stops), How To Get Access (who to ask or
-"single sign-on, just log in" — the script refuses a bare department),
-Vendor Contacts (our rep, the escalation path, or "no rep, we are on our
-own"), and Notes only if there is something for it.
+"single sign-on, just log in" — the script refuses the bare-department
+shapes it can see, the schema's own team names, and the judgment beyond that
+is yours), Vendor Contacts (our rep, the escalation path, or "no rep, we are
+on our own"), and Notes only if there is something for it.
 
 **Ceiling of 400 words across the required sections.** Over it, the script
 raises a question rather than trimming: this row is an index entry, and

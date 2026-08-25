@@ -186,14 +186,31 @@ check('the required-at-create and never-cleared lists name fields the database h
   }
 })
 
-check('Last reviewed is written by new and review and nothing else, the recorded reading', () => {
+check('Last reviewed is written by exactly the skills the fill-event table names', () => {
   // The fill-event table in SCHEMA-software.md names software:new and
   // software:review; the shared rules in SKILLS-software.md say review alone.
-  // DECISIONS.md records both readings and this pins the implemented one, so
-  // a silent drift to either side shows up as a red test rather than a
-  // surprise. Changing the answer on Sarah's ruling is one edit to
-  // LAST_REVIEWED_WRITERS plus the builders it names.
-  assert.deepStrictEqual(shared.LAST_REVIEWED_WRITERS, ['new', 'review'])
+  // DECISIONS.md records both readings; the implementation follows the
+  // fill-event table, and this reads that table rather than hardcoding the
+  // answer, so the constant tracks the document it claims to follow. If
+  // Sarah's ruling goes the other way, the table, the constant and the
+  // builders change together or this goes red.
+  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
+  // Anchored on the fill-event row's own wording, because "| Last reviewed |"
+  // also opens a row in the field table, whose third cell names no skill.
+  const row = design.match(/\| Last reviewed \| Creation[^|]*\| ([^|]+)\|/)
+  assert.ok(row, 'SCHEMA-software.md no longer states Last reviewed\'s fill event in the table form this test reads')
+  const named = (row[1].match(/`software:([a-z-]+)`/g) || []).map(m => m.replace(/`software:([a-z-]+)`/, '$1'))
+  assert.deepStrictEqual(shared.LAST_REVIEWED_WRITERS, named,
+    `the fill-event table names ${JSON.stringify(named)} and the writer enforces ${JSON.stringify(shared.LAST_REVIEWED_WRITERS)}`)
+})
+
+check('the single-person fields are the three accountability fields, and Admins stays the list', () => {
+  for (const field of shared.SINGLE_PERSON_FIELDS) {
+    assert.ok(shared.PERSON_FIELDS.includes(field), `"${field}" is pinned singular and is not a person field at all`)
+  }
+  assert.ok(!shared.SINGLE_PERSON_FIELDS.includes('Admins'),
+    'Admins is the one field designed as Person (multi): who holds an admin seat is a list')
+  assert.deepStrictEqual(shared.SINGLE_PERSON_FIELDS, ['Owner', 'Technical owner', 'Billing owner'])
 })
 
 // --------------------------------------------------------------- the template
