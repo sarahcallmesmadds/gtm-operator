@@ -493,7 +493,9 @@ own setup. That is replaced by the structure below.
 These own no database. They read and write the foundation's. Not started, and
 not in scope until the foundation ships.
 
-`list-building`, `outbound-email`, and others as they come up.
+`import-leads` (named `list-building` until 2026-08-25, when Sarah retired the
+placeholder because the plugin imports lists rather than builds them),
+`outbound-email`, and others as they come up.
 
 **`teammates` is v2, decided 2026-08-17, and that resolves the contradiction it
 carried.** A teams and people directory owns an object, so by the rule below it
@@ -1084,7 +1086,9 @@ empty project rows.
 
 ### Tier 2, not started and not in scope yet
 
-`list-building`, `outbound-email`.
+**Amended 2026-08-25: the first job plugin is designed.** `import-leads`,
+named `list-building` until that day, has its skills file; see the dated
+section at the end of this document. `outbound-email` remains not started.
 
 **`teammates` is not in this list.** It is a foundation plugin deferred to v2, see
 the tier 2 section above. Filing it here is what created the contradiction.
@@ -5326,3 +5330,79 @@ The same message set the working rule that she is not a gate on pull
 requests: reviews run (Codex CLI, Devin CLI, the Devin app check) and the
 PR merges without her involvement. Recorded here because the previous
 session held PR 22 open waiting for her yes.
+
+## import-leads, the first job plugin, designed 2026-08-25
+
+Tier 2 opened the day the foundation shipped, and this is its first design.
+Everything in this section is design; nothing is built.
+
+### The name
+
+**`list-building` is retired as this plugin's name, Sarah's call.** The
+placeholder named the wrong job: this plugin imports lists that already exist,
+it does not build them. `import-leads` is the plugin, and its two skills are
+`run` and `check`, her names, confirmed 2026-08-25 after `import` and `check`
+were proposed and the plugin rename made `import` a stutter. The
+`list-building` name stays free for a plugin that actually builds lists.
+
+### A rebuild of the reference lead-list skill, changed as little as possible
+
+The reference set holds a lead-list import skill that ran this pipeline in
+production and worked well. Sarah's rule for the rebuild: keep it as close to
+the reference as possible and move out only what identifies the organisation.
+The pipeline order, the gates and the baked-in refinements carry over; the
+org's picklist values, record type ids, field names, routing and tenant ids
+become config entries and Process artifacts for the installing organisation to
+fill. `SKILLS-import-leads.md` is the design.
+
+### Persona matching is optional
+
+The reference required a persona on every contact and its five values were the
+org's own. Here the step runs only when a personas artifact exists in Process,
+and is skipped without complaint otherwise. Sarah's call, 2026-08-25: an org
+without a persona model is not forced to invent one to import a list, and an
+org with one gets the reference behaviour, unclear titles flagged rather than
+guessed.
+
+### Chat summaries are cut
+
+The reference posted run summaries to chat channels, with per-campaign-type
+routing. Cut, on her yes: announcing is not the plugin's job anywhere in this
+marketplace, and the default has to work for someone with nothing else
+connected. The run's own report is the record.
+
+### Enrichment is a seam with a gate, not an integration
+
+No enrichment skill and no vendor code, settled across three of her calls: it
+is critical but optional, nobody is locked into a provider, and providers ship
+their own plugins so a skill that just enriches would duplicate what the
+vendor maintains. The plugin's side is the moment in `run` where gaps are
+named and whatever the session has connected is offered them, plus the gate: a
+filled value names its source or it is refused, person fields stay empty
+whatever a tool claims, and paid steps run only on a named yes.
+
+### The fields, settled
+
+From the list: first and last name, both required; email; phone; title;
+mailing city, state and country; the opt-out when the list carries an opt-in
+column; and a LinkedIn URL where the org maps a field for it. From the flow:
+the account, matched or created, with the website set on create when the list
+carries a domain; campaign membership with its status from the grid; the
+org's lead-source value, confirmed at run time; the owner, only through a
+routing artifact or an explicit confirmation; and persona, only when the
+artifact exists. Anything beyond that comes from the org's own
+required-fields artifact, and a row that cannot meet the rule is refused with
+the gap named rather than padded.
+
+### Salesforce, with no way to measure it today
+
+v1 writes Salesforce only, the same one-store rule as the backend choice. The
+reference ran on the Salesforce CLI rather than an MCP connection, so losing
+the MCP lost nothing the rebuild needs; what is missing is an org to point the
+CLI at. Neither the CLI nor any Salesforce surface exists on the design
+machine, so every Salesforce behaviour in the design is carried intent from
+the reference, not a measurement of this rebuild. The route is a free
+Developer Edition org as the measuring target, and the live acceptance run as
+the release gate, calendar's rule. Build order follows calendar too:
+everything provable by fixtures is built and reviewed first, and the live
+surface is measured before anything claims to work.
