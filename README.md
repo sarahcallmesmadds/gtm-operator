@@ -99,8 +99,9 @@ named for the work it does, and owns no database.
 | `software` | Software | Schema and skills designed |
 | `calendar` | Calendar | Schema and skills designed |
 
-Job plugins such as list building and outbound email come after the foundation
-ships, not alongside it.
+Job plugins come after the foundation ships, not alongside it. The first,
+[`import-leads`](SKILLS-import-leads.md), is designed and not yet built;
+outbound email follows.
 
 ## What is in this repository
 
