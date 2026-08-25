@@ -438,11 +438,32 @@ property, which does not exist until phase B has run.
 **Fetch every data source and every database.** A database fetch also returns its
 views, which is what the view half of this needs.
 
-Write what came back into a file:
+**Save each fetch's output verbatim, one file per fetch, and let `readback` do
+the extraction.** Paste the whole tool output into the file exactly as it came,
+without editing, restructuring or retyping anything: the schema arrives as one
+JSON blob inside a `<data-source-state>` tag and each view as one blob inside a
+`<view>` tag, measured 2026-08-25, and `readback` parses them out and builds the
+envelope itself. **Never re-key values into the envelope by hand.** That was the
+old shape of this step, roughly two hundred option values re-typed per install,
+where one slip reads as a real mismatch; the 2026-08-18 transcription silently
+lost every property description, and the 2026-08-23 install could not complete
+the step at all.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" readback <envelope.json> <key> <ds-save.txt> <db-save.txt>
+```
+
+Run it once per database. It refuses a clipped or edited save loudly (a paste
+that lost its tail stops being valid JSON), refuses saves from more than one
+database handed over as one, and prints what it extracted: the property count, the option-value
+count, how many carry descriptions, and the views it found. **Read those counts
+against the plan.** A database that should carry 23 properties arriving as 9 is
+a bad save, not a broken database: re-fetch that one database and save it again.
+
+**Then add the rows halves to the same envelope by hand; they are short lists.**
 
 ```json
 {
-  "databases": { "<key>": { "schema": { ... }, "views": [ ... ] } },
   "viewRows":  { "<key>::<view name>": ["https://app.notion.com/p/<32 hex page id>"] },
   "sqlRows":   { "<key>::<view name>": ["https://app.notion.com/<32 hex page id>"] }
 }
@@ -456,8 +477,14 @@ to compare as the same row. Note this is the page's own `url`, not `public_url`,
 which for a published page can carry a custom slug with no id in it at all.
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" verify <that file>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install.js" verify <envelope.json>
 ```
+
+**If verify reports many things missing on one database, suspect the save before
+the workspace.** A clipped save is refused outright, but a save of the wrong
+database or a stale fetch can still parse. The remedy costs one database, not
+six: re-fetch it, re-save it, re-run `readback` for that key, and only believe a
+mismatch that survives a fresh save.
 
 **Reading the filter back is not enough, and this is the hardest-won thing in
 this plugin.** Measured 2026-08-18: a view filtered on a relative date was

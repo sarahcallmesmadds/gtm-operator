@@ -1,0 +1,47 @@
+<database url="{{https://app.notion.com/p/db00000000000000000000000000pr0b}}" inline="false">
+The title of this Database is: Readback shape probe
+<ancestor-path>
+<parent-page url="https://app.notion.com/p/3bf57763ef6f80d99ab8d61dc93520de" title="Plugins testing"/>
+</ancestor-path>
+Here are the Database's Data Sources:
+You can use the "view" tool on the URL of any Data Source to see its full schema configuration.
+<data-sources>
+<data-source url="{{collection://facadefa-cade-4000-8000-facadefacade}}">
+The title of this Data Source is: Readback shape probe
+
+Here is the database's configurable state:
+Properties with `readOnly: true` are synced or system-managed. Do not try to update their values with page update tools.
+<data-source-state>
+{"name":"Readback shape probe","schema":{"Annual cost":{"description":"","name":"Annual cost","type":"number"},"Audience":{"description":"","name":"Audience","options":[{"color":"blue","description":"","name":"Sales","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/Q29cYg/REDACTED1"},{"color":"blue","description":"","name":"RevOps","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/Q29cYg/REDACTED2"},{"color":"default","description":"","name":"Everyone","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/Q29cYg/REDACTED3"}],"type":"multi_select"},"Contract link":{"description":"Put the contract PDF in Google Drive and paste the link here.","name":"Contract link","type":"url"},"Created time":{"description":"","name":"Created time","type":"created_time"},"Customer facing":{"description":"","name":"Customer facing","type":"checkbox"},"Description":{"description":"","name":"Description","type":"text"},"Login":{"description":"","name":"Login","type":"url"},"Name":{"description":"","name":"Name","type":"title"},"Notice deadline":{"description":"","name":"Notice deadline","querySqlColumns":{"columns":[{"name":"date:Notice deadline:start","sqlType":"TEXT"},{"name":"date:Notice deadline:end","sqlType":"TEXT"},{"name":"date:Notice deadline:is_datetime","sqlType":"INTEGER"}],"usage":"For connections.notion.querySql. Main schema name not queryable."},"type":"date"},"Owner":{"description":"","name":"Owner","type":"person"},"Status":{"description":"","name":"Status","options":[{"color":"yellow","description":"","name":"Evaluating","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/SEB0Sw/REDACTED4"},{"color":"green","description":"","name":"Active","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/SEB0Sw/REDACTED5"},{"color":"gray","description":"","name":"Retired","url":"collectionPropertyOption://facadefa-cade-4000-8000-facadefacade/SEB0Sw/REDACTED6"}],"type":"select"}},"url":"collection://facadefa-cade-4000-8000-facadefacade"}
+</data-source-state>
+
+Here is the SQLite table definition for this data source.
+<sqlite-table>
+CREATE TABLE IF NOT EXISTS "collection://facadefa-cade-4000-8000-facadefacade" (
+	url TEXT UNIQUE,
+	createdTime TEXT,
+	"Customer facing" TEXT,
+	"Owner" TEXT,
+	"date:Notice deadline:start" TEXT,
+	"date:Notice deadline:end" TEXT,
+	"date:Notice deadline:is_datetime" INTEGER,
+	"Audience" TEXT,
+	"Status" TEXT,
+	"Annual cost" FLOAT,
+	"Contract link" TEXT,
+	"Login" TEXT,
+	"Created time" TEXT NOT NULL,
+	"Description" TEXT,
+	"Name" TEXT
+)
+</sqlite-table>
+</data-source>
+</data-sources>
+Here are the Database's Views:
+You can use the "view" tool on the URL of any View to see its full configuration.
+<views>
+<view url="{{view://00000000-0000-4000-8000-00000000v1ew}}">
+{"dataSourceUrl":"{{collection://facadefa-cade-4000-8000-facadefacade}}","displayProperties":["Name","Annual cost","Audience","Contract link","Created time","Customer facing","Description","Login","Notice deadline","Owner","Status"],"name":"Default view","type":"table"}
+</view>
+</views>
+</database>
