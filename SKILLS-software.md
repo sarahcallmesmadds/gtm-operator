@@ -246,7 +246,7 @@ filled by hand does not get filled.
 
 | Source | What it proves | What it can fill |
 |---|---|---|
-| **A folder of contracts** | That an agreement exists, on these terms | Name, the whole contract group, sometimes the billing owner from a signature |
+| **A folder of contracts** | That an agreement exists, on these terms | Name and the whole contract group. A signature may identify the billing owner, but the field is never filled: name the person in the report instead |
 | **Email**: invoices, receipts, renewal notices, product announcements, support threads | That the tool is in use and somebody is paying for it | Name, and honestly little else |
 
 **A contract makes a strong candidate and an email makes a thin one, and the skill

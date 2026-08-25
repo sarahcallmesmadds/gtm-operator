@@ -282,7 +282,11 @@ function draft (candidate) {
   // breaking at the layer above the one that enforces it. The three
   // annotations are this module's own outputs from `candidates`, accepted
   // back rather than silently ignored.
-  const knownTop = ['what', 'where', 'kind', 'row', 'evidence', 'proves', 'strength']
+  // `ok`, `backfill`, `leftEmpty` and `note` are draft's OWN outputs,
+  // accepted back so the commands compose: `backfill-create` re-validates by
+  // calling draft again, and a skill that saved the draft output and handed
+  // it on was refused for fields this module itself had added.
+  const knownTop = ['what', 'where', 'kind', 'row', 'evidence', 'proves', 'strength', 'ok', 'backfill', 'leftEmpty', 'note']
   for (const key of Object.keys(candidate)) {
     if (knownTop.includes(key)) continue
     if (NEVER_FILLED.includes(key)) {
@@ -348,6 +352,15 @@ function draft (candidate) {
     problems.push(refuse('where', 'missing', 'The candidate says nothing about where it came from, and provenance is the only claim backfill makes that a reader can check.'))
   }
 
+  // A whitespace-only text value is nothing wearing a value's shape: it
+  // passes an emptiness test, writes as text, and the person believes
+  // something was recorded. Refused rather than trimmed to nothing.
+  for (const field of ['Description', 'Contract link']) {
+    if (typeof row[field] === 'string' && !row[field].trim()) {
+      problems.push(refuse(field, 'blank', `${field} is whitespace, which is nothing wearing a value's shape. Leave the field out, or put something in it.`))
+    }
+  }
+
   // The same value gates every other write runs: an invented select value, a
   // rolled-over day or a backwards range is refused here, with the candidate
   // still on the table, rather than at write time with the row lost.
@@ -357,8 +370,14 @@ function draft (candidate) {
 
   return {
     ok: true,
-    row: Object.fromEntries(FILLABLE.filter(f => row[f] !== undefined && !isEmpty(row[f])).map(f => [f, row[f]])),
+    // The candidate's own identity travels on the output, so the output can
+    // be handed straight back to `backfill-create` and `prove-backfill`:
+    // both re-validate through this function, and an output missing its
+    // kind was refused by the very gate that produced it.
+    what: text(candidate.what),
     where,
+    kind: candidate.kind,
+    row: Object.fromEntries(FILLABLE.filter(f => row[f] !== undefined && !isEmpty(row[f])).map(f => [f, row[f]])),
     backfill: true,
     leftEmpty: {
       people: 'Owner, Technical owner, Admins and Billing owner are empty. Notify the real people rather than guessing.',
@@ -462,14 +481,17 @@ function properties (context, drafted) {
 
   put('Name', String(row.Name).trim())
   put('Status', context.value('Status', row.Status))
-  if (row.Description !== undefined) put('Description', String(row.Description))
+  // Trimmed the same way newProperties trims, or the two builders write two
+  // shapes for one field and the read-back proof learns to disagree with
+  // itself.
+  if (row.Description !== undefined) put('Description', String(row.Description).trim())
   if (row.Domain !== undefined) put('Domain', context.value('Domain', row.Domain))
   if (row.Audience !== undefined) {
     put('Audience', schema.listValues(row.Audience).map(v => context.value('Audience', v)))
   }
   if (row.Renews !== undefined) put('Renews', context.value('Renews', row.Renews))
   if (row['Annual cost'] !== undefined) put('Annual cost', row['Annual cost'])
-  if (row['Contract link'] !== undefined) put('Contract link', String(row['Contract link']))
+  if (row['Contract link'] !== undefined) put('Contract link', String(row['Contract link']).trim())
   if (row['Notice deadline'] !== undefined) putDate('Notice deadline', String(row['Notice deadline']), null)
   const dates = row['Contract dates']
   if (dates !== undefined && dates && dates.start) {
