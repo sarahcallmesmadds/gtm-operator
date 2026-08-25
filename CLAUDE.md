@@ -15,13 +15,13 @@ would be a copy, and copies drift.
 
 - `plugins/setup/`: creates every database, wires the relations, writes the one
   config file the other foundation plugins read. The only plugin that creates
-  anything in Notion or touches the foundation's config. A job plugin may keep
+  the foundation's databases or touches the foundation's config. A job plugin may keep
   a private config file of its own, which no other plugin reads or writes;
   `SKILLS-import-leads.md` defines the first
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
 - `plugins/calendar/`, `plugins/process/`, `plugins/memos/`,
   `plugins/projects/`, `plugins/software/`: writing plugins. Each reads config
-  through its vendored copy of `shared/config-read.js` and creates nothing
+  through its vendored copy of `shared/config-read.js` and creates no databases
 - `shared/`: the source of every vendored file. `node scripts/vendor.js` copies
   it into each plugin, which declares what it wants in its own manifest under
   `gtmOperator.vendor`. **Re-vendor after touching `shared/`**, or a plugin runs

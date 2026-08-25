@@ -9,7 +9,7 @@ does not do, and the judgment it carries.
 
 Databases are defined in the `SCHEMA-*.md` files. This file defines the order
 things are created in, the shape of the relations between them, and the shape of
-the config file every other plugin reads.
+the config file every other foundation plugin reads.
 
 **It does not restate a value list or a full field definition, and it does name
 properties.** The relation map and the config shape below cannot be written
@@ -22,8 +22,8 @@ without naming them. A rule forbidding that would be broken by its own page.
 ## What this plugin is
 
 `setup` creates every database in the foundation and writes the one config file
-the other five plugins read. Nothing else in the marketplace creates a database,
-and nothing else writes config.
+the other foundation plugins read. Nothing else in the marketplace creates a
+database, and nothing else writes the foundation's config.
 
 **It creates all six, every time.** Decided 2026-08-17. Setup does not ask which
 databases you want and does not read which plugins you have installed. It builds
