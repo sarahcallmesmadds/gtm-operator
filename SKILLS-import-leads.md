@@ -272,8 +272,10 @@ enrichment tool still gets a working import with its gaps named honestly.
 
 ## Salesforce, and what has actually been measured
 
-v1 writes Salesforce and nothing else, the same one-store rule as the backend
-choice: an untested store half-works and the plugin gets blamed. The reference
+Salesforce is the only CRM backend in v1, the same one-store rule as the
+backend choice: an untested store half-works and the plugin gets blamed. The
+Notion writeback is the one write outside the CRM, and the writeback rules
+above govern it. The reference
 ran on the Salesforce CLI rather than on any MCP connection, so the CLI is the
 assumed surface here too.
 

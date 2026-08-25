@@ -1,8 +1,8 @@
 # gtm-operator
 
 A go-to-market operating system in Notion, built by plugins rather than by a
-consultant. One plugin creates the databases. The others write to them, and by
-design none of them calls another.
+consultant. One plugin creates the databases. The other foundation plugins write to
+them, and by design none of them calls another.
 
 By [Sarah Madden](https://github.com/sarahcallmesmadds).
 

@@ -52,7 +52,7 @@ than working around it.
 Four to seven tasks, five typical; the script raises a count outside that
 band as a question, not a refusal.
 
-- **Verb first.** "Wire the Clay webhook", not "Clay webhook work".
+- **Verb first.** "Wire the enrichment webhook", not "enrichment webhook work".
 - **One task per integration or connector**, rather than one covering several.
 - **Anything unverified becomes a "review and confirm" task** instead of
   being written as fact.
@@ -63,7 +63,7 @@ band as a question, not a refusal.
 Write the list to a file, one entry per task, in order:
 
 ```json
-[{ "what": "Wire the Clay webhook", "description": "one line", "who": "me", "due": "2026-09-01" }]
+[{ "what": "Wire the enrichment webhook", "description": "one line", "who": "me", "due": "2026-09-01" }]
 ```
 
 `who` and `due` are optional; a `who` is a Notion person id or `me`, and the

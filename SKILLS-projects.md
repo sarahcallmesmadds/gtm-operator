@@ -260,7 +260,7 @@ the clarity rather than two separate skills.
 
 **On task creation:**
 - Four to seven tasks, five is typical.
-- Verb first. "Wire the Clay webhook", not "Clay webhook work".
+- Verb first. "Wire the enrichment webhook", not "enrichment webhook work".
 - One task per integration or connector, rather than one covering several.
 - **Anything unverified becomes a "review and confirm" task** instead of being
   written as fact.

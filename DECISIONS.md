@@ -5399,7 +5399,8 @@ combine.
 
 ### Salesforce, with no way to measure it today
 
-v1 writes Salesforce only, the same one-store rule as the backend choice. The
+Salesforce is v1's only CRM backend, the same one-store rule as the backend
+choice; the Notion writeback is the one write outside it. The
 reference ran on the Salesforce CLI rather than an MCP connection, so losing
 the MCP lost nothing the rebuild needs; what is missing is an org to point the
 CLI at. Neither the CLI nor any Salesforce surface exists on the design
@@ -5493,9 +5494,12 @@ marketplace description and its hand counts; the setup plugin README, which
 still said five plugins and the check skill do not exist; the tier-2
 definition, which said job plugins write the foundation's databases when
 import-leads writes Salesforce; the root README's "the others write to
-them"; the Tool Changelog note in `SCHEMA-software.md`, which said an
-object-owning plugin ships as tier two, the inverse of the rule this
-architecture runs on and the same contradiction `teammates` carried; and the
+them" **(recorded as taken here and not actually edited; caught by the
+post-merge round below and fixed there)**; the Tool Changelog note in
+`SCHEMA-software.md`, which said an object-owning plugin ships as tier two,
+the inverse of the rule this architecture runs on and the same contradiction
+`teammates` carried **(the fix reached one of its three copies; the other
+two are closed in the post-merge round)**; and the
 doc-level halves of the config-rule sweep, in `SKILLS-setup.md`, the setup
 README, the install skill's description and two places in this file.
 
@@ -5514,11 +5518,12 @@ silently.
 
 ### Round 6 on the design pull request, Devin CLI confirming, 2026-08-25: nothing found
 
-The confirming round the review order requires. It verified the round-5
-edits agree with each other, that the recorded deferral names exactly the
-files whose comments still carry the unscoped rule, and that the diff is
-clean on contradictions, identity leakage, measurement claims and hand
-counts, with per-file coverage stated. Six rounds in all: fifteen, five,
+The confirming round the review order requires. It reported nothing found
+against the round-5 edits, the recorded deferral and the four sweep items,
+with per-file coverage stated. **This paragraph originally said the round
+verified the diff clean, which was wider than a nothing-found report
+supports; the post-merge round below found faults that were present in what
+it read, and the wording is corrected here rather than left standing.** Six rounds in all: fifteen, five,
 seven, four, six findings, then nothing, every finding real and none needing
 her, which is the pipeline running the way the 2026-08-25 rule says it
 should.
@@ -5527,7 +5532,8 @@ should.
 this pull request: it posted a real review body reading No Issues Found,
 with no hidden-findings line and no inline comments, where PRs 20 and 21 got
 no body at all and PR 22's check description admitted the review was
-skipped. The open question from the fifth live run is answered.
+skipped. The open question recorded with the backfill pull request's app
+review, and carried in the handoff, is answered.
 
 ### Round 7 on the design pull request, the Devin GitHub app, 2026-08-25: one finding, taken
 
@@ -5537,3 +5543,25 @@ what six CLI rounds read past: the CLAUDE.md layout bullet ended "defines
 the first" with its noun implied, an unfinished sentence. Fixed with the
 noun. The two channels finding different things is the recorded reason both
 run.
+
+### The post-merge Codex round, 2026-08-25: six findings, all taken, two of them about the record itself
+
+Sarah asked for a Codex CLI review of the merged result, and it read the
+merged range whole plus the repository around it. Two findings were about
+what the record claimed rather than what the documents said, which is the
+fault this file has now logged in its own review records twice in one day:
+round 5's record listed the root README sentence as taken when no edit had
+been made, and round 6's record said the confirming round verified the diff
+clean when its evidence was a nothing-found report. Both records are
+corrected in place above. The document faults: an enrichment vendor's name
+survived in example strings in the projects skill, its design file and two
+test fixtures, scrubbed to a neutral wording with projects bumped to 0.1.1;
+the Tool Changelog tier-two wording survived in two copies the round-5 fix
+never reached, `SCHEMA-software.md`'s cuts table and the software plugin
+README, both now saying an object-owning plugin ships as a foundation
+plugin, with software bumped to 0.2.1; "v1 writes Salesforce and nothing
+else" claimed the only write surface while the design writes a Notion
+source back, and both documents now say Salesforce is the only CRM backend
+with the writeback named beside it; and the Devin-app record pointed at the
+fifth live run when the open question it answered was recorded with the
+backfill pull request's app review.

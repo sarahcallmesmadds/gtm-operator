@@ -76,7 +76,7 @@
       "name": "projects",
       "source": "./plugins/projects",
       "description": "Runs a project from named problem to shipped release. Finds problems that keep coming up and nobody has written down, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. A skill never advances a status it did not earn, and scoping refuses to finish without a problem statement. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Sarah Madden"
       },
@@ -92,7 +92,7 @@
       "name": "software",
       "source": "./plugins/software",
       "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation after checking for a duplicate, changes the facts when they change without touching the freshness stamp, confirms a whole row is still true and stamps the date only on a real pass, reports which renewals are coming up ordered by consequence rather than by date ending with what it could not see, and backfills the directory from a folder of contracts and your own mailbox, one approval at a time, never filling a person, an importance, or the review stamp. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "Sarah Madden"
       },
