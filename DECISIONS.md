@@ -6846,7 +6846,7 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Sixteen hand mutations across the build and its three review rounds, each
+Eighteen hand mutations across the build and its four review rounds, each
 asserted onto disk before its suite ran, each red in its named check, and
 each file restored byte-identical after: the probe judge's column binding
 removed, the count judge's type discipline coerced, the probe's alias
@@ -6857,9 +6857,10 @@ judge commands made to swallow a refusal, the probe judge's half-pair
 acceptance restored, its non-object row check dropped, the wrong-backend
 guard on the first-run commands removed, the draft's mailingFields
 requirement dropped, the refusal arm's column binding removed, the
-malformed-config guard dropped, and a grouped variant smuggled into the
-probe query past the exact-form pins. The whole repository suite is
-green after all of it.
+malformed-config guard dropped, a grouped variant smuggled into the
+probe query past the exact-form pins, the older judges' non-object row
+refusals removed, and the draft's state/country override refusal
+dropped. The whole repository suite is green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -6886,26 +6887,6 @@ document names the marketing status beside it, now naming both; and
 three new checks carried no deliberate-break proof, now covered by the
 round's five new mutations, recorded above.
 
-### Round 3 on the follow-ups, Codex CLI confirming, 2026-08-26: four findings, all taken
-
-High effort confirmed by the banner, per-file coverage stated, every
-requested file whole, every finding reproduced before it was reported.
-The round confirmed rounds 1 and 2 present and found where each stopped
-short. The two High: the config draft still assembled a salesforce
-config from defaults with no probe evidence at all, the exact config the
-probe exists to prevent, so the draft now refuses answers without the
-judged `mailingFields` pair and the salesforce defaults carry no state
-or country names; and the refusal arm still decided the whole pair on a
-refusal naming one column, so the probe became one single-column
-aggregate per field, judged independently, and a mixed org gets a
-measured mixed pair. The Medium: the wrong-backend guard fired only on a
-config that parses, while a malformed one fell through to first-run
-treatment; a config that exists and cannot be read now refuses by name,
-and only a missing file proceeds. The Low: the aggregate-form test pins
-were substring matches a grouped variant slipped past; the request
-builders' queries are now pinned by exact equality. Four new mutations,
-recorded above, prove the four new arms.
-
 ### Round 2 on the follow-ups, Devin CLI, 2026-08-26: six findings, all taken
 
 No-tools route, per-document coverage stated, every inline document
@@ -6927,3 +6908,45 @@ command tests pinned less than the fixes they cover: the probe test now
 pins the exact named-aggregate form, and the judge test asserts `ok` and
 `codeFields` beside the pair. Three new mutations, recorded above, prove
 the three new arms.
+
+### Round 3 on the follow-ups, Codex CLI confirming, 2026-08-26: four findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole, every finding reproduced before it was reported.
+The round confirmed rounds 1 and 2 present and found where each stopped
+short. The two High: the config draft still assembled a salesforce
+config from defaults with no probe evidence at all, the exact config the
+probe exists to prevent, so the draft now refuses answers without the
+judged `mailingFields` pair and the salesforce defaults carry no state
+or country names; and the refusal arm still decided the whole pair on a
+refusal naming one column, so the probe became one single-column
+aggregate per field, judged independently, and a mixed org gets a
+measured mixed pair. The Medium: the wrong-backend guard fired only on a
+config that parses, while a malformed one fell through to first-run
+treatment; a config that exists and cannot be read now refuses by name,
+and only a missing file proceeds. The Low: the aggregate-form test pins
+were substring matches a grouped variant slipped past; the request
+builders' queries are now pinned by exact equality. Four new mutations,
+recorded above, prove the four new arms.
+
+### Round 4 on the follow-ups, Devin CLI confirming, 2026-08-26: six findings, all taken
+
+No-tools route, per-document coverage stated, every inline document
+whole. The round confirmed round 3 present in the core code and found
+where it stopped short. The guard a caller could route around was the
+sharpest: the draft required the judged mailingFields pair and then let
+a properties.contact override replace either name beside it, so the
+override is now refused by name and mailingFields is the one home for
+the state and country names, with a correction made there rather than
+beside it. The first-run guidance in config.read()'s missing-file
+message and the design document's answers list never mentioned the pair
+the draft now requires; both name it. The README still said one
+read-only query and claimed every plain org lacks the code fields; it
+says two queries with per-field verdicts and keeps the claim to what
+was measured. The named non-object row discipline had only reached the
+two new judges while a null row in a saved file would crash the older
+ones on property access; judgeCampaignLookup, judgeStatusRead and
+judgeFlag now refuse it by name. And two test gaps: a deep-equal that
+asserted the judge's why against itself now checks content, and the
+command layer exercises the mixed pair. Two new mutations, recorded
+above.

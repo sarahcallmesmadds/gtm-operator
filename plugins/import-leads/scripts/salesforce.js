@@ -333,6 +333,11 @@ function judgeCampaignLookup (response, expectedName) {
   }
   if (result.records.length === 1) {
     const record = result.records[0]
+    // Questioned before it is read: a null or non-object row in a saved
+    // file would otherwise crash on property access instead of refusing.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      return { outcome: 'unknown', why: `The one row is ${JSON.stringify(record === undefined ? null : record)}, not a record. Save the response whole and look at it.` }
+    }
     if (typeof record.Id !== 'string' || !record.Id) {
       return { outcome: 'unknown', why: 'The row carries no Id, so there is nothing to match against. Save the response whole and look at it.' }
     }
@@ -410,6 +415,10 @@ function judgeStatusRead (response, expectedCampaignId) {
   // string "null" and a wordy SortOrder becoming 0 would plan creates
   // beside rows that exist, which is the exact thing this read prevents.
   for (const record of result.records) {
+    // Questioned before it is read, or a null row crashes the judge.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      return { ok: false, why: `A status row is ${JSON.stringify(record === undefined ? null : record)}, not a record. Save the response whole and look at it.` }
+    }
     if (typeof record.Label !== 'string' || !record.Label.trim()) {
       return { ok: false, why: `A status row carries ${JSON.stringify(record.Label)} for its Label, which is not a status name. Save the response whole and look at it.` }
     }
@@ -459,6 +468,9 @@ function judgeFlag (response) {
         return { ok: false, why: `The flag query returned ${result.records.length} users where one id should return one. Look at the saved response.` }
       }
       const record = result.records[0]
+      if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        return { ok: false, why: `The row is ${JSON.stringify(record === undefined ? null : record)}, not a record. Save the response whole and look at it.` }
+      }
       if (typeof record.Id !== 'string' || !record.Id) {
         return { ok: false, why: 'The row carries no Id. Save the response whole and look at it.' }
       }

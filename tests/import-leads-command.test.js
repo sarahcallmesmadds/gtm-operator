@@ -405,6 +405,15 @@ check('mailing-fields-judge answers the pair to offer, and exits non-zero on a s
   assert.deepStrictEqual(judged.codeFields, { state: true, country: true })
   assert.deepStrictEqual(judged.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
 
+  // The round-3 mixed pair, exercised at the command layer too: a
+  // regression back to whole-pair verdicts would not otherwise be caught
+  // here.
+  const refusedCountry = path.join(TEMP, 'sf-probe-country-refused.json')
+  fs.writeFileSync(refusedCountry, JSON.stringify({ name: 'INVALID_FIELD', message: "Invalid field: 'MailingCountryCode'", exitCode: 1 }))
+  const mixed = JSON.parse(run('mailing-fields-judge', stateFile, refusedCountry).stdout)
+  assert.deepStrictEqual(mixed.use, { state: 'MailingStateCode', country: 'MailingCountry' })
+  assert.deepStrictEqual(mixed.codeFields, { state: true, country: false })
+
   const odd = path.join(TEMP, 'sf-probe-odd.json')
   fs.writeFileSync(odd, JSON.stringify({ odd: true }))
   const refused = run('mailing-fields-judge', odd, countryFile)

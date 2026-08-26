@@ -90,8 +90,9 @@ request.
 **This plugin writes its own config, once, with confirmation.** On a first run
 with no config, either skill stops, says what it needs for the backend it is
 being pointed at (the `crm`; on HubSpot the portal, the property names and
-where the key lives; on Salesforce the org alias, the field names and any
-record-type ids; and the alias-map path either way), searches for what
+where the key lives; on Salesforce the org alias, the judged mailingFields
+pair, the field names and any record-type ids; and the alias-map path
+either way), searches for what
 it can find rather than asking
 anyone to type what it could look up, shows what it will record, and writes
 the file on an explicit yes. On Salesforce the search half includes the

@@ -226,6 +226,12 @@ check('a salesforce draft without the judged mailing pair is refused, naming the
   assert.throws(() => config.draft(half), /mailingFields is missing or incomplete/)
 })
 
+check('a state or country override beside mailingFields is refused: the judged pair is the one home', () => {
+  const smuggled = salesforceAnswers()
+  smuggled.properties = { contact: { state: 'SomeOtherField' } }
+  assert.throws(() => config.draft(smuggled), /set.*through mailingFields.*nowhere else/s)
+})
+
 check('a missing org alias is refused with the keychain named as where the credential actually lives', () => {
   const missing = salesforceAnswers()
   delete missing.orgAlias
