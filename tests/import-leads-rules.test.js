@@ -56,6 +56,50 @@ check('nothing looser than case and whitespace fires: suffix stripping is judgme
   assert.strictEqual(rows[0].fields.company, 'IBM Inc', 'IBM Inc is not the variant IBM, and deciding they are one company is the person\'s call')
 })
 
+// ------------------------------------------- free-mail and derived domains
+
+check('free-mail flags the consumer providers, folded, and skips rows with no email', () => {
+  const flagged = rules.freeMailRows([
+    row(1, { email: ' Ivy.Lark@GMAIL.com ' }),
+    row(2, { email: 'jon@yahoo.com' }),
+    row(3, { email: 'cora@harborlane.example' }),
+    row(4, {})
+  ])
+  assert.deepStrictEqual(flagged, [
+    { index: 1, email: ' Ivy.Lark@GMAIL.com ', domain: 'gmail.com' },
+    { index: 2, email: 'jon@yahoo.com', domain: 'yahoo.com' }
+  ], 'a work domain passes and a no-email row is the dedupe step\'s question, not this one\'s')
+})
+
+check('a provider the list does not know passes through: absence of a flag is not a guarantee', () => {
+  assert.deepStrictEqual(rules.freeMailRows([row(1, { email: 'a@obscure-free-mail.example' })]), [])
+})
+
+check('a company domain derives from the rows\' work emails only when they agree on one', () => {
+  const agreed = rules.deriveCompanyDomain([
+    row(1, { email: 'ada@acme.example' }),
+    row(2, { email: 'ben@ACME.example' })
+  ])
+  assert.deepStrictEqual(agreed, { domain: 'acme.example', fromEmails: 2 })
+})
+
+check('zero or several distinct work domains derive nothing: choosing between them is the person\'s judgment', () => {
+  assert.strictEqual(rules.deriveCompanyDomain([
+    row(1, { email: 'ada@acme.example' }),
+    row(2, { email: 'ben@other.example' })
+  ]), null, 'two domains is a question, not a coin flip')
+  assert.strictEqual(rules.deriveCompanyDomain([row(1, {})]), null, 'no emails derives nothing')
+})
+
+check('a personal address never becomes a company\'s search domain', () => {
+  assert.strictEqual(rules.deriveCompanyDomain([row(1, { email: 'jon@yahoo.com' })]), null)
+  const mixed = rules.deriveCompanyDomain([
+    row(1, { email: 'jon@yahoo.com' }),
+    row(2, { email: 'gus@brightquay.example' })
+  ])
+  assert.deepStrictEqual(mixed, { domain: 'brightquay.example', fromEmails: 1 }, 'the personal address is ignored, not counted as a second domain')
+})
+
 // ----------------------------------------------- the required-fields rule
 
 check('a required field the plugin cannot fill is refused, not silently skipped', () => {
