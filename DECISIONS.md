@@ -6846,7 +6846,7 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Forty-four hand mutations across the build and its seven review rounds,
+Forty-five hand mutations across the build and its eight review rounds,
 each asserted onto disk before its suite ran, each red in its named
 check, and each file restored byte-identical after: the probe judge's
 column binding removed, the count judge's type discipline coerced, the
@@ -6872,9 +6872,10 @@ read-back-id arms removed one at a time (four), the plan's companyId id
 arm removed, both search parsers' text refusals removed, the salesforce
 parser's AccountId refusal removed, both parsers' empty-id acceptance
 restored, the hubspot properties-container refusal removed, the
-membership judge's id discipline removed, and the draft's per-kind and
-container map refusals removed one at a time. The whole repository
-suite is green after all of it.
+membership judge's id discipline removed, the draft's per-kind and
+container map refusals removed one at a time, and the adoption loop's
+companyId id arm removed. The whole repository suite is green after all
+of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -7038,3 +7039,17 @@ non-id-shaped entry now drops the answer to the unknown arm as the
 unmeasured shape it is. Fourteen new mutations, recorded above,
 including the single-arm deletions on each side of both association
 proofs.
+
+### Round 8 on the follow-ups, Devin CLI confirming, 2026-08-26: one finding, taken
+
+No-tools route, per-document coverage stated, every inline document
+whole. The round confirmed rounds 6 and 7 present, paired, and the
+documents matched to the dated records, and found exactly one missing
+half: round 7's companyId id-shape guard landed on the needed-companies
+match loop and not on its sibling, the adoption-only match loop, so a
+matched fill on a company no create needs could still carry an object
+companyId around the guard and into the adoption PATCH URL as
+"[object Object]". The sibling loop now refuses a companyId that is not
+id-shaped with the same words, and the round-7 plan check exercises the
+adoption path beside the needed-companies one. One new mutation,
+recorded above.

@@ -832,6 +832,13 @@ function assemble (input) {
       problems.push(`"${name}" is decided as a match with no companyId. A match names the record it matched.`)
       continue
     }
+    // The same id-shape rule as the needed-companies loop above (round
+    // 8: the guard landed there and this sibling was the route around
+    // it, straight into the adoption PATCH URL).
+    if (typeof decision.companyId !== 'string' && typeof decision.companyId !== 'number') {
+      problems.push(`"${name}" is decided as a match whose companyId is ${JSON.stringify(decision.companyId)}, not an id. A match names the record it matched.`)
+      continue
+    }
     fillProblems(name, decision.fill)
     companies.matched.push({ name, companyId: String(decision.companyId), rows: [], fill: decision.fill })
   }
