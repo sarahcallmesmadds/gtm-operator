@@ -242,8 +242,9 @@ and both execute only what the approved plan names.**
    explicit website wins, the list's domain is the automatic fallback, both
    only where config maps a website property. On Salesforce the company is
    an Account, and the domain half of the search runs against `Website`,
-   whose query shape is on the port's unmeasured list and gets measured
-   before the build claims it. HubSpot itself
+   whose query shape was measured on 2026-08-26: the bare-domain LIKE finds
+   the prefixed form, and the pattern over-fetches at worst, with the
+   person judging the candidates. HubSpot itself
    auto-creates companies from email domains and takes the primary
    association (measured 2026-08-25), so the plan names that collision
    rather than letting it happen silently; what `run` ultimately does about
@@ -276,17 +277,15 @@ and both execute only what the approved plan names.**
    Salesforce: the campaign itself, matched by name or planned, and the
    grid's statuses for it, each matched against the campaign's existing
    member-status rows (a fresh campaign carries Sent and Responded,
-   measured 2026-08-25) or planned as a create. What is measured is what
-   those lookups return against a fresh campaign; the lookups themselves,
-   the campaign by name and a campaign's status rows as the pipeline will
-   query them, are unmeasured shapes on the build's list. A Salesforce org
+   measured 2026-08-25) or planned as a create. The lookups themselves,
+   the campaign by name with its empty-result absent answer and a
+   campaign's status rows, were measured on 2026-08-26. A Salesforce org
    whose Marketing User flag is off refuses campaign creation outright
    (measured 2026-08-25), so a plan that needs a campaign while the flag
    is off carries the one-call fix to the operator's own User record as
    its own named line, pushed before the campaign create and proved by
    reading the flag back, rather than dying mid-push. The fix's one call
-   is measured; the read-back that proves it landed is the build's to
-   measure. It is a write like
+   and the flag read-back are both measured. It is a write like
    any other: in the write contract, shown in the confirmation summary,
    executed only inside the approved plan. Striking the line from the plan
    strikes the campaign half with it, because the one cannot land without
@@ -440,8 +439,9 @@ The port changes the store, not the pipeline. The order, the gates, the
 write contract's floor, the enrichment seam, the config and artifact homes
 and the skill names all carry over unchanged; what differs per backend is
 said where it differs, and the measured sections below are the evidence
-each half stands on. Until the port's build lands and passes its own
-release gate, the built plugin is HubSpot-only and its README says so.
+each half stands on. The port is built as of 2026-08-26; until its
+acceptance run passes, the Salesforce half has not been watched doing its
+job, and the plugin README says so.
 
 ## Contacts and accounts, not leads
 
@@ -498,10 +498,16 @@ rate limits at volume.
 
 The surface is the `sf` CLI, the transport the reference ran on and the one
 measured here. The credential lives in the CLI's keychain under the alias
-config names, SOQL is the query surface, and creates, updates and deletes
-go through the CLI's data commands, with the command output judged like any
-other response; the exact output shape is the build's to pin against real
-runs before anything judges it.
+config names and SOQL is the query surface, through the data commands.
+The writes go through `sf api request rest` with a JSON body file, settled
+by measurement on 2026-08-26: the data commands' `--values` parser refuses
+a value carrying an apostrophe in either spelling, and names like O'Brien
+are ordinary list data, so the values route cannot be the write transport.
+A REST create answers the bare `{id, success, errors}` envelope; a REST
+PATCH answers HTTP 204 with an empty body, so a read-back is its only
+proof; a REST error arrives as an array of `{message, errorCode}` objects,
+and the data commands' errors as `{name, message, exitCode}`, both judged
+as measured.
 
 **Measured against a free Developer Edition org, 2026-08-25**: every create
 proved by a query read-back, and every test record deleted afterwards with
@@ -524,36 +530,50 @@ in the local run files, outside this public repository; the dated summary
 and the transcribed measured set are in `DECISIONS.md`, so the
 repository's own record carries every fact this section stands on.
 
-**What is not measured**: update semantics on existing contacts, which the
-pipeline's fill-blanks updates need before the build claims them; the query
-shape that matches an account by the derived domain against `Website`; the
-campaign-by-name lookup and the read of a campaign's existing member-status
-rows, which the membership step runs; the User-record read-back that proves
-the flag fix landed; whatever duplicate rules an org configures, which is
-why email uniqueness
-is treated as absent rather than as a backstop; the Lead object entirely;
-batch semantics against the per-record CLI route; and what a free org
-limits at volume. Update semantics, the domain-match query shape, the
-membership step's lookups and the flag read-back are
-the build's to measure before anything claims to work; the Lead object,
-batch semantics and volume limits stay out of the port's scope rather
-than being half-measured.
+**Measured by the build's own session, 2026-08-26**, closing the list the
+design named as the build's to measure, every record created for it deleted
+afterwards with the deletions confirmed by count queries: a partial update
+changes only the named field, with every untouched field surviving, and its
+response shape is `{id, success, errors}` under the data commands' wrapper;
+an update to an occupied field overwrites silently, so the fill-blanks gate
+is the only guard, the same standing HubSpot's PATCH has; `LIKE
+'%<bare domain>%'` on `Website` finds a form stored as `https://www.`, an
+exact `=` matches a bare-stored form, LIKE matches case-insensitively, and
+`_` is a wildcard, so a domain pattern over-fetches at worst and the
+candidates are judged by the person; the campaign-by-name lookup returns
+the row, and an absent name answers an empty result set rather than an
+error; the member-status read returns Label, SortOrder, IsDefault and
+HasResponded per row; the Marketing User flag reads back through SOQL on
+the User record, for a list and for the operator's own id; a dotted
+`Account.Name` select arrives nested under `Account`; and an unknown field
+on a create refuses with `INVALID_FIELD` naming the column, nothing
+created. The raw captures live in the local run files; the dated summary
+is in `DECISIONS.md`.
+
+**What is not measured**: whatever duplicate rules an org configures, which
+is why email uniqueness is treated as absent rather than as a backstop; the
+Lead object entirely; batch semantics against the per-record route; and
+what a free org limits at volume. All four stay out of the port's scope
+rather than being half-measured, and the remaining gate is the acceptance
+run itself: a fresh invented list end to end against a Developer Edition
+org, pre-created fixtures playing the already-in-CRM records, push, prove
+field by field, teardown with every deletion confirmed by count read-backs.
 
 ---
 
 ## Open
 
-1. **The Salesforce port's build.** The design above covers the port as of
-   2026-08-26, un-parked by Sarah's ask the same day: native member
-   statuses from the same grid, Contacts and Accounts per the section
-   above, the `sf` CLI as the transport, one CRM per install through
-   config's `crm` field. What remains is the build, through the full
-   review order, with the Salesforce section's own unmeasured items
-   measured before anything claims to work, and the acceptance pattern
-   against a Developer Edition org as the release gate: a fresh invented
+1. **The Salesforce port's acceptance run.** The port was designed and
+   built on 2026-08-26, un-parked by Sarah's ask the same day: native
+   member statuses from the same grid, Contacts and Accounts per the
+   section above, the `sf` CLI as the transport with the writes settled
+   onto its REST command by measurement, one CRM per install through
+   config's `crm` field, and the build's measurement session closing the
+   list the design named. What remains is the release gate: the
+   acceptance pattern against a Developer Edition org, a fresh invented
    list, pre-created fixtures playing the already-in-CRM records, push,
    prove field by field, teardown with every deletion confirmed by count
-   read-backs.
+   read-backs, recorded in `DECISIONS.md`.
 2. **What `run` does about automatic company creation, half answered
    2026-08-26.** The acceptance run answered the matching half: the
    company step now searches by domain as well as name, and a domain hit

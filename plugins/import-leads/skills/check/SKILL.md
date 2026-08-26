@@ -1,7 +1,7 @@
 ---
 name: check
 description: Say whether an import would work before anyone is mid-import, and what it would do. Use when the user asks "are we set up to import", "would this list import cleanly", "check this list", before the first import ever, after the org's rules change, or before a big list where finding out mid-run would be expensive. Reads config, the alias map, the Process artifacts and the CRM, and a list only when handed one. Writes nothing, and never runs a paid step.
-allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources
+allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources
 ---
 
 # check
@@ -21,8 +21,10 @@ The same command layer as `run`:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/import-leads.js" <command> <args>
 ```
 
-Requests are sent the same way, with the Service Key as a bearer read from
-the file config names, never printed and never pasted. Every request this
+Requests are sent the way `run` sends them: on HubSpot with the Service Key
+as a bearer read from the file config names, never printed and never
+pasted; on Salesforce through the `sf` CLI, whose keychain holds the
+credential under the alias the specs carry. Every request this
 skill sends is a read.
 
 ## The standing half: is the setup ready at all
@@ -32,17 +34,27 @@ Run `check-standing`. It reports, in one pass:
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
   `config-write` only on an explicit yes.
-- **The Service Key file**: exists and is not empty, at the path config
-  names. Its contents are never read into any output.
+- **The credential, per backend.** On HubSpot, the Service Key file exists
+  and is not empty, at the path config names, its contents never read into
+  any output. On Salesforce there is nothing key-shaped to check: the org
+  alias is resolved instead, by sending the emitted org display spec and
+  running `org-judge` on the saved response.
 - **The alias map**: exists and parses, or what is wrong with it.
 - **The probe**: a single read-only request. Send it and run `probe-judge` on
-  the saved response. A connection is alive when the portal answered with the
-  measured envelope, and nothing more is claimed: the key working for reads
-  says nothing about writes, which only the live run proves.
-- **Automatic company creation**, named as a standing risk. The portal can
-  auto-create a company from an email domain and take the primary
-  association. Whether the setting is readable from the API is unmeasured, so
-  this is called out, not checked.
+  the saved response. A connection is alive when the store answered with the
+  measured envelope, and nothing more is claimed: a credential working for
+  reads says nothing about writes, which only the live run proves.
+- **On Salesforce, the Marketing User flag.** Read it with `flag-query` and
+  `flag-judge` (whoami first, the flag read second) and call it out when it
+  is off, because campaign creation is refused until it is on. Naming it is
+  the whole of this skill's job; the measured one-call fix travels in
+  `run`'s plan as its own named line.
+- **Automatic company creation.** On HubSpot, named as a standing risk: the
+  portal can auto-create a company from an email domain and take the primary
+  association, and whether the setting is readable from the API is
+  unmeasured, so it is called out, not checked. On Salesforce nothing like
+  it was observed and an org's own automation stays unmeasured rather than
+  assumed absent.
 
 Then the artifacts: read the required-fields rule and the member-status grid
 from the Process library, and run `validate-rules` on what was read, with the

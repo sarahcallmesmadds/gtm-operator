@@ -103,7 +103,7 @@ named for the work it does, and owns no database.
 | [`projects`](plugins/projects) | Projects and Tasks | Built |
 | [`software`](plugins/software) | Software | Built |
 | [`calendar`](plugins/calendar) | Calendar | Built |
-| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot | Built. Its release gate, the live acceptance run, passed twice on 2026-08-26; the Salesforce port is designed and unbuilt |
+| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot or Salesforce, one per install | Built. HubSpot's release gate, the live acceptance run, passed twice on 2026-08-26; the Salesforce half is built and its own acceptance run is its remaining gate |
 
 Job plugins come after the foundation ships, not alongside it. `import-leads`
 is the first; outbound email follows.
