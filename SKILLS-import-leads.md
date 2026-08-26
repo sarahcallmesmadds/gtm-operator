@@ -188,7 +188,10 @@ and both execute only what the approved plan names.**
    for the person's call, Sarah's rule of 2026-08-26: removed, or enriched
    to find the work email, with the enrichment offer made before anything is
    removed. A found work email is shown, never silently swapped, because the
-   fill-blanks rule protects the source's own email.
+   fill-blanks rule protects the source's own email. An approved
+   replacement keeps the original address on the row, and the dedupe step
+   searches both, because a contact stored under the original is otherwise
+   an unseen duplicate; a match under it is presented, never auto-resolved.
 4. **Personas**, only when the artifact exists. Unclear titles are flagged,
    never guessed.
 5. **Company names normalised** against the alias map.
@@ -199,8 +202,11 @@ and both execute only what the approved plan names.**
    2026-08-26, made after the live run proved a company can exist with no
    name at all, visible only to a domain search. Companies get the same
    care as the people on them: a domain hit with no name or a disagreeing
-   name is presented like any duplicate, adopt (filling only empty fields)
-   or create beside, decided by the person. A planned company carries
+   name is presented like any duplicate, adopt (filling only fields the
+   candidate's own evidence showed empty) or create beside, decided by the
+   person. An adoption's fill rides the plan whether or not any create
+   needs that company, is pushed as one PATCH, and is proved by its
+   read-back like every other write. A planned company carries
    its name and its website on the write contract's terms: the decision's
    explicit website wins, the list's domain is the automatic fallback, both
    only where config maps a website property. HubSpot itself
@@ -232,7 +238,13 @@ and both execute only what the approved plan names.**
     of the question rather than as a settled fact. Sarah's correction of
     2026-08-26: the first acceptance run reported "no lead source
     configured" as if that settled it, and the unasked question was the
-    miss. Then the confirmation summary: the whole plan, company creates,
+    miss. An answer naming a field the plugin can carry (its list fields
+    plus persona, owner and the lead source on contacts, name and website
+    on companies) becomes a config mapping or artifact edit on its own
+    explicit yes; anything else is refused by name at the checkpoint and
+    recorded as a design request, because a stamp that silently cannot be
+    written reads as written. Then the confirmation summary: the whole
+    plan, company creates,
     contact creates and updates, exclusions, list creates and memberships,
     and the writeback the run will make to the source, shown in full, with
     an explicit yes before any push.

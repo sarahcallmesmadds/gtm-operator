@@ -160,6 +160,24 @@ check('an update body refuses the lead source and unknown fields even when the p
   assert.deepStrictEqual(body.properties, { jobtitle: 'Admiral' }, 'the lead source is create-only, and email and unknown fields never ride an update')
 })
 
+check('the domain lookup is its own request, never OR-ed into the name search', () => {
+  // A broad name can fill the single page and push the exact domain hit
+  // off it, recreating the nameless-company miss the domain half exists
+  // to prevent.
+  const requests = hubspot.companySearchRequests(config(), [
+    { name: 'Acme', domain: 'acme.example' },
+    { name: 'Bare Co', domain: null }
+  ])
+  assert.strictEqual(requests.length, 3)
+  const byName = requests.find(r => r.label === 'company search: Acme')
+  assert.strictEqual(byName.body.filterGroups.length, 1)
+  assert.strictEqual(byName.body.filterGroups[0].filters[0].operator, 'CONTAINS_TOKEN')
+  const byDomain = requests.find(r => r.label === 'company search by domain: Acme')
+  assert.strictEqual(byDomain.body.filterGroups.length, 1)
+  assert.deepStrictEqual(byDomain.body.filterGroups[0].filters[0], { propertyName: 'domain', operator: 'EQ', value: 'acme.example' })
+  assert.ok(!requests.find(r => r.label === 'company search by domain: Bare Co'), 'no domain, no domain request')
+})
+
 // -------------------------------------------------------------------- push
 
 const smallPlan = () => ({
@@ -427,6 +445,37 @@ check('an ABSENT association or membership read-back fails the proof: skipping t
   delete noMembership.memberships['Summit - Invited']
   const second = hubspot.prove(config(), smallPlan(), pushedIds(), noMembership)
   assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /unproved fails the proof/.test(p.why)))
+})
+
+check('an adoption fill on a matched company is pushed as one PATCH by its id, read back, and proved', () => {
+  const plan = smallPlan()
+  plan.companies.matched[0].fill = { name: 'Navy Proper' }
+  const { requests } = hubspot.pushRequests(config(), plan)
+  const fill = requests.find(r => r.label === 'fill company: Navy')
+  assert.ok(fill, 'the fill PATCH is emitted')
+  assert.strictEqual(fill.method, 'PATCH')
+  assert.ok(fill.url.endsWith('/crm/v3/objects/companies/900'), 'by the id the match already names')
+  assert.deepStrictEqual(fill.body.properties, { name: 'Navy Proper' })
+
+  const readbacks = hubspot.readbackRequests(config(), plan, pushedIds())
+  const read = readbacks.find(r => r.label === 'read back company: Navy')
+  assert.ok(read, 'the fill is a write like any other, and an unread one is unproved')
+  assert.ok(read.url.includes('/crm/v3/objects/companies/900?'))
+
+  const provedClean = (() => {
+    const all = cleanReadbacks()
+    all.companies.Navy = { id: '900', properties: { name: 'Navy Proper' } }
+    return hubspot.prove(config(), plan, pushedIds(), all)
+  })()
+  assert.deepStrictEqual(provedClean.problems, [], JSON.stringify(provedClean.problems))
+  assert.ok(provedClean.checked.some(c => /company Navy \(fill\)/.test(c.what)))
+
+  const provedAbsent = hubspot.prove(config(), plan, pushedIds(), cleanReadbacks())
+  assert.ok(provedAbsent.problems.some(p => /company Navy \(fill\)/.test(p.what)), 'a promised fill with no read-back fails the proof')
+
+  const fillLess = smallPlan()
+  const bare = hubspot.pushRequests(config(), fillLess)
+  assert.ok(!bare.requests.find(r => r.label.startsWith('fill company')), 'a plain match emits no PATCH')
 })
 
 check('readbackRequests fetches updates by the id the plan carried, not only the pushed creates', () => {

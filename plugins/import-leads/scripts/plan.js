@@ -229,8 +229,26 @@ function dedupeVerdicts (rows, existing) {
   const verdicts = []
   const conflicts = []
   const unchecked = []
+  const replacedEmailMatches = []
 
   for (const row of rows) {
+    // A row whose personal address was replaced by an approved enrichment
+    // answer keeps the original on `replacedEmail`, and the original is an
+    // identity too: a contact stored under it is otherwise an unseen
+    // duplicate, because the portal accepts a second record when the
+    // emails differ. Presented, never auto-resolved.
+    const replaced = row.replacedEmail && foldEmail(row.replacedEmail)
+    if (replaced && existing.byEmail[replaced]) {
+      replacedEmailMatches.push({
+        index: row.index,
+        replacedEmail: replaced,
+        contactId: existing.byEmail[replaced].id,
+        why:
+          'The CRM holds a contact under the address this row replaced. Pushing the row as it stands would create a ' +
+          'second record for the same person under the new address. Presented, never auto-resolved.'
+      })
+    }
+
     const email = row.fields.email && foldEmail(row.fields.email)
     if (!email) {
       unchecked.push({
@@ -288,7 +306,7 @@ function dedupeVerdicts (rows, existing) {
     }
   }
 
-  return { verdicts, inListDuplicates, conflicts, unchecked }
+  return { verdicts, inListDuplicates, conflicts, unchecked, replacedEmailMatches }
 }
 
 // ------------------------------------------------------------ the assembly
@@ -413,6 +431,14 @@ function assemble (input) {
       )
     }
   }
+  for (const match of (input.dedupe.replacedEmailMatches || [])) {
+    if (!excluded.has(match.index) && !decided.has(match.index)) {
+      problems.push(
+        `Row ${match.index}: the CRM already holds a contact (id ${match.contactId}) under the address this row replaced ` +
+        `(${match.replacedEmail}), and nobody has decided it. A replaced address's own match is presented, never auto-resolved.`
+      )
+    }
+  }
 
   const verdictByIndex = new Map((input.dedupe.verdicts || []).map(v => [v.index, v]))
   const assignmentsByIndex = new Map()
@@ -529,6 +555,28 @@ function assemble (input) {
   }
 
   const companies = { creates: [], matched: [], undecided: [] }
+
+  /**
+   * An adoption fill on a matched company: the person's decision, made
+   * against the shown candidate (an empty name included), carried in the
+   * plan so the push executes it and the proof compares it. The keys are
+   * the write contract's own company fields and nothing else, and a
+   * website fill follows the same mapped-or-refused rule the create's
+   * website does. Blanks-only is grounded in the decision itself: the
+   * candidate's evidence showed what was empty, and the read-back proof
+   * shows what landed.
+   */
+  const fillProblems = (name, fill) => {
+    for (const key of Object.keys(fill)) {
+      if (key !== 'name' && key !== 'website') {
+        problems.push(`"${name}" is adopted with a fill for ${key}, and a company fill carries only name and website, the write contract's own company fields.`)
+      }
+    }
+    if (fill.website !== undefined && !input.config.properties.company.website) {
+      problems.push(`"${name}" is adopted with a website fill and config maps no company website property, so it would be silently lost. Map properties.company.website, or take the website out of the fill.`)
+    }
+  }
+
   for (const [name, needed] of companiesNeeded.entries()) {
     const decision = input.companyDecisions[name]
     if (!decision || (decision.decision !== 'match' && decision.decision !== 'create')) {
@@ -538,7 +586,12 @@ function assemble (input) {
       if (!decision.companyId) {
         problems.push(`"${name}" is decided as a match with no companyId. A match names the record it matched.`)
       } else {
-        companies.matched.push({ name, companyId: String(decision.companyId), rows: needed.rows })
+        const entry = { name, companyId: String(decision.companyId), rows: needed.rows }
+        if (decision.fill && Object.keys(decision.fill).length) {
+          fillProblems(name, decision.fill)
+          entry.fill = decision.fill
+        }
+        companies.matched.push(entry)
       }
     } else {
       // The write contract: a created company carries the website when the
@@ -569,6 +622,23 @@ function assemble (input) {
         'silently lost. Map properties.company.website, or take the website off the decision and create the company bare.'
       )
     }
+  }
+
+  // An adoption can belong to no create at all. The run that taught this
+  // (2026-08-26) adopted the portal's nameless company while the only row
+  // on it was an update, which needs no company decision, so the promised
+  // name fill had no vehicle in the plan and ran as a write beside it. A
+  // matched decision carrying a fill is part of the plan whether or not a
+  // create needs the company.
+  for (const [name, decision] of Object.entries(input.companyDecisions)) {
+    if (companiesNeeded.has(name)) continue
+    if (!decision || decision.decision !== 'match' || !decision.fill || !Object.keys(decision.fill).length) continue
+    if (!decision.companyId) {
+      problems.push(`"${name}" is decided as a match with no companyId. A match names the record it matched.`)
+      continue
+    }
+    fillProblems(name, decision.fill)
+    companies.matched.push({ name, companyId: String(decision.companyId), rows: [], fill: decision.fill })
   }
 
   // The status lists: matched, or planned for creation, which needs the

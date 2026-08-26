@@ -159,19 +159,30 @@ function companySearchRequests (config, companies) {
   if (!Array.isArray(companies)) throw new Error('companySearchRequests needs [{name, domain}] entries.')
   const nameProperty = config.properties.company.name
   const websiteProperty = config.properties.company.website
-  return companies.map((company, at) => {
-    const filters = [{ propertyName: nameProperty, operator: 'CONTAINS_TOKEN', value: company.name }]
-    const groups = [{ filters }]
-    if (company.domain) {
-      groups.push({ filters: [{ propertyName: 'domain', operator: 'EQ', value: company.domain }] })
-    }
-    return spec(
+  const properties = [nameProperty, websiteProperty, 'domain'].filter(Boolean)
+  const requests = []
+  for (const company of companies) {
+    requests.push(spec(
       `company search: ${company.name}`,
       'POST',
       '/crm/v3/objects/companies/search',
-      { filterGroups: groups, properties: [nameProperty, websiteProperty, 'domain'].filter(Boolean), limit: 20 }
-    )
-  })
+      { filterGroups: [{ filters: [{ propertyName: nameProperty, operator: 'CONTAINS_TOKEN', value: company.name }] }], properties, limit: 20 }
+    ))
+    // The domain lookup is its own request, never OR-ed into the name
+    // search: a broad name can match more than one page holds, the exact
+    // domain hit can fall off that page, and an unpaged union then
+    // recreates the nameless-company miss the domain half exists to
+    // prevent.
+    if (company.domain) {
+      requests.push(spec(
+        `company search by domain: ${company.name}`,
+        'POST',
+        '/crm/v3/objects/companies/search',
+        { filterGroups: [{ filters: [{ propertyName: 'domain', operator: 'EQ', value: company.domain }] }], properties, limit: 20 }
+      ))
+    }
+  }
+  return requests
 }
 
 // -------------------------------------------------------------------- writes
@@ -343,6 +354,21 @@ function pushRequests (config, plan) {
     requests.push(spec(`create company: ${company.name}`, 'POST', '/crm/v3/objects/companies', { properties }))
   }
 
+  // The adoption fill on a matched company, the person's decision carried
+  // by the plan: one PATCH by the id the match already names. Only the
+  // contract's own company fields map, and the read-back proves what
+  // landed.
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    const properties = {}
+    if (matched.fill.name !== undefined) properties[config.properties.company.name] = matched.fill.name
+    if (matched.fill.website !== undefined && config.properties.company.website) {
+      properties[config.properties.company.website] = matched.fill.website
+    }
+    if (!Object.keys(properties).length) continue
+    requests.push(spec(`fill company: ${matched.name}`, 'PATCH', `/crm/v3/objects/companies/${matched.companyId}`, { properties }))
+  }
+
   for (const create of plan.contacts.creates) {
     requests.push(spec(`create contact: row ${create.index}`, 'POST', '/crm/v3/objects/contacts', contactCreateBody(config, create.row, plan.leadSource)))
   }
@@ -497,6 +523,14 @@ function readbackRequests (config, plan, pushedIds) {
     requests.push(spec(`read back company: ${name}`, 'GET',
       `/crm/v3/objects/companies/${id}?properties=${[config.properties.company.name, config.properties.company.website].filter(Boolean).join(',')}`))
   }
+  // A matched company with an adoption fill is read back by the id the
+  // plan already carries: the fill is a write like any other, and an
+  // unread one is unproved.
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    requests.push(spec(`read back company: ${matched.name}`, 'GET',
+      `/crm/v3/objects/companies/${matched.companyId}?properties=${[config.properties.company.name, config.properties.company.website].filter(Boolean).join(',')}`))
+  }
   // MEMBERSHIP READS COME FROM THE PLAN, NOT FROM THE PUSHED IDS. The
   // pushed ids only hold lists this run created, and a run whose lists all
   // matched existing ones generated no membership read at all, so the
@@ -585,6 +619,19 @@ function prove (config, plan, pushedIds, readbacks) {
       intended.properties[config.properties.company.website] = company.website
     }
     compareContact(`company ${company.name}`, intended, response)
+  }
+
+  // The adoption fill is proved like every other write: the plan promised
+  // it, so its read-back is compared field by field, and an absent one
+  // fails through compareContact's own no-read-back arm.
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    const intended = { properties: {} }
+    if (matched.fill.name !== undefined) intended.properties[config.properties.company.name] = matched.fill.name
+    if (matched.fill.website !== undefined && config.properties.company.website) {
+      intended.properties[config.properties.company.website] = matched.fill.website
+    }
+    compareContact(`company ${matched.name} (fill)`, intended, (readbacks.companies || {})[matched.name])
   }
 
   for (const membership of plan.lists.memberships) {

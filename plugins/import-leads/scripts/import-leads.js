@@ -147,11 +147,22 @@ const commands = {
     if (!rowsFile) throw new Error('dedupe-queries needs the rows.')
     const result = configOrExit()
     const rows = readJson(rowsFile)
-    const emails = rows.map(row => row.fields && row.fields.email).filter(Boolean)
+    // A replaced personal address is an identity too: a contact stored
+    // under it is otherwise an unseen duplicate, because the portal
+    // accepts a second record when the emails differ.
+    const emails = []
+    for (const row of rows) {
+      if (row.fields && row.fields.email) emails.push(row.fields.email)
+      if (row.replacedEmail) emails.push(row.replacedEmail)
+    }
     console.log(JSON.stringify({
       requests: hubspot.searchRequests(result.config, emails),
       withoutEmail: rows.filter(row => !(row.fields && row.fields.email)).map(row => row.index),
-      note: 'Send each request with the Service Key as the bearer header, read from the file config names. Save each response whole, in order, and pass the array to dedupe. Rows without an email cannot be checked and come back as such.'
+      note:
+        'Send each request with the Service Key as the bearer header, read from the file config names. Save each response ' +
+        'whole, in order, and pass the array to dedupe. Rows without an email cannot be checked and come back as such. ' +
+        'Rows whose personal address was replaced are searched under both addresses, and a match under the replaced one ' +
+        'comes back presented for the person.'
     }, null, 2))
   },
 
