@@ -6457,3 +6457,17 @@ Lows: the root README's release-gate claim scoped to the HubSpot half,
 and the marketplace entry's tags gaining salesforce. Six new mutations,
 each asserted landed and each red in its named check; the whole suite is
 green.
+
+### Round 2 on the port build, Devin CLI, 2026-08-26: one finding in two halves, taken
+
+No-tools route, per-file coverage stated, every inline document whole,
+and the round confirmed all seven of round 1's fixes complete at their
+pairs by line. The finding: a configured record-type id was written on
+contact and account creates and never selected by the read-backs, so a
+routed contact create would false-fail its proof against a read-back
+that cannot carry what was sent, and an account's routing was sent and
+never known to have landed. The read-backs select RecordTypeId wherever
+config maps one, the account create's intended set carries it, and the
+contact side is proved through the body it already compares. Pinned in
+both directions: a clean routed proof, a read-back without the type
+failing, and no RecordTypeId selected when config maps none.

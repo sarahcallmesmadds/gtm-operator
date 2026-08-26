@@ -634,8 +634,13 @@ function readbackRequests (config, plan, pushedIds) {
   const requests = []
   const org = config.orgAlias
   const memberships = plan.campaignMemberships
-  const contactSelect = `SELECT ${[...new Set(contactFieldNames(config).concat(['Id', 'AccountId']))].join(', ')} FROM Contact`
-  const accountSelect = `SELECT ${['Id', config.properties.company.name, config.properties.company.website].filter(Boolean).join(', ')} FROM Account`
+  // A configured record type is a written field like any other, so the
+  // read-backs select it, or a routed create would false-fail its proof
+  // against a read-back that cannot carry what was sent.
+  const contactTypeField = config.recordTypeIds && config.recordTypeIds.contact ? ['RecordTypeId'] : []
+  const accountTypeField = config.recordTypeIds && config.recordTypeIds.account ? ['RecordTypeId'] : []
+  const contactSelect = `SELECT ${[...new Set(contactFieldNames(config).concat(['Id', 'AccountId'], contactTypeField))].join(', ')} FROM Contact`
+  const accountSelect = `SELECT ${['Id', config.properties.company.name, config.properties.company.website].filter(Boolean).concat(accountTypeField).join(', ')} FROM Account`
 
   for (const [key, id] of Object.entries(pushedIds.contacts || {})) {
     requests.push(query(`read back contact: row ${key}`, org, `${contactSelect} WHERE Id = ${soqlLiteral(id)}`))
@@ -759,6 +764,11 @@ function prove (config, plan, pushedIds, readbacks) {
     const intended = { [config.properties.company.name]: company.name }
     if (company.website && config.properties.company.website) {
       intended[config.properties.company.website] = company.website
+    }
+    // The record type the push wrote is proved like every other field, or
+    // the routing is sent and never known to have landed.
+    if (config.recordTypeIds && config.recordTypeIds.account) {
+      intended.RecordTypeId = config.recordTypeIds.account
     }
     compareRecord(`account ${company.name}`, intended, recordFrom((readbacks.accounts || {})[company.name]))
   }

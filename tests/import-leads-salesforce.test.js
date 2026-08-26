@@ -575,6 +575,31 @@ check('a created campaign and a created status row are read back and proved, and
   assert.ok(fourth.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /SortOrder/.test(p.why)))
 })
 
+check('a configured record type is selected by the read-backs and proved on both objects', () => {
+  const typed = config()
+  typed.recordTypeIds = { contact: '012C', account: '012A' }
+  const requests = salesforce.readbackRequests(typed, smallPlan(), pushedIds())
+  const contactRead = requests.find(r => r.label === 'read back contact: row 1')
+  assert.ok(contactRead.soql.includes('RecordTypeId'), 'a routed contact create is proved against what was sent')
+  const accountRead = requests.find(r => r.label === 'read back account: Acme')
+  assert.ok(accountRead.soql.includes('RecordTypeId'))
+
+  const readbacks = cleanReadbacks()
+  readbacks.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: '001A', RecordTypeId: '012C' })
+  readbacks.contacts[2] = contactRecord('003B', { FirstName: 'Grace', LastName: 'Hopper', Email: 'grace@x.com', AccountId: '001N', RecordTypeId: '012C' })
+  readbacks.accounts.Acme = queryEnvelope([{ Id: '001A', Name: 'Acme', Website: 'acme.example', RecordTypeId: '012A' }])
+  const proof = salesforce.prove(typed, smallPlan(), pushedIds(), readbacks)
+  assert.deepStrictEqual(proof.problems, [], JSON.stringify(proof.problems))
+  assert.ok(proof.checked.some(c => c.what === 'account Acme, RecordTypeId'))
+  assert.ok(proof.checked.some(c => c.what === 'row 1, RecordTypeId'))
+
+  const wrongType = salesforce.prove(typed, smallPlan(), pushedIds(), cleanReadbacks())
+  assert.ok(wrongType.problems.some(p => /RecordTypeId/.test(p.why)), 'a read-back without the type fails rather than passing unproved')
+
+  const untyped = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
+  assert.ok(!untyped.find(r => r.soql && r.soql.includes('RecordTypeId')), 'no configured type, nothing selected for it')
+})
+
 check('org display judges Connected as ok and anything else as not proved', () => {
   assert.deepStrictEqual(
     salesforce.judgeOrgDisplay({ status: 0, result: { connectedStatus: 'Connected', apiVersion: '67.0' } }),
