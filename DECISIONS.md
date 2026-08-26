@@ -5838,3 +5838,25 @@ the id the plan carried; and a refusal that pointed at a command that does
 not exist now names the real route. The round confirmed the kept-rows guard,
 the listId arm, the exclusive-create write, the opaque placeholders and the
 email folding closed. The suite is green after all of it.
+
+### Round 4 on the build, Devin CLI confirming, 2026-08-25: three findings, two taken, one refuted by running it
+
+Per-file coverage stated, sixteen files whole by their numbered listings.
+Taken: the website's write-contract sentence, the config comment and the
+run skill still described the round-3 behaviour's older half, and all three
+now say what the code does, the decision's explicit website winning, the
+list's domain as the automatic fallback, both only where a website property
+is mapped; and `assertPlanLists` guarded `creates` and `matched` but not
+`memberships`, so a hand-edited plan crashed with a TypeError instead of
+the refusal, now guarded and tested. The round's suggested test gaps were
+also filled: smuggled persona and owner fills, and the memberships-missing
+shape.
+
+**Refuted, not taken: the claim that full month names miss the month
+lookup.** The round said `January 15, 2026` would capture the whole word
+and `MONTHS.indexOf` would miss. Run against the real code before repeating
+it anywhere, per the standing rule that a reviewer's concrete scenario is a
+claim: the capture group closes before the `[a-z]*`, so it takes only the
+three-letter prefix, full names signal and impossible full-name dates are
+rejected. A test now locks the measured answer so the question stays
+answered. The suite is green after all of it.

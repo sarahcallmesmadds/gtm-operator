@@ -289,10 +289,12 @@ function judgeListLookup (response) {
  * not to guess at.
  */
 function assertPlanLists (plan, who) {
-  if (!plan || !plan.lists || !Array.isArray(plan.lists.creates) || !Array.isArray(plan.lists.matched)) {
+  if (!plan || !plan.lists || !Array.isArray(plan.lists.creates) || !Array.isArray(plan.lists.matched) ||
+      !Array.isArray(plan.lists.memberships)) {
     throw new Error(
-      `${who} needs a plan whose lists carry \`creates\` and \`matched\`, which the plan command builds from the judged ` +
-      'list lookups. This plan does not, so it was built by an older step: run `plan` again rather than pushing a guess.'
+      `${who} needs a plan whose lists carry \`creates\`, \`matched\` and \`memberships\`, which the plan command builds ` +
+      'from the judged list lookups. This plan does not, so it was built by an older step or edited by hand: run `plan` ' +
+      'again rather than pushing a guess.'
     )
   }
 }

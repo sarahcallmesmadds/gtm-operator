@@ -52,9 +52,11 @@ const CONTACT_PROPERTIES = {
 }
 
 const COMPANY_PROPERTIES = {
-  // The write contract makes the website conditional ("when the list
-  // carries a domain"), so the mapping is optional too: an org without a
-  // website property still imports, its companies created bare.
+  // The write contract makes the website conditional (the decision's
+  // explicit website wins, the list's domain is the automatic fallback), so
+  // the mapping is optional too: an org without a website property still
+  // imports, its companies created bare, and only an explicitly decided
+  // website with nowhere to land is refused.
   required: ['name'],
   optional: ['website']
 }

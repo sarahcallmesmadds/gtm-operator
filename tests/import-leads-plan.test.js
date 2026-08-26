@@ -205,6 +205,22 @@ check('a named-month day has to exist in its month', () => {
   assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'When'))
 })
 
+check('full month names work the same as their three-letter forms', () => {
+  // A round-4 review claimed the capture took the whole word and the month
+  // lookup missed; run against the real code, the capture group takes only
+  // the three-letter prefix. This case keeps that measured answer true.
+  const real = [
+    row(1, {}, { source: { When: 'January 15, 2026' } }),
+    row(2, {}, { source: { When: 'February 2, 2026' } })
+  ]
+  assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'When'))
+  const impossible = [
+    row(1, {}, { source: { When: 'February 31, 2026' } }),
+    row(2, {}, { source: { When: 'April 31, 2026' } })
+  ]
+  assert.deepStrictEqual(plan.eventSignals(impossible).dateColumns, [])
+})
+
 check('a slash date has to be a real day-and-month in one of its two orders', () => {
   const impossible = [
     row(1, {}, { source: { When: '31/02/2026' } }),
@@ -451,6 +467,16 @@ check('an update fill is proved against the gated row: a smuggled value or a lea
 
   const honest = goodInput()
   assert.strictEqual(plan.assemble(honest).ok, true, 'the row\'s own sourced title still fills')
+})
+
+check('a smuggled persona or owner in the fill blocks the same way a smuggled list field does', () => {
+  const persona = goodInput()
+  persona.dedupe.verdicts[1].fill = { persona: 'Invented Leader' }
+  assert.ok(plan.assemble(persona).problems.some(p => /Row 2: the update fill carries persona/.test(p)), 'a persona the row does not carry with a source is refused')
+
+  const owner = goodInput()
+  owner.dedupe.verdicts[1].fill = { owner: 'owner-9' }
+  assert.ok(plan.assemble(owner).problems.some(p => /Row 2: the update fill carries owner/.test(p)), 'an owner with no recorded source is refused in the fill too')
 })
 
 check('the domain fallback fires only when a website property is mapped; an explicit website without one blocks', () => {
