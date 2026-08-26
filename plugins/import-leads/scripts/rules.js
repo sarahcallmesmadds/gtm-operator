@@ -89,6 +89,76 @@ function applyAliases (rows, map) {
   return { rows: out, applied }
 }
 
+// ------------------------------------------- free-mail and derived domains
+
+/**
+ * The consumer mail providers this plugin treats as personal addresses.
+ * Sarah's rule, 2026-08-26: a personal address is cleaned and removed, or
+ * enriched to find the work email. THE DETECTOR ONLY PRESENTS. Removal and
+ * replacement are the person's calls, made in conversation, and a found
+ * work email is shown rather than written, because the fill-blanks rule
+ * protects the source's own email either way. A provider missing from this
+ * list is simply not flagged, and the row still passes through every other
+ * step, so the cost of an omission is a missed prompt, never a wrong write.
+ */
+const FREE_MAIL_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'ymail.com',
+  'hotmail.com', 'hotmail.co.uk', 'outlook.com', 'live.com', 'msn.com',
+  'aol.com', 'icloud.com', 'me.com', 'mac.com', 'proton.me',
+  'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'mail.com',
+  'yandex.com', 'zoho.com', 'comcast.net', 'verizon.net', 'att.net',
+  'sbcglobal.net', 'cox.net'
+])
+
+/** The domain of an email, folded, or null when there is no @ to split on. */
+function emailDomain (email) {
+  const folded = String(email === null || email === undefined ? '' : email).trim().toLowerCase()
+  const at = folded.lastIndexOf('@')
+  if (at === -1 || at === folded.length - 1) return null
+  return folded.slice(at + 1)
+}
+
+/**
+ * The rows whose email is a personal address, for the person's call. Rows
+ * with no email are a different question (the dedupe check surfaces those)
+ * and are not repeated here.
+ */
+function freeMailRows (rows) {
+  const out = []
+  for (const row of rows) {
+    const email = row.fields && row.fields.email
+    if (!email) continue
+    const domain = emailDomain(email)
+    if (domain && FREE_MAIL_DOMAINS.has(domain)) {
+      out.push({ index: row.index, email, domain })
+    }
+  }
+  return out
+}
+
+/**
+ * The search domain for one company, derived from its rows' work emails
+ * when the list carries no domain column. Sarah's rule, 2026-08-26, after
+ * the live run proved name search misses what a domain search finds: the
+ * portal's own auto-created company had no name at all and only its domain.
+ *
+ * Exactly one distinct non-personal domain across the rows is an answer,
+ * returned with the row count behind it so the step can show its work. Zero
+ * or several is null, because choosing between them is a judgment about
+ * which rows are right, and that stays with the person.
+ */
+function deriveCompanyDomain (rows) {
+  const counts = new Map()
+  for (const row of rows) {
+    const domain = emailDomain(row.fields && row.fields.email)
+    if (!domain || FREE_MAIL_DOMAINS.has(domain)) continue
+    counts.set(domain, (counts.get(domain) || 0) + 1)
+  }
+  if (counts.size !== 1) return null
+  const [domain, fromEmails] = [...counts.entries()][0]
+  return { domain, fromEmails }
+}
+
 // -------------------------------------------------- the required-fields rule
 
 /**
@@ -307,6 +377,10 @@ function applyPersonas (rows, artifact) {
 
 module.exports = {
   foldCompany,
+  FREE_MAIL_DOMAINS,
+  emailDomain,
+  freeMailRows,
+  deriveCompanyDomain,
   aliasMapProblems,
   applyAliases,
   requiredFieldsProblems,

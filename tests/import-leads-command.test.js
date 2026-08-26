@@ -130,5 +130,58 @@ check('list-queries realises names from the grid and refuses an uncovered assign
   assert.ok(/Ghosted/.test(bad.stderr))
 })
 
+check('free-mail presents the flagged rows and says the call is the person\'s', () => {
+  const rows = path.join(TEMP, 'rows.json')
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 1, source: {}, fields: { email: 'ivy@gmail.com' }, fieldSources: { email: 'list' } },
+    { index: 2, source: {}, fields: { email: 'cora@harborlane.example' }, fieldSources: { email: 'list' } }
+  ]))
+  const result = run('free-mail', rows)
+  assert.strictEqual(result.status, 0)
+  const parsed = JSON.parse(result.stdout)
+  assert.deepStrictEqual(parsed.rows, [{ index: 1, email: 'ivy@gmail.com', domain: 'gmail.com' }])
+  assert.ok(/never silently swapped/.test(parsed.note))
+
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 2, source: {}, fields: { email: 'cora@harborlane.example' }, fieldSources: { email: 'list' } }
+  ]))
+  const clean = JSON.parse(run('free-mail', rows).stdout)
+  assert.deepStrictEqual(clean.rows, [])
+  assert.ok(/absence of flags, not a guarantee/.test(clean.note))
+})
+
+check('company-queries derives a search domain from agreeing work emails and says where it came from', () => {
+  const rows = path.join(TEMP, 'company-rows.json')
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 1, source: {}, fields: { email: 'ada@acme.example', company: 'Acme' }, fieldSources: { email: 'list', company: 'list' } },
+    { index: 2, source: {}, fields: { email: 'ben@acme.example', company: 'Acme' }, fieldSources: { email: 'list', company: 'list' } },
+    { index: 3, source: {}, fields: { email: 'x@one.example', company: 'Split Co' }, fieldSources: { email: 'list', company: 'list' } },
+    { index: 4, source: {}, fields: { email: 'y@two.example', company: 'Split Co' }, fieldSources: { email: 'list', company: 'list' } }
+  ]))
+  const result = run('company-queries', rows)
+  assert.strictEqual(result.status, 0)
+  const parsed = JSON.parse(result.stdout)
+  const acme = parsed.companies.find(c => c.name === 'Acme')
+  assert.strictEqual(acme.domain, 'acme.example')
+  assert.ok(/derived from 2 work emails/.test(acme.domainSource))
+  const split = parsed.companies.find(c => c.name === 'Split Co')
+  assert.strictEqual(split.domain, null, 'disagreeing domains derive nothing: the choice is the person\'s')
+  const acmeRequest = parsed.requests.find(r => r.label === 'company search: Acme')
+  assert.strictEqual(acmeRequest.body.filterGroups.length, 2, 'the derived domain becomes the second filter group')
+  const splitRequest = parsed.requests.find(r => r.label === 'company search: Split Co')
+  assert.strictEqual(splitRequest.body.filterGroups.length, 1, 'no derived domain, name search only')
+})
+
+check('a domain column still wins over derivation, recorded as such', () => {
+  const rows = path.join(TEMP, 'column-rows.json')
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 1, source: {}, fields: { email: 'ada@other.example', company: 'Acme', companyDomain: 'acme.example' }, fieldSources: { email: 'list', company: 'list', companyDomain: 'list' } }
+  ]))
+  const parsed = JSON.parse(run('company-queries', rows).stdout)
+  const acme = parsed.companies.find(c => c.name === 'Acme')
+  assert.strictEqual(acme.domain, 'acme.example')
+  assert.strictEqual(acme.domainSource, 'column')
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

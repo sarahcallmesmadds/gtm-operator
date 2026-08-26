@@ -262,6 +262,49 @@ check('a list create answers with listId, the measured shape, and judges as crea
   assert.deepStrictEqual(judged, { outcome: 'created', id: '703' })
 })
 
+check('a list create wrapping its listId in a list envelope, the shape measured live 2026-08-26, judges as created', () => {
+  const judged = hubspot.judgeResponse(
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/lists', label: 'create list' },
+    { list: { listId: '704', name: 'Summit - Attended', processingType: 'MANUAL' } }
+  )
+  assert.deepStrictEqual(judged, { outcome: 'created', id: '704' })
+})
+
+check('an association PUT answering COMPLETE with both directions judges done, scoped to association requests', () => {
+  const body = {
+    status: 'COMPLETE',
+    results: [
+      { from: { id: '501' }, to: { id: '601' }, associationSpec: { associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 279 } },
+      { from: { id: '601' }, to: { id: '501' }, associationSpec: { associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 280 } }
+    ]
+  }
+  const judged = hubspot.judgeResponse(
+    { method: 'PUT', url: hubspot.BASE + '/crm/v4/objects/contacts/501/associations/default/companies/601', label: 'associate' },
+    body
+  )
+  assert.strictEqual(judged.outcome, 'done')
+  assert.ok(/read-back is still the proof/.test(judged.why))
+  const elsewhere = hubspot.judgeResponse(
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/contacts', label: 'create' },
+    body
+  )
+  assert.strictEqual(elsewhere.outcome, 'unknown', 'the COMPLETE reading is scoped to the request it was measured on')
+})
+
+check('a membership add answering recordsIdsAdded, the portal\'s own spelling, judges done with the ids', () => {
+  const judged = hubspot.judgeResponse(
+    { method: 'PUT', url: hubspot.BASE + '/crm/v3/lists/15/memberships/add', label: 'add' },
+    { recordsIdsAdded: ['501', 502] }
+  )
+  assert.strictEqual(judged.outcome, 'done')
+  assert.deepStrictEqual(judged.added, ['501', '502'])
+  const elsewhere = hubspot.judgeResponse(
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/contacts', label: 'create' },
+    { recordsIdsAdded: ['501'] }
+  )
+  assert.strictEqual(elsewhere.outcome, 'unknown', 'the recordsIdsAdded reading is scoped to the membership add')
+})
+
 check('the duplicate create refusal carries the existing id out of the error text, and is never an update', () => {
   const judged = hubspot.judgeResponse(
     { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/contacts', label: 'create' },

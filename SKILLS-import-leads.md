@@ -184,17 +184,32 @@ and both execute only what the approved plan names.**
    session actually has connected is offered the gaps. The plugin carries no
    enrichment vendor code at all; providers ship their own plugins, and this
    plugin's side is the gate. Paid verification runs only on a named yes.
+   Personal addresses (gmail, yahoo and kin) are detected here and presented
+   for the person's call, Sarah's rule of 2026-08-26: removed, or enriched
+   to find the work email, with the enrichment offer made before anything is
+   removed. A found work email is shown, never silently swapped, because the
+   fill-blanks rule protects the source's own email.
 4. **Personas**, only when the artifact exists. Unclear titles are flagged,
    never guessed.
 5. **Company names normalised** against the alias map.
-6. **Companies matched, or planned for creation.** A planned company carries
+6. **Companies matched, or planned for creation, by name and by domain.**
+   The search runs by name and, wherever a domain is known, by domain; a
+   list with no domain column still gets the domain half where the
+   company's rows' own work emails agree on one, Sarah's rule of
+   2026-08-26, made after the live run proved a company can exist with no
+   name at all, visible only to a domain search. Companies get the same
+   care as the people on them: a domain hit with no name or a disagreeing
+   name is presented like any duplicate, adopt (filling only empty fields)
+   or create beside, decided by the person. A planned company carries
    its name and its website on the write contract's terms: the decision's
    explicit website wins, the list's domain is the automatic fallback, both
    only where config maps a website property. HubSpot itself
    auto-creates companies from email domains and takes the primary
    association (measured 2026-08-25), so the plan names that collision
    rather than letting it happen silently; what `run` ultimately does about
-   the portal's behaviour is deliberately Open, not guessed here.
+   the portal's behaviour is deliberately Open, not guessed here. On
+   2026-08-26 it was measured not firing when a company already carrying
+   the domain existed.
 7. **Dedupe against the CRM**, by email, through the search surface, and
    each row gets its plan: create, update filling blanks only, or exclude.
    HubSpot also enforces email uniqueness itself, and a duplicate create is
@@ -210,10 +225,17 @@ and both execute only what the approved plan names.**
    column.
 9. **Status lists matched, or planned for creation**, one per status per
    campaign, named by the grid's convention.
-10. **The confirmation summary**: the whole plan, company creates, contact
-    creates and updates, exclusions, list creates and memberships, and the
-    writeback the run will make to the source, shown in full, with an
-    explicit yes before any push.
+10. **The checkpoint, then the confirmation summary.** Before the plan is
+    assembled the run stops and asks, in as many words: "Are there any
+    other fields that we should be stamping for new or updated accounts
+    and contacts?", showing the lead-source value or its absence as part
+    of the question rather than as a settled fact. Sarah's correction of
+    2026-08-26: the first acceptance run reported "no lead source
+    configured" as if that settled it, and the unasked question was the
+    miss. Then the confirmation summary: the whole plan, company creates,
+    contact creates and updates, exclusions, list creates and memberships,
+    and the writeback the run will make to the source, shown in full, with
+    an explicit yes before any push.
 11. **Push, executing exactly the approved plan**, with partial-success
     semantics per record. A duplicate list add is a silent no-op and a
     duplicate contact create returns the existing id, both measured, both
@@ -333,13 +355,23 @@ an empty string reading back empty. The raw measurement records live in the
 local run files, outside this public repository; the dated summary is in
 `DECISIONS.md`.
 
+**Measured by the acceptance run, 2026-08-26**, the release gate's first
+full pass, one ten-row list end to end with every write proved by
+read-back and torn down cleanly: the list by-name lookup's not-found
+answer (`OBJECT_NOT_FOUND`, `ListError.LIST_NAME_DOES_NOT_EXIST`); the
+list create wrapping its `listId` in a `list` envelope; the association
+PUT answering `COMPLETE` with both directions in `results`; the
+membership add answering `recordsIdsAdded`; list deletion being soft, a
+deleted list still answering GET 200 with `deletedAt` set, so a teardown
+read-back checks that field and never expects a 404; the portal deriving
+a created company's `domain` from the `website` the push set; and
+auto-company-creation not firing when a company already carrying the
+domain existed. The raw records stay in the local run files; the dated
+summary is in `DECISIONS.md`.
+
 **What is not measured**: subscription statuses (HubSpot's native email
 opt-out surface), the marketing campaigns object, batch endpoints, and
-rate limits at volume. The live acceptance run of the whole pipeline end
-to end is still the release gate, the same rule `calendar` set: this
-plugin is not finished until it has run one real list through every step
-against a portal, verified the writes by reading them back, and been torn
-down cleanly.
+rate limits at volume.
 
 ---
 
@@ -354,11 +386,12 @@ down cleanly.
    being org-dependent), so the port is specified work waiting on a user
    who asks for it, per the backend rule. The contacts-versus-leads
    question moves with it.
-2. **What `run` does about automatic company creation.** `check` names the
-   risk; whether the setting itself can be read from the API is unmeasured
-   and part of this item, and whether `run` should ask for it off, or adopt
-   the portal's auto-created companies into its matching, needs the build's
-   first real list rather than a guess here.
+2. **What `run` does about automatic company creation, half answered
+   2026-08-26.** The acceptance run answered the matching half: the
+   company step now searches by domain as well as name, and a domain hit
+   with no name or a disagreeing name is presented for adoption or a
+   create-beside, the person's call. Still Open: whether the setting
+   itself can be read from the API, which stays unmeasured.
 3. **The email opt-out.** HubSpot's subscription statuses are a separate,
    unmeasured surface, so the opt-out is out of the write contract until a
    measurement session says how it behaves.

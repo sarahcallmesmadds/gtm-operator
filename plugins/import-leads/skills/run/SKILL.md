@@ -104,6 +104,16 @@ means a working import with its gaps named honestly.
 - **Anything metered or paid is named and confirmed before it runs.** Paid
   verification runs only on a named yes.
 
+**Personal addresses are part of the same conversation.** Run
+`free-mail <rows.json>`: it names the rows whose email is a consumer
+provider (gmail, yahoo and kin). The rule those rows follow: removed, or
+enriched to find the work email. Offer the connected enrichment tool the
+lookup before anything is removed, and show what it found or that it found
+nothing. **A found work email is shown, never silently swapped**: the
+fill-blanks rule protects the source's own email, so replacement is the
+person's decision every time. A no-email row gets the same offer when the
+dedupe step surfaces it.
+
 ## Step 4. Personas, only if the artifact exists
 
 `personas <rows.json> <personas.json>`. Unclear titles come back flagged;
@@ -119,11 +129,26 @@ person may fix the source and start again, or proceed without those rows.
 
 ## Step 6. Companies
 
-`company-queries <rows.json>` builds one search per company. Send them, show
-the candidates with their evidence, and let the person decide match or create
-per company. **Whether two records are the same company is the person's
-call**; the alias map holds the answers already settled so they are not
-re-asked, and a new settled answer is worth offering to add to the map.
+`company-queries <rows.json>` builds one search per company: by name, and by
+domain wherever one is known. A list with no domain column still gets the
+domain half where the company's rows' own work emails agree on one; the
+output says where each search domain came from, so the evidence shows its
+work. **Name search alone is not a duplicate check**: the live run of
+2026-08-26 proved a company can exist with no name at all, visible only to
+a domain search.
+
+Send them, show the candidates with their evidence, and let the person
+decide match or create per company. **Whether two records are the same
+company is the person's call**; the alias map holds the answers already
+settled so they are not re-asked, and a new settled answer is worth
+offering to add to the map.
+
+**Companies get the same care as the people on them.** A domain hit with no
+name, or with a name that disagrees with the list, is presented like any
+duplicate: it may be the portal's own auto-created record, and the person
+chooses between adopting it (match it, filling only fields that are empty,
+an empty name included) and creating a named company beside it. Nothing
+about a company record is resolved silently.
 
 On a create decision, a website the person names wins; otherwise the list's
 domain fills in automatically where config maps a website property, and an
@@ -131,7 +156,9 @@ org that maps none gets the company created bare.
 
 The portal may auto-create a company from an email domain and take the
 primary association. The plan names that collision; do not resolve it
-silently.
+silently. Measured 2026-08-26: it did not fire when a company already
+carrying the domain existed, and the portal derived that company's `domain`
+from the website the push set.
 
 ## Step 7. Dedupe
 
@@ -165,10 +192,18 @@ list judged absent is created; an answer the judge does not recognise is a
 question, because reading it as absent is how a second copy of an existing
 list appears.
 
-## Step 10. The plan, and the one confirmation
+## Step 10. The checkpoint, the plan, and the one confirmation
 
-Write the inputs file (rows, events output, dedupe output, grid, required
-fields, campaigns, assignments, company decisions, list decisions,
+**Before assembling the plan, stop and ask the person, in as many words:
+"Are there any other fields that we should be stamping for new or updated
+accounts and contacts?"** Show the lead-source value the artifact gives, or
+that none exists, as part of that question, never as a settled fact: an
+empty lead source is an answer someone gave, not a default to report past.
+An answer naming a new field becomes a config mapping or an artifact edit,
+each on its own explicit yes, before the plan is built.
+
+Then write the inputs file (rows, events output, dedupe output, grid,
+required fields, campaigns, assignments, company decisions, list decisions,
 resolutions) and run `plan`. It refuses, by name, anything undecided, and it
 re-runs the gate on what is actually in it, so nothing between the steps can
 have slipped past the floor.

@@ -422,6 +422,36 @@ function judgeResponse (request, response) {
   if (typeof response === 'object' && (response.listId || response.listId === 0)) {
     return { outcome: 'created', id: String(response.listId) }
   }
+  // The live run of 2026-08-26 measured the create wrapping that same id in
+  // a `list` envelope, the shape the by-name lookup already answers with.
+  // Both arms stay: each is a measured shape, and either carries the id.
+  if (typeof response === 'object' && response.list &&
+      (response.list.listId || response.list.listId === 0)) {
+    return { outcome: 'created', id: String(response.list.listId) }
+  }
+  // An association PUT answering COMPLETE with the pair in `results`,
+  // measured 2026-08-26: the portal reports both directions of the default
+  // association. Scoped to the request it was measured on. The read-back is
+  // still the proof.
+  if (request.method === 'PUT' && request.url.includes('/associations/') &&
+      typeof response === 'object' && response.status === 'COMPLETE' && Array.isArray(response.results)) {
+    return {
+      outcome: 'done',
+      why: 'The association answered COMPLETE with both directions in results, the shape measured 2026-08-26. The association read-back is still the proof.'
+    }
+  }
+  // A membership add that added someone answers `recordsIdsAdded`, the
+  // portal's own spelling, measured 2026-08-26. A duplicate add still
+  // answers empty, the no-op arm above. The membership read-back is still
+  // the proof.
+  if (request.method === 'PUT' && request.url.includes('/memberships/add') &&
+      typeof response === 'object' && Array.isArray(response.recordsIdsAdded)) {
+    return {
+      outcome: 'done',
+      added: response.recordsIdsAdded.map(String),
+      why: 'The add answered with the record ids it added, the shape measured 2026-08-26. The membership read-back is still the proof.'
+    }
+  }
   if (typeof response === 'object' && (response.status === 'error' || response.category || response.message)) {
     const text = String(response.message || '')
     // The duplicate-contact reading is scoped to the request it was measured

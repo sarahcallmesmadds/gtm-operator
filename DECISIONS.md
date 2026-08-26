@@ -5885,3 +5885,95 @@ every home) and nothing new against the branch's final state. Six rounds in
 all on the build: sixteen, seven, seven, three with one refuted by running
 it, three, then nothing, every taken finding real and none needing her.
 The Devin GitHub app's pass on the pull request is the remaining gate.
+
+## import-leads: the release gate runs, and the run corrects the design, 2026-08-26
+
+The Devin app's pass on the build's pull request came back genuinely clean,
+read from the body per the standing rule: No Issues Found, no
+hidden-findings line, no inline comments. The branch merged by rebase and
+the suite ran green on `main`. Then the release gate itself ran: one
+ten-row list end to end against a real free portal, fake people with the
+refusals planted on purpose, every write proved by read-back, and both CRMs
+torn down to exactly their starting state with every removal confirmed.
+The raw records, ids and responses stay in the local run files, outside
+this public repository.
+
+### What the run proved
+
+The pipeline ran every step in order: config, standing check, probe,
+ingest with the mapping confirmed, aliases (one fired), the gate (the
+no-last-name row refused), multi-event (two campaigns detected from the
+event column), dedupe by email (the planted existing contact matched, its
+update filling blanks only; the in-list duplicate, the no-email row and
+the cross-company conflict all surfaced and none auto-resolved), company
+search, list lookups by name (all four absent), the assembled plan shown
+whole, one explicit yes, a nineteen-request push in dependency order with
+opaque tokens substituted as ids returned, every response judged, and the
+proof comparing every read-back field by field: forty-nine checks, zero
+problems. Sarah's calls decided the judgment batch: the richer duplicate
+row kept, the no-email and personal-address rows offered a connected
+enrichment lookup before removal (all three lookups ran and came back
+empty, invented people, which proved the step rather than the people), and
+the portal's own nameless auto-created company adopted by filling its
+empty name, after which name search found it.
+
+### Measured against the real portal, 2026-08-26
+
+- The list by-name lookup's not-found answer: `OBJECT_NOT_FOUND` with
+  subcategory `ListError.LIST_NAME_DOES_NOT_EXIST`. The judge already read
+  it as absent.
+- A list create wraps its `listId` in a `list` envelope, the same envelope
+  the lookup answers with. The judge knew only the bare `listId` shape, so
+  four working creates judged unknown; both arms now stand, each measured.
+- An association PUT answers `status: COMPLETE` with both directions in
+  `results` (the default association pair). Judged unknown before; now a
+  scoped `done` arm, with the read-back still the proof.
+- A membership add that added someone answers `recordsIdsAdded`, the
+  portal's own spelling. The empty duplicate-add no-op stands beside it.
+- List deletion is soft: a deleted list still answers GET 200 carrying
+  `deletedAt`, so a teardown read-back checks that field and never expects
+  a 404, or every deleted list reads as still there.
+- The portal derives a created company's `domain` from the `website` the
+  push set, which is what makes domain search find it afterwards.
+- Auto-company-creation did not fire for either new email domain: with a
+  company already carrying the domain, the portal spawned nothing beside
+  it. The Open item keeps its unmeasured half, whether the setting is
+  readable from the API.
+
+### Sarah's corrections during the run, and what this change builds
+
+Three corrections, each hers, each now in the design:
+
+1. **The unasked checkpoint.** The run reported "no lead source
+   configured" as a settled fact instead of stopping to ask. Her rule, in
+   her words, now in step 10 of the pipeline and the run skill: before the
+   plan is assembled, ask "Are there any other fields that we should be
+   stamping for new or updated accounts and contacts?", with the
+   lead-source value or its absence shown as part of the question. Her
+   call for this portal was to skip it, and the miss was the question,
+   not the field.
+2. **Companies are matched by domain, not name alone.** The run's own
+   evidence: the auto-created company had no name at all and only a
+   domain search found it. `company-queries` now derives a search domain
+   from a company's rows' work emails when the list has no domain column,
+   exactly one distinct non-personal domain or nothing, and says where
+   each domain came from. Companies get the same care as the people on
+   them: a domain hit with no name or a disagreeing name is presented for
+   adoption (blanks-only, an empty name included) or a create-beside.
+3. **Personal addresses get an offer before removal.** Her rule of
+   2026-08-26: gmail, yahoo and kin are removed or enriched to a work
+   email. The new `free-mail` command detects and presents them; the
+   enrichment offer is made before anything is removed, and a found work
+   email is shown, never silently swapped, because the fill-blanks rule
+   protects the source's own email. The detector's provider list is
+   deliberately a presenting aid: an unknown provider passes through, so
+   the cost of an omission is a missed prompt, never a wrong write.
+
+### Un-parked and queued
+
+The Salesforce port is un-parked by her ask of 2026-08-26, the backend
+rule's "user who asks" having happened, and arrives as its own
+design-and-build cycle through the full review order, never as an addition
+to a run session. Her instruction for the plugin itself: a second
+acceptance run end to end on a fresh invented list, with pre-created
+fixtures playing the already-in-HubSpot people, after this change lands.

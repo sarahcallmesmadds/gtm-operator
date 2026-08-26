@@ -19,6 +19,7 @@
  *   node import-leads.js aliases <rows.json>
  *   node import-leads.js personas <rows.json> <personas.json>
  *   node import-leads.js gate <rows.json> <required.json>
+ *   node import-leads.js free-mail <rows.json>
  *   node import-leads.js events <rows.json>
  *   node import-leads.js dedupe-queries <rows.json>
  *   node import-leads.js dedupe <rows.json> <responses.json>
@@ -167,18 +168,54 @@ const commands = {
     const result = configOrExit()
     const rows = readJson(rowsFile)
     const companies = new Map()
+    const byCompany = new Map()
     for (const row of rows) {
       const name = row.fields && row.fields.company
       if (!name) continue
-      if (!companies.has(name)) companies.set(name, { name, domain: null, rows: [] })
+      if (!companies.has(name)) {
+        companies.set(name, { name, domain: null, domainSource: null, rows: [] })
+        byCompany.set(name, [])
+      }
       const entry = companies.get(name)
       entry.rows.push(row.index)
-      if (!entry.domain && row.fields.companyDomain) entry.domain = row.fields.companyDomain
+      byCompany.get(name).push(row)
+      if (!entry.domain && row.fields.companyDomain) {
+        entry.domain = row.fields.companyDomain
+        entry.domainSource = 'column'
+      }
+    }
+    // A list with no domain column still gets a domain lookup where the
+    // rows' own work emails agree on one. Sarah's rule of 2026-08-26, after
+    // the live run proved name search misses what a domain search finds.
+    for (const entry of companies.values()) {
+      if (entry.domain) continue
+      const derived = rules.deriveCompanyDomain(byCompany.get(entry.name))
+      if (derived) {
+        entry.domain = derived.domain
+        entry.domainSource = `derived from ${derived.fromEmails} work email${derived.fromEmails === 1 ? '' : 's'}`
+      }
     }
     console.log(JSON.stringify({
       companies: [...companies.values()],
       requests: hubspot.companySearchRequests(result.config, [...companies.values()]),
-      note: 'Send each and show the candidates with their evidence. The match is the person\'s decision; the alias map holds the answers already settled so they are not re-asked. Rows without a company are handled at the gate, not here.'
+      note:
+        'Send each and show the candidates with their evidence, including where each search domain came from. The match ' +
+        'is the person\'s decision; the alias map holds the answers already settled so they are not re-asked. A domain hit ' +
+        'carrying no name, or a name that disagrees, is presented too: it may be the portal\'s own auto-created company, ' +
+        'and adopting it or creating beside it is the person\'s call. Rows without a company are handled at the gate, not here.'
+    }, null, 2))
+  },
+
+  'free-mail' (rowsFile) {
+    if (!rowsFile) throw new Error('free-mail needs the ingested rows.')
+    const flagged = rules.freeMailRows(readJson(rowsFile))
+    console.log(JSON.stringify({
+      rows: flagged,
+      note: flagged.length
+        ? 'Personal addresses, presented for the person\'s call: removed, or enriched to find the work email. Offer ' +
+          'whatever enrichment the session actually has connected. A found work email is shown, never silently swapped: ' +
+          'the fill-blanks rule protects the source\'s own email, so replacement is the person\'s decision every time.'
+        : 'No personal addresses detected. The detector knows the common consumer providers; one it does not know passes through, so this is an absence of flags, not a guarantee.'
     }, null, 2))
   },
 
