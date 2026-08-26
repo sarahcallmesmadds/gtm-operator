@@ -138,7 +138,13 @@ function searchResults (config, responses) {
         const field = back[name]
         if (field) properties[field] = value
       }
-      const email = properties.email ? String(properties.email).trim().toLowerCase() : null
+      // An email is text or the record is malformed, the same rule the
+      // Salesforce parser holds: a coerced email is an identity nothing
+      // can match, and the unmatched row plans as a duplicate create.
+      if (properties.email !== undefined && typeof properties.email !== 'string') {
+        throw new Error(`Response ${at + 1} holds a result whose email is ${JSON.stringify(properties.email)}, not text. Save what the portal returned, whole: a coerced email is an identity nothing can match.`)
+      }
+      const email = properties.email ? properties.email.trim().toLowerCase() : null
       if (!email) continue
       byEmail[email] = { id: String(result.id), properties }
     }
@@ -602,17 +608,33 @@ function prove (config, plan, pushedIds, readbacks) {
       problems.push({ what: label, why: 'No read-back to compare, so nothing about this write is proved.' })
       return
     }
+    // The id has to be id-shaped before it can bind: String() coercion
+    // matched an object id against an object locator, both spelled
+    // "[object Object]", and proved a write nothing read.
+    if (typeof response.id !== 'string' && typeof response.id !== 'number') {
+      problems.push({
+        what: label,
+        why: `The read-back carries ${JSON.stringify(response.id === undefined ? null : response.id)} for its id, which is not an id, so it cannot be bound to the record it was fetched for. Nothing about this write is proved by it.`
+      })
+      return
+    }
     if (String(response.id) !== String(expectedId)) {
       problems.push({
         what: label,
-        why: `The read-back carries id ${JSON.stringify(response.id === undefined ? null : response.id)} where ${JSON.stringify(String(expectedId))} was fetched, so it answers a different record, and nothing about this write is proved by it.`
+        why: `The read-back carries id ${JSON.stringify(response.id)} where ${JSON.stringify(String(expectedId))} was fetched, so it answers a different record, and nothing about this write is proved by it.`
       })
       return
     }
     for (const [name, sent] of Object.entries(intended.properties)) {
       const got = response.properties[name]
-      if (got === undefined || got === null || String(got) !== String(sent)) {
-        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got === undefined ? null : got)}.` })
+      // The measured portal answers every property as text, so a
+      // non-string is refused rather than coerced equal, the same rule
+      // the Salesforce proof holds: String() read a numeric 42 as a
+      // faithful echo of the string "42".
+      if (typeof got !== 'string') {
+        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got === undefined ? null : got)}, which is not text. A malformed value is refused rather than coerced equal.` })
+      } else if (got !== String(sent)) {
+        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got)}.` })
       } else {
         checked.push({ what: `${label}, ${back[name] || name}` })
       }
@@ -688,6 +710,19 @@ function prove (config, plan, pushedIds, readbacks) {
       // The same rule as the association: a planned write with no read-back
       // fails the proof rather than sliding into unchecked.
       problems.push({ what: `list ${membership.list}`, why: 'No membership read-back was saved, and the plan put rows on this list. Who landed there is unproved, and unproved fails the proof.' })
+      continue
+    }
+    // Membership entries are record ids, string or number, bare or under
+    // recordId; anything else is refused rather than coerced, the same
+    // discipline the Salesforce member proof holds.
+    const idShapedEntry = r => (typeof r === 'string' || typeof r === 'number') ||
+      (r && typeof r === 'object' && !Array.isArray(r) && (typeof r.recordId === 'string' || typeof r.recordId === 'number'))
+    const malformed = response.results.find(r => !idShapedEntry(r))
+    if (malformed !== undefined) {
+      problems.push({
+        what: `list ${membership.list}`,
+        why: `The membership read-back holds ${JSON.stringify(malformed)} where a record id belongs, so this proof refuses to read it. Save the response as it came and look at it.`
+      })
       continue
     }
     const onList = new Set(response.results.map(r => String(typeof r === 'object' ? r.recordId : r)))

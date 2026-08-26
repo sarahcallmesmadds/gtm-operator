@@ -412,6 +412,36 @@ check('a property that came back different is a problem naming both values', () 
   assert.ok(proof.problems.some(p => /row 1, firstname/.test(p.what) && /"Ada"/.test(p.why) && /"Ad"/.test(p.why)))
 })
 
+check('a search result whose email is not text is refused, never coerced into an identity', () => {
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ id: '1', properties: { email: { odd: true } } }] }]), /not text/)
+})
+
+check('a read-back or membership entry whose id is not an id fails the proof instead of coercing', () => {
+  // The round-5 repro: an object read-back id bound to an object pushed
+  // locator, both spelled "[object Object]" by String(), and the row was
+  // marked checked.
+  const objectId = cleanReadbacks()
+  objectId.contacts[1] = { id: { odd: true }, properties: { firstname: 'Ada', lastname: 'Lovelace', email: 'ada@x.com' } }
+  const ids = pushedIds()
+  ids.contacts[1] = {}
+  const first = hubspot.prove(config(), smallPlan(), ids, objectId)
+  assert.ok(first.problems.some(p => /^row 1$/.test(p.what) && /not an id/.test(p.why)))
+
+  const badEntry = cleanReadbacks()
+  badEntry.memberships['Summit - Invited'] = { results: [{ recordId: { odd: true } }] }
+  const second = hubspot.prove(config(), smallPlan(), pushedIds(), badEntry)
+  assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /refuses to read/.test(p.why)))
+})
+
+check('a property that came back as a number is refused by the proof, not coerced equal', () => {
+  const plan = smallPlan()
+  plan.contacts.updates[0].fill = { title: '42' }
+  const readbacks = cleanReadbacks()
+  readbacks.contacts[3] = { id: '301', properties: { jobtitle: 42 } }
+  const proof = hubspot.prove(config(), plan, pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /row 3 \(update\), jobtitle/.test(p.what) && /not text/.test(p.why)))
+})
+
 check('a list lookup with a malformed listId or name is a question, never coerced', () => {
   // A truthy object listId read through String() becomes "[object Object]"
   // and every membership add goes to a list that does not exist; a

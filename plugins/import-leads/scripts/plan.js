@@ -213,8 +213,15 @@ function dedupeVerdicts (rows, existing) {
   // Folded again here, not only at ingest, because enrichment fills emails
   // after ingest as the tool spelled them. Without this, " Ada@X.com " and
   // ada@x.com were two different people to both the in-list check and the
-  // match lookup.
-  const foldEmail = value => String(value).trim().toLowerCase()
+  // match lookup. And an email is text or the rows file is malformed: a
+  // coerced one is an identity nothing can match, so it is refused here
+  // the same way the search parsers refuse it on the CRM side.
+  const foldEmail = value => {
+    if (typeof value !== 'string') {
+      throw new Error(`A row carries ${JSON.stringify(value)} for an email, not text. The rows file is malformed: save the rows as ingest and enrichment produced them.`)
+    }
+    return value.trim().toLowerCase()
+  }
 
   // A replaced address is the same person's identity, so it joins the
   // in-list map too: a row still carrying the original, or two rows that
@@ -853,10 +860,17 @@ function assemble (input) {
           continue
         }
         campaignMemberships.campaigns.matched.push({ name: campaignName, campaignId: String(decision.campaignId) })
+        // The read is validated to its entries, not its shape alone: a
+        // label that is not a non-empty string can never match a grid
+        // status, so every status would plan as a blind create beside
+        // rows that exist, the exact thing the read prevents.
         const read = input.campaignStatuses[campaignName]
-        if (!read || !Array.isArray(read.labels) || typeof read.maxSortOrder !== 'number') {
+        if (!read || !Array.isArray(read.labels) ||
+            read.labels.some(label => typeof label !== 'string' || !label.trim()) ||
+            typeof read.maxSortOrder !== 'number' || !Number.isFinite(read.maxSortOrder)) {
           problems.push(
-            `The campaign "${campaignName}" exists and its member-status rows have not been read ({labels, maxSortOrder}). ` +
+            `The campaign "${campaignName}" exists and its member-status rows have not been read, or the read is malformed ` +
+            '({labels: the status names as non-empty text, maxSortOrder: a number}). ' +
             'Run status-queries and status-judge: planning a status create without looking is how a second copy appears.'
           )
           continue
