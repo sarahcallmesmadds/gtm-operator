@@ -47,13 +47,14 @@ Read this before trusting any of it.
 
 The pipeline's own logic (ingest, mapping, gates, dedupe verdicts, the
 multi-event signals, plan assembly, request building and response judging) is
-covered by the fixture suites in `tests/`. The live surface is not: the
-request shapes are rebuilt from the 2026-08-25 portal measurements, and the
-release gate is one real list run end to end against a portal, verified by
-read-backs and torn down cleanly. Until that run is recorded in
-`DECISIONS.md`, this plugin has not been watched doing its job.
+covered by the fixture suites in `tests/`. The release gate, one real list
+run end to end against a portal with every write proved by read-back and the
+portal torn down to its starting state, has passed twice: the acceptance run
+of 2026-08-26 and a second run the same day on the corrected pipeline, both
+recorded in `DECISIONS.md`.
 
-Unmeasured and deliberately open: what `run` does about the portal
-auto-creating companies from email domains, the email opt-out (HubSpot's
-subscription statuses are a separate surface), batch endpoints, rate limits
-at volume, and the company search surface.
+Unmeasured and deliberately open: whether the portal's auto-company-creation
+setting can be read from the API (the matching half was answered on
+2026-08-26, when the company search gained the domain half beside the name),
+the email opt-out (HubSpot's subscription statuses are a separate surface),
+batch endpoints, and rate limits at volume.

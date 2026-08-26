@@ -20,9 +20,10 @@ run against a live workspace is recorded in `DECISIONS.md`.
 that flow has been run end to end against a live Notion workspace. The
 writing plugins are built and reviewed, and what each one has and has not run
 against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
-`import-leads`, is built to its fixture-provable core and has not run against
-a live portal: its release gate, one real list end to end, is still ahead of
-it.
+`import-leads`, is built and has passed its release gate twice over: two
+acceptance runs against a real portal on 2026-08-26, every write proved by
+read-back and the portal torn down to its starting state each time, recorded
+in `DECISIONS.md`.
 
 **It has been run by its author and by nobody else**, and never against a
 workspace that already had something in it. Every failure it has survived was
@@ -102,7 +103,7 @@ named for the work it does, and owns no database.
 | [`projects`](plugins/projects) | Projects and Tasks | Built |
 | [`software`](plugins/software) | Software | Built |
 | [`calendar`](plugins/calendar) | Calendar | Built |
-| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot | Built to its fixture-provable core. The live acceptance run is its release gate and has not happened |
+| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot | Built. Its release gate, the live acceptance run, passed twice on 2026-08-26; the Salesforce port is designed and unbuilt |
 
 Job plugins come after the foundation ships, not alongside it. `import-leads`
 is the first; outbound email follows.
