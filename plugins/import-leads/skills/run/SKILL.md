@@ -217,9 +217,16 @@ an artifact edit, each on its own explicit yes, before the plan is built.
 **The fields the plugin can carry are its own list fields plus persona,
 owner and the lead source, through config's property map, and name and
 website on a company. An answer naming anything else is refused by name at
-the checkpoint and recorded as a design request**, because the payload
-builders ignore unknown fields, and a stamp that silently cannot be
-written reads as written.
+the checkpoint**, because the payload builders ignore unknown fields, and
+a stamp that silently cannot be written reads as written. Say the refusal
+in the run's own report, with the field named, so the request is on the
+record; the report is the record, and this plugin writes no file for it.
+
+The checkpoint is deliberately a step of the conversation, not a command:
+there is no request to send and no response to judge, and its refusal is
+grounded in the same field lists the gate, the payload builders and
+config's own validation already enforce, so a field waved through here
+still cannot reach a payload.
 
 Then write the inputs file (rows, events output, dedupe output, grid,
 required fields, campaigns, assignments, company decisions, list decisions,

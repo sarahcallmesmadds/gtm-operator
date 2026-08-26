@@ -241,10 +241,14 @@ and both execute only what the approved plan names.**
     miss. An answer naming a field the plugin can carry (its list fields
     plus persona, owner and the lead source on contacts, name and website
     on companies) becomes a config mapping or artifact edit on its own
-    explicit yes; anything else is refused by name at the checkpoint and
-    recorded as a design request, because a stamp that silently cannot be
-    written reads as written. Then the confirmation summary: the whole
-    plan, company creates,
+    explicit yes; anything else is refused by name at the checkpoint,
+    with the refusal said in the run's own report, because a stamp that
+    silently cannot be written reads as written. The checkpoint is
+    deliberately conversational, no command behind it: there is no
+    request to send and no response to judge, and the gate, the payload
+    builders and config's validation enforce the same field lists, so a
+    field waved through in conversation still cannot reach a payload.
+    Then the confirmation summary: the whole plan, company creates,
     contact creates and updates, exclusions, list creates and memberships,
     and the writeback the run will make to the source, shown in full, with
     an explicit yes before any push.
