@@ -63,7 +63,32 @@ function gate (rows, requiredFieldsRules) {
  */
 const EVENT_WORDS = ['webinar', 'conference', 'summit', 'expo', 'event', 'roadshow', 'workshop', 'dinner', 'meetup', 'booth', 'session']
 
-const DATE_LIKE = /^\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(,?\s+\d{4})?)\s*$/i
+const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+\d{4})?)\s*$/i
+
+/**
+ * Shape and plausibility together. The shape alone reported 2026-13-40 as a
+ * date, which is a false signal handed to the person as evidence. An ISO
+ * value has to be a day that exists; a slash form has to be readable as a
+ * real day-and-month in at least one of its two orders, since which order a
+ * list uses is unknowable from one value.
+ */
+function dateLike (value) {
+  const match = DATE_LIKE.exec(String(value))
+  if (!match) return false
+  const [, isoY, isoM, isoD, slashA, slashB, monthDay] = match
+  if (isoY !== undefined) {
+    const at = new Date(Date.UTC(Number(isoY), Number(isoM) - 1, Number(isoD)))
+    return at.getUTCFullYear() === Number(isoY) && at.getUTCMonth() === Number(isoM) - 1 && at.getUTCDate() === Number(isoD)
+  }
+  if (slashA !== undefined) {
+    const a = Number(slashA)
+    const b = Number(slashB)
+    const readable = (day, month) => day >= 1 && day <= 31 && month >= 1 && month <= 12
+    return readable(a, b) || readable(b, a)
+  }
+  const day = Number(monthDay)
+  return day >= 1 && day <= 31
+}
 
 /**
  * The signals a list is really several events or assets wearing one file.
@@ -113,7 +138,7 @@ function eventSignals (rows) {
       })
     }
 
-    const dateValues = distinct.filter(([value]) => DATE_LIKE.test(value))
+    const dateValues = distinct.filter(([value]) => dateLike(value))
     if (dateValues.length && new Set(dateValues.map(([value]) => value)).size > 1) {
       dateColumns.push({ column, distinctDates: dateValues.map(([value]) => value) })
     }
@@ -174,9 +199,15 @@ function dedupeVerdicts (rows, existing) {
     )
   }
 
+  // Folded again here, not only at ingest, because enrichment fills emails
+  // after ingest as the tool spelled them. Without this, " Ada@X.com " and
+  // ada@x.com were two different people to both the in-list check and the
+  // match lookup.
+  const foldEmail = value => String(value).trim().toLowerCase()
+
   const emails = new Map()
   for (const row of rows) {
-    const email = row.fields.email
+    const email = row.fields.email && foldEmail(row.fields.email)
     if (!email) continue
     if (!emails.has(email)) emails.set(email, [])
     emails.get(email).push(row.index)
@@ -190,7 +221,7 @@ function dedupeVerdicts (rows, existing) {
   const unchecked = []
 
   for (const row of rows) {
-    const email = row.fields.email
+    const email = row.fields.email && foldEmail(row.fields.email)
     if (!email) {
       unchecked.push({
         index: row.index,
@@ -217,12 +248,24 @@ function dedupeVerdicts (rows, existing) {
       })
     }
 
+    const blank = field => {
+      const theirs = match.properties ? match.properties[field] : undefined
+      return theirs === undefined || theirs === null || String(theirs).trim() === ''
+    }
     const fill = {}
     for (const [field, value] of Object.entries(row.fields)) {
       if (field === 'email' || field === 'company' || field === 'companyDomain') continue
-      const theirs = match.properties ? match.properties[field] : undefined
-      if (theirs === undefined || theirs === null || String(theirs).trim() === '') fill[field] = value
+      if (blank(field)) fill[field] = value
     }
+    // Persona and owner join the blanks-only fill on the same terms as every
+    // other field: only into a blank, and only carrying a recorded source
+    // (the artifact, routing, or an explicit confirmation). Without this, an
+    // existing contact with a blank persona stayed blank while the write
+    // contract promised the field. The lead source deliberately does not
+    // join: it is create-only, because it records where a NEW contact came
+    // from.
+    if (row.persona && row.personaSource && blank('persona')) fill.persona = row.persona
+    if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && blank('owner')) fill.owner = row.owner
     if (Object.keys(fill).length) {
       verdicts.push({ index: row.index, verdict: 'update', contactId: match.id, fill })
     } else {
@@ -256,6 +299,12 @@ function dedupeVerdicts (rows, existing) {
  * A company the rows name that has no decision is a refusal, because the
  * floor says no contact is pushed without its company matched or planned.
  *
+ * `listDecisions` is the judged list lookups, keyed by realised list name:
+ *   { "<list name>": {"outcome": "exists", "listId": "..."}
+ *   | {"outcome": "absent"} }
+ * A name with no judged lookup is a refusal: matched or planned for
+ * creation means the portal was asked, not assumed.
+ *
  * `resolutions` carries the person's answers to what dedupe presented:
  *   { "excluded": [{"index": n, "why": "..."}] }
  * Every in-list duplicate has to end with all but one of its rows excluded,
@@ -273,6 +322,7 @@ function assemble (input) {
     ['campaigns', 'the campaigns the person decided after the multi-event check'],
     ['assignments', 'the per-row campaign and status assignments'],
     ['companyDecisions', 'the person\'s match-or-create decision per company'],
+    ['listDecisions', 'the judged list lookups: which of the grid\'s lists already exist and which will be created'],
     ['config', 'the plugin config']
   ]) {
     if (input[key] === undefined || input[key] === null) {
@@ -284,6 +334,14 @@ function assemble (input) {
   }
 
   const problems = []
+
+  // AN INCOMPLETE SEARCH BLOCKS THE PLAN. A paged dedupe response means
+  // contacts were withheld, and a withheld contact is a duplicate the plan
+  // would confirm as new. Reporting it and planning anyway would be the
+  // report absolving the plan.
+  for (const incomplete of (input.dedupe.searchIncomplete || [])) {
+    problems.push(`Dedupe search response ${incomplete.response} was incomplete: ${incomplete.why} Re-run the search until it is whole before planning.`)
+  }
   const grid = input.grid
   const wrongGrid = rules.gridProblems(grid)
   if (wrongGrid.length) problems.push(...wrongGrid)
@@ -305,6 +363,15 @@ function assemble (input) {
   const resolutions = input.resolutions || {}
   const excluded = new Map((resolutions.excluded || []).map(entry => [entry.index, entry.why || 'excluded by the person']))
   const decided = new Set(resolutions.decided || [])
+
+  // THE GATE RUNS AGAIN HERE, ON WHAT IS ACTUALLY IN THE PLAN. It ran
+  // earlier in the conversation, but the assembly cannot know that, and a
+  // plan input built without it would push a row with no last name or an
+  // enriched value that names no source. A refused row leaves the plan as an
+  // exclusion or blocks it here by name.
+  for (const refusal of gate(input.rows.filter(row => !excluded.has(row.index)), input.requiredFields).refused) {
+    problems.push(`Row ${refusal.index} fails the gate: ${refusal.gaps.join('; ')}. Fix the source, or exclude the row with its reason.`)
+  }
 
   for (const duplicate of input.dedupe.inListDuplicates || []) {
     const kept = duplicate.rows.filter(index => !excluded.has(index))
@@ -339,6 +406,7 @@ function assemble (input) {
   const contacts = { creates: [], updates: [], nothing: [], excluded: [] }
   const companiesNeeded = new Map()
   const memberships = new Map()
+  const nameToPair = new Map()
 
   for (const row of input.rows) {
     if (excluded.has(row.index)) {
@@ -364,16 +432,20 @@ function assemble (input) {
     }
 
     // Only a create needs the company decision. An update fills blanks on a
-    // contact whose association already exists and is left alone, and a
-    // nothing row writes nothing at all.
+    // contact the CRM already holds, whose associations are the CRM's own
+    // and are left alone by the blanks-only rule, and a nothing row writes
+    // nothing at all. The write contract states this scoping in as many
+    // words.
     const isCreate = !verdict || verdict.verdict === 'create'
     if (isCreate) {
       const company = row.fields.company
       if (!company) {
-        problems.push(`Row ${row.index} has no company and is planned as a create. No contact is pushed without its company matched or planned.`)
+        problems.push(`Row ${row.index} has no company and is planned as a create. No contact is created without its company matched or planned.`)
       } else {
-        if (!companiesNeeded.has(company)) companiesNeeded.set(company, [])
-        companiesNeeded.get(company).push(row.index)
+        if (!companiesNeeded.has(company)) companiesNeeded.set(company, { rows: [], domain: null })
+        const entry = companiesNeeded.get(company)
+        entry.rows.push(row.index)
+        if (!entry.domain && row.fields.companyDomain) entry.domain = row.fields.companyDomain
       }
     }
 
@@ -386,29 +458,79 @@ function assemble (input) {
       if (!campaign) continue // already reported by assignmentProblems
       const name = wrongGrid.length ? null : rules.listName(grid, assignment.campaign, assignment.status)
       if (name === null) continue
+      // TWO PAIRS REALISING ONE NAME IS A COLLISION, NOT A MERGE. The grid's
+      // template can make campaign "A" with status "B - C" and campaign
+      // "A - B" with status "C" spell the same list, and merging them
+      // silently mixes two campaigns' members.
+      const pair = `${assignment.campaign}␟${assignment.status}`
+      if (!nameToPair.has(name)) nameToPair.set(name, pair)
+      else if (nameToPair.get(name) !== pair) {
+        const [otherCampaign, otherStatus] = nameToPair.get(name).split('␟')
+        problems.push(
+          `The grid's naming convention gives one list name, "${name}", to two different assignments: ` +
+          `"${otherCampaign}" with status "${otherStatus}" and "${assignment.campaign}" with status "${assignment.status}". ` +
+          'Their members would silently merge. The campaign names or the convention have to change.'
+        )
+        continue
+      }
       if (!memberships.has(name)) memberships.set(name, [])
       memberships.get(name).push(row.index)
     }
   }
 
+  // Fields that carry judgment need a mapped property to land in, or they
+  // are silently lost between the plan and the payload. The same
+  // both-halves rule the lead source already follows.
+  for (const row of input.rows) {
+    if (excluded.has(row.index)) continue
+    if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && !input.config.properties.contact.owner) {
+      problems.push(`Row ${row.index} carries a confirmed owner and config maps no owner property, so it would be silently lost. Map properties.contact.owner, or take the owner off the row.`)
+    }
+    if (row.persona && row.personaSource && !input.config.properties.contact.persona) {
+      problems.push(`Row ${row.index} carries a persona from the artifact and config maps no persona property, so it would be silently lost. Map properties.contact.persona, or skip the persona step.`)
+    }
+  }
+
   const companies = { creates: [], matched: [], undecided: [] }
-  for (const [name, rowIndexes] of companiesNeeded.entries()) {
+  for (const [name, needed] of companiesNeeded.entries()) {
     const decision = input.companyDecisions[name]
     if (!decision || (decision.decision !== 'match' && decision.decision !== 'create')) {
-      companies.undecided.push({ name, rows: rowIndexes })
-      problems.push(`"${name}" has no match-or-create decision, and rows ${rowIndexes.join(', ')} need it before they can be pushed.`)
+      companies.undecided.push({ name, rows: needed.rows })
+      problems.push(`"${name}" has no match-or-create decision, and rows ${needed.rows.join(', ')} need it before they can be pushed.`)
     } else if (decision.decision === 'match') {
       if (!decision.companyId) {
         problems.push(`"${name}" is decided as a match with no companyId. A match names the record it matched.`)
       } else {
-        companies.matched.push({ name, companyId: String(decision.companyId), rows: rowIndexes })
+        companies.matched.push({ name, companyId: String(decision.companyId), rows: needed.rows })
       }
     } else {
       companies.creates.push({
         name,
-        website: decision.website || null,
-        rows: rowIndexes
+        // The write contract: a created company carries the website when the
+        // list has a domain. The decision's explicit website wins, the rows'
+        // own domain is the fallback, and only when neither exists is the
+        // company created bare.
+        website: decision.website || needed.domain || null,
+        rows: needed.rows
       })
+    }
+  }
+
+  // The status lists: matched, or planned for creation, which needs the
+  // portal to have been asked. A list judged as existing gets its id; one
+  // judged absent is created; a name with no judged lookup blocks, because
+  // creating without looking is how a second copy of an existing list
+  // appears beside the first.
+  const lists = { creates: [], matched: [] }
+  for (const name of [...memberships.keys()].sort()) {
+    const decision = input.listDecisions[name]
+    if (!decision || (decision.outcome !== 'exists' && decision.outcome !== 'absent')) {
+      problems.push(`The list "${name}" has no judged lookup (outcome exists or absent). Run list-queries, send the lookups, judge each response, and pass the outcomes by name.`)
+    } else if (decision.outcome === 'exists') {
+      if (!decision.listId) problems.push(`The list "${name}" is judged as existing with no listId. A match names the record it matched.`)
+      else lists.matched.push({ name, listId: String(decision.listId) })
+    } else {
+      lists.creates.push(name)
     }
   }
 
@@ -439,6 +561,8 @@ function assemble (input) {
       contacts,
       lists: {
         names: [...memberships.keys()].sort(),
+        creates: lists.creates,
+        matched: lists.matched,
         memberships: [...memberships.entries()].map(([name, rowIndexes]) => ({ list: name, rows: rowIndexes.sort((a, b) => a - b) }))
       },
       leadSource: leadSourceValue ? { property: leadSourceProperty, value: leadSourceValue } : null,

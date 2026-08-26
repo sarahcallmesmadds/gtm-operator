@@ -76,6 +76,11 @@ check('duplicate emails collapse before batching', () => {
   assert.strictEqual(requests[0].body.filterGroups[0].filters[0].values.length, 2)
 })
 
+check('emails fold before searching, so an enrichment spelling cannot miss its match', () => {
+  const requests = hubspot.searchRequests(config(), [' Ada@X.com ', 'ada@x.com'])
+  assert.deepStrictEqual(requests[0].body.filterGroups[0].filters[0].values, ['ada@x.com'])
+})
+
 check('search results normalise to contacts by lowercased email, keyed by canonical field', () => {
   const result = hubspot.searchResults(config(), [{
     total: 1,
@@ -111,6 +116,23 @@ check('a create body carries mapped fields, the persona only with its source, an
     lead_source: 'Content'
   })
   assert.ok(!('company' in body.properties) && !('name' in body.properties), 'the company travels as an association, not as a contact property')
+})
+
+check('a sourceless field never enters a create payload, even when the caller skipped the gate', () => {
+  const smuggled = row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' })
+  smuggled.fields.title = 'Invented'
+  delete smuggled.fieldSources.title
+  const body = hubspot.contactCreateBody(config(), smuggled, null)
+  assert.ok(!('jobtitle' in body.properties), 'a value with no source is refused at the payload as well as at the gate')
+})
+
+check('a confirmed owner is written when config maps a property, and a sourceless one never is', () => {
+  const withOwner = config()
+  withOwner.properties.contact.owner = 'hubspot_owner_id'
+  const routed = row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' }, { owner: 'owner-9', ownerSource: 'routing' })
+  assert.strictEqual(hubspot.contactCreateBody(withOwner, routed, null).properties.hubspot_owner_id, 'owner-9')
+  const guessed = row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' }, { owner: 'owner-9' })
+  assert.ok(!('hubspot_owner_id' in hubspot.contactCreateBody(withOwner, guessed, null).properties))
 })
 
 check('a persona with no source never enters a payload', () => {
@@ -150,8 +172,13 @@ const smallPlan = () => ({
     excluded: []
   },
   lists: {
-    names: ['Summit - Invited'],
-    memberships: [{ list: 'Summit - Invited', rows: [1, 2] }]
+    names: ['Summit - Attended', 'Summit - Invited'],
+    creates: ['Summit - Invited'],
+    matched: [{ name: 'Summit - Attended', listId: '702' }],
+    memberships: [
+      { list: 'Summit - Invited', rows: [1, 2] },
+      { list: 'Summit - Attended', rows: [3] }
+    ]
   },
   leadSource: null,
   writeback: { kind: 'none' }
@@ -165,19 +192,47 @@ check('the push emits companies, contacts, associations, lists and memberships, 
   assert.ok(labels.indexOf('create list: Summit - Invited') < labels.indexOf('add to list: Summit - Invited'))
 })
 
-check('associations use the matched id where one exists and a placeholder where it does not yet', () => {
-  const { requests } = hubspot.pushRequests(config(), smallPlan())
+check('placeholders are opaque numbered tokens with a legend, never raw names', () => {
+  const { requests, placeholders } = hubspot.pushRequests(config(), smallPlan())
   const toAcme = requests.find(r => r.label === 'associate: row 1 to Acme')
   const toNavy = requests.find(r => r.label === 'associate: row 2 to Navy')
-  assert.ok(toAcme.url.endsWith('/companies/{company:Acme}'))
+  assert.ok(toAcme.url.endsWith('/companies/{company:1}'), toAcme.url)
   assert.ok(toAcme.url.includes('/contacts/{contact:1}/'))
   assert.ok(toNavy.url.endsWith('/companies/900'), 'a matched company already has its id')
+  assert.deepStrictEqual(placeholders['{company:1}'], { kind: 'company', key: 'Acme' })
+  assert.deepStrictEqual(placeholders['{contact:1}'], { kind: 'contact', key: '1' })
 })
 
-check('memberships carry contact placeholders for the skill to substitute', () => {
+check('a company named like a token cannot corrupt a substitution, because names never enter tokens', () => {
+  const plan = smallPlan()
+  plan.companies.creates[0].name = '{contact:2}'
+  plan.contacts.creates[0].row.fields.company = '{contact:2}'
+  const { requests, placeholders } = hubspot.pushRequests(config(), plan)
+  const associate = requests.find(r => r.label.startsWith('associate: row 1'))
+  assert.ok(associate.url.endsWith('/companies/{company:1}'), associate.url)
+  assert.deepStrictEqual(placeholders['{company:1}'], { kind: 'company', key: '{contact:2}' })
+})
+
+check('memberships reference creates by token and existing contacts by their known id', () => {
   const { requests } = hubspot.pushRequests(config(), smallPlan())
-  const add = requests.find(r => r.label === 'add to list: Summit - Invited')
-  assert.deepStrictEqual(add.body, ['{contact:1}', '{contact:2}'])
+  const invited = requests.find(r => r.label === 'add to list: Summit - Invited')
+  assert.deepStrictEqual(invited.body, ['{contact:1}', '{contact:2}'])
+  const attended = requests.find(r => r.label === 'add to list: Summit - Attended')
+  assert.deepStrictEqual(attended.body, ['301'], 'the update row already has its CRM id, and a placeholder for it would never resolve')
+  assert.ok(attended.url.includes('/lists/702/'), 'a matched list is addressed by its id, not created again')
+  assert.ok(invited.url.includes('/lists/{list:1}/'))
+})
+
+check('only lists judged absent are created; matched lists get no create request', () => {
+  const { requests } = hubspot.pushRequests(config(), smallPlan())
+  assert.ok(requests.find(r => r.label === 'create list: Summit - Invited'))
+  assert.ok(!requests.find(r => r.label === 'create list: Summit - Attended'))
+})
+
+check('a membership row with no known id and no planned create is refused as the plan bug it is', () => {
+  const plan = smallPlan()
+  plan.lists.memberships[0].rows.push(99)
+  assert.throws(() => hubspot.pushRequests(config(), plan), /Row 99/)
 })
 
 check('an update goes to the existing record and carries only the fill', () => {
@@ -196,12 +251,25 @@ check('a body with an id judges as created', () => {
 
 check('the duplicate create refusal carries the existing id out of the error text, and is never an update', () => {
   const judged = hubspot.judgeResponse(
-    { method: 'POST', url: 'x', label: 'create' },
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/contacts', label: 'create' },
     { status: 'error', category: 'CONFLICT', message: 'Contact already exists. Existing ID: 12345' }
   )
   assert.strictEqual(judged.outcome, 'conflict')
   assert.strictEqual(judged.existingId, '12345')
   assert.ok(/nothing here turns it into an update/.test(judged.why))
+})
+
+check('the duplicate reading is scoped to a contact create: the same words on any other request judge as failed', () => {
+  const companyCreate = hubspot.judgeResponse(
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/companies', label: 'create company' },
+    { status: 'error', category: 'CONFLICT', message: 'Existing ID: 999' }
+  )
+  assert.strictEqual(companyCreate.outcome, 'failed', 'a company error is not a duplicate person')
+  const patch = hubspot.judgeResponse(
+    { method: 'PATCH', url: hubspot.BASE + '/crm/v3/objects/contacts/301', label: 'update' },
+    { status: 'error', category: 'VALIDATION_ERROR', message: 'bad value near Existing ID: 55' }
+  )
+  assert.strictEqual(patch.outcome, 'failed')
 })
 
 check('an empty response to a membership add is the measured silent no-op, pointed at the read-back', () => {
@@ -241,7 +309,10 @@ const cleanReadbacks = () => ({
     2: { results: [{ toObjectId: 900 }] }
   },
   companies: { Acme: { id: '601', properties: { name: 'Acme', website: 'acme.example' } } },
-  memberships: { 'Summit - Invited': { results: [{ recordId: '501' }, { recordId: '502' }] } }
+  memberships: {
+    'Summit - Invited': { results: [{ recordId: '501' }, { recordId: '502' }] },
+    'Summit - Attended': { results: [{ recordId: '301' }] }
+  }
 })
 
 check('a clean set of read-backs proves every planned write and still names what it did not check', () => {
@@ -279,6 +350,40 @@ check('a missing read-back is a problem for the record it belongs to', () => {
   delete readbacks.contacts[2]
   const proof = hubspot.prove(config(), smallPlan(), pushedIds(), readbacks)
   assert.ok(proof.problems.some(p => /row 2/.test(p.what) && /No read-back/.test(p.why)))
+})
+
+check('an ABSENT association or membership read-back fails the proof: skipping the fetch cannot pass', () => {
+  const noAssociation = cleanReadbacks()
+  delete noAssociation.associations[1]
+  const first = hubspot.prove(config(), smallPlan(), pushedIds(), noAssociation)
+  assert.ok(first.problems.some(p => /row 1 association/.test(p.what) && /unproved fails the proof/.test(p.why)))
+
+  const noMembership = cleanReadbacks()
+  delete noMembership.memberships['Summit - Invited']
+  const second = hubspot.prove(config(), smallPlan(), pushedIds(), noMembership)
+  assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /unproved fails the proof/.test(p.why)))
+})
+
+check('readbackRequests fetches updates by the id the plan carried, not only the pushed creates', () => {
+  const requests = hubspot.readbackRequests(config(), smallPlan(), pushedIds())
+  const update = requests.find(r => r.label === 'read back contact: row 3')
+  assert.ok(update, 'the update read-back is requested')
+  assert.ok(update.url.includes('/crm/v3/objects/contacts/301?'))
+})
+
+// -------------------------------------------------------------- list lookups
+
+check('list lookups are one GET per name, url-encoded', () => {
+  const requests = hubspot.listLookupRequests(['Summit - Invited'])
+  assert.strictEqual(requests[0].method, 'GET')
+  assert.ok(requests[0].url.endsWith('/crm/v3/lists/object-type-id/0-1/name/Summit%20-%20Invited'))
+})
+
+check('a lookup judges exists with its id, not-found as absent, and anything else as a question', () => {
+  assert.deepStrictEqual(hubspot.judgeListLookup({ list: { listId: 701 } }), { outcome: 'exists', listId: '701' })
+  assert.strictEqual(hubspot.judgeListLookup({ status: 'error', category: 'NOT_FOUND', message: 'no list by that name' }).outcome, 'absent')
+  assert.strictEqual(hubspot.judgeListLookup('ok').outcome, 'unknown')
+  assert.strictEqual(hubspot.judgeListLookup({ status: 'error', category: 'RATE_LIMIT', message: 'slow down' }).outcome, 'unknown', 'an unrecognised error read as absent would create a duplicate list')
 })
 
 // -------------------------------------------------------------------- probe

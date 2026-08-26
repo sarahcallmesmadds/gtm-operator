@@ -150,6 +150,48 @@ check('raw search responses are refused: dedupe reads only the judged results', 
   assert.throws(() => plan.dedupeVerdicts([], { results: [] }), /byEmail/)
 })
 
+check('an email enrichment spelled loosely still matches and still collides in-list', () => {
+  // Enrichment fills emails after ingest, as the tool spelled them. Both the
+  // match lookup and the in-list check fold before comparing.
+  const loose = row(1, { firstName: 'Ada', lastName: 'Lovelace' })
+  loose.fields.email = ' Ada@X.com '
+  loose.fieldSources.email = 'enrichment:some-tool'
+  const twin = row(2, { firstName: 'Ada', lastName: 'L', email: 'ada@x.com' })
+  const result = plan.dedupeVerdicts([loose, twin], existing({
+    'ada@x.com': { id: '7', properties: { email: 'ada@x.com', firstName: 'Ada', lastName: 'Lovelace' } }
+  }))
+  assert.ok(result.verdicts.every(v => v.verdict !== 'create'), 'both spellings matched the existing record')
+  assert.deepStrictEqual(result.inListDuplicates, [{ email: 'ada@x.com', rows: [1, 2] }])
+})
+
+check('persona and owner join the blanks-only fill, never over a value already there, and lead source does not', () => {
+  const carrying = row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@x.com' },
+    { persona: 'Marketing Leader', personaSource: 'personas-artifact', owner: 'owner-9', ownerSource: 'routing' })
+  const blankBoth = plan.dedupeVerdicts([carrying], existing({
+    'ada@x.com': { id: '7', properties: { email: 'ada@x.com', firstName: 'Ada', lastName: 'Lovelace' } }
+  }))
+  assert.strictEqual(blankBoth.verdicts[0].fill.persona, 'Marketing Leader')
+  assert.strictEqual(blankBoth.verdicts[0].fill.owner, 'owner-9')
+
+  const filledBoth = plan.dedupeVerdicts([carrying], existing({
+    'ada@x.com': { id: '7', properties: { email: 'ada@x.com', firstName: 'Ada', lastName: 'Lovelace', persona: 'Technology Leader', owner: 'owner-1' } }
+  }))
+  assert.strictEqual(filledBoth.verdicts[0].verdict, 'nothing', 'a persona or owner already there is never overwritten')
+})
+
+check('an impossible date is not date evidence: shape alone reported 2026-13-40 as a signal', () => {
+  const rows = [
+    row(1, {}, { source: { Notes: '2026-02-31' } }),
+    row(2, {}, { source: { Notes: '2026-13-40' } })
+  ]
+  assert.deepStrictEqual(plan.eventSignals(rows).dateColumns, [])
+  const real = [
+    row(1, {}, { source: { Notes: '2026-09-10' } }),
+    row(2, {}, { source: { Notes: 'Oct 2, 2026' } })
+  ]
+  assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'Notes'), 'real dates still signal')
+})
+
 // ------------------------------------------------------------- the assembly
 
 const goodInput = () => ({
@@ -175,6 +217,10 @@ const goodInput = () => ({
     { index: 2, campaign: 'Autumn Summit', status: 'Attended' }
   ],
   companyDecisions: { Acme: { decision: 'create', website: 'acme.example' } },
+  listDecisions: {
+    'Autumn Summit - Invited': { outcome: 'absent' },
+    'Autumn Summit - Attended': { outcome: 'exists', listId: '701' }
+  },
   resolutions: {},
   config: {
     properties: { contact: { email: 'email' }, company: { name: 'name', website: 'website' } }
@@ -188,9 +234,78 @@ check('a complete set of decided inputs assembles the whole plan', () => {
   assert.strictEqual(result.plan.contacts.updates.length, 1)
   assert.deepStrictEqual(result.plan.companies.creates, [{ name: 'Acme', website: 'acme.example', rows: [1] }])
   assert.deepStrictEqual(result.plan.lists.names, ['Autumn Summit - Attended', 'Autumn Summit - Invited'])
+  assert.deepStrictEqual(result.plan.lists.creates, ['Autumn Summit - Invited'], 'a list judged absent is planned for creation')
+  assert.deepStrictEqual(result.plan.lists.matched, [{ name: 'Autumn Summit - Attended', listId: '701' }], 'a list judged existing is matched by its id')
   assert.deepStrictEqual(result.plan.lists.memberships.find(m => m.list === 'Autumn Summit - Invited').rows, [1])
   assert.strictEqual(result.plan.writeback.kind, 'none')
   assert.strictEqual(result.plan.leadSource, null)
+})
+
+check('a list with no judged lookup blocks the plan: matched or planned means the portal was asked', () => {
+  const input = goodInput()
+  delete input.listDecisions['Autumn Summit - Invited']
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /"Autumn Summit - Invited" has no judged lookup/.test(p)))
+})
+
+check('an incomplete dedupe search blocks the plan: a withheld contact is an unseen duplicate', () => {
+  const input = goodInput()
+  input.dedupe.searchIncomplete = [{ response: 1, why: 'The response carries paging, so results were withheld.' }]
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /incomplete/.test(p) && /Re-run the search/.test(p)))
+})
+
+check('the assembly re-runs the gate: a sourceless value or a missing name cannot slip between the steps', () => {
+  const input = goodInput()
+  input.rows[0].fields.title = 'Countess'
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /Row 1 fails the gate/.test(p) && /names no source/.test(p)))
+
+  const nameless = goodInput()
+  delete nameless.rows[1].fields.lastName
+  delete nameless.rows[1].fieldSources.lastName
+  assert.ok(plan.assemble(nameless).problems.some(p => /Row 2 fails the gate/.test(p) && /lastName/.test(p)))
+})
+
+check('two assignments realising one list name are a collision, named with both pairs', () => {
+  const input = goodInput()
+  input.grid.types.Event.push('B - Invited')
+  input.campaigns.push({ name: 'Autumn Summit - B', type: 'Event' })
+  input.rows.push(row(3, { firstName: 'Mary', lastName: 'Shelley', email: 'mary@x.com', company: 'Acme' }))
+  input.dedupe.verdicts.push({ index: 3, verdict: 'create' })
+  input.assignments = [
+    { index: 1, campaign: 'Autumn Summit', status: 'B - Invited' },
+    { index: 3, campaign: 'Autumn Summit - B', status: 'Invited' },
+    { index: 2, campaign: 'Autumn Summit', status: 'Attended' }
+  ]
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /one list name, "Autumn Summit - B - Invited", to two different assignments/.test(p)))
+})
+
+check('a created company takes its website from the rows\' domain when the decision gives none', () => {
+  const input = goodInput()
+  input.companyDecisions = { Acme: { decision: 'create' } }
+  input.rows[0].fields.companyDomain = 'acme-from-list.example'
+  input.rows[0].fieldSources.companyDomain = 'list'
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.strictEqual(result.plan.companies.creates[0].website, 'acme-from-list.example')
+})
+
+check('a confirmed owner with no mapped owner property blocks rather than silently vanishing', () => {
+  const input = goodInput()
+  input.rows[0].owner = 'owner-9'
+  input.rows[0].ownerSource = 'confirmed'
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /maps no owner property/.test(p)))
+
+  input.config.properties.contact.owner = 'hubspot_owner_id'
+  assert.strictEqual(plan.assemble(input).ok, true, 'with the property mapped, the confirmed owner assembles')
 })
 
 check('a missing input is refused by name, and campaign setup without the multi-event check is refused', () => {
@@ -261,6 +376,7 @@ check('an owner with no recorded source is refused: routing or explicit confirma
   assert.ok(result.problems.some(p => /owner with no recorded source/.test(p)))
 
   input.rows[0].ownerSource = 'confirmed'
+  input.config.properties.contact.owner = 'hubspot_owner_id'
   assert.strictEqual(plan.assemble(input).ok, true)
 })
 

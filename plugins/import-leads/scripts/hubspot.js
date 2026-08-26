@@ -71,7 +71,12 @@ const SEARCH_BATCH = 100
  */
 function searchRequests (config, emails) {
   if (!Array.isArray(emails)) throw new Error('searchRequests needs the list of emails to look for.')
-  const unique = [...new Set(emails.filter(e => typeof e === 'string' && e.trim()))]
+  // Folded here as well as at ingest, because enrichment fills emails after
+  // ingest and hands them over as the tool spelled them. An unfolded email
+  // searched verbatim misses its folded match and the row plans as a create.
+  const unique = [...new Set(
+    emails.filter(e => typeof e === 'string' && e.trim()).map(e => e.trim().toLowerCase())
+  )]
   const requests = []
   for (let at = 0; at < unique.length; at += SEARCH_BATCH) {
     const batch = unique.slice(at, at + SEARCH_BATCH)
@@ -172,20 +177,28 @@ function companySearchRequests (config, companies) {
 // -------------------------------------------------------------------- writes
 
 /**
- * The properties payload for a contact create. Only fields with sources, and
- * the lead-source value when the plan carries one. Persona goes in only when
- * config maps a property for it and the row's persona names its source.
+ * The properties payload for a contact create. Only fields that name a
+ * source, enforced here as well as at the gate, because a payload builder
+ * that trusts its caller to have gated is one refactor away from writing an
+ * unsourced value. The lead-source value goes on creates only: it records
+ * where a new contact came from, and stamping it onto contacts that already
+ * existed would claim this import brought them in. Persona and owner go in
+ * only when config maps a property for them and the value names its source.
  */
 function contactCreateBody (config, row, leadSource) {
   const properties = {}
   for (const [field, value] of Object.entries(row.fields)) {
     if (field === 'company' || field === 'companyDomain') continue
+    if (!(row.fieldSources && row.fieldSources[field])) continue
     const name = contactProperty(config, field)
     if (!name) continue
     properties[name] = value
   }
   if (row.persona && row.personaSource && contactProperty(config, 'persona')) {
     properties[contactProperty(config, 'persona')] = row.persona
+  }
+  if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && contactProperty(config, 'owner')) {
+    properties[contactProperty(config, 'owner')] = row.owner
   }
   if (leadSource) properties[leadSource.property] = leadSource.value
   return { properties }
@@ -203,16 +216,92 @@ function contactUpdateBody (config, fill) {
 }
 
 /**
+ * The lookups for the status lists the grid names: matched, or planned for
+ * creation, which means asking the portal before planning a create. One GET
+ * by name per list. THE BY-NAME ENDPOINT IS UNMEASURED: the measured list
+ * surface is create, add and read membership. The live run proves this one,
+ * and `judgeListLookup` refuses shapes it does not recognise rather than
+ * reading absence into them.
+ */
+function listLookupRequests (names) {
+  if (!Array.isArray(names)) throw new Error('listLookupRequests needs the list names the grid realised.')
+  return names.map(name => spec(
+    `list lookup: ${name}`,
+    'GET',
+    `/crm/v3/lists/object-type-id/0-1/name/${encodeURIComponent(name)}`
+  ))
+}
+
+/**
+ * What a saved list lookup means: `exists` with the listId, `absent` for the
+ * portal's not-found refusal, `unknown` for anything else. Absent plans a
+ * create; unknown is a question, because reading an unrecognised answer as
+ * absent is how a second `Summit - Invited` gets created beside the first.
+ */
+function judgeListLookup (response) {
+  if (response && typeof response === 'object') {
+    if (response.list && (response.list.listId || response.list.listId === 0)) {
+      return { outcome: 'exists', listId: String(response.list.listId) }
+    }
+    if (response.listId || response.listId === 0) {
+      return { outcome: 'exists', listId: String(response.listId) }
+    }
+    if (response.status === 'error' || response.category || response.message) {
+      const text = `${response.category || ''} ${response.message || ''}`
+      if (/NOT_FOUND|does not exist|404/i.test(text)) return { outcome: 'absent' }
+      return { outcome: 'unknown', why: `The portal answered with an error this does not recognise as not-found: ${response.message || response.category}.` }
+    }
+  }
+  return { outcome: 'unknown', why: 'The response is not a shape whose meaning is known here. Reading it as absent would create a duplicate list, so it is a question instead.' }
+}
+
+/**
  * The push, as request specs in dependency order: companies first, then
- * contacts, then associations, then lists, then memberships. Associations
- * and memberships reference records by the placeholders `{company:<name>}`,
- * `{contact:<row index>}` and `{list:<name>}`, because the ids do not exist
- * until the earlier requests return; the skill substitutes each id as it
- * arrives, and `judge-push` folds the measured refusals and no-ops into the
- * report instead of treating them as errors.
+ * contacts, then associations, then lists, then memberships.
+ *
+ * PLACEHOLDERS ARE OPAQUE TOKENS, `{company:1}`, `{contact:12}`, `{list:2}`,
+ * numbered rather than named, with the legend in `placeholders`. An earlier
+ * version embedded raw company and list names in the tokens, so a company
+ * whose name contained a brace, a slash or another token's spelling could
+ * corrupt a URL or another substitution. A digit can do none of that. The
+ * contact number is the row index; company and list numbers count through
+ * the plan's creates. Records that already have ids (matched companies,
+ * update and nothing rows) are referenced by those ids directly.
  */
 function pushRequests (config, plan) {
   const requests = []
+  const placeholders = {}
+
+  const companyToken = new Map()
+  plan.companies.creates.forEach((company, at) => {
+    const token = `{company:${at + 1}}`
+    companyToken.set(company.name, token)
+    placeholders[token] = { kind: 'company', key: company.name }
+  })
+  const listToken = new Map()
+  ;(plan.lists.creates || []).forEach((name, at) => {
+    const token = `{list:${at + 1}}`
+    listToken.set(name, token)
+    placeholders[token] = { kind: 'list', key: name }
+  })
+  for (const create of plan.contacts.creates) {
+    placeholders[`{contact:${create.index}}`] = { kind: 'contact', key: String(create.index) }
+  }
+
+  /**
+   * A contact reference for a membership add: creates do not have ids yet
+   * and get their token; updates and nothing rows already carry the CRM's
+   * own id, and using it directly is what lets an existing contact land on
+   * a list at all.
+   */
+  const contactRef = index => {
+    const create = plan.contacts.creates.find(c => c.index === index)
+    if (create) return `{contact:${index}}`
+    const known = plan.contacts.updates.find(u => u.index === index) ||
+      plan.contacts.nothing.find(n => n.index === index)
+    if (known && known.contactId) return String(known.contactId)
+    throw new Error(`Row ${index} is on a membership and is neither a planned create nor a row with a known contact id. The plan is inconsistent, and this is a bug in this plugin, not in the list.`)
+  }
 
   for (const company of plan.companies.creates) {
     const properties = { [config.properties.company.name]: company.name }
@@ -229,7 +318,7 @@ function pushRequests (config, plan) {
 
   const companyIdFor = name => {
     const matched = plan.companies.matched.find(m => m.name === name)
-    return matched ? matched.companyId : `{company:${name}}`
+    return matched ? matched.companyId : companyToken.get(name)
   }
   for (const create of plan.contacts.creates) {
     const company = create.row.fields.company
@@ -241,26 +330,32 @@ function pushRequests (config, plan) {
     ))
   }
 
-  for (const name of plan.lists.names) {
+  for (const name of (plan.lists.creates || [])) {
     requests.push(spec(`create list: ${name}`, 'POST', '/crm/v3/lists', {
       name,
       objectTypeId: '0-1',
       processingType: 'MANUAL'
     }))
   }
+  const listIdFor = name => {
+    const matched = (plan.lists.matched || []).find(m => m.name === name)
+    return matched ? matched.listId : listToken.get(name)
+  }
   for (const membership of plan.lists.memberships) {
     requests.push(spec(
       `add to list: ${membership.list}`,
       'PUT',
-      `/crm/v3/lists/{list:${membership.list}}/memberships/add`,
-      membership.rows.map(index => `{contact:${index}}`)
+      `/crm/v3/lists/${listIdFor(membership.list)}/memberships/add`,
+      membership.rows.map(contactRef)
     ))
   }
 
   return {
     requests,
+    placeholders,
     note:
-      'Send in this order, substituting each returned id into the placeholders before sending the request that carries them. ' +
+      'Send in this order. Every `{kind:number}` token stands for an id that does not exist yet; `placeholders` says which ' +
+      'record each one is, and as each create returns its id, substitute it for that exact token in the later requests. ' +
       'One record failing does not stop the rest: partial success is per record, and judge-push reads the saved responses. ' +
       'Nothing beyond these requests is approved.'
   }
@@ -289,8 +384,13 @@ function judgeResponse (request, response) {
   }
   if (typeof response === 'object' && (response.status === 'error' || response.category || response.message)) {
     const text = String(response.message || '')
+    // The duplicate-contact reading is scoped to the request it was measured
+    // on: a contact create refused as CONFLICT. Read off any other request,
+    // an incidental "Existing ID" in an error would misreport a company or
+    // an update failure as a duplicate person.
+    const isContactCreate = request.method === 'POST' && request.url.endsWith('/crm/v3/objects/contacts')
     const existing = /Existing ID:\s*(\d+)/.exec(text)
-    if (existing) {
+    if (isContactCreate && response.category === 'CONFLICT' && existing) {
       return {
         outcome: 'conflict',
         existingId: existing[1],
@@ -306,13 +406,21 @@ function judgeResponse (request, response) {
 
 // ----------------------------------------------------------------- read-backs
 
-/** The read-back fetches for everything the push claims to have written. */
+/**
+ * The read-back fetches for everything the push claims to have written:
+ * created contacts by the ids the push returned, updated contacts by the
+ * ids the plan already carried (an update is a write like any other, and an
+ * unread one is unproved), companies and list memberships.
+ */
 function readbackRequests (config, plan, pushedIds) {
   const requests = []
   const properties = contactPropertyNames(config).join(',')
   for (const [key, id] of Object.entries(pushedIds.contacts || {})) {
     requests.push(spec(`read back contact: row ${key}`, 'GET', `/crm/v3/objects/contacts/${id}?properties=${properties}`))
     requests.push(spec(`read back associations: row ${key}`, 'GET', `/crm/v4/objects/contacts/${id}/associations/companies`))
+  }
+  for (const update of plan.contacts.updates) {
+    requests.push(spec(`read back contact: row ${update.index}`, 'GET', `/crm/v3/objects/contacts/${update.contactId}?properties=${properties}`))
   }
   for (const [name, id] of Object.entries(pushedIds.companies || {})) {
     requests.push(spec(`read back company: ${name}`, 'GET',
@@ -368,7 +476,10 @@ function prove (config, plan, pushedIds, readbacks) {
       const expected = (plan.companies.matched.find(m => m.name === company) || {}).companyId ||
         (pushedIds.companies || {})[company]
       if (!association || !Array.isArray(association.results)) {
-        unchecked.push({ what: `row ${create.index} association`, why: 'No association read-back was saved, so whether the company association landed is not checked.' })
+        // A PROBLEM, NOT AN UNCHECKED. The plan promised this association,
+        // so a proof with no read-back for it must fail, or a run that
+        // skipped every association fetch would exit clean.
+        problems.push({ what: `row ${create.index} association`, why: 'No association read-back was saved, and the plan promised this association. It is unproved, and unproved fails the proof.' })
       } else if (!expected) {
         problems.push({ what: `row ${create.index} association`, why: `No company id is known for "${company}", so the association cannot be checked against the right record.` })
       } else if (!association.results.some(r => String(r.toObjectId) === String(expected))) {
@@ -398,7 +509,9 @@ function prove (config, plan, pushedIds, readbacks) {
   for (const membership of plan.lists.memberships) {
     const response = (readbacks.memberships || {})[membership.list]
     if (!response || !Array.isArray(response.results)) {
-      unchecked.push({ what: `list ${membership.list}`, why: 'No membership read-back was saved, so who landed on this list is not checked.' })
+      // The same rule as the association: a planned write with no read-back
+      // fails the proof rather than sliding into unchecked.
+      problems.push({ what: `list ${membership.list}`, why: 'No membership read-back was saved, and the plan put rows on this list. Who landed there is unproved, and unproved fails the proof.' })
       continue
     }
     const onList = new Set(response.results.map(r => String(typeof r === 'object' ? r.recordId : r)))
@@ -454,6 +567,8 @@ module.exports = {
   searchRequests,
   searchResults,
   companySearchRequests,
+  listLookupRequests,
+  judgeListLookup,
   contactCreateBody,
   contactUpdateBody,
   pushRequests,

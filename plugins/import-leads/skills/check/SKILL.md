@@ -66,6 +66,9 @@ Never go looking for a list. When one is named:
    floor or the org's rule, with the failing field named per row.
 3. `dedupe-queries` and `dedupe`: how many rows would be new, how many match
    existing records, and which are ambiguous.
+4. `personas`, only when the artifact exists: which titles come back flagged
+   for review. Skip the step without complaint when there is no artifact,
+   and then do not promise persona findings the report never computed.
 
 Report the kinds of not-ready separately, because collapsing them into one
 number would make the preview useless:

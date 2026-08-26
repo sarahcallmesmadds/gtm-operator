@@ -73,21 +73,44 @@ function parseCsv (text) {
   let record = []
   let cell = ''
   let inQuotes = false
+  let justClosed = false
+  let line = 1
   let i = 0
 
+  // MALFORMED QUOTING IS REFUSED, NOT REPAIRED. A quote opening mid-cell
+  // (`ab"cd"`) and text following a closing quote (`"a"x`) both used to
+  // parse silently with the quotes dropped, which is a parser quietly
+  // rewriting data. Excel and every exporter that quotes at all produce
+  // neither, so meeting one means the file is mangled, and a mangled file
+  // is fixed or re-exported rather than guessed at.
   while (i < body.length) {
     const ch = body[i]
     if (inQuotes) {
       if (ch === '"') {
         if (body[i + 1] === '"') { cell += '"'; i += 2; continue }
-        inQuotes = false; i += 1; continue
+        inQuotes = false; justClosed = true; i += 1; continue
       }
+      if (ch === '\n') line += 1
       cell += ch; i += 1; continue
     }
-    if (ch === '"') { inQuotes = true; i += 1; continue }
-    if (ch === ',') { record.push(cell); cell = ''; i += 1; continue }
-    if (ch === '\r' && body[i + 1] === '\n') { record.push(cell); records.push(record); record = []; cell = ''; i += 2; continue }
-    if (ch === '\n' || ch === '\r') { record.push(cell); records.push(record); record = []; cell = ''; i += 1; continue }
+    if (justClosed && ch !== ',' && ch !== '\n' && ch !== '\r') {
+      throw new Error(
+        `Line ${line}: there is text after a closing quote (…"${ch}…). A quoted cell ends at its quote, so this file is ` +
+        'malformed, and parsing on would silently rewrite it. Fix the file, or export it again.'
+      )
+    }
+    if (ch === '"') {
+      if (cell !== '') {
+        throw new Error(
+          `Line ${line}: a quote opens in the middle of a cell (after "${cell}"). A quoted cell starts at its quote, so this ` +
+          'file is malformed, and parsing on would silently drop the quote. Fix the file, or export it again.'
+        )
+      }
+      inQuotes = true; i += 1; continue
+    }
+    if (ch === ',') { record.push(cell); cell = ''; justClosed = false; i += 1; continue }
+    if (ch === '\r' && body[i + 1] === '\n') { record.push(cell); records.push(record); record = []; cell = ''; justClosed = false; line += 1; i += 2; continue }
+    if (ch === '\n' || ch === '\r') { record.push(cell); records.push(record); record = []; cell = ''; justClosed = false; line += 1; i += 1; continue }
     cell += ch; i += 1
   }
   if (inQuotes) {
@@ -97,6 +120,10 @@ function parseCsv (text) {
 
   // A trailing newline leaves one empty record; an entirely blank line inside
   // the file is skipped the same way rather than becoming an all-blank row.
+  // A line holding only `""` lands here too and is skipped as blank: an
+  // empty quoted cell alone on a line carries nothing a row could be built
+  // from, and this sentence is here so the choice is a choice, not an
+  // accident.
   return records.filter(r => !(r.length === 1 && r[0] === ''))
 }
 
