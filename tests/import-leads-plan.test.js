@@ -427,6 +427,17 @@ check('a create whose company has no decision is refused: matched or planned, ne
   assert.ok(result.problems.some(p => /"Acme" has no match-or-create decision/.test(p)))
 })
 
+check('a match decision whose companyId is not an id is refused, never coerced into the plan', () => {
+  // THE ROUND-7 REPRO: an object companyId String()-coerced to
+  // "[object Object]" rode into the plan as the id every push and proof
+  // then compared against.
+  const input = goodInput()
+  input.companyDecisions = { Acme: { decision: 'match', companyId: { odd: true } } }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /"Acme"/.test(p) && /not an id/.test(p)))
+})
+
 check('a create with no company at all is refused by the floor', () => {
   const input = goodInput()
   delete input.rows[0].fields.company

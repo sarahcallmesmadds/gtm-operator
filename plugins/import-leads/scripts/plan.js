@@ -775,6 +775,11 @@ function assemble (input) {
     } else if (decision.decision === 'match') {
       if (!decision.companyId) {
         problems.push(`"${name}" is decided as a match with no companyId. A match names the record it matched.`)
+      } else if (typeof decision.companyId !== 'string' && typeof decision.companyId !== 'number') {
+        // The id has to be id-shaped before it enters the plan: String()
+        // would spell an object "[object Object]" into the id every push
+        // and proof then compares against (round 7).
+        problems.push(`"${name}" is decided as a match whose companyId is ${JSON.stringify(decision.companyId)}, not an id. A match names the record it matched.`)
       } else {
         const entry = { name, companyId: String(decision.companyId), rows: needed.rows }
         if (decision.fill && Object.keys(decision.fill).length) {
