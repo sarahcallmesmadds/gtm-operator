@@ -31,8 +31,8 @@ measure. The rebuild rule, her call on 2026-08-25:
 the hard-won refinements carry over as they are. What moves is identity, not
 logic, and identity moves into these homes:
 
-- **Config holds identifiers.** The portal, the property-name map, file
-  paths.
+- **Config holds identifiers.** The backend, the portal or the org alias,
+  the name maps, file paths.
 - **Process holds judgment.** The rules the organisation decided, written as
   artifacts a person and a skill can both read.
 - **The run confirms the rest.** Anything that is neither an identifier nor a
@@ -88,8 +88,10 @@ artifact-type taxonomy, so a team can keep it in a repo and change it by pull
 request.
 
 **This plugin writes its own config, once, with confirmation.** On a first run
-with no config, either skill stops, says what it needs (the portal, the
-property names, where the key lives, the alias-map path), searches for what
+with no config, either skill stops, says what it needs for the backend it is
+being pointed at (the `crm`; on HubSpot the portal, the property names and
+where the key lives; on Salesforce the org alias, the field names and any
+record-type ids; and the alias-map path either way), searches for what
 it can find rather than asking
 anyone to type what it could look up, shows what it will record, and writes
 the file on an explicit yes. The foundation's config stays `setup`'s alone;
@@ -144,7 +146,10 @@ state and country, and a LinkedIn URL where the org maps a property for it.
 From the flow: the company association on a created contact, which on
 Salesforce is the contact's own `AccountId` field, one write rather than a
 second call; membership of what the grid names, status lists on HubSpot and
-the campaign with its native member status on Salesforce; the lead-source
+the campaign with its native member status on Salesforce; on Salesforce
+only, the Marketing User flag on the operator's own User record, written
+only when a plan needs a campaign while the flag is off, carried as its
+own named line in the plan and never implied; the lead-source
 value from the required-fields artifact, on creates only, because it records
 where a new contact came from and stamping it onto contacts that already
 existed would claim them; the owner, only through routing or explicit
@@ -184,7 +189,10 @@ companies and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
 above, its own config, and the alias map that config names. Writes what the
 approved plan names and nothing else: contact creates and updates, company
-creates and associations, list creates and memberships, and the writeback
+creates and associations, the membership writes (list creates and
+memberships on HubSpot; campaign, member-status and campaign-member
+creates on Salesforce, with the Marketing User flag fix when the plan
+carries it), and the writeback
 to a Notion source, into blank fields only. All of it sits behind one
 confirmation.
 
@@ -239,18 +247,22 @@ and both execute only what the approved plan names.**
    rather than letting it happen silently; what `run` ultimately does about
    the portal's behaviour is deliberately Open, not guessed here. On
    2026-08-26 it was measured not firing when a company already carrying
-   the domain existed. That collision is HubSpot's alone: Salesforce
-   creates nothing from an email domain on its own.
+   the domain existed. The collision is HubSpot's measured behaviour;
+   nothing like it was observed on Salesforce and none is designed for,
+   and whether an org's own automation creates accounts on its own is
+   unmeasured rather than known absent, so the build's measurement session
+   watches for it instead of assuming silence.
 7. **Dedupe against the CRM**, by email, through the search surface, and
    each row gets its plan: create, update filling blanks only, or exclude.
    HubSpot also enforces email uniqueness itself, and a duplicate create is
    refused carrying the existing record's id (measured 2026-08-25), so a
    duplicate that slips past the search cannot become a second record: the
    push reports the refusal with that id, and does not improvise an update
-   nobody approved. Salesforce has no measured backstop of that kind:
-   duplicate rules are org configuration, so on that backend the search is
-   the whole guard and the plan treats it that way rather than counting on
-   a refusal to catch what the search missed.
+   nobody approved. No such refusal was measured on Salesforce, and whatever
+   an org's own duplicate rules enforce is that org's configuration,
+   unmeasured here, so on that backend the design treats the backstop as
+   absent: the search is the whole guard, and the plan treats it that way
+   rather than counting on a refusal to catch what the search missed.
    Duplicates and cross-company conflicts are always presented, never
    auto-resolved.
 8. **Multi-event detection, mandatory before campaign setup.** A list that
@@ -264,11 +276,14 @@ and both execute only what the approved plan names.**
    member-status rows (a fresh campaign carries Sent and Responded,
    measured 2026-08-25) or planned as a create. A Salesforce org whose
    Marketing User flag is off refuses campaign creation outright (measured
-   2026-08-25), so a plan needing one is blocked here rather than dying
-   mid-push, and the measured one-call fix to the user's own record is
-   offered behind its own explicit yes, separate from the plan's
-   confirmation, because the plan's yes covers the plan and this writes a
-   User record the write contract does not cover.
+   2026-08-25), so a plan that needs a campaign while the flag is off
+   carries the measured one-call fix to the operator's own User record as
+   its own named line, pushed before the campaign create and proved by
+   reading the flag back, rather than dying mid-push. It is a write like
+   any other: in the write contract, shown in the confirmation summary,
+   executed only inside the approved plan. Striking the line from the plan
+   strikes the campaign half with it, because the one cannot land without
+   the other, and the run says so rather than pushing a plan that dies.
 10. **The checkpoint, then the confirmation summary.** Before the plan is
     assembled the run stops and asks, in as many words: "Are there any
     other fields that we should be stamping for new or updated accounts
@@ -287,7 +302,10 @@ and both execute only what the approved plan names.**
     builders and config's validation enforce the same field lists, so a
     field waved through in conversation still cannot reach a payload.
     Then the confirmation summary: the whole plan, company creates,
-    contact creates and updates, exclusions, list creates and memberships,
+    contact creates and updates, exclusions, the membership writes (list
+    creates and memberships on HubSpot; campaign, member-status and
+    campaign-member creates on Salesforce, with the Marketing User flag
+    fix when the plan carries it),
     and the writeback the run will make to the source, shown in full, with
     an explicit yes before any push.
 11. **Push, executing exactly the approved plan**, with partial-success
@@ -335,7 +353,8 @@ and both execute only what the approved plan names.**
 2. **Whether this is one campaign or several.** The multi-event check is
    mandatory because the expensive mistake is one campaign wrapped around
    three events, discovered after the memberships are written.
-3. **Which status list each row lands on**, read from the grid and never
+3. **Which membership each row lands on**, the status list on HubSpot and
+   the member status on Salesforce, read from the grid and never
    from a built-in table. When the grid does not cover a row, that is a
    question, not a default.
 
@@ -353,8 +372,8 @@ standing risk; whether the setting itself can be read from the API is
 unmeasured, and is part of the Open item on that behaviour. On Salesforce,
 the user record's Marketing User flag is read and called out when it is
 off, because campaign creation is refused until it is on; naming it is the
-whole of `check`'s job here, and the measured one-call fix belongs to
-`run`, at the moment it blocks, behind its own explicit yes. The
+whole of `check`'s job here, and the measured one-call fix travels in
+`run`'s plan as its own named line, like any other write. The
 per-list half, only when handed a list: how many rows would be new, how many
 match existing records, how many are ambiguous, and which rows fail the floor
 or the required-fields rule, with the failing field named per row.
@@ -377,7 +396,8 @@ config write both skills share, which happens only on an explicit yes.
 **The judgment it carries.** Telling the kinds of not-ready apart: a row that
 can never import (refused, with the gap named), a row that needs a person's
 answer (ambiguous match, uncovered status), and a setup that is not ready at
-all (missing artifact, no portal or key). Collapsing those into one number would make
+all (missing artifact; no portal or key on HubSpot, no resolvable org alias
+on Salesforce). Collapsing those into one number would make
 the preview useless, so they are reported separately, the same distinction
 the foundation's audit makes between empty and unknown.
 
@@ -410,7 +430,7 @@ the writeback rules above govern it.
 The port changes the store, not the pipeline. The order, the gates, the
 write contract's floor, the enrichment seam, the config and artifact homes
 and the skill names all carry over unchanged; what differs per backend is
-said where it differs, and the two measured sections below are the evidence
+said where it differs, and the measured sections below are the evidence
 each half stands on. Until the port's build lands and passes its own
 release gate, the built plugin is HubSpot-only and its README says so.
 
@@ -470,8 +490,9 @@ rate limits at volume.
 The surface is the `sf` CLI, the transport the reference ran on and the one
 measured here. The credential lives in the CLI's keychain under the alias
 config names, SOQL is the query surface, and creates, updates and deletes
-go through the CLI's data commands, their JSON output judged like any other
-response.
+go through the CLI's data commands, with the command output judged like any
+other response; the exact output shape is the build's to pin against real
+runs before anything judges it.
 
 **Measured against a free Developer Edition org, 2026-08-25**: every create
 proved by a query read-back, and every test record deleted afterwards with
@@ -491,7 +512,8 @@ member.` and the existing row untouched; and per-record deletes confirmed
 by count read-backs. The plain email opt-out field does not exist in a
 fresh org at all, so it is org-dependent. The raw measurement records live
 in the local run files, outside this public repository; the dated summary
-is in `DECISIONS.md`.
+and the transcribed measured set are in `DECISIONS.md`, so the
+repository's own record carries every fact this section stands on.
 
 **What is not measured**: update semantics on existing contacts, which the
 pipeline's fill-blanks updates need before the build claims them; the query
@@ -499,9 +521,10 @@ shape that matches an account by the derived domain against `Website`;
 whatever duplicate rules an org configures, which is why email uniqueness
 is treated as absent rather than as a backstop; the Lead object entirely;
 batch semantics against the per-record CLI route; and what a free org
-limits at volume. The first two are the build's to measure before anything
-claims to work; the rest stay out of the port's scope rather than being
-half-measured.
+limits at volume. Update semantics and the domain-match query shape are
+the build's to measure before anything claims to work; the Lead object,
+batch semantics and volume limits stay out of the port's scope rather
+than being half-measured.
 
 ---
 
@@ -524,8 +547,9 @@ half-measured.
    with no name or a disagreeing name is presented for adoption or a
    create-beside, the person's call. Still Open: whether the setting
    itself can be read from the API, which stays unmeasured. This is
-   HubSpot's behaviour and HubSpot's Open item; Salesforce creates
-   nothing from an email domain on its own.
+   HubSpot's behaviour and HubSpot's Open item; no Salesforce counterpart
+   was observed, and an org's own automation stays unmeasured rather than
+   assumed absent.
 3. **The email opt-out.** HubSpot's subscription statuses are a separate,
    unmeasured surface, and Salesforce's plain field is org-dependent,
    measured absent from a fresh Developer Edition org, so the opt-out is

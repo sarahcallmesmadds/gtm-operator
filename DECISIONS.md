@@ -6167,29 +6167,71 @@ to stand in for the member status a HubSpot list cannot carry.
 ### What differs per backend is said where it differs
 
 - The company association is the contact's own `AccountId` field, one
-  write rather than a second call.
-- Salesforce auto-creates nothing from an email domain, so the collision
-  the HubSpot company step names does not exist there, and the Open item
-  about reading that setting stays HubSpot's.
-- No measured email-uniqueness backstop: duplicate rules are org
-  configuration, so the dedupe search is the whole guard on that backend
-  and the plan treats it that way rather than counting on a refusal to
-  catch what the search missed.
+  write rather than a second call, which is what the measured contact
+  create carried.
+- The auto-creation collision the HubSpot company step names was never
+  observed on Salesforce and no counterpart is designed for; whether an
+  org's own automation creates accounts is unmeasured rather than known
+  absent, and the build's measurement session watches for it. The Open
+  item about reading the setting stays HubSpot's.
+- No email-uniqueness refusal was measured on Salesforce, and whatever an
+  org's own duplicate rules enforce is unmeasured here, so the design
+  treats the backstop as absent: the dedupe search is the whole guard on
+  that backend, and the plan treats it that way rather than counting on a
+  refusal to catch what the search missed.
 - A duplicate campaign member is a hard individual error with the existing
   row untouched, folded into the report beside HubSpot's silent no-op:
   the same partial-success expectation in the other store's spelling.
 - The Marketing User flag: `check` reads it and names it, because campaign
   creation is refused while it is off, and naming is the whole of
-  `check`'s job. `run` blocks a plan that needs a campaign at the
-  membership step and offers the measured one-call fix behind its own
-  explicit yes, separate from the plan's confirmation, because the plan's
-  yes covers the plan and this writes the org's User record, which the
-  write contract does not cover.
+  `check`'s job. In `run` the measured one-call fix rides the plan: a
+  plan that needs a campaign while the flag is off carries the User-record
+  write as its own named line, in the write contract, shown in the
+  confirmation summary, pushed before the campaign create and proved by
+  reading the flag back. The first draft of this design put the fix
+  behind a second yes outside the plan, which contradicted the standing
+  rule that the push executes exactly the approved plan and nothing else;
+  the round 1 review caught it the same day, and the fix now travels
+  inside the one gate every other write already uses. Striking the line
+  strikes the campaign half of the plan with it, said rather than pushed
+  into a mid-flight death.
 - The email opt-out stays out of the write contract on both backends:
   HubSpot's lives in unmeasured subscription statuses, Salesforce's plain
   field is org-dependent, measured absent from a fresh Developer Edition
   org, and nothing in the pipeline reads an opt-out from a source list
   anyway.
+
+### The Salesforce measured set, transcribed from the run notes
+
+Transcribed 2026-08-26 from the raw 2026-08-25 measurement notes in the
+local run files, because the dated summary above compressed them and a
+design standing on facts the repository does not carry is a claim wider
+than its recorded evidence. Nothing identifying travels: these are the
+platform's own behaviours and error texts, measured against a free
+Developer Edition org, every create proved by a query read-back and every
+test record deleted afterwards with the deletions confirmed by count
+queries.
+
+- Browser login lands the credential in the CLI keychain, one round trip.
+- SOQL queries work, including the IN filter.
+- An Account creates with Name and Website, id returned.
+- A Contact creates with FirstName, LastName, Email, Title and AccountId,
+  id returned; carrying AccountId on the create is what makes the company
+  association one write.
+- Campaign creation is refused with `entity type cannot be inserted:
+  Campaign` until the user record's Marketing User flag is on, and the
+  flag is settable through the API with one User update, measured.
+- A fresh campaign carries Sent, the default, and Responded as its member
+  statuses.
+- A custom CampaignMemberStatus creates with one plain data-create call,
+  where the reference needed Apex.
+- A CampaignMember creates with a custom status, and the read-back carries
+  the status's own HasResponded.
+- A duplicate CampaignMember fails individually with `Already a campaign
+  member.`, the existing row's status untouched by the failed insert.
+- Per-record deletes work, confirmed by count read-backs.
+- The plain email opt-out field does not exist in a fresh org at all, so
+  it is org-dependent.
 
 ### What the build must measure before it claims to work
 
@@ -6202,3 +6244,29 @@ release gate is the acceptance pattern the HubSpot half closed twice over,
 run against a Developer Edition org: a fresh invented list, pre-created
 fixtures playing the already-in-CRM records, push, prove field by field,
 teardown with every deletion confirmed by count read-backs.
+
+### Round 1 on the port design, Codex CLI, 2026-08-26: eight findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated in the
+report, both changed files whole. The two that reshaped the design: the
+Marketing User flag fix sat behind a second yes outside the plan, which
+contradicted three standing sentences at once (the write contract as the
+one home, push and writeback as the only writes, nothing written without
+the confirmation summary), and it now rides the plan as its own named
+line, proved by reading the flag back; and the generic write inventory,
+the confirmation summary and the judgment list all still said "list
+creates and memberships" with no Salesforce counterpart, the pair-miss
+this file keeps recording, now per-backend in all three homes. The
+evidence findings: the claim that Salesforce never auto-creates from an
+email domain, and the claim that duplicate rules are org configuration,
+were both stated as known when nothing recorded supports them, and both
+now say unmeasured rather than absent; and the measured set in the skills
+file stood on details only the local run notes carried, so the
+transcription above brings the facts into the repository's own record.
+The rest: the first-run config paragraph, the identity summary and
+`check`'s readiness classification all still described only HubSpot's
+identifiers, now per-backend; both READMEs still said the live acceptance
+run had not happened after the gate closed twice over on 2026-08-26, the
+expired-record fault this file has logged before, both now say it ran;
+and two hand counts pointing at neighbouring lists ("the two measured
+sections", "the first two") are named items now.
