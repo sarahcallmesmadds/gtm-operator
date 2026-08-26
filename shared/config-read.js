@@ -1,7 +1,9 @@
 'use strict'
 
 /**
- * Reading the shared config, for every plugin that is not `setup`.
+ * Reading the foundation's shared config, for every foundation plugin that is
+ * not `setup`. A job plugin keeps a private config of its own and carries no
+ * copy of this file.
  *
  * THIS FILE IS THE SOURCE. It is copied into each plugin's `scripts/vendor/`
  * by `scripts/vendor.js`, and `tests/vendor-copies-current.test.js` fails when
@@ -17,8 +19,9 @@
  *
  * WHAT THIS FILE DELIBERATELY CANNOT DO. It cannot write. There is no `begin`,
  * no `complete`, no `recordDatabase`, no `recordNames`. `setup` is the only
- * thing that writes config, and the surest way to keep that true is for the
- * code every other plugin carries to have no way of doing it.
+ * thing that writes the foundation's config, and the surest way to keep that
+ * true is for the code every plugin that reads it carries to have no way of
+ * doing it.
  *
  * THE ONE ENTRY POINT IS `contextFor`. Everything else is exported for tests.
  * An earlier draft of this handed out ids, state and the name map as separate

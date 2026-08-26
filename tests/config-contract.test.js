@@ -4,7 +4,9 @@
  * The reader and the writer agree about the config file.
  *
  * `plugins/setup/scripts/config.js` writes `~/.claude/gtm-operator.config.json`.
- * `shared/config-read.js` reads it, and is vendored into every other plugin.
+ * `shared/config-read.js` reads it, and is vendored into every other
+ * foundation plugin. A job plugin has its own private config and carries no
+ * copy of the reader.
  * They are two files by necessity: an installed plugin has no path to another
  * plugin's scripts, so the reader cannot require the writer.
  *

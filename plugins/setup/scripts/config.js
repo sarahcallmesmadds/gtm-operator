@@ -1,13 +1,15 @@
 'use strict'
 
 /**
- * The one config file the whole marketplace reads.
+ * The foundation's one config file, read by every foundation plugin.
  *
  * `~/.claude/gtm-operator.config.json`, named for the marketplace and not for a
- * plugin. Six plugins reading six config files is six chances for them to
- * disagree about which database is Process.
+ * plugin. Foundation plugins each reading a config file of their own would be
+ * that many chances to disagree about which database is Process.
  *
- * `setup` is the only thing that writes it. Everything else reads it.
+ * `setup` is the only thing that writes it. Every other foundation plugin
+ * reads it. A job plugin keeps a private config of its own, which nothing
+ * else reads or writes.
  *
  * WHY IT IS WRITTEN AS THE RUN GOES rather than at the end. A run that dies
  * halfway leaves a file that says `creating`, which is what lets the next run

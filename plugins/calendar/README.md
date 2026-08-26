@@ -45,9 +45,9 @@ so nothing here depends on reading this file.
 
 ## How it reads config
 
-`~/.claude/gtm-operator.config.json`, written by `setup` and read by everything
-else. This plugin carries its own read-only copy of the reader, at
-`scripts/vendor/config-read.js`.
+`~/.claude/gtm-operator.config.json`, written by `setup` and read by every
+other foundation plugin. This plugin carries its own read-only copy of the
+reader, at `scripts/vendor/config-read.js`.
 
 **That copy is generated.** The source is `shared/config-read.js` in the
 repository, `scripts/vendor.js` copies it, and

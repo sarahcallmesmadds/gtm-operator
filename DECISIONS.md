@@ -5672,3 +5672,18 @@ now generalised so the reference's stack is not fingerprinted.
 The confirming round the review order requires, with per-file coverage
 stated and every file whole. It reported all three round-2 pairs closed
 and nothing remaining in the changed set.
+
+## import-leads: the build opens with the config-comment sweep, 2026-08-25
+
+The round-5 deferral on the design pull request expired the moment the build
+branch opened: its recorded reason was that the unscoped config wording was
+true only while import-leads existed as design, and the sweep was recorded as
+the build's first task. Swept in this branch's first commit and re-vendored:
+`shared/config-read.js` and the five copies vendored from it,
+`plugins/setup/scripts/config.js`, one comment each in
+`tests/config-contract.test.js` and `tests/install.test.js`, and the calendar
+plugin README, each now scoped to the foundation's config with the job-plugin
+private config named beside it. A repository-wide search for the same wording
+in other homes found none: the other plugin READMEs, the root documents and
+the install skill already carry the scoped wording from rounds 3 to 5. The
+suite ran green after the re-vendor.
