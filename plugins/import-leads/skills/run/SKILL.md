@@ -114,6 +114,13 @@ fill-blanks rule protects the source's own email, so replacement is the
 person's decision every time. A no-email row gets the same offer when the
 dedupe step surfaces it.
 
+**An approved replacement keeps the original address on the row**, as
+`replacedEmail`, with the new address sourced `enrichment:<tool>` in
+`fieldSources`. The original is an identity too: dedupe searches both
+addresses, and a contact the CRM holds under the original comes back
+presented, because pushing the row as it stands would create a second
+record for the same person under the new address.
+
 ## Step 4. Personas, only if the artifact exists
 
 `personas <rows.json> <personas.json>`. Unclear titles come back flagged;
@@ -146,9 +153,15 @@ offering to add to the map.
 **Companies get the same care as the people on them.** A domain hit with no
 name, or with a name that disagrees with the list, is presented like any
 duplicate: it may be the portal's own auto-created record, and the person
-chooses between adopting it (match it, filling only fields that are empty,
-an empty name included) and creating a named company beside it. Nothing
-about a company record is resolved silently.
+chooses between adopting it (match it, filling only fields the candidate's
+own evidence showed empty, an empty name included) and creating a named
+company beside it. Nothing about a company record is resolved silently.
+
+**An adoption rides the plan, never beside it.** The decision is recorded
+as `{"decision": "match", "companyId": "...", "fill": {"name": "..."}}`;
+the plan carries the fill whether or not any create needs that company,
+the push executes it as one PATCH, and the read-back proves it, the same
+as every other write.
 
 On a create decision, a website the person names wins; otherwise the list's
 domain fills in automatically where config maps a website property, and an
@@ -199,8 +212,14 @@ list appears.
 accounts and contacts?"** Show the lead-source value the artifact gives, or
 that none exists, as part of that question, never as a settled fact: an
 empty lead source is an answer someone gave, not a default to report past.
-An answer naming a new field becomes a config mapping or an artifact edit,
-each on its own explicit yes, before the plan is built.
+An answer naming a field the plugin can carry becomes a config mapping or
+an artifact edit, each on its own explicit yes, before the plan is built.
+**The fields the plugin can carry are its own list fields plus persona,
+owner and the lead source, through config's property map, and name and
+website on a company. An answer naming anything else is refused by name at
+the checkpoint and recorded as a design request**, because the payload
+builders ignore unknown fields, and a stamp that silently cannot be
+written reads as written.
 
 Then write the inputs file (rows, events output, dedupe output, grid,
 required fields, campaigns, assignments, company decisions, list decisions,

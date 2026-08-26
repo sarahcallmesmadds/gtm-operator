@@ -167,9 +167,22 @@ check('company-queries derives a search domain from agreeing work emails and say
   const split = parsed.companies.find(c => c.name === 'Split Co')
   assert.strictEqual(split.domain, null, 'disagreeing domains derive nothing: the choice is the person\'s')
   const acmeRequest = parsed.requests.find(r => r.label === 'company search: Acme')
-  assert.strictEqual(acmeRequest.body.filterGroups.length, 2, 'the derived domain becomes the second filter group')
-  const splitRequest = parsed.requests.find(r => r.label === 'company search: Split Co')
-  assert.strictEqual(splitRequest.body.filterGroups.length, 1, 'no derived domain, name search only')
+  assert.strictEqual(acmeRequest.body.filterGroups.length, 1, 'the name search stays a name search')
+  const acmeDomainRequest = parsed.requests.find(r => r.label === 'company search by domain: Acme')
+  assert.ok(acmeDomainRequest, 'the derived domain becomes its own request, never OR-ed into the name search')
+  assert.deepStrictEqual(acmeDomainRequest.body.filterGroups[0].filters[0], { propertyName: 'domain', operator: 'EQ', value: 'acme.example' })
+  assert.ok(!parsed.requests.find(r => r.label === 'company search by domain: Split Co'), 'no derived domain, name search only')
+})
+
+check('dedupe-queries searches a replaced address as an identity of its own', () => {
+  const rows = path.join(TEMP, 'replaced-rows.json')
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 1, source: {}, fields: { email: 'vik@peatmarsh.example' }, fieldSources: { email: 'enrichment:some-tool' }, replacedEmail: 'vik.moss@gmail.com' }
+  ]))
+  const parsed = JSON.parse(run('dedupe-queries', rows).stdout)
+  const values = parsed.requests[0].body.filterGroups[0].filters[0].values
+  assert.deepStrictEqual(values.sort(), ['vik.moss@gmail.com', 'vik@peatmarsh.example'], 'both addresses are searched')
+  assert.ok(/replaced/.test(parsed.note))
 })
 
 check('a domain column still wins over derivation, recorded as such', () => {

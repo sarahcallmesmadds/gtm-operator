@@ -5977,3 +5977,38 @@ design-and-build cycle through the full review order, never as an addition
 to a run session. Her instruction for the plugin itself: a second
 acceptance run end to end on a fresh invented list, with pre-created
 fixtures playing the already-in-HubSpot people, after this change lands.
+
+### Round 1 on the corrections, Codex CLI, 2026-08-26: four findings, all taken
+
+High effort confirmed by the banner. All four were the same shape: the
+skill text promising what the planning and push layers could not carry.
+
+1. **A replaced address is an identity.** An approved enrichment
+   replacement moved the row to the work address and dedupe searched only
+   that, so a contact stored under the personal address was an unseen
+   duplicate the portal would accept, the emails differing. The row now
+   keeps the original on `replacedEmail`, `dedupe-queries` searches both,
+   a match under the original comes back in its own presented list, and
+   the assembly blocks it undecided, exactly like a conflict.
+2. **The checkpoint has a boundary.** The new pre-push question invited
+   naming any field while config's allowlists, the artifact shape and the
+   payload builders can carry only the plugin's own fields, so an answer
+   like a lifecycle stage would be accepted in conversation and silently
+   absent from the plan. The checkpoint now states what the plugin can
+   carry and refuses anything else by name, recorded as a design request,
+   because a stamp that silently cannot be written reads as written.
+3. **An adoption rides the plan, never beside it.** The promised
+   empty-name fill on a matched company had no vehicle: `assemble`
+   recorded matches bare, `push` emitted no PATCH, and the first
+   acceptance run had in fact executed its adoption as a write beside the
+   plan. A match decision now carries an optional `fill` validated
+   against the contract's company fields, consumed whether or not any
+   create needs the company (the run's own case: the only row on it was
+   an update), pushed as one PATCH and proved by its read-back.
+4. **The domain lookup is its own request.** OR-ing the exact-domain
+   filter into the name search shared one unpaged 20-result limit, so a
+   broad name could push the domain hit off the page and recreate the
+   nameless-company miss the domain half exists to prevent. One search
+   per key now, the domain request labelled as such.
+
+The suite is green after all of it.

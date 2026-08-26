@@ -150,6 +150,26 @@ check('raw search responses are refused: dedupe reads only the judged results', 
   assert.throws(() => plan.dedupeVerdicts([], { results: [] }), /byEmail/)
 })
 
+check('a contact stored under a replaced address is surfaced: the original is an identity too', () => {
+  // An approved enrichment replacement moves the row to the work address
+  // and keeps the personal one on `replacedEmail`. Without this check the
+  // CRM contact under the personal address is missed and the portal
+  // accepts a second record, because the emails differ.
+  const replaced = row(1, { firstName: 'Vik', lastName: 'Moss', email: 'vik.moss@peatmarsh.example' }, { replacedEmail: ' Vik.Moss@GMAIL.com ' })
+  replaced.fieldSources.email = 'enrichment:some-tool'
+  const result = plan.dedupeVerdicts([replaced], existing({
+    'vik.moss@gmail.com': { id: '88', properties: { email: 'vik.moss@gmail.com', firstName: 'Vik' } }
+  }))
+  assert.strictEqual(result.verdicts[0].verdict, 'create', 'the new address matched nothing, so the verdict alone would create')
+  assert.strictEqual(result.replacedEmailMatches.length, 1)
+  assert.strictEqual(result.replacedEmailMatches[0].contactId, '88')
+  assert.strictEqual(result.replacedEmailMatches[0].replacedEmail, 'vik.moss@gmail.com', 'folded before matching')
+  assert.ok(/never auto-resolved/.test(result.replacedEmailMatches[0].why))
+
+  const clean = plan.dedupeVerdicts([replaced], existing({}))
+  assert.deepStrictEqual(clean.replacedEmailMatches, [], 'no contact under either address, nothing surfaced')
+})
+
 check('an email enrichment spelled loosely still matches and still collides in-list', () => {
   // Enrichment fills emails after ingest, as the tool spelled them. Both the
   // match lookup and the in-list check fold before comparing.
@@ -429,6 +449,53 @@ check('an undecided conflict and an undecided no-email row block the plan', () =
   const second = goodInput()
   second.dedupe.unchecked = [{ index: 2, why: 'no email' }]
   assert.ok(plan.assemble(second).problems.some(p => /could not be dedupe-checked/.test(p)))
+})
+
+check('an undecided replaced-email match blocks the plan like a conflict does', () => {
+  const input = goodInput()
+  input.dedupe.replacedEmailMatches = [{ index: 1, replacedEmail: 'ada@gmail.com', contactId: '88', why: 'presented' }]
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /Row 1/.test(p) && /address this row replaced/.test(p) && /ada@gmail\.com/.test(p)))
+
+  input.resolutions = { decided: [1] }
+  assert.strictEqual(plan.assemble(input).ok, true, 'deciding the row is the person keeping it, deliberately')
+})
+
+check('an adoption fill on a matched company rides the plan, validated against the contract\'s company fields', () => {
+  const input = goodInput()
+  input.rows[0].fields.company = 'Bright Quay Ops'
+  input.companyDecisions = { 'Bright Quay Ops': { decision: 'match', companyId: '77', fill: { name: 'Bright Quay Ops' } } }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.deepStrictEqual(result.plan.companies.matched, [{ name: 'Bright Quay Ops', companyId: '77', rows: [1], fill: { name: 'Bright Quay Ops' } }])
+
+  const unknownField = goodInput()
+  unknownField.rows[0].fields.company = 'Bright Quay Ops'
+  unknownField.companyDecisions = { 'Bright Quay Ops': { decision: 'match', companyId: '77', fill: { name: 'X', lifecycle: 'lead' } } }
+  assert.ok(plan.assemble(unknownField).problems.some(p => /fill for lifecycle/.test(p) && /only name and website/.test(p)))
+
+  const unmappedWebsite = goodInput()
+  delete unmappedWebsite.config.properties.company.website
+  unmappedWebsite.rows[0].fields.company = 'Bright Quay Ops'
+  unmappedWebsite.companyDecisions = { 'Bright Quay Ops': { decision: 'match', companyId: '77', fill: { website: 'x.example' } } }
+  assert.ok(plan.assemble(unmappedWebsite).problems.some(p => /website fill/.test(p) && /silently lost/.test(p)))
+})
+
+check('an adoption no create needs still rides the plan: the run that taught this had only an update on the company', () => {
+  const input = goodInput()
+  input.companyDecisions.Adopted = { decision: 'match', companyId: '42', fill: { name: 'Adopted Co' } }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  const adopted = result.plan.companies.matched.find(m => m.name === 'Adopted Co' || m.name === 'Adopted')
+  assert.ok(adopted, 'the fill-carrying match is in the plan without any create needing it')
+  assert.deepStrictEqual(adopted.fill, { name: 'Adopted Co' })
+  assert.deepStrictEqual(adopted.rows, [])
+
+  const plainMatch = goodInput()
+  plainMatch.companyDecisions.Elsewhere = { decision: 'match', companyId: '43' }
+  const second = plan.assemble(plainMatch)
+  assert.ok(!second.plan.companies.matched.some(m => m.name === 'Elsewhere'), 'a fill-less match nothing needs stays out of the plan')
 })
 
 check('an excluded row needs no assignment and appears only under excluded', () => {
