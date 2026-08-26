@@ -204,10 +204,23 @@ function contactCreateBody (config, row, leadSource) {
   return { properties }
 }
 
-/** The blanks-only fill for an existing contact, as a PATCH body. */
+/**
+ * The blanks-only fill for an existing contact, as a PATCH body.
+ *
+ * Only the fields an update may carry: the list fields plus persona and
+ * owner. The lead source is refused here as well as at the plan, because it
+ * is create-only, and `leadSource` is in the property map, so without this
+ * check a fill that smuggled it past the plan would map cleanly into the
+ * payload.
+ */
+const UPDATE_FIELDS = new Set([
+  'firstName', 'lastName', 'phone', 'title', 'city', 'state', 'country', 'linkedinUrl', 'persona', 'owner'
+])
+
 function contactUpdateBody (config, fill) {
   const properties = {}
   for (const [field, value] of Object.entries(fill)) {
+    if (!UPDATE_FIELDS.has(field)) continue
     const name = contactProperty(config, field)
     if (!name) continue
     properties[name] = value
@@ -268,7 +281,24 @@ function judgeListLookup (response) {
  * the plan's creates. Records that already have ids (matched companies,
  * update and nothing rows) are referenced by those ids directly.
  */
+/**
+ * The plan shape the list fixes introduced, asserted rather than defaulted.
+ * A plan built by an older step carries only `lists.names`, and treating
+ * the missing fields as empty sent a membership add to list `undefined`
+ * with no create in front of it. An obsolete shape is a plan to rebuild,
+ * not to guess at.
+ */
+function assertPlanLists (plan, who) {
+  if (!plan || !plan.lists || !Array.isArray(plan.lists.creates) || !Array.isArray(plan.lists.matched)) {
+    throw new Error(
+      `${who} needs a plan whose lists carry \`creates\` and \`matched\`, which the plan command builds from the judged ` +
+      'list lookups. This plan does not, so it was built by an older step: run `plan` again rather than pushing a guess.'
+    )
+  }
+}
+
 function pushRequests (config, plan) {
+  assertPlanLists(plan, 'push')
   const requests = []
   const placeholders = {}
 
@@ -279,7 +309,7 @@ function pushRequests (config, plan) {
     placeholders[token] = { kind: 'company', key: company.name }
   })
   const listToken = new Map()
-  ;(plan.lists.creates || []).forEach((name, at) => {
+  plan.lists.creates.forEach((name, at) => {
     const token = `{list:${at + 1}}`
     listToken.set(name, token)
     placeholders[token] = { kind: 'list', key: name }
@@ -332,7 +362,7 @@ function pushRequests (config, plan) {
     ))
   }
 
-  for (const name of (plan.lists.creates || [])) {
+  for (const name of plan.lists.creates) {
     requests.push(spec(`create list: ${name}`, 'POST', '/crm/v3/lists', {
       name,
       objectTypeId: '0-1',
@@ -340,7 +370,7 @@ function pushRequests (config, plan) {
     }))
   }
   const listIdFor = name => {
-    const matched = (plan.lists.matched || []).find(m => m.name === name)
+    const matched = plan.lists.matched.find(m => m.name === name)
     return matched ? matched.listId : listToken.get(name)
   }
   for (const membership of plan.lists.memberships) {
@@ -421,6 +451,7 @@ function judgeResponse (request, response) {
  * unread one is unproved), companies and list memberships.
  */
 function readbackRequests (config, plan, pushedIds) {
+  assertPlanLists(plan, 'readbacks')
   const requests = []
   const properties = contactPropertyNames(config).join(',')
   for (const [key, id] of Object.entries(pushedIds.contacts || {})) {
@@ -434,8 +465,15 @@ function readbackRequests (config, plan, pushedIds) {
     requests.push(spec(`read back company: ${name}`, 'GET',
       `/crm/v3/objects/companies/${id}?properties=${[config.properties.company.name, config.properties.company.website].filter(Boolean).join(',')}`))
   }
-  for (const [name, id] of Object.entries(pushedIds.lists || {})) {
-    requests.push(spec(`read back memberships: ${name}`, 'GET', `/crm/v3/lists/${id}/memberships`))
+  // MEMBERSHIP READS COME FROM THE PLAN, NOT FROM THE PUSHED IDS. The
+  // pushed ids only hold lists this run created, and a run whose lists all
+  // matched existing ones generated no membership read at all, so the
+  // matched half of a normal run could never satisfy the proof.
+  for (const membership of plan.lists.memberships) {
+    const matched = plan.lists.matched.find(m => m.name === membership.list)
+    const id = matched ? matched.listId : (pushedIds.lists || {})[membership.list]
+    if (!id) continue // no id means the create never returned one; prove fails it as an absent read-back
+    requests.push(spec(`read back memberships: ${membership.list}`, 'GET', `/crm/v3/lists/${id}/memberships`))
   }
   return requests
 }

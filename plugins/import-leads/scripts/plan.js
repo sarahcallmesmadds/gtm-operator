@@ -63,7 +63,10 @@ function gate (rows, requiredFieldsRules) {
  */
 const EVENT_WORDS = ['webinar', 'conference', 'summit', 'expo', 'event', 'roadshow', 'workshop', 'dinner', 'meetup', 'booth', 'session']
 
-const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+\d{4})?)\s*$/i
+const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.]\d{2,4}|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+\d{4})?)\s*$/i
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const DAYS_IN = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 /**
  * Shape and plausibility together. The shape alone reported 2026-13-40 as a
@@ -75,24 +78,21 @@ const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/
 function dateLike (value) {
   const match = DATE_LIKE.exec(String(value))
   if (!match) return false
-  const [, isoY, isoM, isoD, slashA, slashB, monthDay] = match
+  const [, isoY, isoM, isoD, slashA, slashB, monthName, monthDay] = match
   if (isoY !== undefined) {
     const at = new Date(Date.UTC(Number(isoY), Number(isoM) - 1, Number(isoD)))
     return at.getUTCFullYear() === Number(isoY) && at.getUTCMonth() === Number(isoM) - 1 && at.getUTCDate() === Number(isoD)
   }
+  // Day checked against the month's own length, not a flat 31, in every
+  // form: 31/02 and "Feb 31" are both shapes, not dates. February allows 29
+  // because the year is not knowable from one value.
+  const readable = (day, month) => month >= 1 && month <= 12 && day >= 1 && day <= DAYS_IN[month - 1]
   if (slashA !== undefined) {
     const a = Number(slashA)
     const b = Number(slashB)
-    // Day checked against the month's own length, not a flat 31, or the
-    // comment's promise of "a real day-and-month" was wider than the check:
-    // 31/02 read as a date. February allows 29 because the year's order in
-    // a slash form is not knowable from one value.
-    const daysIn = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    const readable = (day, month) => month >= 1 && month <= 12 && day >= 1 && day <= daysIn[month - 1]
     return readable(a, b) || readable(b, a)
   }
-  const day = Number(monthDay)
-  return day >= 1 && day <= 31
+  return readable(Number(monthDay), MONTHS.indexOf(monthName.toLowerCase()) + 1)
 }
 
 /**
@@ -199,7 +199,8 @@ function dedupeVerdicts (rows, existing) {
   if (!existing || typeof existing !== 'object' || Array.isArray(existing) ||
       !existing.byEmail || typeof existing.byEmail !== 'object') {
     throw new Error(
-      'dedupe needs the judged search results (the output of `search-results`), with contacts under byEmail. ' +
+      'dedupe needs the judged search results, with contacts under byEmail: the `dedupe` command builds them from ' +
+      'the saved responses, and a direct caller uses hubspot.searchResults. ' +
       'Passing the raw responses here would compare against a shape nothing has normalised.'
     )
   }
@@ -439,6 +440,25 @@ function assemble (input) {
     } else if (verdict.verdict === 'create') {
       contacts.creates.push({ index: row.index, row })
     } else if (verdict.verdict === 'update') {
+      // THE FILL IS PROVED AGAINST THE GATED ROW, ENTRY BY ENTRY. The
+      // verdicts arrive as caller input, so a fill is a claim, not a fact:
+      // without this check a hand-edited fill could smuggle a value the row
+      // never carried, or a lead source onto an update, past a gate that
+      // only ever saw the rows. Each entry has to be the row's own sourced
+      // value, or its persona or owner with the source the design demands.
+      for (const [field, value] of Object.entries(verdict.fill || {})) {
+        const fromFields = row.fields[field] === value && Boolean(row.fieldSources && row.fieldSources[field])
+        const fromPersona = field === 'persona' && row.persona === value && Boolean(row.personaSource)
+        const fromOwner = field === 'owner' && row.owner === value &&
+          (row.ownerSource === 'routing' || row.ownerSource === 'confirmed')
+        if (!fromFields && !fromPersona && !fromOwner) {
+          problems.push(
+            `Row ${row.index}: the update fill carries ${field} = ${JSON.stringify(value)}, which is not the row's own ` +
+            'sourced value. A fill is derived from the gated row, never supplied beside it, and the lead source never ' +
+            'rides on an update.'
+          )
+        }
+      }
       contacts.updates.push({ index: row.index, row, contactId: verdict.contactId, fill: verdict.fill })
     } else {
       contacts.nothing.push({ index: row.index, contactId: verdict.contactId, why: verdict.why })
@@ -517,24 +537,31 @@ function assemble (input) {
         companies.matched.push({ name, companyId: String(decision.companyId), rows: needed.rows })
       }
     } else {
+      // The write contract: a created company carries the website when the
+      // list has a domain. The decision's explicit website wins; the rows'
+      // own domain is the fallback, and it fires only when config maps a
+      // website property, because an org without one imports its companies
+      // bare and an automatic fallback is not a person's input to lose. An
+      // EXPLICIT website with nowhere to land is a different case and is
+      // refused below.
+      const websiteMapped = Boolean(input.config.properties.company.website)
       companies.creates.push({
         name,
-        // The write contract: a created company carries the website when the
-        // list has a domain. The decision's explicit website wins, the rows'
-        // own domain is the fallback, and only when neither exists is the
-        // company created bare.
-        website: decision.website || needed.domain || null,
+        website: decision.website || (websiteMapped ? needed.domain : null) || null,
         rows: needed.rows
       })
     }
   }
 
-  // The same silently-lost rule the owner and persona follow: a website
-  // that has nowhere mapped to land is named, not dropped.
-  for (const company of companies.creates) {
-    if (company.website && !input.config.properties.company.website) {
+  // The same silently-lost rule the owner and persona follow, scoped to
+  // what a person actually supplied: a website the DECISION names with
+  // nowhere mapped to land is refused, while the automatic domain fallback
+  // simply does not fire without a mapping and the company is created bare.
+  for (const [name, decision] of Object.entries(input.companyDecisions)) {
+    if (decision && decision.decision === 'create' && decision.website &&
+        !input.config.properties.company.website && companiesNeeded.has(name)) {
       problems.push(
-        `"${company.name}" would be created with a website and config maps no company website property, so it would be ` +
+        `"${name}" is decided as a create with a website, and config maps no company website property, so it would be ` +
         'silently lost. Map properties.company.website, or take the website off the decision and create the company bare.'
       )
     }
