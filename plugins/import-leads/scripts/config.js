@@ -231,6 +231,23 @@ function problems (config) {
         out.push(`properties.${kind}.${field} has to be the property name as a non-empty string, or the key left out.`)
       }
     }
+    // On Salesforce the mapped names are interpolated into SOQL as
+    // identifiers, and soqlLiteral escapes values, not identifiers, so a
+    // name that is not field-API-shaped could alter the query itself. The
+    // gate refuses it here, where every mapped name already passes:
+    // letters, digits and underscores, starting with a letter, which
+    // covers every standard field and every __c custom field.
+    if (crm === 'salesforce' && map) {
+      for (const [field, name] of Object.entries(map)) {
+        if (typeof name !== 'string' || !name.trim()) continue
+        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name.trim())) {
+          out.push(
+            `properties.${kind}.${field} maps ${JSON.stringify(name)}, which is not a Salesforce field API name ` +
+            '(letters, digits and underscores, starting with a letter). A name outside that shape cannot go into a query as an identifier.'
+          )
+        }
+      }
+    }
     if (map) {
       const seen = new Map()
       for (const [field, name] of Object.entries(map)) {

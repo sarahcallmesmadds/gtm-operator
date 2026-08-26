@@ -62,6 +62,33 @@ check('an optional property mapping that is not a non-empty string is a problem,
   assert.deepStrictEqual(config.problems(draft), [], 'a real name still validates clean')
 })
 
+check('a salesforce mapping that is not field-API-name shaped is refused: identifiers cannot be escaped into a query', () => {
+  const sf = () => ({
+    configVersion: config.CONFIG_VERSION,
+    crm: 'salesforce',
+    orgAlias: 'devorg',
+    aliasMapPath: '~/gtm/company-aliases.json',
+    properties: {
+      contact: Object.assign({}, config.DEFAULT_SALESFORCE_FIELD_NAMES.contact),
+      company: Object.assign({}, config.DEFAULT_SALESFORCE_FIELD_NAMES.company)
+    }
+  })
+  assert.deepStrictEqual(config.problems(sf()), [], 'the standard field names validate clean')
+
+  const custom = sf()
+  custom.properties.contact.persona = 'Persona__c'
+  assert.deepStrictEqual(config.problems(custom), [], 'a __c custom field is API-name shaped')
+
+  const crafted = sf()
+  crafted.properties.contact.firstName = 'FirstName FROM Contact WHERE Id != NULL'
+  assert.ok(config.problems(crafted).some(p => /properties\.contact\.firstName/.test(p) && /field API name/.test(p)),
+    'a name that could alter the query is refused at the gate')
+
+  const hubspotUnderscore = config.draft(answers())
+  hubspotUnderscore.properties.contact.owner = 'hubspot_owner_id'
+  assert.deepStrictEqual(config.problems(hubspotUnderscore), [], 'the salesforce identifier rule does not reach the hubspot backend')
+})
+
 check('the draft fills the portal default property names and validates clean', () => {
   const draft = config.draft(answers())
   assert.strictEqual(draft.configVersion, config.CONFIG_VERSION)

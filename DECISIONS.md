@@ -6627,3 +6627,34 @@ all on the build: seven, one in two halves, five, three, five, then
 nothing, every taken finding real and none needing her. The Devin
 GitHub app's body on the pull request, and then the live acceptance run
 against the Developer Edition org, are the remaining gates.
+
+### Round 7 on the port build, the Devin GitHub app, 2026-08-26: two findings, both taken
+
+The app's review of pull request 30, read from the body per the standing
+rule: the check showed green while the body said two potential issues,
+which is exactly why the body is the verdict. Both were read from the
+inline comments endpoint and taken.
+
+The bug, and it was real: a matched campaign in a real org can hold
+members linked to a Lead, whose rows carry ContactId null, and the
+round-4 type guard refused the whole member read-back over them, so a
+correctly landed push reported as failed. A null ContactId is a
+different answer from a malformed one: the Lead object is out of scope
+by recorded decision, such a row can neither satisfy nor contradict a
+planned contact membership, so it is skipped after its CampaignId
+binding is checked, while a ContactId that is present and not a string
+stays refused as the wrong type it is.
+
+The hardening note, taken at the config gate: SOQL interpolates the
+mapped field names as identifiers, and soqlLiteral escapes values, not
+identifiers, so a crafted property name could alter the query itself. A
+salesforce mapping now has to be field-API-name shaped (letters, digits
+and underscores, starting with a letter, which covers every standard
+field and every __c custom field) or config refuses it, scoped to the
+backend whose queries interpolate it.
+
+Two new hand mutations, each asserted onto disk before its suite ran,
+each red in its named check, and each file restored byte-identical
+after: the lead-row skip reverted, and the identifier check removed. The
+whole repository suite is green after all of it. The app's pass on the
+final head, and then the live acceptance run, are the remaining gates.
