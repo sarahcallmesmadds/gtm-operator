@@ -23,6 +23,8 @@
  *   node import-leads.js dedupe-queries <rows.json>
  *   node import-leads.js dedupe <rows.json> <responses.json>
  *   node import-leads.js company-queries <rows.json>
+ *   node import-leads.js list-queries <grid.json> <campaigns.json> <assignments.json>
+ *   node import-leads.js list-judge <names.json> <responses.json>
  *   node import-leads.js plan <inputs.json>
  *   node import-leads.js push <plan.json>
  *   node import-leads.js judge-push <requests.json> <responses.json>
@@ -178,6 +180,49 @@ const commands = {
       requests: hubspot.companySearchRequests(result.config, [...companies.values()]),
       note: 'Send each and show the candidates with their evidence. The match is the person\'s decision; the alias map holds the answers already settled so they are not re-asked. Rows without a company are handled at the gate, not here.'
     }, null, 2))
+  },
+
+  'list-queries' (gridFile, campaignsFile, assignmentsFile) {
+    if (!gridFile || !campaignsFile || !assignmentsFile) {
+      throw new Error('list-queries needs the grid, the campaigns and the assignments: the lists to look up are the ones the grid realises from them.')
+    }
+    const grid = readJson(gridFile)
+    const campaigns = readJson(campaignsFile)
+    const assignments = readJson(assignmentsFile)
+    const wrong = rules.gridProblems(grid).concat(rules.assignmentProblems(grid, campaigns, assignments))
+    if (wrong.length) {
+      console.error(`The lists cannot be realised from this:\n  ${wrong.join('\n  ')}`)
+      process.exit(1)
+    }
+    const names = [...new Set(assignments.map(a => rules.listName(grid, a.campaign, a.status)))].sort()
+    console.log(JSON.stringify({
+      names,
+      requests: hubspot.listLookupRequests(names),
+      note:
+        'Send each lookup, save each response whole, and pass the names and the responses, in this same order, to list-judge. ' +
+        'Matched or planned for creation means the portal was asked, not assumed.'
+    }, null, 2))
+  },
+
+  'list-judge' (namesFile, responsesFile) {
+    if (!namesFile || !responsesFile) throw new Error('list-judge needs the names and the saved responses, in the same order.')
+    const names = readJson(namesFile)
+    const responses = readJson(responsesFile)
+    if (!Array.isArray(names) || !Array.isArray(responses) || names.length !== responses.length) {
+      throw new Error('The names and responses do not line up one to one. Pass the names array list-queries printed and one saved response per name, in order.')
+    }
+    const decisions = {}
+    const unknown = []
+    names.forEach((name, at) => {
+      const judged = hubspot.judgeListLookup(responses[at])
+      decisions[name] = judged
+      if (judged.outcome === 'unknown') unknown.push({ name, why: judged.why })
+    })
+    console.log(JSON.stringify({ listDecisions: decisions, unknown }, null, 2))
+    if (unknown.length) {
+      console.error('Some lookups came back in shapes this does not recognise. Those are questions, not creates: look at the saved responses before planning.')
+      process.exit(1)
+    }
   },
 
   plan (inputsFile) {

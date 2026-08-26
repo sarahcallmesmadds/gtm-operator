@@ -48,7 +48,7 @@ const CONFIG_PATH = process.env.IMPORT_LEADS_CONFIG ||
  */
 const CONTACT_PROPERTIES = {
   required: ['firstName', 'lastName', 'email', 'phone', 'title', 'city', 'state', 'country'],
-  optional: ['linkedinUrl', 'persona', 'leadSource']
+  optional: ['linkedinUrl', 'persona', 'leadSource', 'owner']
 }
 
 const COMPANY_PROPERTIES = {
@@ -268,14 +268,21 @@ function write (candidate) {
   if (wrong.length) {
     throw new Error(`Refusing to write a config with known problems:\n  ${wrong.join('\n  ')}`)
   }
-  if (fs.existsSync(CONFIG_PATH)) {
-    throw new Error(
-      `${CONFIG_PATH} already exists, and this plugin writes its config once. ` +
-      'If it is wrong, fix it by hand or move it aside deliberately. Nothing here replaces it.'
-    )
-  }
+  const refusal =
+    `${CONFIG_PATH} already exists, and this plugin writes its config once. ` +
+    'If it is wrong, fix it by hand or move it aside deliberately. Nothing here replaces it.'
+  if (fs.existsSync(CONFIG_PATH)) throw new Error(refusal)
   fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true })
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(candidate, null, 2) + '\n')
+  // `wx`, not the default overwrite: the existence check above and the write
+  // are two steps, and two first runs racing through the gap would have the
+  // later one silently replace the earlier portal's config. Exclusive
+  // creation makes the race lose loudly instead.
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(candidate, null, 2) + '\n', { flag: 'wx' })
+  } catch (error) {
+    if (error.code === 'EEXIST') throw new Error(refusal)
+    throw error
+  }
   return { path: CONFIG_PATH }
 }
 

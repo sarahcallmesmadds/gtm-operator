@@ -122,13 +122,20 @@ fields it fills, the same rule `SKILLS-projects.md` follows. This section is
 the one home for that list.
 
 **The floor, this plugin's own:** a row without a first and last name is
-refused, and no contact is pushed without its company matched or planned.
-From the list: first name, last name, email, phone, title, city, state and
-country, and a LinkedIn URL where the org maps a property for it. From the
-flow: the company association; membership of the status lists the grid
-names; the lead-source value from the required-fields artifact; the owner,
-only through routing or explicit confirmation; persona, only when the
-personas artifact exists. On a company the flow creates rather than matches:
+refused, and no contact is created without its company matched or planned.
+The company half of the floor governs creates: an update fills blanks on a
+contact the CRM already holds, and that contact's associations are the
+CRM's own, left alone by the same rule that protects every value already
+there. From the list: first name, last name, email, phone, title, city,
+state and country, and a LinkedIn URL where the org maps a property for it.
+From the flow: the company association on a created contact; membership of
+the status lists the grid names; the lead-source value from the
+required-fields artifact, on creates only, because it records where a new
+contact came from and stamping it onto contacts that already existed would
+claim them; the owner, only through routing or explicit confirmation;
+persona, only when the personas artifact exists. Persona and owner also
+fill blanks on an update, on the same terms and never over a value already
+there. On a company the flow creates rather than matches:
 the name, and the website when the list carries a domain, because that is
 what makes the next import's matching better. The email opt-out is not in
 the contract yet: HubSpot's native opt-out lives in subscription statuses, a

@@ -51,6 +51,14 @@ check('a file ending inside a quote is refused: half a list must not import as a
   assert.throws(() => ingest.parseCsv('A,B\n"unterminated,2\n'), /ends inside a quoted field/)
 })
 
+check('a quote opening mid-cell is refused rather than silently dropped', () => {
+  assert.throws(() => ingest.parseCsv('A,B\nab"cd",x\n'), /quote opens in the middle of a cell/)
+})
+
+check('text after a closing quote is refused rather than silently joined', () => {
+  assert.throws(() => ingest.parseCsv('A,B\n"a"x,y\n'), /text after a closing quote/)
+})
+
 check('blank lines are skipped rather than becoming all-blank rows', () => {
   const records = ingest.parseCsv('A,B\n1,2\n\n3,4\n')
   assert.strictEqual(records.length, 3)

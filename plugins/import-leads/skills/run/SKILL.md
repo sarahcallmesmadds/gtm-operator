@@ -153,11 +153,21 @@ grid does not cover is a question, not a default.** The script validates
 every assignment against the grid and names the lists by the grid's own
 convention, one list per status per campaign.
 
+Then the lists are **matched, or planned for creation**, never assumed
+absent: `list-queries` realises the names and builds one lookup per list,
+you send them, and `list-judge` turns the saved responses into the
+decisions the plan needs. A list that exists gets its id and new members; a
+list judged absent is created; an answer the judge does not recognise is a
+question, because reading it as absent is how a second copy of an existing
+list appears.
+
 ## Step 10. The plan, and the one confirmation
 
 Write the inputs file (rows, events output, dedupe output, grid, required
-fields, campaigns, assignments, company decisions, resolutions) and run
-`plan`. It refuses, by name, anything undecided.
+fields, campaigns, assignments, company decisions, list decisions,
+resolutions) and run `plan`. It refuses, by name, anything undecided, and it
+re-runs the gate on what is actually in it, so nothing between the steps can
+have slipped past the floor.
 
 **Show the whole plan inline**: company creates, contact creates and updates,
 the exclusions with their reasons, list creates and memberships, the lead
@@ -166,10 +176,12 @@ explicit yes**. Anything ambiguous is not yet confirmed.
 
 ## Step 11. Push, exactly the plan
 
-`push <plan.json>` emits the requests in dependency order with placeholders
-for ids that do not exist yet. Send them in order, substituting ids as they
-return, saving every response. Partial success is per record: one refusal
-does not stop the rest.
+`push <plan.json>` emits the requests in dependency order, with opaque
+`{kind:number}` tokens standing for ids that do not exist yet and a
+`placeholders` legend saying which record each token is. Send them in
+order, substituting each returned id for its exact token, saving every
+response. Partial success is per record: one refusal does not stop the
+rest.
 
 Then `judge-push`. The measured cases fold into the report rather than
 becoming errors: a duplicate list add is a silent no-op, and a duplicate

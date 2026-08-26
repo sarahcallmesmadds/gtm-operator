@@ -5749,3 +5749,45 @@ a lead-source value with no mapped property or the reverse, and campaign
 setup without the multi-event check having run. Each of these is a rule the
 design states in as many words, enforced where the plan is assembled rather
 than trusted to conversation.
+
+### Round 1 on the build, Codex CLI, 2026-08-25: sixteen findings, all taken
+
+Per-file coverage was stated, every changed file whole, and the round proved
+its claims by reproducing them. The seven that blocked: status lists were
+only ever created, never matched, against the design's own step, and the
+build now looks each list up by name, judges the answer (exists, absent, or
+a question, because an unrecognised answer read as absent creates a second
+copy), and the plan refuses a list nobody asked the portal about; membership
+adds and read-backs could not address existing contacts, and now reference
+updates and nothing rows by the ids the plan already carries; an incomplete
+dedupe search was reported and then ignored, and now blocks the plan; a
+proof handed no association or membership read-backs exited clean, and a
+planned write with no read-back now fails the proof; the assembly never
+re-ran the gate, so a plan input built without it could push an unsourced
+value, and the gate now runs inside `assemble` with the payload builder
+refusing sourceless fields as well; the write contract's company floor read
+as covering updates while the code exempted them, resolved by scoping the
+contract's own wording to creates, because an update fills blanks on a
+contact the CRM already holds and its associations are the CRM's own; and
+the owner promised by the write contract had nowhere to go, so config gains
+an optional owner mapping, creates and blanks-only updates write it with its
+source, and a confirmed owner with no mapped property blocks instead of
+vanishing. Persona joins the update fill on the same blanks-only terms; the
+lead source stays create-only because it records where a new contact came
+from, now stated in the write contract.
+
+The rest: placeholders switched from name-carrying tokens to opaque numbered
+ones with a legend, so a company named like a token cannot corrupt a URL or
+a substitution; the CSV parser refuses a quote opening mid-cell and text
+after a closing quote instead of silently rewriting them, and the
+quoted-empty single-cell line stays treated as a blank line with the choice
+stated in the code; emails fold at every consumer, not only at ingest,
+because enrichment fills them afterwards; the duplicate-create reading is
+scoped to the request it was measured on; `check`'s per-list half runs the
+persona step when the artifact exists rather than promising findings it
+never computed; the config write is exclusive-create, so two racing first
+runs cannot silently replace each other's portal; a created company takes
+its website from the rows' domain when the decision gives none; two
+assignments realising one list name are refused as the collision they are;
+and the date signal checks plausibility, not shape alone. The suite is green
+after all of it.
