@@ -6314,3 +6314,15 @@ distinct write on HubSpot that the mandatory pre-push summary never
 showed. The summary names it now. The gap predates this branch, the
 original summary never named associations either, and it became visible
 when round 3 put the two lists side by side.
+
+### Rounds 5 and 6 on the port design, both confirming, 2026-08-26: nothing found
+
+Codex round 5 reported no findings: round 4 closed, the write inventory
+and the confirmation summary matching in both directions on both
+backends, every earlier fix still in place, every Salesforce claim
+supported or marked, the standing gates intact. Devin round 6, no-tools
+route with per-document coverage stated and every inline document whole,
+reported the same and named the checks it ran. Six rounds in all on the
+design: eight, three, one, one, then nothing twice, every finding real
+and none needing her. The Devin GitHub app's body on the pull request is
+the remaining gate, read from the body per the standing rule.
