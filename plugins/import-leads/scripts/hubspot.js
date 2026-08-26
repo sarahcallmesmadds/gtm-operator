@@ -661,6 +661,11 @@ function prove (config, plan, pushedIds, readbacks) {
         problems.push({ what: `row ${create.index} association`, why: 'No association read-back was saved, and the plan promised this association. It is unproved, and unproved fails the proof.' })
       } else if (!expected) {
         problems.push({ what: `row ${create.index} association`, why: `No company id is known for "${company}", so the association cannot be checked against the right record.` })
+      } else if (association.results.some(r => !r || typeof r !== 'object' || Array.isArray(r))) {
+        // A null entry in a saved file is refused before toObjectId is
+        // read on it, the same object question the sibling proofs ask.
+        const odd = association.results.find(r => !r || typeof r !== 'object' || Array.isArray(r))
+        problems.push({ what: `row ${create.index} association`, why: `The association read-back holds ${JSON.stringify(odd === undefined ? null : odd)}, not a record. Save the response the read-back printed, whole, and look at it.` })
       } else if (!association.results.some(r => String(r.toObjectId) === String(expected))) {
         problems.push({ what: `row ${create.index} association`, why: `The association to company ${expected} is not on the record that came back.` })
       } else {
