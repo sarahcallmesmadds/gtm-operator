@@ -341,21 +341,27 @@ down cleanly.
    being org-dependent), so the port is specified work waiting on a user
    who asks for it, per the backend rule. The contacts-versus-leads
    question moves with it.
-2. **The alias map's shape** is undefined beyond "a user-owned file". It
-   should be settled in the build against real examples, not invented here.
-3. **What `check` can say about a Notion source** without the foundation
-   installed. The plugin should work for someone using only HubSpot, and
-   where that line sits (which halves of `check` still run) needs one
-   deliberate pass in the build.
-4. **What `run` does about automatic company creation.** `check` names the
+2. **What `run` does about automatic company creation.** `check` names the
    risk; whether the setting itself can be read from the API is unmeasured
    and part of this item, and whether `run` should ask for it off, or adopt
    the portal's auto-created companies into its matching, needs the build's
    first real list rather than a guess here.
-5. **The email opt-out.** HubSpot's subscription statuses are a separate,
+3. **The email opt-out.** HubSpot's subscription statuses are a separate,
    unmeasured surface, so the opt-out is out of the write contract until a
    measurement session says how it behaves.
 
-The config-comment sweep that used to sit on this list was the build's
-recorded first task, and the build did it first: the deferral, its expiry and
-the sweep itself are dated in `DECISIONS.md`.
+Settled by the build, with the answers where they now live:
+
+- **The config-comment sweep** was the build's recorded first task and the
+  build did it first; the deferral, its expiry and the sweep are dated in
+  `DECISIONS.md`.
+- **The alias map's shape**: `{"aliases": {"variant": "canonical"}}`, a
+  variant matching case-insensitively with whitespace collapsed and nothing
+  looser, because anything looser is a judgment about whether two names are
+  one company, which stays with the person. Defined in the plugin's
+  `scripts/rules.js` and README. Settled against fixtures, not yet against a
+  real list; the live run is where it meets one.
+- **What `check` says without the foundation**: the standing half runs
+  everything of this plugin's own (config, key file, alias map, probe) and
+  reports the Process artifacts as unreachable rather than missing, because
+  those are different answers. The line is drawn in `check`'s SKILL.md.
