@@ -5570,3 +5570,70 @@ source back, and both documents now say Salesforce is the only CRM backend
 with the writeback named beside it; and the Devin-app record pointed at the
 fifth live run when the open question it answered was recorded with the
 backfill pull request's app review.
+
+## import-leads: both CRMs measured live, and v1 flips to HubSpot, 2026-08-25
+
+The design merged in the morning with Salesforce as v1 and a live run as the
+release gate. Sarah pushed back the same evening: no Salesforce access, and
+the marketplace's audience mostly has HubSpot. Both stores were then measured
+against real accounts she created that evening, which is what the backend
+rule asks for: a real request, then evidence.
+
+### What was measured, and where the full records live
+
+Both sessions proved every create by a read-back and tore their test records
+down, with the teardown confirmed. The raw records, which carry her account
+identifiers, live in the local run files and never enter this public
+repository.
+
+**Salesforce, via a free Developer Edition org and the Salesforce CLI**: the
+whole reference shape works, and more easily than the reference had it,
+because a custom campaign member status creates with one plain call where
+the reference needed Apex. A duplicate campaign member fails individually
+with the existing row untouched. Two traps: a fresh org refuses Campaign
+creation until the user record's Marketing User flag is set, which one API
+call fixes, and the email opt-out field does not exist in a fresh org at
+all, so it is org-dependent.
+
+**HubSpot, via a free portal and a Service Key** (this platform version's
+replacement for private-app tokens; the private-app route does not exist in
+her portal, found in HubSpot's own docs after two wrong guesses at the UI):
+contact and company creates, associations, manual lists, membership adds and
+read-backs, the search surface's IN filter, and empty-string clears all
+work. Three behaviours matter to the design: the portal enforces email
+uniqueness itself and the duplicate refusal carries the existing record's
+id; the portal auto-creates a company from an email domain and takes the
+primary association, racing the pipeline's own matching; and its email
+validation is stricter than Salesforce's, refusing an address Salesforce
+accepted. A HubSpot list carries no member status: a person is in or out,
+and a duplicate add is a silent no-op.
+
+The personal access key route was also measured for completeness: the
+exchange endpoint works, but such keys carry read-only CRM scopes, so the
+Service Key is the write credential.
+
+### The decision: HubSpot is v1, and the grid becomes lists
+
+**Her call, on the comparison: v1 targets HubSpot.** The one-store rule
+holds; nothing ships against two CRMs. The member-status grid, which has no
+native home on HubSpot, is realised as one list per status per campaign,
+named by a convention the grid artifact itself states. That was the shape
+she chose ("statuses become lists") over dropping statuses from v1
+entirely, because it keeps the judgment in Process and costs a naming
+convention. The Salesforce port moves to the design's Open list as
+specified work: it gets native member statuses back from the same grid, its
+surface is already measured, and it waits for a user who asks, per the rule
+against unrequested backends.
+
+This reverses the morning's Salesforce-first choice within the same day.
+What changed is not preference but evidence: access, audience, and two live
+measurement sessions that did not exist when the morning's call was made.
+
+### What the flip does not change
+
+The pipeline order, the gates, the write contract's floor, the enrichment
+seam, the config and artifact homes, the skill names, and the release gate:
+one real list through every step against a portal, verified by read-backs,
+torn down cleanly. The opt-out leaves the write contract until HubSpot's
+subscription statuses are measured, and what `run` does about automatic
+company creation is Open rather than guessed.

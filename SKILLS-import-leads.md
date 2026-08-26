@@ -8,7 +8,7 @@ This plugin owns no database and no schema file. A job plugin is named for its
 job, and this one's job is taking a lead list from wherever it lives and landing
 it in the CRM correctly. It reads the source list, its own config and the alias
 map that config names, reads its judgment from Process artifacts, and reads and
-writes Salesforce.
+writes HubSpot.
 
 Written 2026-08-25. The plugin and skill names are Sarah's, confirmed the same
 day: the tier-2 placeholder name `list-building` is retired, because this
@@ -68,16 +68,18 @@ actually opened. More belong to this plugin.
 ## Where the judgment lives
 
 Config sits at `~/.claude/import-leads.config.json` and holds identifiers
-only: the org, the field-name map including any custom fields the org wants
-filled (a LinkedIn URL field, a persona field), the record-type ids the org's
-campaign types use, and the path to the company alias map. The alias map
+only: the portal, the property-name map including any custom properties the
+org wants filled (a LinkedIn URL property, a persona property), where the
+Service Key lives (never the key itself, per the credentials rule above), and
+the path to the company alias map. The alias map
 itself is a user-owned file at a configurable path, the same pattern as the
 artifact-type taxonomy, so a team can keep it in a repo and change it by pull
 request.
 
 **This plugin writes its own config, once, with confirmation.** On a first run
-with no config, either skill stops, says what it needs (the org, the field
-names, the alias-map path), searches for what it can find rather than asking
+with no config, either skill stops, says what it needs (the portal, the
+property names, where the key lives, the alias-map path), searches for what
+it can find rather than asking
 anyone to type what it could look up, shows what it will record, and writes
 the file on an explicit yes. The foundation's config stays `setup`'s alone;
 this file is this plugin's, and nothing else writes it.
@@ -88,8 +90,14 @@ Process artifacts carry the organisation's rules, read at run time:
    this plugin's own floor, and the value the org uses for the lead source,
    shown at run time before anything is pushed. The artifact adds to the
    floor and cannot subtract from it.
-2. **The campaign member-status grid.** Which member status a row gets, by
-   campaign type and by what is known about the person's engagement.
+2. **The campaign member-status grid.** Which status a row gets, by campaign
+   type and by what is known about the person's engagement. On HubSpot the
+   grid is realised as lists, one list per status per campaign, named by a
+   convention the grid itself states, because a HubSpot list carries no
+   member status of its own (measured 2026-08-25). Sarah's call the same
+   day. The Salesforce port maps this same grid onto native member statuses
+   instead, which is part of why the grid lives in Process rather than in
+   code.
 3. **Personas, optional.** The persona list and its title-mapping rules. When
    this artifact exists, the persona step runs and unclear titles are flagged
    for review rather than guessed. When it does not exist, the step is skipped
@@ -113,16 +121,18 @@ fields it fills, the same rule `SKILLS-projects.md` follows. This section is
 the one home for that list.
 
 **The floor, this plugin's own:** a row without a first and last name is
-refused, and no contact is pushed without an account. From the list: first
-name, last name, email, phone, title, mailing city, state and country, the
-email opt-out when the list carries an opt-in column, and a LinkedIn URL
-where the org maps a field for it. From the flow: the account; campaign
-membership with its member status from the grid; the lead-source value from
-the required-fields artifact; the owner, only through routing or explicit
-confirmation; persona, only when the personas artifact exists. On an account
-the flow creates rather than matches: the name, and the website when the
-list carries a domain, because that is what makes the next import's matching
-better.
+refused, and no contact is pushed without its company matched or planned.
+From the list: first name, last name, email, phone, title, city, state and
+country, and a LinkedIn URL where the org maps a property for it. From the
+flow: the company association; membership of the status lists the grid
+names; the lead-source value from the required-fields artifact; the owner,
+only through routing or explicit confirmation; persona, only when the
+personas artifact exists. On a company the flow creates rather than matches:
+the name, and the website when the list carries a domain, because that is
+what makes the next import's matching better. The email opt-out is not in
+the contract yet: HubSpot's native opt-out lives in subscription statuses, a
+separate surface nothing here has measured, and it is Open rather than
+implied.
 
 Anything more comes from the org's own required-fields artifact. A row that
 cannot meet the rule is refused with the gap named, never padded.
@@ -132,8 +142,8 @@ cannot meet the rule is refused with the gap named, never padded.
 ## run
 
 **What it does.** Takes one named list and lands the approved rows in
-Salesforce: cleaned, deduped, matched to accounts, on the right campaigns with
-the right member statuses, verified by reading the writes back, and, when the
+HubSpot: cleaned, deduped, matched to companies, on the status lists the
+grid names, verified by reading the writes back, and, when the
 source is a Notion page or database, written back to the source. A CSV source
 is never modified.
 
@@ -141,14 +151,14 @@ is never modified.
 download export, a vendor handoff, a spreadsheet somebody kept.
 
 **What it reads and writes.** Reads the one source the user named, a CSV file
-or a Notion page or database, never a search. Reads Salesforce to match
-accounts and contacts, showing what it found for confirmation rather than
+or a Notion page or database, never a search. Reads HubSpot to match
+companies and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
 above, its own config, and the alias map that config names. Writes what the
-approved plan names and nothing else: contact creates and updates, account
-creates, campaigns and campaign memberships, and the
-writeback to a Notion source, into blank fields only. All of it sits behind
-one confirmation.
+approved plan names and nothing else: contact creates and updates, company
+creates and associations, list creates and memberships, and the writeback
+to a Notion source, into blank fields only. All of it sits behind one
+confirmation.
 
 **The pipeline, kept from the reference in order. Everything before the
 confirmation plans; the push and the writeback after it are the only writes,
@@ -166,24 +176,34 @@ and both execute only what the approved plan names.**
 4. **Personas**, only when the artifact exists. Unclear titles are flagged,
    never guessed.
 5. **Company names normalised** against the alias map.
-6. **Accounts matched, or planned for creation.** A planned account carries
-   its name and, when the list has a domain, its website.
-7. **Dedupe against the CRM**, by email, in batched queries, and each row gets
-   its plan: create, update filling blanks only, or exclude. Duplicates and
-   cross-account conflicts are always presented, never auto-resolved.
+6. **Companies matched, or planned for creation.** A planned company carries
+   its name and, when the list has a domain, its website. HubSpot itself
+   auto-creates companies from email domains and takes the primary
+   association (measured 2026-08-25), so the plan says which companies the
+   push will create and which the portal will invent on its own, rather than
+   letting the two collide silently.
+7. **Dedupe against the CRM**, by email, through the search surface, and
+   each row gets its plan: create, update filling blanks only, or exclude.
+   HubSpot also enforces email uniqueness itself, and a duplicate create is
+   refused carrying the existing record's id (measured 2026-08-25), which
+   the push folds into the update path rather than treating as a failure.
+   Duplicates and cross-company conflicts are always presented, never
+   auto-resolved.
 8. **Multi-event detection, mandatory before campaign setup.** A list that
    covers several events or assets becomes several campaigns, and the signals
    (dates, locations, event names) are checked even outside the obvious
    column.
-9. **Campaigns matched, or planned for creation**, member statuses from the
-   grid.
-10. **The confirmation summary**: the whole plan, account creates, contact
-    creates and updates, exclusions, campaign creates and memberships, and
-    the writeback the run will make to the source, shown in full, with an
+9. **Status lists matched, or planned for creation**, one per status per
+   campaign, named by the grid's convention.
+10. **The confirmation summary**: the whole plan, company creates, contact
+    creates and updates, exclusions, list creates and memberships, and the
+    writeback the run will make to the source, shown in full, with an
     explicit yes before any push.
-11. **Push, executing exactly the approved plan**, in batches with
-    partial-success semantics. A duplicate campaign membership failing
-    individually is expected, not an error.
+11. **Push, executing exactly the approved plan**, with partial-success
+    semantics per record. A duplicate list add is a silent no-op and a
+    duplicate contact create returns the existing id, both measured, both
+    expected, and both folded into the report rather than treated as
+    errors.
 12. **Verify.** Every created or updated record is fetched back by the id the
     push returned, and the read-back is compared field by field against the
     approved plan. An id is a locator, not a proof; the comparison is the
@@ -197,7 +217,7 @@ and both execute only what the approved plan names.**
 - Never writes without the confirmation summary and an explicit yes.
 - Never guesses a person, an owner, or a persona.
 - Never overwrites a source-provided value, in the CRM or in the source.
-- Never auto-resolves a duplicate or a cross-account conflict.
+- Never auto-resolves a duplicate or a cross-company conflict.
 - Never pads a row to pass the floor or the required-fields rule. A row that
   cannot meet them is refused with the gap named.
 - Never reads rows from anywhere but the one named source: no second list, no
@@ -219,9 +239,9 @@ and both execute only what the approved plan names.**
 2. **Whether this is one campaign or several.** The multi-event check is
    mandatory because the expensive mistake is one campaign wrapped around
    three events, discovered after the memberships are written.
-3. **Which member status each row gets**, read from the grid and never from a
-   built-in table. When the grid does not cover a row, that is a question, not
-   a default.
+3. **Which status list each row lands on**, read from the grid and never
+   from a built-in table. When the grid does not cover a row, that is a
+   question, not a default.
 
 ---
 
@@ -229,7 +249,9 @@ and both execute only what the approved plan names.**
 
 **What it does.** Says whether an import would work, before anyone is
 mid-import, and what it would do. The standing half: the required artifacts
-exist in Process, config points at an org, the connection is alive. The
+exist in Process, config points at a portal and the key it names resolves,
+the connection is alive, and the portal's automatic company creation
+setting is reported whichever way it is set. The
 per-list half, only when handed a list: how many rows would be new, how many
 match existing records, how many are ambiguous, and which rows fail the floor
 or the required-fields rule, with the failing field named per row.
@@ -270,43 +292,66 @@ enrichment tool still gets a working import with its gaps named honestly.
 
 ---
 
-## Salesforce, and what has actually been measured
+## HubSpot, and what has actually been measured
 
-Salesforce is the only CRM backend in v1, the same one-store rule as the
-backend choice: an untested store half-works and the plugin gets blamed. The
-Notion writeback is the one write outside the CRM, and the writeback rules
-above govern it. The reference
-ran on the Salesforce CLI rather than on any MCP connection, so the CLI is the
-assumed surface here too.
+HubSpot is the only CRM backend in v1, Sarah's call on 2026-08-25, made
+after both stores were measured against real accounts the same day; the
+reasoning and the reversal it contains are recorded in `DECISIONS.md`. The
+one-store rule holds: v1 ships one CRM, and the Salesforce port is Open
+work rather than a half-adapter. The Notion writeback is the one write
+outside the CRM, and the writeback rules above govern it. The surface is
+the REST API with a Service Key as a bearer header, the credential this
+platform version issues.
 
-**Nothing in this design has run against a real org.** No Salesforce surface
-is connected on the machine this was designed on, and the CLI is not
-installed. Every Salesforce behaviour named above (matching, batched creates,
-partial-success semantics, member-status creation) is carried from the
-reference as design intent, not as a measurement of this rebuild. The live
-acceptance run against a real org is the release gate, the same rule
-`calendar` set: this plugin is not finished until it has pushed one real row,
-verified it by reading it back, and been torn down cleanly. A free Developer
-Edition org is the intended target for that run.
+**Measured against a real portal, 2026-08-25**, every claim proved by a
+read-back, and the test records archived afterwards with the archival
+confirmed: contact and company creates; the contact-to-company association;
+email uniqueness enforced by the portal, with the duplicate refusal
+carrying the existing record's id; the portal auto-creating a company from
+an email domain and taking the primary association; email validation
+stricter than Salesforce's, refusing an address Salesforce accepted; manual
+list create, member add, membership read-back, and a duplicate add as a
+silent no-op; the search surface's IN filter; and a property cleared with
+an empty string reading back empty. The raw measurement records live in the
+local run files, outside this public repository; the dated summary is in
+`DECISIONS.md`.
+
+**What is not measured**: subscription statuses (HubSpot's native email
+opt-out surface), the marketing campaigns object, batch endpoints, and
+rate limits at volume. The live acceptance run of the whole pipeline end
+to end is still the release gate, the same rule `calendar` set: this
+plugin is not finished until it has run one real list through every step
+against a portal, verified the writes by reading them back, and been torn
+down cleanly.
 
 ---
 
 ## Open
 
-1. **The Salesforce surface is assumed, not measured.** The CLI, its auth, and
-   what its create and query calls actually return all need a measurement
-   session against a real org before anything is built on them.
-2. **Contacts versus leads.** The reference wrote contacts with accounts, and
-   this design follows it. An org that works lead-first is real and unhandled,
-   and supporting it is a design decision, not a flag.
-3. **The alias map's shape** is undefined beyond "a user-owned file". It
+1. **The Salesforce port.** The reference's home, and it gets native member
+   statuses back in place of status lists, driven by the same grid
+   artifact. Its surface is already measured: the Salesforce CLI ran
+   against a free Developer Edition org on 2026-08-25 (creates, custom
+   member statuses without Apex, duplicate members failing individually,
+   the Marketing User flag trap and its one-call fix, the opt-out field
+   being org-dependent), so the port is specified work waiting on a user
+   who asks for it, per the backend rule. The contacts-versus-leads
+   question moves with it.
+2. **The alias map's shape** is undefined beyond "a user-owned file". It
    should be settled in the build against real examples, not invented here.
-4. **What `check` can say about a Notion source** without the foundation
-   installed. The plugin should work for someone using only Salesforce, and
+3. **What `check` can say about a Notion source** without the foundation
+   installed. The plugin should work for someone using only HubSpot, and
    where that line sits (which halves of `check` still run) needs one
    deliberate pass in the build.
-5. **The build's first task is the config-comment sweep.** Comments in the
+4. **The build's first task is the config-comment sweep.** Comments in the
    foundation's built code and its vendored copies still say nothing but
    `setup` writes config, which is true while this plugin is design only and
    stops being true the day it is built. The deferral and its expiry are
    recorded in `DECISIONS.md`, round 5 of this design's review.
+5. **What `run` does about automatic company creation.** `check` reports the
+   setting; whether `run` should ask for it off, or adopt the portal's
+   auto-created companies into its matching, needs the build's first real
+   list rather than a guess here.
+6. **The email opt-out.** HubSpot's subscription statuses are a separate,
+   unmeasured surface, so the opt-out is out of the write contract until a
+   measurement session says how it behaves.
