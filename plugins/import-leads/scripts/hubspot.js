@@ -130,7 +130,13 @@ function searchResults (config, responses) {
       incomplete.push({ response: at + 1, why: 'The response carries paging, so results were withheld. A duplicate could be among them.' })
     }
     for (const result of response.results) {
-      if (!result || typeof result.id !== 'string' && typeof result.id !== 'number') {
+      // A row that is not a record is a different answer from a result
+      // with no id, and the refusal names which, the same split the
+      // Salesforce parser holds (round 6).
+      if (!result || typeof result !== 'object' || Array.isArray(result)) {
+        throw new Error(`Response ${at + 1} holds ${JSON.stringify(result === undefined ? null : result)} where a result should be, not a record. Save what the portal returned, whole.`)
+      }
+      if (typeof result.id !== 'string' && typeof result.id !== 'number') {
         throw new Error(`Response ${at + 1} holds a result with no id. Save what the portal returned.`)
       }
       const properties = {}
@@ -478,19 +484,25 @@ function judgeResponse (request, response) {
     }
     return { outcome: 'unknown', why: 'The response is empty and this request is not one whose empty response has a measured meaning. Nothing about it is proved.' }
   }
-  if (typeof response === 'object' && response.id) {
+  // Every created id has to be id-shaped before it becomes a verdict, the
+  // rule judgeListLookup already holds: String() would spell an object
+  // "[object Object]" into every read-back fetch built on it (round 6).
+  // A malformed id falls through to the unknown arm.
+  const idShaped = value => typeof value === 'string' || typeof value === 'number'
+  if (typeof response === 'object' && response.id && idShaped(response.id)) {
     return { outcome: 'created', id: String(response.id) }
   }
   // A list create answers with `listId`, not `id`: the measured surface
   // ("listId returned", 2026-08-25). Without this arm a successful list
   // create judged as unknown, which reads as a push that half worked.
-  if (typeof response === 'object' && (response.listId || response.listId === 0)) {
+  if (typeof response === 'object' && idShaped(response.listId) &&
+      (response.listId || response.listId === 0)) {
     return { outcome: 'created', id: String(response.listId) }
   }
   // The live run of 2026-08-26 measured the create wrapping that same id in
   // a `list` envelope, the shape the by-name lookup already answers with.
   // Both arms stay: each is a measured shape, and either carries the id.
-  if (typeof response === 'object' && response.list &&
+  if (typeof response === 'object' && response.list && idShaped(response.list.listId) &&
       (response.list.listId || response.list.listId === 0)) {
     return { outcome: 'created', id: String(response.list.listId) }
   }

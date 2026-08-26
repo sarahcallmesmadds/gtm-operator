@@ -356,6 +356,20 @@ check('the bare REST create envelope judges as created, and the wrapped data-com
   assert.deepStrictEqual(salesforce.judgeResponse(request, { status: 0, result: { id: '001A', success: true, errors: [] } }), { outcome: 'created', id: '001A' })
 })
 
+check('a create response whose id is not id-shaped is never judged created: "[object Object]" is not an id', () => {
+  // THE ROUND-6 REPRO: an object id String()-coerced into a created
+  // verdict, the same coercion the whoami judge refuses.
+  const bare = salesforce.judgeResponse({ label: 'x', method: 'POST', path: 'y' }, { id: { odd: true }, success: true })
+  assert.strictEqual(bare.outcome, 'unknown')
+  const wrapped = salesforce.judgeResponse({ label: 'x', method: 'POST', path: 'y' }, { status: 0, result: { id: { odd: true }, success: true } })
+  assert.strictEqual(wrapped.outcome, 'unknown')
+})
+
+check('a search row that is not a record is refused by name, apart from a record with no Id', () => {
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([null])]), /not a record/)
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Email: 'x@y.com' }])]), /no Id/)
+})
+
 check('an empty answer to a PATCH is the measured 204 and points at the read-back; anywhere else it proves nothing', () => {
   const patch = { label: 'fill', method: 'PATCH', path: '/services/data/v67.0/sobjects/Account/001A' }
   assert.strictEqual(salesforce.judgeResponse(patch, '').outcome, 'done-unproved')
@@ -460,6 +474,16 @@ check('a member missing, or on the campaign with the wrong status, is a problem,
   wrongStatus.members['Autumn Summit'].result.records[0].Status = 'Sent'
   const second = salesforce.prove(config(), smallPlan(), pushedIds(), wrongStatus)
   assert.ok(second.problems.some(p => /campaign Autumn Summit, row 1/.test(p.what) && /"Sent"/.test(p.why)))
+})
+
+check('a single-record read-back whose one row is not a record is refused by name, not read as absent', () => {
+  // Round 6: the object question reached the row proofs and stopped one
+  // short of the one-row path, where a [null] contact read-back reported
+  // "no read-back to compare" while a malformed one sat on disk.
+  const readbacks = cleanReadbacks()
+  readbacks.contacts[1] = queryEnvelope([null])
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /^row 1$/.test(p.what) && /not a record/.test(p.why)))
 })
 
 check('a null row in a status or member read-back is refused by the proof, never dereferenced', () => {

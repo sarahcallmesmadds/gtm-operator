@@ -60,6 +60,12 @@ check('an optional property mapping that is not a non-empty string is a problem,
   assert.ok(config.problems(draft).some(p => /properties\.contact\.owner/.test(p) && /non-empty string/.test(p)))
   draft.properties.contact.owner = 'hubspot_owner_id'
   assert.deepStrictEqual(config.problems(draft), [], 'a real name still validates clean')
+
+  // Round 6: the same shape through the draft path itself, which
+  // validates and throws rather than handing the object back.
+  const bad = answers()
+  bad.properties = { contact: { owner: { odd: true } } }
+  assert.throws(() => config.draft(bad), /properties\.contact\.owner/)
 })
 
 check('a salesforce mapping that is not field-API-name shaped is refused: identifiers cannot be escaped into a query', () => {
