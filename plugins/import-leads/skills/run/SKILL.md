@@ -76,6 +76,16 @@ anyone to type what could be looked up. Then `config-draft`, show the whole
 draft, and `config-write` only on an explicit yes. The file is written once;
 any other refusal is fixed by hand, not rewritten.
 
+**On a salesforce first run, ask the org which mailing fields it carries
+before the draft is shown.** `mailing-fields-probe <orgAlias>` emits one
+read-only query and `mailing-fields-judge` answers the state and country
+names the draft should offer: `MailingStateCode` and `MailingCountryCode` on
+a picklist org, which refuses the plain fields' values outright, and the
+plain pair otherwise, both branches measured 2026-08-26. Neither pair is
+right for every org, which is why the org is asked rather than defaulted at.
+Pass the judged pair into the draft answers as `properties.contact.state`
+and `properties.contact.country`, and show which pair the org chose and why.
+
 ## Step 1. Scope: one named source
 
 One CSV file or one Notion page or database, named by the user, never found by
@@ -90,6 +100,20 @@ Show the proposed mapping with the unmapped columns and any ambiguities, get
 it confirmed or corrected, and run ingest again with the confirmed mapping.
 Unmapped columns ride along untouched for the writeback; they are shown, not
 dropped silently.
+
+**Then, before anything maps into the CRM, confirm what this import
+creates: Contacts, each with its company matched or planned.** On
+Salesforce, ask the org first rather than asking the person cold:
+`lead-contact-queries` emits two `COUNT()` reads and `lead-contact-judge`
+turns the saved pair into the evidence; show both counts and ask whether
+Contacts is how this org works. An org that works in Leads deserves the
+mismatch named before any write is planned: this plugin lands Contacts and
+Accounts, a lead-based import is deliberately out of scope
+(`SKILLS-import-leads.md` records it as Open work waiting for a user who
+asks), and the person chooses between stopping there and proceeding
+deliberately, with the choice recorded in the run's report. On HubSpot
+there is no measured Lead surface to count, so the same confirmation is
+asked plainly, without counts. Silence is not a confirmation.
 
 ## Step 2. The Process artifacts
 
@@ -281,6 +305,16 @@ the checkpoint**, because the payload builders ignore unknown fields, and
 a stamp that silently cannot be written reads as written. Say the refusal
 in the run's own report, with the field named, so the request is on the
 record; the report is the record, and this plugin writes no file for it.
+
+**Ask a second question in the same breath: "Should these contacts carry a
+marketing status or an email opt-out?"** This import writes neither, on
+either backend: HubSpot's marketing-contact status and its subscription
+statuses, and Salesforce's org-dependent opt-out field, are all unmeasured
+surfaces, deliberately outside the write contract. The question exists so
+nobody walks away assuming the import set one. An answer wanting them
+stamped is refused by name, like any other field the plugin cannot carry,
+and the ask goes in the run's report: that recorded demand is exactly what
+un-parks the opt-out measurement (`SKILLS-import-leads.md`, Open).
 
 The checkpoint is deliberately a step of the conversation, not a command:
 there is no request to send and no response to judge, and its refusal is

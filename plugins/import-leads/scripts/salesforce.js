@@ -477,6 +477,131 @@ function judgeFlag (response) {
   return { ok: false, why: 'The response is neither the whoami answer nor the flag query envelope, both measured 2026-08-26. Save it whole and look at it.' }
 }
 
+// --------------------------------- first-run and scope questions to the org
+
+/**
+ * The first-run mailing-fields probe: does this org carry the state and
+ * country code fields? A picklist org refuses the plain MailingState and
+ * MailingCountry values a list actually carries ("US" was refused with
+ * FIELD_INTEGRITY_EXCEPTION, measured 2026-08-26 in the acceptance run),
+ * and only a picklist org has the code fields at all, so neither pair of
+ * defaults is right for every org. The org itself is asked, one read-only
+ * query, before the config draft offers field names. The alias comes in
+ * directly because this runs on a first run, before any config exists.
+ */
+function mailingFieldsProbeRequest (orgAlias) {
+  if (typeof orgAlias !== 'string' || !orgAlias.trim()) {
+    throw new Error('mailingFieldsProbeRequest needs the org alias the sf CLI holds the credential under.')
+  }
+  // A named aggregate, not a bare select: the answer then carries its
+  // question as the `probe` key on its one row, on an empty org as well
+  // as a full one, so an unrelated saved success cannot pass as this
+  // probe's answer. Envelope measured 2026-08-26.
+  return query('mailing-fields probe', orgAlias.trim(), 'SELECT COUNT(MailingStateCode) probe FROM Contact')
+}
+
+/**
+ * What the probe's saved answer means, every branch measured 2026-08-26.
+ * The aggregate envelope, one row carrying the `probe` count, means the
+ * code fields exist (state and country picklists are on) and the draft
+ * offers MailingStateCode and MailingCountryCode, which accept the ISO
+ * codes a list carries and from which the org derives the label fields.
+ * The data commands' error shape, `name` INVALID_FIELD with the message
+ * naming the probed column (both measured spellings name it), means they
+ * do not exist and the draft offers the plain fields.
+ *
+ * THE ANSWER IS BOUND TO ITS QUESTION, on both arms: a successful
+ * envelope without the `probe` key, or an INVALID_FIELD about some other
+ * column, answers a different question and is refused rather than read,
+ * because the wrong pair here is either every contact create failing at
+ * the push or a config naming fields the org does not have.
+ */
+function judgeMailingFieldsProbe (response) {
+  const result = queryRecords(response)
+  if (result) {
+    if (result.done !== true) {
+      return { ok: false, why: 'The response says done is not true, so the answer was cut short. The probe is not read from an incomplete answer.' }
+    }
+    if (result.records.length !== 1) {
+      return { ok: false, why: `The response holds ${result.records.length} rows where the aggregate probe answers exactly one. Save the probe response whole and look at it.` }
+    }
+    const row = result.records[0]
+    if (typeof row.probe !== 'number' || !Number.isFinite(row.probe)) {
+      return { ok: false, why: 'The row carries no `probe` count, so this successful answer belongs to a different query. Save the probe response whole and look at it: reading it as a picklist org would write a config against the wrong org.' }
+    }
+    return {
+      ok: true,
+      codeFields: true,
+      use: { state: 'MailingStateCode', country: 'MailingCountryCode' },
+      why: 'The org answered the code-field aggregate, so state and country picklists are on and the code fields take the ISO codes a list carries (measured 2026-08-26).'
+    }
+  }
+  if (response && typeof response === 'object' && response.name === 'INVALID_FIELD' &&
+      typeof response.message === 'string' && response.message.includes('MailingStateCode')) {
+    return {
+      ok: true,
+      codeFields: false,
+      use: { state: 'MailingState', country: 'MailingCountry' },
+      why: 'The org refused the code-field aggregate with INVALID_FIELD naming MailingStateCode, so picklists are off and the plain fields are the ones that exist (error shape measured 2026-08-26).'
+    }
+  }
+  if (response && typeof response === 'object' && response.name === 'INVALID_FIELD') {
+    return { ok: false, why: 'The response is INVALID_FIELD about a column that is not the probed one, so it answers a different question. Save the probe response whole and look at it.' }
+  }
+  return { ok: false, why: 'The response is neither the measured aggregate envelope nor the measured INVALID_FIELD shape, so what this org carries is not known. Save it whole and look at it: a guessed pair fails every contact create or names fields the org does not have.' }
+}
+
+/**
+ * The scope question's evidence: how many Contacts and how many Leads the
+ * org holds, so "this import creates Contacts with their companies" is
+ * confirmed against what the org actually works in rather than assumed.
+ * Two named-aggregate reads; the envelope (one AggregateResult row whose
+ * alias key carries the count) is measured 2026-08-26.
+ */
+function leadContactCountRequests (config) {
+  // Named aggregates, not bare COUNT(): each answer then carries its
+  // question as the alias key on its one row, so two saved files passed
+  // in the wrong order surface as refusals instead of mislabelled
+  // evidence, the same binding rule every other judge here holds.
+  return [
+    query('count contacts', config.orgAlias, 'SELECT COUNT(Id) contacts FROM Contact'),
+    query('count leads', config.orgAlias, 'SELECT COUNT(Id) leads FROM Lead')
+  ]
+}
+
+/**
+ * The two saved counts, judged strictly against the measured aggregate
+ * envelope (2026-08-26): one row whose alias key carries the count.
+ *
+ * EACH ANSWER IS BOUND TO ITS QUESTION BY THE ALIAS KEY ITS ROW CARRIES,
+ * not by which argument it arrived as: reversed saved files, or an
+ * unrelated query saved in a count's place, would otherwise put the wrong
+ * numbers in front of the person at the record-kind gate. A malformed
+ * count is refused rather than read as zero, which would tell a Leads org
+ * it has no leads.
+ */
+function judgeLeadContactCounts (contactResponse, leadResponse) {
+  const countOf = (response, key) => {
+    const result = queryRecords(response)
+    if (!result || result.done !== true) {
+      return { why: `The ${key} response is not the measured aggregate envelope, or was cut short. Save it whole and look at it: a misread count is evidence shown to a person.` }
+    }
+    if (result.records.length !== 1) {
+      return { why: `The ${key} response holds ${result.records.length} rows where the aggregate answers exactly one. Save it whole and look at it.` }
+    }
+    const value = result.records[0][key]
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return { why: `The ${key} response's row carries no \`${key}\` count, so it answers a different question, or the saved files are out of order. Save both responses whole, in the order the requests were emitted.` }
+    }
+    return { count: value }
+  }
+  const contacts = countOf(contactResponse, 'contacts')
+  if (contacts.why) return { ok: false, why: contacts.why }
+  const leads = countOf(leadResponse, 'leads')
+  if (leads.why) return { ok: false, why: leads.why }
+  return { ok: true, contacts: contacts.count, leads: leads.count }
+}
+
 // ---------------------------------------------------------------- the push
 
 /**
@@ -1047,6 +1172,10 @@ module.exports = {
   judgeStatusRead,
   flagRequest,
   judgeFlag,
+  mailingFieldsProbeRequest,
+  judgeMailingFieldsProbe,
+  leadContactCountRequests,
+  judgeLeadContactCounts,
   assertPlanShape,
   pushRequests,
   judgeResponse,

@@ -108,7 +108,7 @@
       "name": "import-leads",
       "source": "./plugins/import-leads",
       "description": "Imports lead lists into the CRM config names, HubSpot or Salesforce, one per install: mapped, deduped, matched to companies, on the memberships the org's grid names, verified by reading every write back, and written back to a Notion source. Every write sits behind one confirmation.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "Sarah Madden"
       },

@@ -35,7 +35,10 @@ the org alias the `sf` CLI keychain holds the credential under (nothing
 key-shaped exists on that backend), the field-name map in the org's own API
 names, and any record-type ids. Both name the path to the
 company alias map. The plugin writes that file once, with confirmation, on a
-first run, and nothing else writes it.
+first run, and nothing else writes it. On a salesforce first run the draft
+asks the org which state and country fields it carries, one read-only
+query, because a picklist org refuses the plain mailing fields' values and
+a plain org lacks the code fields (both branches measured 2026-08-26).
 
 The organisation's rules are Process artifacts, read at run time: the
 required-fields rule, the campaign member-status grid, and optionally
@@ -63,13 +66,16 @@ count read-backs, recorded in `DECISIONS.md` beside the two org behaviours
 the run surfaced (state and country picklists refusing the plain mailing
 fields, and the org's active standard duplicate rule).
 
-Unmeasured and deliberately open: whether HubSpot's auto-company-creation
-setting can be read from the API (the matching half was answered on
-2026-08-26, when the company search gained the domain half beside the name);
-the email opt-out (HubSpot's subscription statuses are a separate surface,
-and Salesforce's plain field is org-dependent); batch surfaces and rate
-limits at volume on both backends; the Lead object entirely; and the full
-behaviour of org-configured Salesforce duplicate rules, which is why the
-dedupe search is the whole guard there (the acceptance run observed the
-standard rule refuse one deliberate same-person create, recorded in
-`DECISIONS.md`).
+Unmeasured and deliberately open: the email opt-out and HubSpot's
+marketing-contact status (the run's checkpoint asks about both by name and
+writes neither until a measurement session says how each surface behaves);
+batch surfaces and rate limits at volume on both backends; the Lead object
+entirely (the run confirms at scope that Contacts are what the org works
+in, with the org's own Contact and Lead counts as evidence on Salesforce);
+and the full behaviour of org-configured Salesforce duplicate rules, which
+is why the dedupe search is the whole guard there (the acceptance run
+observed the standard rule refuse one deliberate same-person create,
+recorded in `DECISIONS.md`). Measured and closed, 2026-08-26: HubSpot's
+auto-company-creation setting is not exposed by the documented API, so
+`check` names that behaviour as a standing risk permanently rather than
+checking it.
