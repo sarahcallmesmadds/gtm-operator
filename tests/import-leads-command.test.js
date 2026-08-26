@@ -60,7 +60,7 @@ check('config-draft with no answers file names both backends\' identifiers, not 
   const result = run('config-draft')
   assert.strictEqual(result.status, 1)
   assert.ok(/portalId and serviceKeyPath on hubspot/.test(result.stderr))
-  assert.ok(/orgAlias and any recordTypeIds on salesforce/.test(result.stderr))
+  assert.ok(/orgAlias, the judged mailingFields pair and any recordTypeIds on salesforce/.test(result.stderr))
 })
 
 // A working config pointing at a key file and an alias map in the temp dir.
@@ -328,9 +328,12 @@ check('mailing-fields-probe runs with no config at all, because it belongs to th
   })()
   assert.strictEqual(result.status, 0)
   const parsed = JSON.parse(result.stdout)
-  assert.strictEqual(parsed.request.targetOrg, 'first-run-org')
-  assert.ok(/SELECT COUNT\(MailingStateCode\) stateProbe, COUNT\(MailingCountryCode\) countryProbe FROM Contact/.test(parsed.request.soql),
-    'the named-aggregate form is the binding, so the test pins it exactly')
+  assert.strictEqual(parsed.requests.length, 2)
+  assert.ok(parsed.requests.every(r => r.targetOrg === 'first-run-org'))
+  // Exact equality: round 3 found the substring pins staying green for
+  // grouped variants the judge refuses at runtime.
+  assert.strictEqual(parsed.requests[0].soql, 'SELECT COUNT(MailingStateCode) stateProbe FROM Contact')
+  assert.strictEqual(parsed.requests[1].soql, 'SELECT COUNT(MailingCountryCode) countryProbe FROM Contact')
 
   const bare = run('mailing-fields-probe')
   assert.notStrictEqual(bare.status, 0)
@@ -366,33 +369,53 @@ check('a config that already exists and says hubspot refuses both first-run prob
   const probe = runHubspot('mailing-fields-probe', 'some-org')
   assert.notStrictEqual(probe.status, 0)
   assert.ok(/says hubspot/.test(probe.stderr))
-  const judge = runHubspot('mailing-fields-judge', hubspotConfig)
+  const judge = runHubspot('mailing-fields-judge', hubspotConfig, hubspotConfig)
   assert.notStrictEqual(judge.status, 0)
   assert.ok(/says hubspot/.test(judge.stderr))
+
+  // Round 3: a config that exists and cannot be read is not a first run
+  // either. Only a genuinely missing file gets first-run treatment.
+  const brokenConfig = path.join(TEMP, 'broken-config.json')
+  fs.writeFileSync(brokenConfig, JSON.stringify({ configVersion: 99, crm: 'hubspot' }))
+  const broken = (() => {
+    try {
+      const stdout = execFileSync('node', [SCRIPT, 'mailing-fields-probe', 'some-org'], {
+        env: Object.assign({}, process.env, { IMPORT_LEADS_CONFIG: brokenConfig }),
+        encoding: 'utf8'
+      })
+      return { status: 0, stdout, stderr: '' }
+    } catch (error) {
+      return { status: error.status, stdout: error.stdout || '', stderr: error.stderr || '' }
+    }
+  })()
+  assert.notStrictEqual(broken.status, 0)
+  assert.ok(/cannot be read/.test(broken.stderr))
 })
 
 check('mailing-fields-judge answers the pair to offer, and exits non-zero on a shape it does not know', () => {
-  const picklist = path.join(TEMP, 'sf-probe-picklist.json')
-  fs.writeFileSync(picklist, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, stateProbe: 3, countryProbe: 4 }], totalSize: 1, done: true } }))
-  const judged = JSON.parse(run('mailing-fields-judge', picklist).stdout)
-  // ok and codeFields are asserted as well as the pair: round 2 found a
-  // test that would have passed a judge answering the right pair under a
+  const stateFile = path.join(TEMP, 'sf-probe-state.json')
+  const countryFile = path.join(TEMP, 'sf-probe-country.json')
+  fs.writeFileSync(stateFile, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, stateProbe: 3 }], totalSize: 1, done: true } }))
+  fs.writeFileSync(countryFile, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, countryProbe: 4 }], totalSize: 1, done: true } }))
+  const judged = JSON.parse(run('mailing-fields-judge', stateFile, countryFile).stdout)
+  // ok, codeFields and the pair are all asserted: round 2 found a test
+  // that would have passed a judge answering the right pair under a
   // refusal.
   assert.strictEqual(judged.ok, true)
-  assert.strictEqual(judged.codeFields, true)
+  assert.deepStrictEqual(judged.codeFields, { state: true, country: true })
   assert.deepStrictEqual(judged.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
 
   const odd = path.join(TEMP, 'sf-probe-odd.json')
   fs.writeFileSync(odd, JSON.stringify({ odd: true }))
-  const refused = run('mailing-fields-judge', odd)
+  const refused = run('mailing-fields-judge', odd, countryFile)
   assert.notStrictEqual(refused.status, 0)
 })
 
 check('the lead-contact counts flow emits two named aggregates and judges the saved pair', () => {
   const emitted = JSON.parse(run('lead-contact-queries').stdout)
   assert.strictEqual(emitted.requests.length, 2)
-  assert.ok(/COUNT\(Id\) contacts FROM Contact/.test(emitted.requests[0].soql))
-  assert.ok(/COUNT\(Id\) leads FROM Lead/.test(emitted.requests[1].soql))
+  assert.strictEqual(emitted.requests[0].soql, 'SELECT COUNT(Id) contacts FROM Contact')
+  assert.strictEqual(emitted.requests[1].soql, 'SELECT COUNT(Id) leads FROM Lead')
   assert.ok(/before anything maps into the CRM/.test(emitted.note))
 
   const contacts = path.join(TEMP, 'sf-count-contacts.json')

@@ -751,85 +751,67 @@ check('org display judges Connected as ok and anything else as not proved', () =
   assert.strictEqual(salesforce.judgeOrgDisplay({ odd: true }).ok, false)
 })
 
-check('the mailing-fields probe takes a bare alias, asks the named aggregate over both code fields, and refuses an empty alias', () => {
-  const request = salesforce.mailingFieldsProbeRequest('first-run-org')
-  assert.strictEqual(request.transport, 'query')
-  assert.strictEqual(request.targetOrg, 'first-run-org')
-  // Both columns probed, each under its own alias: the round-2 finding
-  // was the judge answering for a pair the request never asked the org
-  // about.
-  assert.ok(/SELECT COUNT\(MailingStateCode\) stateProbe, COUNT\(MailingCountryCode\) countryProbe FROM Contact/.test(request.soql))
-  assert.throws(() => salesforce.mailingFieldsProbeRequest('  '), /org alias/)
+check('the mailing-fields probe asks one named aggregate per code field, and refuses an empty alias', () => {
+  const requests = salesforce.mailingFieldsProbeRequests('first-run-org')
+  assert.strictEqual(requests.length, 2)
+  assert.ok(requests.every(r => r.transport === 'query' && r.targetOrg === 'first-run-org'))
+  // Exact equality, not a substring: round 3 found the regex pins staying
+  // green for grouped variants the judge refuses at runtime.
+  assert.strictEqual(requests[0].soql, 'SELECT COUNT(MailingStateCode) stateProbe FROM Contact')
+  assert.strictEqual(requests[1].soql, 'SELECT COUNT(MailingCountryCode) countryProbe FROM Contact')
+  assert.throws(() => salesforce.mailingFieldsProbeRequests('  '), /org alias/)
 })
 
-check('the probe judge reads the measured branches and binds both arms to the probed question', () => {
-  // Every branch measured 2026-08-26: the two-alias aggregate envelope
-  // from a picklist org, and the data commands' INVALID_FIELD error shape
-  // whose message echoes the refused query and so names the probed
-  // columns, in both measured spellings.
-  const aggregate = (s, c) => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, stateProbe: s, countryProbe: c }], totalSize: 1, done: true } })
-  const picklist = salesforce.judgeMailingFieldsProbe(aggregate(3, 4))
-  assert.strictEqual(picklist.ok, true)
-  assert.strictEqual(picklist.codeFields, true)
-  assert.deepStrictEqual(picklist.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate(0, 0)).ok, true, 'an empty org still answers the aggregate')
+check('the probe judge answers per field, bound both arms, so a mixed org gets a measured mixed pair', () => {
+  const aggregate = (key, n) => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, [key]: n }], totalSize: 1, done: true } })
+  const refusal = column => ({ name: 'INVALID_FIELD', message: "Invalid field: '" + column + "'", exitCode: 1 })
 
-  const plain = salesforce.judgeMailingFieldsProbe({
-    name: 'INVALID_FIELD',
-    message: "Invalid field: 'MailingStateCode'",
-    exitCode: 1
+  const codes = salesforce.judgeMailingFieldsProbe(aggregate('stateProbe', 3), aggregate('countryProbe', 4))
+  assert.deepStrictEqual(codes, {
+    ok: true,
+    codeFields: { state: true, country: true },
+    use: { state: 'MailingStateCode', country: 'MailingCountryCode' },
+    why: codes.why
   })
-  assert.strictEqual(plain.ok, true)
-  assert.strictEqual(plain.codeFields, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate('stateProbe', 0), aggregate('countryProbe', 0)).ok, true, 'an empty org still answers the aggregates')
+
+  const plain = salesforce.judgeMailingFieldsProbe(refusal('MailingStateCode'), refusal('MailingCountryCode'))
   assert.deepStrictEqual(plain.use, { state: 'MailingState', country: 'MailingCountry' })
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe({
-    name: 'INVALID_FIELD',
-    message: "No such column 'MailingCountryCode' on entity 'Contact'.",
-    exitCode: 1
-  }).codeFields, false, 'either probed column, either measured spelling')
-
-  // THE SUCCESS ARM IS BOUND: a successful answer belonging to a
-  // different query (the round-1 repro, a row carrying only an Id, and
-  // round 2's half-pair variant) is refused, not read as a picklist org.
-  const unrelated = salesforce.judgeMailingFieldsProbe({
-    status: 0, result: { records: [{ Id: '003X' }], totalSize: 1, done: true }
-  })
-  assert.strictEqual(unrelated.ok, false)
-  assert.ok(/different query/.test(unrelated.why))
+  assert.deepStrictEqual(plain.codeFields, { state: false, country: false })
   assert.strictEqual(salesforce.judgeMailingFieldsProbe(
-    { status: 0, result: { records: [{ stateProbe: 3 }], totalSize: 1, done: true } }
-  ).ok, false, 'half the pair is not the pair')
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [], totalSize: 0, done: true } }).ok, false,
-    'a rowless success carries nothing to bind and is refused')
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [{ stateProbe: 1, countryProbe: 1 }], totalSize: 1, done: false } }).ok, false)
+    { name: 'INVALID_FIELD', message: "No such column 'MailingStateCode' on entity 'Contact'.", exitCode: 1 },
+    refusal('MailingCountryCode')
+  ).use.state, 'MailingState', 'the bare-select refusal spelling is read too')
 
-  // A malformed saved file with a non-object row is a refusal, never a
-  // crash: the round-2 wrong-type finding.
-  const nonObject = salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: ['odd'], totalSize: 1, done: true } })
+  // THE ROUND-3 REPRO: a refusal naming one column proves nothing about
+  // the other. A mixed org now gets a measured mixed pair.
+  const mixed = salesforce.judgeMailingFieldsProbe(aggregate('stateProbe', 2), refusal('MailingCountryCode'))
+  assert.deepStrictEqual(mixed.use, { state: 'MailingStateCode', country: 'MailingCountry' })
+  assert.deepStrictEqual(mixed.codeFields, { state: true, country: false })
+
+  // Bound, both arms, both files: reversed saves, an unrelated success,
+  // a refusal about another column, a non-object row, a cut-short answer.
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate('countryProbe', 4), aggregate('stateProbe', 3)).ok, false, 'reversed files are refused')
+  const unrelated = salesforce.judgeMailingFieldsProbe(
+    { status: 0, result: { records: [{ Id: '003X' }], totalSize: 1, done: true } }, aggregate('countryProbe', 4))
+  assert.strictEqual(unrelated.ok, false)
+  assert.ok(/different question|out of order/.test(unrelated.why))
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(refusal('Persona__c'), refusal('MailingCountryCode')).ok, false)
+  const nonObject = salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: ['odd'], totalSize: 1, done: true } }, aggregate('countryProbe', 4))
   assert.strictEqual(nonObject.ok, false)
   assert.ok(/not a record/.test(nonObject.why))
-
-  // The refusal arm stays bound: INVALID_FIELD about another column
-  // answers a different question.
-  const otherColumn = salesforce.judgeMailingFieldsProbe({
-    name: 'INVALID_FIELD',
-    message: "No such column 'Persona__c' on entity 'Contact'.",
-    exitCode: 1
-  })
-  assert.strictEqual(otherColumn.ok, false)
-  assert.ok(/different question/.test(otherColumn.why))
-
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ odd: true }).ok, false)
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe(null).ok, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [{ stateProbe: 1 }], totalSize: 1, done: false } }, aggregate('countryProbe', 4)).ok, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ odd: true }, aggregate('countryProbe', 4)).ok, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(null, null).ok, false)
 })
 
 check('the lead and contact counts are two named aggregates on the configured org', () => {
   const requests = salesforce.leadContactCountRequests(config())
   assert.strictEqual(requests.length, 2)
   assert.strictEqual(requests[0].label, 'count contacts')
-  assert.ok(/SELECT COUNT\(Id\) contacts FROM Contact/.test(requests[0].soql))
+  assert.strictEqual(requests[0].soql, 'SELECT COUNT(Id) contacts FROM Contact')
   assert.strictEqual(requests[1].label, 'count leads')
-  assert.ok(/SELECT COUNT\(Id\) leads FROM Lead/.test(requests[1].soql))
+  assert.strictEqual(requests[1].soql, 'SELECT COUNT(Id) leads FROM Lead')
   assert.ok(requests.every(r => r.targetOrg === 'acceptance-org' && r.transport === 'query'))
 })
 

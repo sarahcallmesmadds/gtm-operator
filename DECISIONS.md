@@ -6823,26 +6823,30 @@ than left as first-run guidance. Neither pair of state and country field
 names is right for every org: a picklist org refuses the plain fields'
 values (`FIELD_INTEGRITY_EXCEPTION` on "US", measured in the acceptance
 run) and only a picklist org carries the code fields at all. So the first
-run asks the org, one read-only named aggregate over both code fields
-(`SELECT COUNT(MailingStateCode) stateProbe, COUNT(MailingCountryCode)
-countryProbe FROM Contact`), before the draft is shown. Every branch is
-measured 2026-08-26: the aggregate envelope from a picklist org, one row
-carrying both alias counts on an empty org as well as a full one, and the
-data commands' refusal shape, `name` INVALID_FIELD with a message that
-echoes the refused query and so names the probed columns, in both
-measured spellings, from an org that lacks one. Both arms are bound to
-the probed question: a successful answer without both alias keys, and an
-INVALID_FIELD naming no probed column, are questions rather than
-verdicts, the same saved-file discipline every other judge holds. The
-pair the judge offers is probed per org rather than assumed co-present
-(round 2's finding). The probe and its judge require no config, because
-they run while the draft's answers are still being gathered; a config
-that already exists and names hubspot refuses them by name, like every
-cross-backend command.
+run asks the org, one read-only single-column named aggregate per code
+field, before the draft is shown, and judges each answer on its own:
+a field the org answered is offered as its code name, one the org
+refused by name as its plain name, so even a mixed org gets a measured
+mixed pair and no verdict about one field ever speaks for the other
+(rounds 2 and 3). Every branch is measured 2026-08-26: the aggregate
+envelope, one row carrying the alias count on an empty org as well as a
+full one, and the data commands' refusal shape, `name` INVALID_FIELD
+with a message that names the refused column in both measured spellings.
+Both arms of each verdict are bound to their question, the alias key on
+success and the column name in the refusal, so reversed saved files, an
+unrelated success, and a refusal about some other column all surface as
+refusals. The draft enforces the probe: a salesforce `config-draft`
+refuses answers without the judged `mailingFields` pair, and the
+salesforce defaults deliberately carry no state or country names at all,
+because a defaulted pair is the exact config the probe exists to prevent
+(round 3). The probe and its judge require no config, because they run
+while the draft's answers are still being gathered; a config that exists
+and names hubspot, or exists and cannot be read, refuses them by name,
+and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Twelve hand mutations across the build and its two review rounds, each
+Sixteen hand mutations across the build and its three review rounds, each
 asserted onto disk before its suite ran, each red in its named check, and
 each file restored byte-identical after: the probe judge's column binding
 removed, the count judge's type discipline coerced, the probe's alias
@@ -6850,9 +6854,12 @@ check dropped, the probe command made to read config, the probe judge's
 success-arm binding removed, the count judge's alias binding loosened to
 any numeric value, the count builder's aliases dropped, each of the two
 judge commands made to swallow a refusal, the probe judge's half-pair
-acceptance restored, its non-object row check dropped, and the
-wrong-backend guard on the first-run commands removed. The whole
-repository suite is green after all of it.
+acceptance restored, its non-object row check dropped, the wrong-backend
+guard on the first-run commands removed, the draft's mailingFields
+requirement dropped, the refusal arm's column binding removed, the
+malformed-config guard dropped, and a grouped variant smuggled into the
+probe query past the exact-form pins. The whole repository suite is
+green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -6878,6 +6885,26 @@ home for excluded fields named only the opt-out where every other
 document names the marketing status beside it, now naming both; and
 three new checks carried no deliberate-break proof, now covered by the
 round's five new mutations, recorded above.
+
+### Round 3 on the follow-ups, Codex CLI confirming, 2026-08-26: four findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole, every finding reproduced before it was reported.
+The round confirmed rounds 1 and 2 present and found where each stopped
+short. The two High: the config draft still assembled a salesforce
+config from defaults with no probe evidence at all, the exact config the
+probe exists to prevent, so the draft now refuses answers without the
+judged `mailingFields` pair and the salesforce defaults carry no state
+or country names; and the refusal arm still decided the whole pair on a
+refusal naming one column, so the probe became one single-column
+aggregate per field, judged independently, and a mixed org gets a
+measured mixed pair. The Medium: the wrong-backend guard fired only on a
+config that parses, while a malformed one fell through to first-run
+treatment; a config that exists and cannot be read now refuses by name,
+and only a missing file proceeds. The Low: the aggregate-form test pins
+were substring matches a grouped variant slipped past; the request
+builders' queries are now pinned by exact equality. Four new mutations,
+recorded above, prove the four new arms.
 
 ### Round 2 on the follow-ups, Devin CLI, 2026-08-26: six findings, all taken
 

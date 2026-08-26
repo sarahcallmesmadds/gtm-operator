@@ -34,10 +34,11 @@ Run `check-standing`. It reports, in one pass:
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
   `config-write` only on an explicit yes. On salesforce, run
-  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge` first, one
-  read-only query, so the draft offers the state and country field names
-  this org actually carries (a picklist org refuses the plain fields'
-  values; a plain org lacks the code fields; measured 2026-08-26).
+  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge` first, two
+  read-only queries with one measured verdict per code field, and pass the
+  judged pair as the draft's `mailingFields`, which it refuses to assemble
+  without (a picklist org refuses the plain fields' values; a plain org
+  lacks the code fields; measured 2026-08-26).
 - **The credential, per backend.** On HubSpot, the Service Key file exists
   and is not empty, at the path config names, its contents never read into
   any output. On Salesforce there is nothing key-shaped to check: the org

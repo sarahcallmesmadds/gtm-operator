@@ -77,14 +77,17 @@ draft, and `config-write` only on an explicit yes. The file is written once;
 any other refusal is fixed by hand, not rewritten.
 
 **On a salesforce first run, ask the org which mailing fields it carries
-before the draft is shown.** `mailing-fields-probe <orgAlias>` emits one
-read-only query and `mailing-fields-judge` answers the state and country
-names the draft should offer: `MailingStateCode` and `MailingCountryCode` on
-a picklist org, which refuses the plain fields' values outright, and the
-plain pair otherwise, both branches measured 2026-08-26. Neither pair is
-right for every org, which is why the org is asked rather than defaulted at.
-Pass the judged pair into the draft answers as `properties.contact.state`
-and `properties.contact.country`, and show which pair the org chose and why.
+before the draft is shown.** `mailing-fields-probe <orgAlias>` emits two
+read-only queries, one per code field, and `mailing-fields-judge` turns the
+two saved responses (state first) into one measured verdict per field:
+`MailingStateCode` where the org answered it, the plain name where the org
+refused it by name, so even a mixed org gets a measured pair (every branch
+measured 2026-08-26). Neither pair is right for every org, which is why the
+org is asked rather than defaulted at, and the draft enforces it: a
+salesforce `config-draft` refuses answers that carry no judged
+`mailingFields` pair. Pass the judge's `use` object as
+`mailingFields` in the draft answers, and show which names the org chose
+and why.
 
 ## Step 1. Scope: one named source
 

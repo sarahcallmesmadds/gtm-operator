@@ -69,7 +69,7 @@ check('a salesforce mapping that is not field-API-name shaped is refused: identi
     orgAlias: 'devorg',
     aliasMapPath: '~/gtm/company-aliases.json',
     properties: {
-      contact: Object.assign({}, config.DEFAULT_SALESFORCE_FIELD_NAMES.contact),
+      contact: Object.assign({ state: 'MailingStateCode', country: 'MailingCountryCode' }, config.DEFAULT_SALESFORCE_FIELD_NAMES.contact),
       company: Object.assign({}, config.DEFAULT_SALESFORCE_FIELD_NAMES.company)
     }
   })
@@ -186,7 +186,10 @@ check('an unknown crm is refused by name, and nothing else about the file is gue
 const salesforceAnswers = () => ({
   crm: 'salesforce',
   orgAlias: 'acceptance-org',
-  aliasMapPath: '~/gtm/company-aliases.json'
+  aliasMapPath: '~/gtm/company-aliases.json',
+  // The judged pair from mailing-fields-probe: the draft refuses to
+  // assemble without it (round 3, 2026-08-26).
+  mailingFields: { state: 'MailingStateCode', country: 'MailingCountryCode' }
 })
 
 check('a salesforce draft records the crm, the alias and the standard field names, and validates clean', () => {
@@ -195,6 +198,8 @@ check('a salesforce draft records the crm, the alias and the standard field name
   assert.strictEqual(draft.orgAlias, 'acceptance-org')
   assert.strictEqual(draft.properties.contact.firstName, 'FirstName')
   assert.strictEqual(draft.properties.contact.city, 'MailingCity')
+  assert.strictEqual(draft.properties.contact.state, 'MailingStateCode')
+  assert.strictEqual(draft.properties.contact.country, 'MailingCountryCode')
   assert.strictEqual(draft.properties.company.name, 'Name')
   assert.ok(!('portalId' in draft) && !('serviceKeyPath' in draft), 'nothing key-shaped or portal-shaped exists on this backend')
   assert.deepStrictEqual(config.problems(draft), [])
@@ -210,6 +215,15 @@ check('a salesforce config refuses HubSpot identifiers, and a hubspot one refuse
   const aliased = config.draft(answers())
   aliased.orgAlias = 'acceptance-org'
   assert.ok(config.problems(aliased).some(p => /orgAlias is Salesforce's identifier/.test(p)))
+})
+
+check('a salesforce draft without the judged mailing pair is refused, naming the probe', () => {
+  const bare = salesforceAnswers()
+  delete bare.mailingFields
+  assert.throws(() => config.draft(bare), /mailingFields is missing.*mailing-fields-probe/s)
+  const half = salesforceAnswers()
+  half.mailingFields = { state: 'MailingStateCode' }
+  assert.throws(() => config.draft(half), /mailingFields is missing or incomplete/)
 })
 
 check('a missing org alias is refused with the keychain named as where the credential actually lives', () => {

@@ -32,8 +32,8 @@
  *   node import-leads.js status-judge <campaign-decisions.json> <responses.json>         (salesforce)
  *   node import-leads.js flag-query [userId]                                             (salesforce)
  *   node import-leads.js flag-judge <response.json>                                      (salesforce)
- *   node import-leads.js mailing-fields-probe <orgAlias>                                 (salesforce, first run: no config yet)
- *   node import-leads.js mailing-fields-judge <response.json>                            (salesforce, first run: no config yet)
+ *   node import-leads.js mailing-fields-probe <orgAlias>                                 (salesforce, first run: config optional)
+ *   node import-leads.js mailing-fields-judge <state-response.json> <country-response.json> (salesforce, first run: config optional)
  *   node import-leads.js lead-contact-queries                                            (salesforce)
  *   node import-leads.js lead-contact-judge <contact-count.json> <lead-count.json>       (salesforce)
  *   node import-leads.js plan <inputs.json>
@@ -114,7 +114,8 @@ const commands = {
     if (!answersFile) {
       throw new Error(
         'config-draft needs the answers file: the crm (absent means hubspot), then per backend its identifiers ' +
-        '(portalId and serviceKeyPath on hubspot; orgAlias and any recordTypeIds on salesforce), aliasMapPath, and any ' +
+        '(portalId and serviceKeyPath on hubspot; orgAlias, the judged mailingFields pair and any recordTypeIds on ' +
+        'salesforce), aliasMapPath, and any ' +
         'property corrections.'
       )
     }
@@ -433,6 +434,10 @@ const commands = {
   // probe was round 2's routing finding.
   'mailing-fields-probe' (orgAlias) {
     const existing = config.read()
+    if (!existing.ok && !existing.missing) {
+      console.error('A config exists at ' + existing.path + ' and cannot be read, so this is not a first run. Fix the file by hand before probing: ' + 'a wrong-backend probe was refused here on purpose.')
+      process.exit(1)
+    }
     if (existing.ok && existing.crm === 'hubspot') {
       console.error('mailing-fields-probe is the salesforce route and this install\'s config says hubspot. On hubspot the property names are the portal\'s own and there is nothing to probe: correct them in conversation at the draft.')
       process.exit(1)
@@ -444,22 +449,27 @@ const commands = {
       )
     }
     console.log(JSON.stringify({
-      request: salesforce.mailingFieldsProbeRequest(orgAlias),
+      requests: salesforce.mailingFieldsProbeRequests(orgAlias),
       note:
-        SEND_NOTE.salesforce + ' Pass the saved response to mailing-fields-judge: it answers which state and country ' +
-        'field names the config draft should offer, because a picklist org refuses the plain fields and a plain org ' +
-        'does not have the code fields (measured 2026-08-26).'
+        SEND_NOTE.salesforce + ' Pass the two saved responses, state first, to mailing-fields-judge: it answers which ' +
+        'state and country field names the config draft requires as its mailingFields pair, one measured verdict per ' +
+        'field, because a picklist org refuses the plain fields and a plain org does not have the code fields ' +
+        '(measured 2026-08-26).'
     }, null, 2))
   },
 
-  'mailing-fields-judge' (responseFile) {
+  'mailing-fields-judge' (stateFile, countryFile) {
     const existing = config.read()
+    if (!existing.ok && !existing.missing) {
+      console.error('A config exists at ' + existing.path + ' and cannot be read, so this is not a first run. Fix the file by hand before probing: ' + 'a wrong-backend probe was refused here on purpose.')
+      process.exit(1)
+    }
     if (existing.ok && existing.crm === 'hubspot') {
       console.error('mailing-fields-judge is the salesforce route and this install\'s config says hubspot. On hubspot the property names are the portal\'s own and there is nothing to probe: correct them in conversation at the draft.')
       process.exit(1)
     }
-    if (!responseFile) throw new Error('mailing-fields-judge needs the saved probe response.')
-    const judged = salesforce.judgeMailingFieldsProbe(readJson(responseFile))
+    if (!stateFile || !countryFile) throw new Error('mailing-fields-judge needs the two saved probe responses, state first, country second.')
+    const judged = salesforce.judgeMailingFieldsProbe(readJson(stateFile), readJson(countryFile))
     console.log(JSON.stringify(judged, null, 2))
     if (!judged.ok) process.exit(1)
   },
