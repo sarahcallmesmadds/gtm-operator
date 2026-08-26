@@ -6012,3 +6012,18 @@ skill text promising what the planning and push layers could not carry.
    per key now, the domain request labelled as such.
 
 The suite is green after all of it.
+
+### Round 2 on the corrections, Devin CLI, 2026-08-26: one non-blocking finding, answered as the line it marks
+
+No-tools route, per-file coverage stated, eleven files whole and
+DECISIONS.md by its diff. The finding: the documents promise the pre-push
+checkpoint and no command implements it. The answer is that the split is
+the marketplace's own convention, now said in as many words where the
+checkpoint is described: the script decides what to send and what an
+answer means, the skill drives the conversation, and the checkpoint is a
+conversational step with no request to send and no response to judge. Its
+teeth already live in the layers that enforce the contract, so a field
+waved through in conversation still cannot reach a payload. What the
+finding did catch: "recorded as a design request" read like a file write,
+which an installed plugin must never do; both documents now say the
+refusal is said in the run's own report, which is the record.
