@@ -28,7 +28,8 @@ measure. The rebuild rule, her call on 2026-08-25:
 the hard-won refinements carry over as they are. What moves is identity, not
 logic, and identity moves into these homes:
 
-- **Config holds identifiers.** The org, the field-name map, file paths.
+- **Config holds identifiers.** The portal, the property-name map, file
+  paths.
 - **Process holds judgment.** The rules the organisation decided, written as
   artifacts a person and a skill can both read.
 - **The run confirms the rest.** Anything that is neither an identifier nor a
@@ -179,14 +180,16 @@ and both execute only what the approved plan names.**
 6. **Companies matched, or planned for creation.** A planned company carries
    its name and, when the list has a domain, its website. HubSpot itself
    auto-creates companies from email domains and takes the primary
-   association (measured 2026-08-25), so the plan says which companies the
-   push will create and which the portal will invent on its own, rather than
-   letting the two collide silently.
+   association (measured 2026-08-25), so the plan names that collision
+   rather than letting it happen silently; what `run` ultimately does about
+   the portal's behaviour is deliberately Open, not guessed here.
 7. **Dedupe against the CRM**, by email, through the search surface, and
    each row gets its plan: create, update filling blanks only, or exclude.
    HubSpot also enforces email uniqueness itself, and a duplicate create is
-   refused carrying the existing record's id (measured 2026-08-25), which
-   the push folds into the update path rather than treating as a failure.
+   refused carrying the existing record's id (measured 2026-08-25), so a
+   duplicate that slips past the search cannot become a second record: the
+   push reports the refusal with that id, and does not improvise an update
+   nobody approved.
    Duplicates and cross-company conflicts are always presented, never
    auto-resolved.
 8. **Multi-event detection, mandatory before campaign setup.** A list that
@@ -250,8 +253,9 @@ and both execute only what the approved plan names.**
 **What it does.** Says whether an import would work, before anyone is
 mid-import, and what it would do. The standing half: the required artifacts
 exist in Process, config points at a portal and the key it names resolves,
-the connection is alive, and the portal's automatic company creation
-setting is reported whichever way it is set. The
+and the connection is alive. Automatic company creation is called out as a
+standing risk; whether the setting itself can be read from the API is
+unmeasured, and is part of the Open item on that behaviour. The
 per-list half, only when handed a list: how many rows would be new, how many
 match existing records, how many are ambiguous, and which rows fail the floor
 or the required-fields rule, with the failing field named per row.
@@ -274,7 +278,7 @@ config write both skills share, which happens only on an explicit yes.
 **The judgment it carries.** Telling the kinds of not-ready apart: a row that
 can never import (refused, with the gap named), a row that needs a person's
 answer (ambiguous match, uncovered status), and a setup that is not ready at
-all (missing artifact, no org). Collapsing those into one number would make
+all (missing artifact, no portal or key). Collapsing those into one number would make
 the preview useless, so they are reported separately, the same distinction
 the foundation's audit makes between empty and unknown.
 
@@ -303,9 +307,9 @@ outside the CRM, and the writeback rules above govern it. The surface is
 the REST API with a Service Key as a bearer header, the credential this
 platform version issues.
 
-**Measured against a real portal, 2026-08-25**, every claim proved by a
-read-back, and the test records archived afterwards with the archival
-confirmed: contact and company creates; the contact-to-company association;
+**Measured against a real portal, 2026-08-25**: every create proved by a
+read-back, every refusal and no-op by its measured response, and the test
+records archived afterwards with the archival confirmed. The measured set: contact and company creates; the contact-to-company association;
 email uniqueness enforced by the portal, with the duplicate refusal
 carrying the existing record's id; the portal auto-creating a company from
 an email domain and taking the primary association; email validation

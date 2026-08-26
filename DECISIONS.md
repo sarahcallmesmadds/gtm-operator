@@ -5590,17 +5590,18 @@ repository.
 whole reference shape works, and more easily than the reference had it,
 because a custom campaign member status creates with one plain call where
 the reference needed Apex. A duplicate campaign member fails individually
-with the existing row untouched. Two traps: a fresh org refuses Campaign
+with the existing row untouched. The traps: a fresh org refuses Campaign
 creation until the user record's Marketing User flag is set, which one API
 call fixes, and the email opt-out field does not exist in a fresh org at
 all, so it is org-dependent.
 
-**HubSpot, via a free portal and a Service Key** (this platform version's
+**HubSpot, via a free portal and a Service Key sent as a bearer header on
+the REST API, which is the measured transport** (this platform version's
 replacement for private-app tokens; the private-app route does not exist in
 her portal, found in HubSpot's own docs after two wrong guesses at the UI):
 contact and company creates, associations, manual lists, membership adds and
 read-backs, the search surface's IN filter, and empty-string clears all
-work. Three behaviours matter to the design: the portal enforces email
+work. The behaviours that matter to the design: the portal enforces email
 uniqueness itself and the duplicate refusal carries the existing record's
 id; the portal auto-creates a company from an email domain and takes the
 primary association, racing the pipeline's own matching; and its email
@@ -5637,3 +5638,19 @@ one real list through every step against a portal, verified by read-backs,
 torn down cleanly. The opt-out leaves the write contract until HubSpot's
 subscription statuses are measured, and what `run` does about automatic
 company creation is Open rather than guessed.
+
+### Round 1 on the HubSpot pull request, Codex CLI, 2026-08-25: six findings, all taken
+
+The two that mattered: the pipeline's company step resolved the automatic
+creation behaviour that the Open list says is deliberately unresolved, and
+now names the collision instead of deciding it; and the dedupe step promised
+to fold a mid-push duplicate refusal into an update, which would have been
+an unapproved write and an auto-resolved duplicate in one move, the exact
+things the design forbids, and it now reports the refusal with the existing
+id and writes nothing nobody approved. The rest: `check` promised to report
+a portal setting nothing has measured a way to read, softened to naming the
+risk with the readability Open; the bearer-header transport is now in the
+measurement record it was missing from, and "every claim proved by a
+read-back" narrowed to creates by read-back and refusals by their measured
+responses; two Salesforce-era terms (org for portal) corrected; and the
+hand counts beside the trap and behaviour lists dropped.
