@@ -5791,3 +5791,25 @@ its website from the rows' domain when the decision gives none; two
 assignments realising one list name are refused as the collision they are;
 and the date signal checks plausibility, not shape alone. The suite is green
 after all of it.
+
+### Round 2 on the build, Devin CLI, 2026-08-25: seven findings, all taken
+
+The no-tools route, with the diff and the full final text of every plugin,
+test and design file inline; per-file coverage was stated, sixteen files
+whole and the rest by their diff hunks. The two that blocked: a successful
+list create judges by `listId`, the measured shape, where the judge only
+knew `id`, so a working create read as unknown; and the in-list duplicate
+guard demanded the excluded rows in `decided` as well as the kept ones, so
+excluding one of three and deliberately keeping two was blocked by the
+exclusion itself. The rest: the slash-form date check now holds the
+comment's own promise (a real day in its month, February allowed 29, in at
+least one of the two orders); `check-standing`'s artifacts note now carries
+the unreachable-versus-missing distinction the skill reports, and the
+command layer gained its own suite, run as a child process against a temp
+config, covering the standing report, the key file never being read into
+output, and the list lookups; the company website mapping moved to optional
+to match the contract's own conditional, with every builder guarding the
+absent mapping and a website with nowhere to land named in the plan rather
+than dropped; the weak count assertion on the clean proof became the
+planned writes asserted by name; and the `resolutions` docstring now states
+both keys. The suite is green after all of it.

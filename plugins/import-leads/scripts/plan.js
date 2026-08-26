@@ -83,7 +83,12 @@ function dateLike (value) {
   if (slashA !== undefined) {
     const a = Number(slashA)
     const b = Number(slashB)
-    const readable = (day, month) => day >= 1 && day <= 31 && month >= 1 && month <= 12
+    // Day checked against the month's own length, not a flat 31, or the
+    // comment's promise of "a real day-and-month" was wider than the check:
+    // 31/02 read as a date. February allows 29 because the year's order in
+    // a slash form is not knowable from one value.
+    const daysIn = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    const readable = (day, month) => month >= 1 && month <= 12 && day >= 1 && day <= daysIn[month - 1]
     return readable(a, b) || readable(b, a)
   }
   const day = Number(monthDay)
@@ -306,10 +311,12 @@ function dedupeVerdicts (rows, existing) {
  * creation means the portal was asked, not assumed.
  *
  * `resolutions` carries the person's answers to what dedupe presented:
- *   { "excluded": [{"index": n, "why": "..."}] }
- * Every in-list duplicate has to end with all but one of its rows excluded,
- * or an explicit note saying the person kept both. Every no-email row and
- * every company conflict has to appear in `resolutions.decided` by index, so
+ *   { "excluded": [{"index": n, "why": "..."}], "decided": [n, ...] }
+ * `excluded` removes a row from the plan with its reason kept. `decided`
+ * marks a row the person looked at and kept as it is. Every in-list
+ * duplicate has to end with all but one of its rows excluded, or every kept
+ * row marked decided when keeping several is deliberate. Every no-email row
+ * and every company conflict has to be excluded or decided by index, so
  * nothing dedupe surfaced can fall between the steps unseen.
  */
 function assemble (input) {
@@ -375,10 +382,16 @@ function assemble (input) {
 
   for (const duplicate of input.dedupe.inListDuplicates || []) {
     const kept = duplicate.rows.filter(index => !excluded.has(index))
-    if (kept.length > 1 && !duplicate.rows.every(index => decided.has(index))) {
+    // THE DECISION IS ASKED OF THE KEPT ROWS, NOT THE ORIGINAL GROUP. This
+    // used to require every row of the group in `decided`, including the
+    // excluded ones, so excluding one of three and deliberately keeping two
+    // was blocked by the exclusion itself: the excluded row is decided BY
+    // being excluded, and demanding it twice made the valid resolution
+    // impossible.
+    if (kept.length > 1 && !kept.every(index => decided.has(index))) {
       problems.push(
         `Rows ${duplicate.rows.join(', ')} share the email ${duplicate.email} and more than one is still in the plan. ` +
-        'Exclude all but one, or mark them decided if keeping several is deliberate.'
+        'Exclude all but one, or mark every kept row decided if keeping several is deliberate.'
       )
     }
   }
@@ -513,6 +526,17 @@ function assemble (input) {
         website: decision.website || needed.domain || null,
         rows: needed.rows
       })
+    }
+  }
+
+  // The same silently-lost rule the owner and persona follow: a website
+  // that has nowhere mapped to land is named, not dropped.
+  for (const company of companies.creates) {
+    if (company.website && !input.config.properties.company.website) {
+      problems.push(
+        `"${company.name}" would be created with a website and config maps no company website property, so it would be ` +
+        'silently lost. Map properties.company.website, or take the website off the decision and create the company bare.'
+      )
     }
   }
 
