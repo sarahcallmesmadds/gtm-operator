@@ -175,7 +175,7 @@ cannot meet the rule is refused with the gap named, never padded.
 ## run
 
 **What it does.** Takes one named list and lands the approved rows in the
-CRM config names: cleaned, deduped, matched to companies, on the memberships
+CRM its config names: cleaned, deduped, matched to companies, on the memberships
 the grid names, verified by reading the writes back, and, when the
 source is a Notion page or database, written back to the source. A CSV source
 is never modified.
@@ -274,12 +274,17 @@ and both execute only what the approved plan names.**
    Salesforce: the campaign itself, matched by name or planned, and the
    grid's statuses for it, each matched against the campaign's existing
    member-status rows (a fresh campaign carries Sent and Responded,
-   measured 2026-08-25) or planned as a create. A Salesforce org whose
-   Marketing User flag is off refuses campaign creation outright (measured
-   2026-08-25), so a plan that needs a campaign while the flag is off
-   carries the measured one-call fix to the operator's own User record as
+   measured 2026-08-25) or planned as a create. What is measured is what
+   those lookups return against a fresh campaign; the lookups themselves,
+   the campaign by name and a campaign's status rows as the pipeline will
+   query them, are unmeasured shapes on the build's list. A Salesforce org
+   whose Marketing User flag is off refuses campaign creation outright
+   (measured 2026-08-25), so a plan that needs a campaign while the flag
+   is off carries the one-call fix to the operator's own User record as
    its own named line, pushed before the campaign create and proved by
-   reading the flag back, rather than dying mid-push. It is a write like
+   reading the flag back, rather than dying mid-push. The fix's one call
+   is measured; the read-back that proves it landed is the build's to
+   measure. It is a write like
    any other: in the write contract, shown in the confirmation summary,
    executed only inside the approved plan. Striking the line from the plan
    strikes the campaign half with it, because the one cannot land without
@@ -517,11 +522,15 @@ repository's own record carries every fact this section stands on.
 
 **What is not measured**: update semantics on existing contacts, which the
 pipeline's fill-blanks updates need before the build claims them; the query
-shape that matches an account by the derived domain against `Website`;
-whatever duplicate rules an org configures, which is why email uniqueness
+shape that matches an account by the derived domain against `Website`; the
+campaign-by-name lookup and the read of a campaign's existing member-status
+rows, which the membership step runs; the User-record read-back that proves
+the flag fix landed; whatever duplicate rules an org configures, which is
+why email uniqueness
 is treated as absent rather than as a backstop; the Lead object entirely;
 batch semantics against the per-record CLI route; and what a free org
-limits at volume. Update semantics and the domain-match query shape are
+limits at volume. Update semantics, the domain-match query shape, the
+membership step's lookups and the flag read-back are
 the build's to measure before anything claims to work; the Lead object,
 batch semantics and volume limits stay out of the port's scope rather
 than being half-measured.
