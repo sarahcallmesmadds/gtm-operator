@@ -190,8 +190,12 @@ and both execute only what the approved plan names.**
    removed. A found work email is shown, never silently swapped, because the
    fill-blanks rule protects the source's own email. An approved
    replacement keeps the original address on the row, and the dedupe step
-   searches both, because a contact stored under the original is otherwise
-   an unseen duplicate; a match under it is presented, never auto-resolved.
+   treats both addresses as the same person's identities, in-list and
+   against the CRM; a match under the original is presented, never
+   auto-resolved. The rule is enforced where the plan is assembled: a row
+   still carrying its personal address blocks the plan until excluded or
+   deliberately decided, because a rule that lives only in conversation is
+   a rule an otherwise valid plan slides past.
 4. **Personas**, only when the artifact exists. Unclear titles are flagged,
    never guessed.
 5. **Company names normalised** against the alias map.

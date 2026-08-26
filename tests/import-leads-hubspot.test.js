@@ -478,6 +478,18 @@ check('an adoption fill on a matched company is pushed as one PATCH by its id, r
   assert.ok(!bare.requests.find(r => r.label.startsWith('fill company')), 'a plain match emits no PATCH')
 })
 
+check('an empty fill value never enters the PATCH payload, even when the caller skipped the plan\'s refusal', () => {
+  const plan = smallPlan()
+  plan.companies.matched[0].fill = { name: '', website: '  ' }
+  const { requests } = hubspot.pushRequests(config(), plan)
+  assert.ok(!requests.find(r => r.label === 'fill company: Navy'), 'an all-empty fill emits nothing: an empty PATCH value is a measured clear')
+
+  plan.companies.matched[0].fill = { name: 'Navy Proper', website: '' }
+  const mixed = hubspot.pushRequests(config(), plan)
+  const fill = mixed.requests.find(r => r.label === 'fill company: Navy')
+  assert.deepStrictEqual(fill.body.properties, { name: 'Navy Proper' }, 'the empty half is dropped, the real half is sent')
+})
+
 check('readbackRequests fetches updates by the id the plan carried, not only the pushed creates', () => {
   const requests = hubspot.readbackRequests(config(), smallPlan(), pushedIds())
   const update = requests.find(r => r.label === 'read back contact: row 3')
