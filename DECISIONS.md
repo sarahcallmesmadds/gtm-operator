@@ -5493,15 +5493,20 @@ private-config model contradicts, and it did. Taken whole: the root
 marketplace description and its hand counts; the setup plugin README, which
 still said five plugins and the check skill do not exist; the tier-2
 definition, which said job plugins write the foundation's databases when
-import-leads writes Salesforce; the root README's "the others write to
-them" **(recorded as taken here and not actually edited; caught by the
-post-merge round below and fixed there)**; the Tool Changelog note in
+import-leads writes Salesforce; the Tool Changelog note in
 `SCHEMA-software.md`, which said an object-owning plugin ships as tier two,
 the inverse of the rule this architecture runs on and the same contradiction
 `teammates` carried **(the fix reached one of its three copies; the other
 two are closed in the post-merge round)**; and the
 doc-level halves of the config-rule sweep, in `SKILLS-setup.md`, the setup
 README, the install skill's description and two places in this file.
+
+**One item this record originally listed among the taken was not taken.**
+The round also found the root README's "the others write to them", and the
+first version of this entry claimed it fixed; no edit was made. It was fixed
+by the post-merge round below, and the false classification is removed here
+rather than annotated, because a list of things taken whole cannot carry a
+member that was not.
 
 **Split, and the deferral is recorded with its expiry.** The same unscoped
 wording lives in comments inside built code and its vendored copies:
