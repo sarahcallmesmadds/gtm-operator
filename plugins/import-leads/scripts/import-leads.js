@@ -32,6 +32,10 @@
  *   node import-leads.js status-judge <campaign-decisions.json> <responses.json>         (salesforce)
  *   node import-leads.js flag-query [userId]                                             (salesforce)
  *   node import-leads.js flag-judge <response.json>                                      (salesforce)
+ *   node import-leads.js mailing-fields-probe <orgAlias>                                 (salesforce, first run: no config yet)
+ *   node import-leads.js mailing-fields-judge <response.json>                            (salesforce, first run: no config yet)
+ *   node import-leads.js lead-contact-queries                                            (salesforce)
+ *   node import-leads.js lead-contact-judge <contact-count.json> <lead-count.json>       (salesforce)
  *   node import-leads.js plan <inputs.json>
  *   node import-leads.js push <plan.json>
  *   node import-leads.js judge-push <requests.json> <responses.json>
@@ -420,6 +424,52 @@ const commands = {
     if (!judged.ok) process.exit(1)
   },
 
+  // The two first-run commands deliberately read no config: they run while
+  // the config draft is being gathered, before the file exists, which is
+  // the whole point of asking the org which mailing fields it carries.
+  'mailing-fields-probe' (orgAlias) {
+    if (!orgAlias) {
+      throw new Error(
+        'mailing-fields-probe needs the org alias the sf CLI holds the credential under. It runs on a salesforce ' +
+        'first run, before config exists, so the alias comes from the answers being gathered.'
+      )
+    }
+    console.log(JSON.stringify({
+      request: salesforce.mailingFieldsProbeRequest(orgAlias),
+      note:
+        SEND_NOTE.salesforce + ' Pass the saved response to mailing-fields-judge: it answers which state and country ' +
+        'field names the config draft should offer, because a picklist org refuses the plain fields and a plain org ' +
+        'does not have the code fields (measured 2026-08-26).'
+    }, null, 2))
+  },
+
+  'mailing-fields-judge' (responseFile) {
+    if (!responseFile) throw new Error('mailing-fields-judge needs the saved probe response.')
+    const judged = salesforce.judgeMailingFieldsProbe(readJson(responseFile))
+    console.log(JSON.stringify(judged, null, 2))
+    if (!judged.ok) process.exit(1)
+  },
+
+  'lead-contact-queries' () {
+    const result = configOrExit()
+    requireCrm(result, 'salesforce', 'lead-contact-queries', 'no HubSpot Lead surface is measured, so the confirmation is asked in conversation, without counts')
+    console.log(JSON.stringify({
+      requests: salesforce.leadContactCountRequests(result.config),
+      note:
+        SEND_NOTE.salesforce + ' Pass the two saved responses, contacts first, to lead-contact-judge. The counts are ' +
+        'the evidence for the scope confirmation: this import creates Contacts with their companies, and an org that ' +
+        'works in Leads deserves to see that named before anything maps into the CRM.'
+    }, null, 2))
+  },
+
+  'lead-contact-judge' (contactFile, leadFile) {
+    if (!contactFile || !leadFile) throw new Error('lead-contact-judge needs the two saved count responses, contacts first, leads second.')
+    requireCrm(configOrExit(), 'salesforce', 'lead-contact-judge', 'no HubSpot Lead surface is measured, so the confirmation is asked in conversation, without counts')
+    const judged = salesforce.judgeLeadContactCounts(readJson(contactFile), readJson(leadFile))
+    console.log(JSON.stringify(judged, null, 2))
+    if (!judged.ok) process.exit(1)
+  },
+
   plan (inputsFile) {
     if (!inputsFile) throw new Error('plan needs the inputs file holding every decided step. The command refuses anything undecided by name.')
     const result = configOrExit()
@@ -595,7 +645,7 @@ const commands = {
       ? 'No account auto-creation was observed on Salesforce and none is designed for; whether an org\'s own automation ' +
         'creates accounts is unmeasured rather than known absent, so it is named here rather than checked or dismissed.'
       : 'Standing risk: the portal may auto-create a company from an email domain and take the primary association (measured ' +
-        '2026-08-25). Whether the setting can be read from the API is unmeasured, so this is named rather than checked.'
+        '2026-08-25). The setting is not exposed by the documented API surface (measured 2026-08-26), so this is named rather than checked, permanently.'
 
     console.log(JSON.stringify(standing, null, 2))
   },

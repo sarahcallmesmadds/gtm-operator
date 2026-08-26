@@ -310,5 +310,67 @@ check('status-judge binds each response to its campaign, so reversed saved files
   assert.ok(/out of order/.test(refused.stdout + refused.stderr))
 })
 
+check('mailing-fields-probe runs with no config at all, because it belongs to the first run', () => {
+  // The probe answers which field names the config draft should offer, so
+  // it cannot depend on the config existing. Point the override at a path
+  // holding nothing and it still emits the spec.
+  const result = (() => {
+    try {
+      const stdout = execFileSync('node', [SCRIPT, 'mailing-fields-probe', 'first-run-org'], {
+        env: Object.assign({}, process.env, { IMPORT_LEADS_CONFIG: path.join(TEMP, 'no-such-config.json') }),
+        encoding: 'utf8'
+      })
+      return { status: 0, stdout }
+    } catch (error) {
+      return { status: error.status, stdout: error.stdout || '' }
+    }
+  })()
+  assert.strictEqual(result.status, 0)
+  const parsed = JSON.parse(result.stdout)
+  assert.strictEqual(parsed.request.targetOrg, 'first-run-org')
+  assert.ok(/MailingStateCode/.test(parsed.request.soql))
+
+  const bare = run('mailing-fields-probe')
+  assert.notStrictEqual(bare.status, 0)
+  assert.ok(/org alias/.test(bare.stderr))
+})
+
+check('mailing-fields-judge answers the pair to offer, and exits non-zero on a shape it does not know', () => {
+  const picklist = path.join(TEMP, 'sf-probe-picklist.json')
+  fs.writeFileSync(picklist, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, probe: 3 }], totalSize: 1, done: true } }))
+  const codes = JSON.parse(run('mailing-fields-judge', picklist).stdout)
+  assert.deepStrictEqual(codes.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
+
+  const odd = path.join(TEMP, 'sf-probe-odd.json')
+  fs.writeFileSync(odd, JSON.stringify({ odd: true }))
+  const refused = run('mailing-fields-judge', odd)
+  assert.notStrictEqual(refused.status, 0)
+})
+
+check('the lead-contact counts flow emits two named aggregates and judges the saved pair', () => {
+  const emitted = JSON.parse(run('lead-contact-queries').stdout)
+  assert.strictEqual(emitted.requests.length, 2)
+  assert.ok(/COUNT\(Id\) contacts FROM Contact/.test(emitted.requests[0].soql))
+  assert.ok(/COUNT\(Id\) leads FROM Lead/.test(emitted.requests[1].soql))
+  assert.ok(/before anything maps into the CRM/.test(emitted.note))
+
+  const contacts = path.join(TEMP, 'sf-count-contacts.json')
+  const leads = path.join(TEMP, 'sf-count-leads.json')
+  fs.writeFileSync(contacts, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, contacts: 20 }], totalSize: 1, done: true } }))
+  fs.writeFileSync(leads, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, leads: 22 }], totalSize: 1, done: true } }))
+  const judged = JSON.parse(run('lead-contact-judge', contacts, leads).stdout)
+  assert.deepStrictEqual(judged, { ok: true, contacts: 20, leads: 22 })
+
+  // Reversed saved files are refused at the command layer too: the alias
+  // key is the binding, and mislabelled counts are evidence a person acts on.
+  const reversed = run('lead-contact-judge', leads, contacts)
+  assert.notStrictEqual(reversed.status, 0)
+
+  const clipped = path.join(TEMP, 'sf-count-clipped.json')
+  fs.writeFileSync(clipped, JSON.stringify({ status: 0, result: { records: [{ leads: 22 }], totalSize: 1, done: false } }))
+  const refused = run('lead-contact-judge', contacts, clipped)
+  assert.notStrictEqual(refused.status, 0)
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

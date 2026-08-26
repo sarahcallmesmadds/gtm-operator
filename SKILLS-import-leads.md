@@ -94,7 +94,13 @@ where the key lives; on Salesforce the org alias, the field names and any
 record-type ids; and the alias-map path either way), searches for what
 it can find rather than asking
 anyone to type what it could look up, shows what it will record, and writes
-the file on an explicit yes. The foundation's config stays `setup`'s alone;
+the file on an explicit yes. On Salesforce the search half includes the
+org itself: one read-only probe answers whether the org carries the state
+and country code fields, so the draft offers `MailingStateCode` and
+`MailingCountryCode` on a picklist org (which refuses the plain fields'
+values, the acceptance run's finding) and the plain pair otherwise,
+because neither default is right for every org (both probe branches
+measured 2026-08-26). The foundation's config stays `setup`'s alone;
 this file is this plugin's, and nothing else writes it.
 
 Process artifacts carry the organisation's rules, read at run time:
@@ -160,12 +166,15 @@ the name, and the website, because that is what makes the next import's
 matching better. The website the person's create decision names wins; the
 list's domain is the automatic fallback, and the fallback fires only where
 config maps a website property, so an org without one gets its companies
-created bare rather than refused. The email opt-out is not in
-the contract on either backend: HubSpot's native opt-out lives in
-subscription statuses, a separate surface nothing here has measured;
-Salesforce's plain field is org-dependent, measured absent from a fresh
-Developer Edition org; and nothing in the pipeline reads an opt-out from a
-source list anyway. It is Open rather than implied.
+created bare rather than refused. The marketing status and the email
+opt-out are not in
+the contract on either backend: HubSpot's marketing-contact status and its
+native opt-out live in unmeasured surfaces (the marketable-status tier and
+subscription statuses);
+Salesforce's plain opt-out field is org-dependent, measured absent from a fresh
+Developer Edition org; and nothing in the pipeline reads either from a
+source list anyway. They are Open rather than implied, and the checkpoint
+asks about them by name (2026-08-26).
 
 Anything more comes from the org's own required-fields artifact. A row that
 cannot meet the rule is refused with the gap named, never padded.
@@ -202,7 +211,16 @@ and both execute only what the approved plan names.**
 
 1. **Scope.** One named source. The scope gate refuses rather than narrows,
    because there is no approval gate in front of a read: half a scope is
-   refused as hard as none, and a source nobody named is never read.
+   refused as hard as none, and a source nobody named is never read. And
+   before anything maps into the CRM, the run confirms what it creates,
+   Contacts with their companies, Sarah's rule of 2026-08-26: on
+   Salesforce the org's own Contact and Lead counts are read (two
+   `COUNT()` queries, the envelope measured 2026-08-26) and shown as the
+   evidence, because an org that works in Leads deserves the mismatch
+   named at the door rather than after an import; a lead-based import is
+   recorded Open work, and proceeding anyway is the person's deliberate
+   choice, kept in the run's report. On HubSpot no Lead surface is
+   measured, so the same confirmation is asked without counts.
 2. **Map and normalise columns**, preserving the source's own column names for
    the writeback.
 3. **Enrich, blanks only.** Gaps are named, and whatever enrichment the
@@ -247,8 +265,11 @@ and both execute only what the approved plan names.**
    person judging the candidates. HubSpot itself
    auto-creates companies from email domains and takes the primary
    association (measured 2026-08-25), so the plan names that collision
-   rather than letting it happen silently; what `run` ultimately does about
-   the portal's behaviour is deliberately Open, not guessed here. On
+   rather than letting it happen silently; the domain search and the
+   adopt-or-create-beside presentation are `run`'s answer to it
+   (2026-08-26), and the setting itself is measured as not exposed by the
+   documented API the same day, so naming the behaviour is all that can
+   be done beyond them. On
    2026-08-26 it was measured not firing when a company already carrying
    the domain existed. The collision is HubSpot's measured behaviour;
    nothing like it was observed on Salesforce and none is designed for,
@@ -313,7 +334,15 @@ and both execute only what the approved plan names.**
     on companies) becomes a config mapping or artifact edit on its own
     explicit yes; anything else is refused by name at the checkpoint,
     with the refusal said in the run's own report, because a stamp that
-    silently cannot be written reads as written. The checkpoint is
+    silently cannot be written reads as written. The checkpoint asks a
+    second question in the same breath, Sarah's rule of 2026-08-26:
+    whether these contacts should carry a marketing status or an email
+    opt-out. The import writes neither, on either backend, because those
+    surfaces are unmeasured and deliberately outside the write contract;
+    the question exists so nobody assumes the import set one, a yes is
+    refused by name like any other uncarriable field, and the recorded
+    ask is the demand that un-parks the opt-out measurement (see Open).
+    The checkpoint is
     deliberately conversational, no command behind it: there is no
     request to send and no response to judge, and the gate, the payload
     builders and config's validation enforce the same field lists, so a
@@ -395,8 +424,9 @@ exist in Process, config points at its CRM and the credential resolves (on
 HubSpot, a portal and the key file config names; on Salesforce, the org
 alias the `sf` CLI answers for), and the connection is alive, proved by a
 cheap read. On HubSpot, automatic company creation is called out as a
-standing risk; whether the setting itself can be read from the API is
-unmeasured, and is part of the Open item on that behaviour. On Salesforce,
+standing risk, permanently: the setting is not exposed by the documented
+API surface, measured 2026-08-26, so calling it out is the whole of what
+`check` can do about it. On Salesforce,
 the user record's Marketing User flag is read and called out when it is
 off, because campaign creation is refused until it is on; naming it is the
 whole of `check`'s job here, and the measured one-call fix travels in
@@ -474,7 +504,11 @@ either abandoning the company half of the floor or inventing a conversion
 step the reference is not recorded as having, and the rebuild rule is to
 change the least possible. A lead-based org's import is real work for a
 user who asks, the same trigger the port itself waited on, and it is Open
-rather than implied.
+rather than implied. So that such an org finds this decision at the door
+rather than after an import, `run` confirms the record kind at scope,
+Sarah's rule of 2026-08-26: the org's own Contact and Lead counts shown as
+evidence on Salesforce, the plain question on HubSpot, and proceeding as
+Contacts anyway is the person's deliberate, recorded choice.
 
 ## HubSpot, and what has actually been measured
 
@@ -584,6 +618,19 @@ campaign delete cascading its member rows as well as its member-status
 rows, confirmed by count read-backs. The raw records stay in the local run
 files; the dated record is in `DECISIONS.md`.
 
+**Measured by the follow-up session, 2026-08-26**, before the first-run
+probe and the scope confirmation were built on them: a query naming a
+column the org does not carry refuses with the data commands' error shape,
+`name` INVALID_FIELD and the message naming the column, in both measured
+spellings ("No such column ..." from a bare select, "Invalid field: ..."
+from an aggregate), which is what lets the mailing-fields probe tell a
+plain org from a picklist org; and a named aggregate
+(`SELECT COUNT(Id) contacts FROM Contact`) answers one AggregateResult
+row whose alias key carries the count, so the answer carries its question
+and a saved file can be bound to the read that produced it. The raw
+captures live in the local run files; the dated record is in
+`DECISIONS.md`.
+
 **What is not measured**: the full behaviour of org-configured duplicate
 rules (the acceptance run observed the standard rule fire once, and email
 uniqueness is still treated as absent rather than as a backstop); the
@@ -596,27 +643,30 @@ itself, passed on 2026-08-26 and is recorded in `DECISIONS.md`.
 
 ## Open
 
-1. **What `run` does about automatic company creation, half answered
-   2026-08-26.** The acceptance run answered the matching half: the
-   company step now searches by domain as well as name, and a domain hit
-   with no name or a disagreeing name is presented for adoption or a
-   create-beside, the person's call. Still Open: whether the setting
-   itself can be read from the API, which stays unmeasured. This is
-   HubSpot's behaviour and HubSpot's Open item; no Salesforce counterpart
-   was observed, and an org's own automation stays unmeasured rather than
-   assumed absent.
-2. **The email opt-out.** HubSpot's subscription statuses are a separate,
-   unmeasured surface, and Salesforce's plain field is org-dependent,
-   measured absent from a fresh Developer Edition org, so the opt-out is
-   out of the write contract on both backends until a measurement session
-   says how each behaves.
-3. **A lead-based import.** Out of the port deliberately, per the Contacts
+1. **The email opt-out, and the marketing status beside it.** HubSpot's
+   marketing-contact status and its subscription statuses are separate,
+   unmeasured surfaces, and Salesforce's plain opt-out field is
+   org-dependent, measured absent from a fresh Developer Edition org, so
+   neither is in the write contract until a measurement session says how
+   each behaves. As of 2026-08-26 the checkpoint asks about them by name,
+   Sarah's rule, so the demand that un-parks the measurement arrives as a
+   recorded answer instead of a silent assumption.
+2. **A lead-based import.** Out of the port deliberately, per the Contacts
    and accounts section: the Lead object is unmeasured and companyless by
    design, and it waits for a user who asks for it, the backend rule's own
-   trigger.
+   trigger. As of 2026-08-26 the run confirms the record kind at scope, so
+   that user finds the decision at the door.
 
 Settled, with the answers where they now live:
 
+- **Whether HubSpot's auto-company-creation setting can be read from the
+  API**: no, measured 2026-08-26. The documented account-info endpoint
+  carries no object automation settings and the API reference exposes no
+  settings endpoint for it, so `check` names the behaviour as a standing
+  risk permanently rather than checking it. The matching half was already
+  answered on 2026-08-26, when the company search gained the domain half
+  beside the name; an org's own automation stays unmeasured rather than
+  assumed absent on Salesforce.
 - **The Salesforce port's acceptance run**, the release gate: passed
   2026-08-26, one ten-row invented list end to end against a Developer
   Edition org, nineteen writes, a 52-check field-by-field proof with no

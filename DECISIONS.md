@@ -6763,3 +6763,112 @@ Salesforce half had not been watched doing its job until this run was
 recorded here; those lines now carry the dated record instead, in this
 same change, per the expired-record fault this file has logged twice
 before.
+
+## import-leads: three questions the run now asks, and one it stops asking, 2026-08-26
+
+Sarah's review of the open items, the same day the gate closed, produced
+two rules and closed one question by measurement. The plugin moves to
+0.3.0.
+
+### The auto-company-creation setting cannot be read, measured
+
+The HubSpot Open item's remaining half asked whether the portal's
+auto-create-companies setting is readable from the API, so `check` could
+report it instead of naming it as a standing risk. Measured 2026-08-26
+against the real portal: the documented account-info endpoint answers
+portal id, account type, timezone, currencies, UI domain and data hosting
+location and nothing about object automation, no settings endpoint for the
+toggle exists in the current API reference, and HubSpot's own community
+answer says none exists. `check` therefore names the behaviour as a
+standing risk permanently, with this dated basis, and the Open item is
+settled as no. The behavioural half was already measured: the collision
+firing (run one) and not firing over an existing domain-carrying company
+(run two).
+
+### The record-kind confirmation at scope, Sarah's rule
+
+The lead-based import stays Open work waiting for a user who asks, but
+that user used to find the decision only after an import landed their
+list as the wrong kind of record. `run` now confirms what it creates,
+Contacts with their companies, before anything maps into the CRM. On
+Salesforce the org itself is asked first: two named-aggregate reads
+(`SELECT COUNT(Id) contacts FROM Contact` and its Lead twin), whose
+measured envelope is one AggregateResult row carrying the count under the
+alias key, so each answer carries its question and reversed saved files
+surface as refusals instead of mislabelled evidence; a malformed count is
+refused rather than read as zero, which would tell a Leads org it has no
+leads, because these numbers are evidence shown to a person. On HubSpot
+no Lead surface is measured, so the confirmation is asked without counts.
+Proceeding as Contacts in an org that works in Leads is the person's
+deliberate choice, kept in the run's report; stopping costs nothing
+because nothing has been written.
+
+### The marketing-status question at the checkpoint, Sarah's rule
+
+The checkpoint now asks, in the same breath as the other-fields question,
+whether the imported contacts should carry a marketing status or an email
+opt-out. The import writes neither, on either backend: HubSpot's
+marketing-contact status and its subscription statuses, and Salesforce's
+org-dependent opt-out field, are unmeasured surfaces deliberately outside
+the write contract. The question exists so nobody walks away assuming the
+import set one; a yes is refused by name like any other field the plugin
+cannot carry, and the recorded ask is the demand that un-parks the
+opt-out measurement. No command sits behind it, the same reasoning as the
+original checkpoint question.
+
+### The mailing-fields probe on a salesforce first run
+
+The acceptance run's picklist finding, closed at the config draft rather
+than left as first-run guidance. Neither pair of state and country field
+names is right for every org: a picklist org refuses the plain fields'
+values (`FIELD_INTEGRITY_EXCEPTION` on "US", measured in the acceptance
+run) and only a picklist org carries the code fields at all. So the first
+run asks the org, one read-only named aggregate
+(`SELECT COUNT(MailingStateCode) probe FROM Contact`), before the draft
+is shown. Every branch is measured 2026-08-26: the aggregate envelope
+from a picklist org, one row carrying the `probe` count on an empty org
+as well as a full one, and the data commands' refusal shape, `name`
+INVALID_FIELD with the message naming the column in both measured
+spellings, from an org that lacks it. Both arms are bound to the probed
+question: a successful answer without the `probe` key, and an
+INVALID_FIELD about another column, are questions rather than verdicts,
+the same saved-file discipline every other judge holds. The probe and its
+judge deliberately read no config, because they run while the draft's
+answers are still being gathered.
+
+### What was proved by breaking it
+
+Nine hand mutations across the build and its first review round, each
+asserted onto disk before its suite ran, each red in its named check, and
+each file restored byte-identical after: the probe judge's column binding
+removed, the count judge's type discipline coerced, the probe's alias
+check dropped, the probe command made to read config, the probe judge's
+success-arm binding removed, the count judge's alias binding loosened to
+any numeric value, the count builder's aliases dropped, and each of the
+two judge commands made to swallow a refusal. The whole repository suite
+is green after all of it.
+
+### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole, and every finding reproduced by the reviewer before
+it was reported. The two High were the same fault family the port rounds
+kept finding, an answer not bound to its question, in the two new judges
+this build added: the count judge took its two files positionally with
+nothing naming which count was which, so reversed saved files answered
+mislabelled evidence at the record-kind gate, and the probe judge read
+any successful query envelope as proof the code fields exist, so an
+unrelated saved success wrote a config against the wrong org. Both fixed
+by making the answer carry its question: the reads became named
+aggregates, measured the same day, and both judges bind by the alias key
+on the answer's one row. The Mediums were the auto-company settlement
+stopping short of two homes, `check-standing`'s standing report and the
+design document's company step, both of which still called the setting
+unmeasured or the behaviour Open, now aligned with the dated settlement;
+and both new routing refusals claiming HubSpot has no separate Lead
+object where the record only supports that no HubSpot Lead surface is
+measured, now saying exactly that. The Lows: the write contract's one
+home for excluded fields named only the opt-out where every other
+document names the marketing status beside it, now naming both; and
+three new checks carried no deliberate-break proof, now covered by the
+round's five new mutations, recorded above.

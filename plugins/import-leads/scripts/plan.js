@@ -975,7 +975,7 @@ function assemble (input) {
     }
     assembled.autoCompanyCreation =
       'This portal may auto-create a company from an email domain and take the primary association (measured 2026-08-25). ' +
-      'The plan names that collision rather than resolving it; what run does about it is deliberately Open.'
+      'The plan names that collision rather than resolving it; the setting is not exposed by the documented API (measured 2026-08-26), so naming it is all that can be done.'
   }
   return { ok: true, plan: assembled }
 }

@@ -751,5 +751,98 @@ check('org display judges Connected as ok and anything else as not proved', () =
   assert.strictEqual(salesforce.judgeOrgDisplay({ odd: true }).ok, false)
 })
 
+check('the mailing-fields probe takes a bare alias, asks the named aggregate, and refuses an empty alias', () => {
+  const request = salesforce.mailingFieldsProbeRequest('first-run-org')
+  assert.strictEqual(request.transport, 'query')
+  assert.strictEqual(request.targetOrg, 'first-run-org')
+  assert.ok(/SELECT COUNT\(MailingStateCode\) probe FROM Contact/.test(request.soql))
+  assert.throws(() => salesforce.mailingFieldsProbeRequest('  '), /org alias/)
+})
+
+check('the probe judge reads the measured branches and binds both arms to the probed question', () => {
+  // Every branch measured 2026-08-26: the aggregate envelope from a
+  // picklist org, and the data commands' INVALID_FIELD error shape from a
+  // column the org does not have (both message spellings name the column).
+  const aggregate = n => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, probe: n }], totalSize: 1, done: true } })
+  const picklist = salesforce.judgeMailingFieldsProbe(aggregate(3))
+  assert.strictEqual(picklist.ok, true)
+  assert.strictEqual(picklist.codeFields, true)
+  assert.deepStrictEqual(picklist.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate(0)).ok, true, 'an empty org still answers the aggregate')
+
+  const plain = salesforce.judgeMailingFieldsProbe({
+    name: 'INVALID_FIELD',
+    message: "Invalid field: 'MailingStateCode'",
+    exitCode: 1
+  })
+  assert.strictEqual(plain.ok, true)
+  assert.strictEqual(plain.codeFields, false)
+  assert.deepStrictEqual(plain.use, { state: 'MailingState', country: 'MailingCountry' })
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({
+    name: 'INVALID_FIELD',
+    message: "No such column 'MailingStateCode' on entity 'Contact'.",
+    exitCode: 1
+  }).codeFields, false, 'the bare-select spelling of the refusal is read too')
+
+  // THE SUCCESS ARM IS BOUND: a successful answer belonging to a different
+  // query (the round-1 repro, a row carrying only an Id) is refused, not
+  // read as a picklist org.
+  const unrelated = salesforce.judgeMailingFieldsProbe({
+    status: 0, result: { records: [{ Id: '003X' }], totalSize: 1, done: true }
+  })
+  assert.strictEqual(unrelated.ok, false)
+  assert.ok(/different query/.test(unrelated.why))
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [], totalSize: 0, done: true } }).ok, false,
+    'a rowless success carries nothing to bind and is refused')
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [{ probe: 1 }], totalSize: 1, done: false } }).ok, false)
+
+  // The refusal arm was already bound: INVALID_FIELD about another column
+  // answers a different question.
+  const otherColumn = salesforce.judgeMailingFieldsProbe({
+    name: 'INVALID_FIELD',
+    message: "No such column 'Persona__c' on entity 'Contact'.",
+    exitCode: 1
+  })
+  assert.strictEqual(otherColumn.ok, false)
+  assert.ok(/different question/.test(otherColumn.why))
+
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ odd: true }).ok, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(null).ok, false)
+})
+
+check('the lead and contact counts are two named aggregates on the configured org', () => {
+  const requests = salesforce.leadContactCountRequests(config())
+  assert.strictEqual(requests.length, 2)
+  assert.strictEqual(requests[0].label, 'count contacts')
+  assert.ok(/SELECT COUNT\(Id\) contacts FROM Contact/.test(requests[0].soql))
+  assert.strictEqual(requests[1].label, 'count leads')
+  assert.ok(/SELECT COUNT\(Id\) leads FROM Lead/.test(requests[1].soql))
+  assert.ok(requests.every(r => r.targetOrg === 'acceptance-org' && r.transport === 'query'))
+})
+
+check('the count judge binds each answer to its question by the alias key, so reversed files are refused', () => {
+  const envelope = (key, n) => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, [key]: n }], totalSize: 1, done: true } })
+  assert.deepStrictEqual(
+    salesforce.judgeLeadContactCounts(envelope('contacts', 20), envelope('leads', 22)),
+    { ok: true, contacts: 20, leads: 22 }
+  )
+  // THE ROUND-1 REPRO: reversed saved files used to answer mislabelled
+  // counts. The alias key is the binding, so they are refused now.
+  const reversed = salesforce.judgeLeadContactCounts(envelope('leads', 22), envelope('contacts', 20))
+  assert.strictEqual(reversed.ok, false)
+  assert.ok(/out of order|different question/.test(reversed.why))
+  // An ordinary query envelope saved in a count's place carries no alias
+  // key and is refused, not read as a count.
+  assert.strictEqual(salesforce.judgeLeadContactCounts(
+    { status: 0, result: { records: [{ Id: '003X', Email: 'x@y.com' }], totalSize: 1, done: true } },
+    envelope('leads', 22)
+  ).ok, false)
+  // A misread count is evidence shown to a person: a Leads org told it has
+  // no leads would confirm the wrong record kind.
+  assert.strictEqual(salesforce.judgeLeadContactCounts(envelope('contacts', 20), envelope('leads', '22')).ok, false)
+  assert.strictEqual(salesforce.judgeLeadContactCounts({ status: 0, result: { records: [{ contacts: 20 }], totalSize: 1, done: false } }, envelope('leads', 22)).ok, false)
+  assert.strictEqual(salesforce.judgeLeadContactCounts(null, envelope('leads', 22)).ok, false)
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

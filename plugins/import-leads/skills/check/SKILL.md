@@ -33,7 +33,11 @@ Run `check-standing`. It reports, in one pass:
 
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
-  `config-write` only on an explicit yes.
+  `config-write` only on an explicit yes. On salesforce, run
+  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge` first, one
+  read-only query, so the draft offers the state and country field names
+  this org actually carries (a picklist org refuses the plain fields'
+  values; a plain org lacks the code fields; measured 2026-08-26).
 - **The credential, per backend.** On HubSpot, the Service Key file exists
   and is not empty, at the path config names, its contents never read into
   any output. On Salesforce there is nothing key-shaped to check: the org
@@ -51,10 +55,12 @@ Run `check-standing`. It reports, in one pass:
   `run`'s plan as its own named line.
 - **Automatic company creation.** On HubSpot, named as a standing risk: the
   portal can auto-create a company from an email domain and take the primary
-  association, and whether the setting is readable from the API is
-  unmeasured, so it is called out, not checked. On Salesforce nothing like
-  it was observed and an org's own automation stays unmeasured rather than
-  assumed absent.
+  association, and the setting is not exposed by the documented API surface
+  (measured 2026-08-26: the account-info endpoint carries no object
+  automation settings, and no settings endpoint for it exists in the API
+  reference), so it is called out, not checked, permanently. On Salesforce
+  nothing like it was observed and an org's own automation stays unmeasured
+  rather than assumed absent.
 
 Then the artifacts: read the required-fields rule and the member-status grid
 from the Process library, and run `validate-rules` on what was read, with the
