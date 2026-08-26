@@ -537,7 +537,7 @@ function judgeResponse (request, response) {
   // String()-spelled into the report (round 7).
   if (request.method === 'PUT' && request.url.includes('/memberships/add') &&
       typeof response === 'object' && Array.isArray(response.recordsIdsAdded) &&
-      response.recordsIdsAdded.every(idShaped)) {
+      response.recordsIdsAdded.every(id => idShaped(id) && id !== '')) {
     return {
       outcome: 'done',
       added: response.recordsIdsAdded.map(String),
@@ -698,9 +698,12 @@ function prove (config, plan, pushedIds, readbacks) {
         // read on it, the same object question the sibling proofs ask.
         const odd = association.results.find(r => !r || typeof r !== 'object' || Array.isArray(r))
         problems.push({ what: `row ${create.index} association`, why: `The association read-back holds ${JSON.stringify(odd === undefined ? null : odd)}, not a record. Save the response the read-back printed, whole, and look at it.` })
-      } else if (association.results.some(r => r.toObjectId !== null && r.toObjectId !== undefined && typeof r.toObjectId !== 'string' && typeof r.toObjectId !== 'number')) {
-        const odd = association.results.find(r => r.toObjectId !== null && r.toObjectId !== undefined && typeof r.toObjectId !== 'string' && typeof r.toObjectId !== 'number')
-        problems.push({ what: `row ${create.index} association`, why: `The association read-back carries ${JSON.stringify(odd.toObjectId)} for toObjectId, which is not an id. A malformed value is refused rather than coerced equal.` })
+      } else if (association.results.some(r => (typeof r.toObjectId !== 'string' || r.toObjectId === '') && typeof r.toObjectId !== 'number')) {
+        // No null or undefined exemption: String(undefined) spells
+        // "undefined", and a planned id carrying that literal string
+        // compared equal to a row with no toObjectId (round 9).
+        const odd = association.results.find(r => (typeof r.toObjectId !== 'string' || r.toObjectId === '') && typeof r.toObjectId !== 'number')
+        problems.push({ what: `row ${create.index} association`, why: `The association read-back carries ${JSON.stringify(odd.toObjectId === undefined ? null : odd.toObjectId)} for toObjectId, which is not an id. A missing or malformed value is refused rather than coerced equal.` })
       } else if (!association.results.some(r => String(r.toObjectId) === String(expected))) {
         problems.push({ what: `row ${create.index} association`, why: `The association to company ${expected} is not on the record that came back.` })
       } else {
@@ -754,9 +757,11 @@ function prove (config, plan, pushedIds, readbacks) {
     }
     // Membership entries are record ids, string or number, bare or under
     // recordId; anything else is refused rather than coerced, the same
-    // discipline the Salesforce member proof holds.
-    const idShapedEntry = r => (typeof r === 'string' || typeof r === 'number') ||
-      (r && typeof r === 'object' && !Array.isArray(r) && (typeof r.recordId === 'string' || typeof r.recordId === 'number'))
+    // discipline the Salesforce member proof holds. An empty string is
+    // not an id either (round 9).
+    const idShapedEntry = r => (typeof r === 'string' && r !== '') || typeof r === 'number' ||
+      (r && typeof r === 'object' && !Array.isArray(r) &&
+        ((typeof r.recordId === 'string' && r.recordId !== '') || typeof r.recordId === 'number'))
     const malformed = response.results.find(r => !idShapedEntry(r))
     if (malformed !== undefined) {
       problems.push({

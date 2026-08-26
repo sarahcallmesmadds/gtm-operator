@@ -431,6 +431,12 @@ check('a read-back or membership entry whose id is not an id fails the proof ins
   badEntry.memberships['Summit - Invited'] = { results: [{ recordId: { odd: true } }] }
   const second = hubspot.prove(config(), smallPlan(), pushedIds(), badEntry)
   assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /refuses to read/.test(p.why)))
+
+  // Round 9: an empty entry is not an id either, bare or under recordId.
+  const emptyEntry = cleanReadbacks()
+  emptyEntry.memberships['Summit - Invited'] = { results: ['', { recordId: '501' }, { recordId: '502' }] }
+  const third = hubspot.prove(config(), smallPlan(), pushedIds(), emptyEntry)
+  assert.ok(third.problems.some(p => /list Summit - Invited/.test(p.what) && /refuses to read/.test(p.why)))
 })
 
 check('a create response whose id is not id-shaped is never judged created: "[object Object]" is not an id', () => {
@@ -472,6 +478,16 @@ check('an association proof refuses a malformed id on either side, never coerced
   recordSide.associations[1] = { results: [{ toObjectId: { odd: true } }] }
   const second = hubspot.prove(config(), smallPlan(), pushedIds(), recordSide)
   assert.ok(second.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
+
+  // Round 9: the null and undefined exemption was the remaining route.
+  // A planned id of the literal string "undefined" against a row with
+  // no toObjectId compared equal through String().
+  const idsUndef = pushedIds()
+  idsUndef.companies.Acme = 'undefined'
+  const missing = cleanReadbacks()
+  missing.associations[1] = { results: [{}] }
+  const third = hubspot.prove(config(), smallPlan(), idsUndef, missing)
+  assert.ok(third.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
 })
 
 check('a membership add whose returned ids are not id-shaped is not the measured done shape', () => {
@@ -480,6 +496,12 @@ check('a membership add whose returned ids are not id-shaped is not the measured
     { recordsIdsAdded: [{ odd: true }] }
   )
   assert.strictEqual(judged.outcome, 'unknown')
+  // Round 9: an empty string is not an id either.
+  const empty = hubspot.judgeResponse(
+    { method: 'PUT', url: hubspot.BASE + '/crm/v3/lists/9/memberships/add', label: 'add' },
+    { recordsIdsAdded: [''] }
+  )
+  assert.strictEqual(empty.outcome, 'unknown')
 })
 
 check('a null entry in an association read-back is refused by the proof, never dereferenced', () => {

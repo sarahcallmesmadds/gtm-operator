@@ -376,6 +376,9 @@ check('a search value that is not text, and an AccountId that is not an id, are 
   // or an AccountId read through String() is a spelling, not a value.
   assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 'x@y.com', Phone: { odd: true } }])]), /not text/)
   assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 'x@y.com', AccountId: { odd: true } }])]), /not an id/)
+  // Round 9: a malformed Account container was silently skipped, which
+  // dropped the company signal and routed around the conflict question.
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 'x@y.com', AccountId: '001N', Account: 'not-a-record' }])]), /not a record/)
 })
 
 check('an empty answer to a PATCH is the measured 204 and points at the read-back; anywhere else it proves nothing', () => {
@@ -482,6 +485,16 @@ check('an association proof refuses a malformed id on either side, never coerced
   recordSide.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: { odd: true } })
   const second = salesforce.prove(config(), smallPlan(), pushedIds(), recordSide)
   assert.ok(second.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
+
+  // Round 9: the null and undefined exemption was the remaining route.
+  // A planned id of the literal string "undefined" against a read-back
+  // with no AccountId compared equal through String().
+  const idsUndef = pushedIds()
+  idsUndef.accounts.Acme = 'undefined'
+  const missing = cleanReadbacks()
+  missing.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com' })
+  const third = salesforce.prove(config(), smallPlan(), idsUndef, missing)
+  assert.ok(third.problems.some(p => /row 1 association/.test(p.what) && /missing or malformed/.test(p.why)))
 })
 
 check('a wrong AccountId on the read-back is an association problem naming both records', () => {
