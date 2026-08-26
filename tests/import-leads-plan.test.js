@@ -221,6 +221,21 @@ check('full month names work the same as their three-letter forms', () => {
   assert.deepStrictEqual(plan.eventSignals(impossible).dateColumns, [])
 })
 
+check('a word that merely starts like a month is not a date', () => {
+  // The loose `[a-z]*` tail read "Janitor 15, 2026" as a date. The names
+  // are now spelled out as their real forms.
+  const notDates = [
+    row(1, {}, { source: { What: 'Janitor 15, 2026' } }),
+    row(2, {}, { source: { What: 'Febrile 2, 2026' } })
+  ]
+  assert.deepStrictEqual(plan.eventSignals(notDates).dateColumns, [])
+  const abbreviated = [
+    row(1, {}, { source: { What: 'Sept 5' } }),
+    row(2, {}, { source: { What: 'Dec. 12, 2026' } })
+  ]
+  assert.ok(plan.eventSignals(abbreviated).dateColumns.find(c => c.column === 'What'), 'the real abbreviations still signal')
+})
+
 check('a slash date has to be a real day-and-month in one of its two orders', () => {
   const impossible = [
     row(1, {}, { source: { When: '31/02/2026' } }),

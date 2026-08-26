@@ -5860,3 +5860,17 @@ claim: the capture group closes before the `[a-z]*`, so it takes only the
 three-letter prefix, full names signal and impossible full-name dates are
 rejected. A test now locks the measured answer so the question stays
 answered. The suite is green after all of it.
+
+### Round 5 on the build, Codex CLI confirming, 2026-08-25: three findings, all taken
+
+All three were the round-4 fixes stopping one short of where they had to
+reach, the fault this file keeps recording. `prove` is directly invokable
+and iterated the plan's memberships without the shape guard the other two
+request builders got, so a hand-edited plan crashed instead of being
+refused; it now asserts the shape like `push` and `readbacks`, and the test
+covers all three. The month regex's `[a-z]*` tail accepted any word
+starting like a month, so "Janitor 15, 2026" was date evidence; the names
+are now spelled out as their real forms, longest first, with the impostors
+tested. And the pipeline's step 6 still carried the older website sentence
+the round-4 sweep missed in the same file it edited, now aligned with the
+write contract. The suite is green after all of it.

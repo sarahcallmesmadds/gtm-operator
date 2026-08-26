@@ -490,6 +490,7 @@ function readbackRequests (config, plan, pushedIds) {
  * response}}`, each response saved as it came.
  */
 function prove (config, plan, pushedIds, readbacks) {
+  assertPlanLists(plan, 'prove')
   const problems = []
   const checked = []
   const unchecked = []
