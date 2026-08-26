@@ -117,9 +117,17 @@ dedupe step surfaces it.
 **An approved replacement keeps the original address on the row**, as
 `replacedEmail`, with the new address sourced `enrichment:<tool>` in
 `fieldSources`. The original is an identity too: dedupe searches both
-addresses, and a contact the CRM holds under the original comes back
+addresses, the in-list duplicate check collides both (a row still carrying
+the original, or two rows that replaced the same one, are the same
+person), and a contact the CRM holds under the original comes back
 presented, because pushing the row as it stands would create a second
 record for the same person under the new address.
+
+**The rule has teeth at the plan**: the assembly re-runs the detector on
+the rows actually in it, and a row still carrying its personal address
+blocks the plan until it is excluded or deliberately decided. Keeping the
+address is a decision the person makes, never a default the plan slides
+past.
 
 ## Step 4. Personas, only if the artifact exists
 

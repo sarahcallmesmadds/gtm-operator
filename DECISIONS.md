@@ -6027,3 +6027,30 @@ waved through in conversation still cannot reach a payload. What the
 finding did catch: "recorded as a design request" read like a file write,
 which an installed plugin must never do; both documents now say the
 refusal is said in the run's own report, which is the record.
+
+### Round 3 on the corrections, Codex CLI confirming, 2026-08-26: three findings, all taken
+
+High effort confirmed by the banner. All three were the fault this file
+keeps recording, a fix stopping one short of where it had to reach:
+
+1. **The free-mail rule gets teeth at the plan.** The detector presented
+   and nothing enforced, so a flagged row nobody decided sailed through
+   an otherwise valid assembly. The assembly now re-runs the detector on
+   the rows actually in the plan, the same way it re-runs the gate, and a
+   row still carrying its personal address blocks until excluded or
+   deliberately decided.
+2. **Replaced addresses join the in-list identity map.** The new CRM-side
+   check compared the original only against the portal, so a row still
+   carrying the address another row replaced, or two rows replacing the
+   same one, planned as two creates under different current emails. Both
+   of a row's addresses are its identities in the in-list collision check
+   now.
+3. **An empty adoption fill is refused at the plan and at the payload.**
+   `fill: {name: null}` or a whitespace website passed the
+   undefined-only checks and would have PATCHed a clear, the measured
+   2026-08-25 behaviour, erasing existing company data under a fill's
+   name. The plan refuses empty values by name, and the payload builder
+   drops them even when the caller skipped the plan, the same
+   belt-and-braces the sourceless-field rule already uses.
+
+The suite is green after all of it.

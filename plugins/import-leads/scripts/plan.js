@@ -215,12 +215,22 @@ function dedupeVerdicts (rows, existing) {
   // match lookup.
   const foldEmail = value => String(value).trim().toLowerCase()
 
+  // A replaced address is the same person's identity, so it joins the
+  // in-list map too: a row still carrying the original, or two rows that
+  // replaced the same one, are the same collision a shared current email
+  // is. Without this, both rows plan as creates under different current
+  // addresses and the portal accepts them both.
   const emails = new Map()
+  const addIdentity = (identity, index) => {
+    if (!emails.has(identity)) emails.set(identity, [])
+    const list = emails.get(identity)
+    if (!list.includes(index)) list.push(index)
+  }
   for (const row of rows) {
     const email = row.fields.email && foldEmail(row.fields.email)
-    if (!email) continue
-    if (!emails.has(email)) emails.set(email, [])
-    emails.get(email).push(row.index)
+    if (email) addIdentity(email, row.index)
+    const replaced = row.replacedEmail && foldEmail(row.replacedEmail)
+    if (replaced) addIdentity(replaced, row.index)
   }
   const inListDuplicates = [...emails.entries()]
     .filter(([, indexes]) => indexes.length > 1)
@@ -440,6 +450,21 @@ function assemble (input) {
     }
   }
 
+  // THE FREE-MAIL RULE IS ENFORCED WHERE THE PLAN IS ASSEMBLED, the same
+  // way the gate is: the detector presents in conversation, and a row
+  // still flagged here has been neither removed nor enriched. Decided is
+  // the person keeping the personal address, deliberately. Without this,
+  // the rule lived only in the conversation, and an otherwise valid plan
+  // pushed the address the rule exists to keep out.
+  for (const flagged of rules.freeMailRows(input.rows.filter(row => !excluded.has(row.index)))) {
+    if (!decided.has(flagged.index)) {
+      problems.push(
+        `Row ${flagged.index} carries the personal address ${flagged.email} (${flagged.domain}) and nobody has decided it. ` +
+        'The rule is removed, or enriched to a work address; keeping the personal address is a decision, not a default.'
+      )
+    }
+  }
+
   const verdictByIndex = new Map((input.dedupe.verdicts || []).map(v => [v.index, v]))
   const assignmentsByIndex = new Map()
   for (const assignment of input.assignments) {
@@ -567,9 +592,14 @@ function assemble (input) {
    * shows what landed.
    */
   const fillProblems = (name, fill) => {
-    for (const key of Object.keys(fill)) {
+    for (const [key, value] of Object.entries(fill)) {
       if (key !== 'name' && key !== 'website') {
         problems.push(`"${name}" is adopted with a fill for ${key}, and a company fill carries only name and website, the write contract's own company fields.`)
+      } else if (typeof value !== 'string' || !value.trim()) {
+        // An empty value in a PATCH is a clear, not a fill: the portal was
+        // measured (2026-08-25) reading a property back empty after an
+        // empty-string write. A fill that would erase is refused.
+        problems.push(`"${name}" is adopted with an empty ${key} fill, and the portal reads an empty PATCH value as a clear, not a fill. A fill carries a non-empty value or is left out.`)
       }
     }
     if (fill.website !== undefined && !input.config.properties.company.website) {

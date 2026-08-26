@@ -170,6 +170,20 @@ check('a contact stored under a replaced address is surfaced: the original is an
   assert.deepStrictEqual(clean.replacedEmailMatches, [], 'no contact under either address, nothing surfaced')
 })
 
+check('replaced addresses collide in-list: a row still carrying the original, or two rows replacing the same one', () => {
+  const moved = row(1, { firstName: 'Vik', lastName: 'Moss', email: 'vik@peatmarsh.example' }, { replacedEmail: 'vik.moss@gmail.com' })
+  const stayed = row(2, { firstName: 'Vik', lastName: 'M', email: 'vik.moss@gmail.com' })
+  const first = plan.dedupeVerdicts([moved, stayed], existing({}))
+  assert.deepStrictEqual(first.inListDuplicates, [{ email: 'vik.moss@gmail.com', rows: [1, 2] }],
+    'different current emails, same person: the replaced address is the shared identity')
+
+  const twinA = row(1, { firstName: 'Vik', lastName: 'Moss', email: 'vik@peatmarsh.example' }, { replacedEmail: 'vik.moss@gmail.com' })
+  const twinB = row(2, { firstName: 'Vik', lastName: 'Moss', email: 'v.moss@peatmarsh.example' }, { replacedEmail: 'vik.moss@gmail.com' })
+  const second = plan.dedupeVerdicts([twinA, twinB], existing({}))
+  assert.deepStrictEqual(second.inListDuplicates, [{ email: 'vik.moss@gmail.com', rows: [1, 2] }],
+    'two rows that replaced the same address are one person twice')
+})
+
 check('an email enrichment spelled loosely still matches and still collides in-list', () => {
   // Enrichment fills emails after ingest, as the tool spelled them. Both the
   // match lookup and the in-list check fold before comparing.
@@ -449,6 +463,38 @@ check('an undecided conflict and an undecided no-email row block the plan', () =
   const second = goodInput()
   second.dedupe.unchecked = [{ index: 2, why: 'no email' }]
   assert.ok(plan.assemble(second).problems.some(p => /could not be dedupe-checked/.test(p)))
+})
+
+check('a personal address still on a row blocks the plan until excluded or deliberately decided', () => {
+  const input = goodInput()
+  input.rows[0].fields.email = 'ada@gmail.com'
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /Row 1/.test(p) && /personal address ada@gmail\.com/.test(p) && /a decision, not a default/.test(p)))
+
+  input.resolutions = { decided: [1] }
+  assert.strictEqual(plan.assemble(input).ok, true, 'keeping it is the person\'s deliberate call')
+
+  const excludedInstead = goodInput()
+  excludedInstead.rows[0].fields.email = 'ada@gmail.com'
+  excludedInstead.resolutions = { excluded: [{ index: 1, why: 'personal address, no work email found' }] }
+  assert.strictEqual(plan.assemble(excludedInstead).ok, true, 'an excluded flagged row no longer blocks')
+
+  const replacedRow = goodInput()
+  replacedRow.rows[0].replacedEmail = 'ada@gmail.com'
+  assert.strictEqual(plan.assemble(replacedRow).ok, true, 'a replaced row carries a work address now and is not flagged')
+})
+
+check('an empty adoption fill is refused: the portal reads an empty PATCH value as a clear', () => {
+  const empties = [{ name: '' }, { name: null }, { website: '   ' }]
+  for (const fill of empties) {
+    const input = goodInput()
+    input.rows[0].fields.company = 'Bright Quay Ops'
+    input.companyDecisions = { 'Bright Quay Ops': { decision: 'match', companyId: '77', fill } }
+    const result = plan.assemble(input)
+    assert.strictEqual(result.ok, false, JSON.stringify(fill))
+    assert.ok(result.problems.some(p => /empty (name|website) fill/.test(p) && /clear, not a fill/.test(p)), JSON.stringify(result.problems))
+  }
 })
 
 check('an undecided replaced-email match blocks the plan like a conflict does', () => {

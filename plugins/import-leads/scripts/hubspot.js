@@ -360,9 +360,13 @@ function pushRequests (config, plan) {
   // landed.
   for (const matched of plan.companies.matched) {
     if (!matched.fill || !Object.keys(matched.fill).length) continue
+    // Empty values never enter the payload, even when the caller skipped
+    // the plan's own refusal: an empty PATCH value is a measured clear
+    // (2026-08-25), and a fill that erases is the opposite of a fill.
+    const filled = value => typeof value === 'string' && value.trim()
     const properties = {}
-    if (matched.fill.name !== undefined) properties[config.properties.company.name] = matched.fill.name
-    if (matched.fill.website !== undefined && config.properties.company.website) {
+    if (filled(matched.fill.name)) properties[config.properties.company.name] = matched.fill.name
+    if (filled(matched.fill.website) && config.properties.company.website) {
       properties[config.properties.company.website] = matched.fill.website
     }
     if (!Object.keys(properties).length) continue
@@ -626,11 +630,15 @@ function prove (config, plan, pushedIds, readbacks) {
   // fails through compareContact's own no-read-back arm.
   for (const matched of plan.companies.matched) {
     if (!matched.fill || !Object.keys(matched.fill).length) continue
+    // The intended set mirrors the push's own refusal of empty values, or
+    // the proof would demand a write the push correctly never sent.
+    const filled = value => typeof value === 'string' && value.trim()
     const intended = { properties: {} }
-    if (matched.fill.name !== undefined) intended.properties[config.properties.company.name] = matched.fill.name
-    if (matched.fill.website !== undefined && config.properties.company.website) {
+    if (filled(matched.fill.name)) intended.properties[config.properties.company.name] = matched.fill.name
+    if (filled(matched.fill.website) && config.properties.company.website) {
       intended.properties[config.properties.company.website] = matched.fill.website
     }
+    if (!Object.keys(intended.properties).length) continue
     compareContact(`company ${matched.name} (fill)`, intended, (readbacks.companies || {})[matched.name])
   }
 
