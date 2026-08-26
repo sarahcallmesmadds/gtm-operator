@@ -95,12 +95,14 @@ record-type ids; and the alias-map path either way), searches for what
 it can find rather than asking
 anyone to type what it could look up, shows what it will record, and writes
 the file on an explicit yes. On Salesforce the search half includes the
-org itself: one read-only probe answers whether the org carries the state
-and country code fields, so the draft offers `MailingStateCode` and
-`MailingCountryCode` on a picklist org (which refuses the plain fields'
-values, the acceptance run's finding) and the plain pair otherwise,
-because neither default is right for every org (both probe branches
-measured 2026-08-26). The foundation's config stays `setup`'s alone;
+org itself: two read-only probes, one per code field, answer which state
+and country names this org carries, one measured verdict each, so a
+picklist org gets the code names, a plain org the plain names, and a
+mixed org a measured mixed pair (every branch measured 2026-08-26; the
+plain fields' values are refused on a picklist org, the acceptance run's
+finding). The draft refuses to assemble a salesforce config without the
+judged pair, because a defaulted pair is the exact config the probe
+exists to prevent. The foundation's config stays `setup`'s alone;
 this file is this plugin's, and nothing else writes it.
 
 Process artifacts carry the organisation's rules, read at run time:

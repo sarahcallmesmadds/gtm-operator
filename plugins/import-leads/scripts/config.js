@@ -107,11 +107,14 @@ const DEFAULT_PROPERTY_NAMES = {
 /**
  * The Salesforce standard field API names, offered as the draft's starting
  * point on that backend. The create shape (FirstName, LastName, Email,
- * Title, AccountId) is measured 2026-08-25; the mailing address names are
- * the platform's standard fields, proved for a given org by its own live
- * run, the same standing the HubSpot defaults have. Optional fields (a
- * LinkedIn URL custom field, a persona custom field, the lead source, the
- * owner) have no default: an org maps them deliberately or not at all.
+ * Title, AccountId) is measured 2026-08-25. The state and country names
+ * are deliberately absent: a picklist org refuses the plain fields'
+ * values and a plain org lacks the code fields (measured 2026-08-26), so
+ * neither default is right for every org, and the draft requires the
+ * judged pair from the mailing-fields probe instead of defaulting either
+ * way. Optional fields (a LinkedIn URL custom field, a persona custom
+ * field, the lead source, the owner) have no default: an org maps them
+ * deliberately or not at all.
  */
 const DEFAULT_SALESFORCE_FIELD_NAMES = {
   contact: {
@@ -120,9 +123,7 @@ const DEFAULT_SALESFORCE_FIELD_NAMES = {
     email: 'Email',
     phone: 'Phone',
     title: 'Title',
-    city: 'MailingCity',
-    state: 'MailingState',
-    country: 'MailingCountry'
+    city: 'MailingCity'
   },
   company: {
     name: 'Name',
@@ -335,16 +336,36 @@ function draft (answers) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
     throw new Error(
       'draft needs an object of answers: the crm (absent means hubspot), then per backend its identifiers ' +
-      '(portalId and serviceKeyPath, or orgAlias and any recordTypeIds), aliasMapPath, and any name corrections.'
+      '(portalId and serviceKeyPath, or orgAlias with the judged mailingFields pair and any recordTypeIds), ' +
+      'aliasMapPath, and any name corrections.'
     )
   }
   const crm = answers.crm === undefined ? 'hubspot' : answers.crm
   if (!CRMS.includes(crm)) {
     throw new Error(`These answers do not make a working config:\n  crm is ${JSON.stringify(crm)} and this plugin writes one of: ${CRMS.join(', ')}.`)
   }
+  // A salesforce draft is not assembled without the judged mailing pair:
+  // the probe is the only measured way to know which state and country
+  // fields this org carries, and a draft that defaults either way is the
+  // exact config the probe exists to prevent (round 3, 2026-08-26).
+  const mailing = answers.mailingFields
+  if (crm === 'salesforce') {
+    const named = f => mailing && typeof mailing[f] === 'string' && mailing[f].trim()
+    if (!named('state') || !named('country')) {
+      throw new Error(
+        'These answers do not make a working config:\n  mailingFields is missing or incomplete. Run ' +
+        'mailing-fields-probe and mailing-fields-judge against the org and pass the judged {state, country} pair, ' +
+        'because a picklist org refuses the plain fields and a plain org lacks the code fields (measured 2026-08-26). ' +
+        'Neither default is right for every org, so nothing here defaults it.'
+      )
+    }
+  }
   const defaults = crm === 'salesforce' ? DEFAULT_SALESFORCE_FIELD_NAMES : DEFAULT_PROPERTY_NAMES
   const properties = {
-    contact: Object.assign({}, defaults.contact, (answers.properties && answers.properties.contact) || {}),
+    contact: Object.assign({},
+      defaults.contact,
+      crm === 'salesforce' ? { state: mailing.state.trim(), country: mailing.country.trim() } : {},
+      (answers.properties && answers.properties.contact) || {}),
     company: Object.assign({}, defaults.company, (answers.properties && answers.properties.company) || {})
   }
   // Optional properties enter the draft only when the org named them. A null
