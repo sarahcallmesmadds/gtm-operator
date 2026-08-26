@@ -436,6 +436,15 @@ check('a match decision whose companyId is not an id is refused, never coerced i
   const result = plan.assemble(input)
   assert.strictEqual(result.ok, false)
   assert.ok(result.problems.some(p => /"Acme"/.test(p) && /not an id/.test(p)))
+
+  // Round 8: the adoption-only match loop is the sibling path, and the
+  // round-7 guard on the needed-companies loop alone left it a route
+  // around, straight into the adoption PATCH URL.
+  const adoption = goodInput()
+  adoption.companyDecisions.Elsewhere = { decision: 'match', companyId: { odd: true }, fill: { name: 'Else Co' } }
+  const second = plan.assemble(adoption)
+  assert.strictEqual(second.ok, false)
+  assert.ok(second.problems.some(p => /"Elsewhere"/.test(p) && /not an id/.test(p)))
 })
 
 check('a create with no company at all is refused by the floor', () => {
