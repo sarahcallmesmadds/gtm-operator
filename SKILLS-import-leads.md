@@ -458,9 +458,10 @@ The port changes the store, not the pipeline. The order, the gates, the
 write contract's floor, the enrichment seam, the config and artifact homes
 and the skill names all carry over unchanged; what differs per backend is
 said where it differs, and the measured sections below are the evidence
-each half stands on. The port is built as of 2026-08-26; until its
-acceptance run passes, the Salesforce half has not been watched doing its
-job, and the plugin README says so.
+each half stands on. The port is built as of 2026-08-26 and its acceptance
+run passed the same day: one real list end to end against a Developer
+Edition org, every write proved by read-back and the org torn down to its
+starting state, recorded in `DECISIONS.md`.
 
 ## Contacts and accounts, not leads
 
@@ -569,31 +570,33 @@ on a create refuses with `INVALID_FIELD` naming the column, nothing
 created. The raw captures live in the local run files; the dated summary
 is in `DECISIONS.md`.
 
-**What is not measured**: whatever duplicate rules an org configures, which
-is why email uniqueness is treated as absent rather than as a backstop; the
+**Measured by the acceptance run, 2026-08-26**, the release gate's first
+full pass on this backend, one ten-row invented list end to end with every
+write proved by read-back and torn down cleanly: a state/country-picklist
+org refusing the plain `MailingState` and `MailingCountry` fields with
+`FIELD_INTEGRITY_EXCEPTION`, and the code fields (`MailingStateCode`,
+`MailingCountryCode`) accepting the ISO codes a list carries, echoing them
+back exactly and deriving the label fields, so a picklist org maps the
+code fields in config; the org's own standard duplicate rule, active in a
+fresh Developer Edition org, refusing a deliberate same-person create with
+`DUPLICATES_DETECTED` while letting distinct people through; and a
+campaign delete cascading its member rows as well as its member-status
+rows, confirmed by count read-backs. The raw records stay in the local run
+files; the dated record is in `DECISIONS.md`.
+
+**What is not measured**: the full behaviour of org-configured duplicate
+rules (the acceptance run observed the standard rule fire once, and email
+uniqueness is still treated as absent rather than as a backstop); the
 Lead object entirely; batch semantics against the per-record route; and
 what a free org limits at volume. All four stay out of the port's scope
-rather than being half-measured, and the remaining gate is the acceptance
-run itself: a fresh invented list end to end against a Developer Edition
-org, pre-created fixtures playing the already-in-CRM records, push, prove
-field by field, teardown with every deletion confirmed by count read-backs.
+rather than being half-measured. The release gate, the acceptance run
+itself, passed on 2026-08-26 and is recorded in `DECISIONS.md`.
 
 ---
 
 ## Open
 
-1. **The Salesforce port's acceptance run.** The port was designed and
-   built on 2026-08-26, un-parked by Sarah's ask the same day: native
-   member statuses from the same grid, Contacts and Accounts per the
-   section above, the `sf` CLI as the transport with the writes settled
-   onto its REST command by measurement, one CRM per install through
-   config's `crm` field, and the build's measurement session closing the
-   list the design named. What remains is the release gate: the
-   acceptance pattern against a Developer Edition org, a fresh invented
-   list, pre-created fixtures playing the already-in-CRM records, push,
-   prove field by field, teardown with every deletion confirmed by count
-   read-backs, recorded in `DECISIONS.md`.
-2. **What `run` does about automatic company creation, half answered
+1. **What `run` does about automatic company creation, half answered
    2026-08-26.** The acceptance run answered the matching half: the
    company step now searches by domain as well as name, and a domain hit
    with no name or a disagreeing name is presented for adoption or a
@@ -602,18 +605,25 @@ field by field, teardown with every deletion confirmed by count read-backs.
    HubSpot's behaviour and HubSpot's Open item; no Salesforce counterpart
    was observed, and an org's own automation stays unmeasured rather than
    assumed absent.
-3. **The email opt-out.** HubSpot's subscription statuses are a separate,
+2. **The email opt-out.** HubSpot's subscription statuses are a separate,
    unmeasured surface, and Salesforce's plain field is org-dependent,
    measured absent from a fresh Developer Edition org, so the opt-out is
    out of the write contract on both backends until a measurement session
    says how each behaves.
-4. **A lead-based import.** Out of the port deliberately, per the Contacts
+3. **A lead-based import.** Out of the port deliberately, per the Contacts
    and accounts section: the Lead object is unmeasured and companyless by
    design, and it waits for a user who asks for it, the backend rule's own
    trigger.
 
-Settled by the build, with the answers where they now live:
+Settled, with the answers where they now live:
 
+- **The Salesforce port's acceptance run**, the release gate: passed
+  2026-08-26, one ten-row invented list end to end against a Developer
+  Edition org, nineteen writes, a 52-check field-by-field proof with no
+  problems, teardown confirmed by count read-backs. The dated record,
+  including the two org behaviours the run surfaced (state and country
+  picklists, and the active standard duplicate rule), is in
+  `DECISIONS.md`.
 - **The config-comment sweep** was the build's recorded first task and the
   build did it first; the deferral, its expiry and the sweep are dated in
   `DECISIONS.md`.
