@@ -410,6 +410,13 @@ check('a plan built by an older step, without lists.creates and lists.matched, i
   assert.throws(() => hubspot.readbackRequests(config(), stale, pushedIds()), /older step/)
 })
 
+check('a plan missing lists.memberships is refused the same way, not crashed through', () => {
+  const edited = smallPlan()
+  delete edited.lists.memberships
+  assert.throws(() => hubspot.pushRequests(config(), edited), /older step or edited by hand/)
+  assert.throws(() => hubspot.readbackRequests(config(), edited, pushedIds()), /older step or edited by hand/)
+})
+
 // -------------------------------------------------------------- list lookups
 
 check('list lookups are one GET per name, url-encoded', () => {

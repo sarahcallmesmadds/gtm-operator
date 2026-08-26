@@ -136,8 +136,11 @@ claim them; the owner, only through routing or explicit confirmation;
 persona, only when the personas artifact exists. Persona and owner also
 fill blanks on an update, on the same terms and never over a value already
 there. On a company the flow creates rather than matches:
-the name, and the website when the list carries a domain, because that is
-what makes the next import's matching better. The email opt-out is not in
+the name, and the website, because that is what makes the next import's
+matching better. The website the person's create decision names wins; the
+list's domain is the automatic fallback, and the fallback fires only where
+config maps a website property, so an org without one gets its companies
+created bare rather than refused. The email opt-out is not in
 the contract yet: HubSpot's native opt-out lives in subscription statuses, a
 separate surface nothing here has measured, and it is Open rather than
 implied.

@@ -125,6 +125,10 @@ per company. **Whether two records are the same company is the person's
 call**; the alias map holds the answers already settled so they are not
 re-asked, and a new settled answer is worth offering to add to the map.
 
+On a create decision, a website the person names wins; otherwise the list's
+domain fills in automatically where config maps a website property, and an
+org that maps none gets the company created bare.
+
 The portal may auto-create a company from an email domain and take the
 primary association. The plan names that collision; do not resolve it
 silently.
