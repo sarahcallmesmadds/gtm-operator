@@ -737,6 +737,100 @@ check('a CRM holding two contacts under one email blocks the row until decided, 
   assert.strictEqual(plan.assemble(input).ok, true, 'excluding the row resolves it')
 })
 
+// An ambiguity input whose candidates came through dedupe itself, the way
+// a real run's do: row 1 is ambiguous in the CRM, row 2 is a plain update.
+const ambiguousInput = () => {
+  const input = goodInput()
+  input.rows[0] = row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@x.com', company: 'Acme', title: 'Countess' })
+  input.dedupe = plan.dedupeVerdicts(input.rows, {
+    byEmail: { 'grace@x.com': { id: '201', properties: { email: 'grace@x.com' } } },
+    ambiguousInCrm: [{
+      email: 'ada@x.com',
+      contactIds: ['003A', '003B'],
+      candidates: [
+        { id: '003A', properties: { email: 'ada@x.com', firstName: 'Ada', lastName: 'Lovelace' } },
+        { id: '003B', properties: { email: 'ada@x.com', firstName: 'Ada', lastName: 'Lovelace', title: 'Countess' } }
+      ]
+    }]
+  })
+  return input
+}
+
+check('each ambiguity candidate travels with the verdict the row would get against it', () => {
+  const dedupe = ambiguousInput().dedupe
+  assert.strictEqual(dedupe.verdicts.filter(v => v.index === 1).length, 0, 'the ambiguous row itself gets no verdict')
+  const presented = dedupe.crmAmbiguousMatches[0]
+  assert.deepStrictEqual(presented.candidates, [
+    { contactId: '003A', verdict: 'update', fill: { title: 'Countess' } },
+    { contactId: '003B', verdict: 'nothing' }
+  ], 'a choice can be realised as that record\'s blanks-only fill, or as nothing')
+})
+
+check('decided alone cannot create from a CRM ambiguity: which record is the question, and decided names none', () => {
+  // The round-3 repro: two matches, no verdict, decided: [1] produced a
+  // contact create, a third record under an email the CRM holds twice.
+  const input = ambiguousInput()
+  input.resolutions = { decided: [1] }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /Row 1/.test(p) && /chosen/.test(p) && /third record/.test(p)))
+  assert.ok(!(result.plan && result.plan.contacts.creates.some(c => c.index === 1)))
+})
+
+check('a chosen candidate realises as its blanks-only update or nothing, never as a create', () => {
+  const updateSide = ambiguousInput()
+  updateSide.resolutions = { chosen: [{ index: 1, contactId: '003A' }] }
+  const result = plan.assemble(updateSide)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  const update = result.plan.contacts.updates.find(u => u.index === 1)
+  assert.deepStrictEqual({ contactId: update.contactId, fill: update.fill }, { contactId: '003A', fill: { title: 'Countess' } })
+  assert.ok(!result.plan.contacts.creates.some(c => c.index === 1), 'no third record')
+
+  const nothingSide = ambiguousInput()
+  nothingSide.resolutions = { chosen: [{ index: 1, contactId: '003B' }] }
+  const second = plan.assemble(nothingSide)
+  assert.strictEqual(second.ok, true, JSON.stringify(second.problems || []))
+  assert.ok(second.plan.contacts.nothing.some(n => n.index === 1 && n.contactId === '003B'))
+})
+
+check('a chosen answer has to name a presented candidate of a presented ambiguity', () => {
+  const wrongId = ambiguousInput()
+  wrongId.resolutions = { chosen: [{ index: 1, contactId: '003ELSE' }] }
+  assert.ok(plan.assemble(wrongId).problems.some(p => /Row 1 is chosen as contact/.test(p) && /003A, 003B/.test(p)))
+
+  const notAmbiguous = ambiguousInput()
+  notAmbiguous.resolutions = { chosen: [{ index: 1, contactId: '003A' }, { index: 2, contactId: '201' }] }
+  assert.ok(plan.assemble(notAmbiguous).problems.some(p => /Row 2 has a chosen contactId and no CRM ambiguity/.test(p)))
+
+  const bare = goodInput()
+  bare.dedupe.crmAmbiguousMatches = [{ index: 1, email: 'ada@x.com', contactIds: ['003A', '003B'] }]
+  bare.resolutions = { chosen: [{ index: 1, contactId: '003A' }] }
+  assert.ok(plan.assemble(bare).problems.some(p => /no candidate records/.test(p) && /Re-run dedupe/.test(p)))
+})
+
+check('a chosen answer wins over the verdict the row\'s other address earned', () => {
+  const input = goodInput()
+  input.rows[0] = row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@work.example', company: 'Acme', title: 'Countess' }, { replacedEmail: 'ada@gmail.com' })
+  input.rows[0].fieldSources.email = 'enrichment:some-tool'
+  input.dedupe = plan.dedupeVerdicts(input.rows, {
+    byEmail: { 'grace@x.com': { id: '201', properties: { email: 'grace@x.com' } } },
+    ambiguousInCrm: [{
+      email: 'ada@gmail.com',
+      contactIds: ['003A', '003B'],
+      candidates: [
+        { id: '003A', properties: { email: 'ada@gmail.com', firstName: 'Ada', lastName: 'Lovelace' } },
+        { id: '003B', properties: { email: 'ada@gmail.com', firstName: 'Ada' } }
+      ]
+    }]
+  })
+  assert.strictEqual(input.dedupe.verdicts.find(v => v.index === 1).verdict, 'create', 'the work address matched nothing, so the verdict alone would create')
+  input.resolutions = { chosen: [{ index: 1, contactId: '003A' }] }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.ok(!result.plan.contacts.creates.some(c => c.index === 1), 'the identification overrules the other address\'s create')
+  assert.ok(result.plan.contacts.updates.some(u => u.index === 1 && u.contactId === '003A'))
+})
+
 check('a replaced address the CRM holds two contacts under is surfaced the same way', () => {
   const moved = row(1, { firstName: 'Vik', lastName: 'Moss', email: 'vik@peatmarsh.example' }, { replacedEmail: 'vik.moss@gmail.com' })
   const result = plan.dedupeVerdicts([moved], { byEmail: {}, ambiguousInCrm: [{ email: 'vik.moss@gmail.com', contactIds: ['003A', '003B'] }] })

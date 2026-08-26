@@ -56,6 +56,13 @@ check('check-standing with no config exits 2 and says it is a first run', () => 
   assert.ok(/first run/.test(result.stdout + result.stderr))
 })
 
+check('config-draft with no answers file names both backends\' identifiers, not just HubSpot\'s', () => {
+  const result = run('config-draft')
+  assert.strictEqual(result.status, 1)
+  assert.ok(/portalId and serviceKeyPath on hubspot/.test(result.stderr))
+  assert.ok(/orgAlias and any recordTypeIds on salesforce/.test(result.stderr))
+})
+
 // A working config pointing at a key file and an alias map in the temp dir.
 const keyPath = path.join(TEMP, 'service-key.txt')
 const aliasPath = path.join(TEMP, 'aliases.json')
@@ -274,6 +281,33 @@ check('status-queries with no existing campaign says so instead of emitting noth
   const parsed = JSON.parse(run('status-queries', decisions).stdout)
   assert.deepStrictEqual(parsed.requests, [])
   assert.ok(/Sent and Responded/.test(parsed.note))
+})
+
+check('status-judge binds each response to its campaign, so reversed saved files are refused', () => {
+  // The round-3 repro at the command layer: Alpha credited with Beta's
+  // statuses when the saved files were passed in the wrong order. The
+  // rows' own CampaignId is the binding.
+  const decisions = path.join(TEMP, 'sf-two-campaigns.json')
+  fs.writeFileSync(decisions, JSON.stringify({
+    campaignDecisions: {
+      Alpha: { outcome: 'exists', campaignId: '701A' },
+      Beta: { outcome: 'exists', campaignId: '701B' }
+    }
+  }))
+  const alphaRows = { status: 0, result: { records: [{ Id: 'S1', Label: 'Invited', SortOrder: 3, IsDefault: false, HasResponded: false, CampaignId: '701A' }], totalSize: 1, done: true } }
+  const betaRows = { status: 0, result: { records: [{ Id: 'S2', Label: 'Attended', SortOrder: 3, IsDefault: false, HasResponded: false, CampaignId: '701B' }], totalSize: 1, done: true } }
+
+  const good = path.join(TEMP, 'sf-status-good.json')
+  fs.writeFileSync(good, JSON.stringify([alphaRows, betaRows]))
+  const clean = run('status-judge', decisions, good)
+  assert.strictEqual(clean.status, 0)
+  assert.deepStrictEqual(JSON.parse(clean.stdout).campaignStatuses.Alpha.labels, ['Invited'])
+
+  const reversed = path.join(TEMP, 'sf-status-reversed.json')
+  fs.writeFileSync(reversed, JSON.stringify([betaRows, alphaRows]))
+  const refused = run('status-judge', decisions, reversed)
+  assert.notStrictEqual(refused.status, 0)
+  assert.ok(/out of order/.test(refused.stdout + refused.stderr))
 })
 
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')

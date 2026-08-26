@@ -213,6 +213,15 @@ rows sharing an email inside the list, cross-company conflicts, and rows with
 no email (unknown is not new). Every one of them needs the person's decision,
 recorded in the plan inputs as exclusions or decided rows.
 
+**A CRM holding more than one contact under one of a row's addresses is a
+different question, with a different answer.** The question is which record
+this person is, so the answer names one: the candidates come back each with
+the verdict the row would get against it, and the person's choice goes in
+the plan inputs as `resolutions.chosen`, `{"index": n, "contactId": "..."}`,
+realised as that record's blanks-only update or as nothing to write.
+Marking such a row decided is not an answer, because a create would add a
+third record; the row is chosen or excluded, never created.
+
 ## Step 8. The multi-event check, mandatory
 
 `events <rows.json>`, before any campaign setup. Show the grouping
@@ -243,9 +252,11 @@ exact-name lookup per campaign and `campaign-judge` turns the responses
 into decisions; a campaign that exists gets its id, an empty answer plans a
 create, and two campaigns with one name is a question. `status-queries`
 reads the existing member-status rows of every matched campaign and
-`status-judge` hands the plan their labels, so a status create is planned
+`status-judge` hands the plan their labels, binding each answer to its
+campaign by the CampaignId the rows carry, so a status create is planned
 only where the row genuinely is not there (a fresh campaign carries Sent
-and Responded, measured 2026-08-25). And `flag-query` with `flag-judge`
+and Responded, measured 2026-08-25) and reversed saved files surface as
+questions instead of crediting the wrong campaign. And `flag-query` with `flag-judge`
 read the user record's Marketing User flag, whoami first and the flag read
 second, because campaign creation is refused while it is off (measured
 2026-08-25): a plan that needs a campaign while the flag is off carries the
@@ -314,6 +325,10 @@ read-back rather than as a success or a failure.
 
 `readbacks`, fetch every one, then `prove`. **An id is a locator, not a
 proof**: the comparison is the proof, and it says what it did not check.
+Every read-back is bound to the record it was fetched for by the id it
+carries, and a campaign-scoped read by its rows' CampaignId, so a saved
+response filed under the wrong key, or reused under two, fails the proof
+instead of proving a write nothing read.
 Report both halves, what is proved and what is not, and never round up to
 "it worked". If a write did not land, say so loudly and show exactly which.
 

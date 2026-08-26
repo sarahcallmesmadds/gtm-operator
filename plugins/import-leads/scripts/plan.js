@@ -243,12 +243,48 @@ function dedupeVerdicts (rows, existing) {
   const replacedEmailMatches = []
   const crmAmbiguousMatches = []
 
+  // The blanks-only fill a row would give an existing record: only fields
+  // the record leaves blank, persona and owner on the same sourced terms,
+  // and never the lead source, which is create-only. One place, because
+  // the same computation answers a plain match and each candidate of an
+  // ambiguous one.
+  const fillAgainst = (row, properties) => {
+    const blank = field => {
+      const theirs = properties ? properties[field] : undefined
+      return theirs === undefined || theirs === null || String(theirs).trim() === ''
+    }
+    const fill = {}
+    for (const [field, value] of Object.entries(row.fields)) {
+      if (field === 'email' || field === 'company' || field === 'companyDomain') continue
+      if (blank(field)) fill[field] = value
+    }
+    // Persona and owner join the blanks-only fill on the same terms as every
+    // other field: only into a blank, and only carrying a recorded source
+    // (the artifact, routing, or an explicit confirmation). Without this, an
+    // existing contact with a blank persona stayed blank while the write
+    // contract promised the field. The lead source deliberately does not
+    // join: it is create-only, because it records where a NEW contact came
+    // from.
+    if (row.persona && row.personaSource && blank('persona')) fill.persona = row.persona
+    if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && blank('owner')) fill.owner = row.owner
+    return fill
+  }
+
   // A store that holds two contacts under one email (possible on
   // Salesforce, where no uniqueness has been measured) answers a question
   // with a question: which record is this person. Neither record is kept
   // by the search results, and every row on the email is presented here,
-  // never auto-resolved.
-  const ambiguousByEmail = new Map((existing.ambiguousInCrm || []).map(a => [a.email, a.contactIds]))
+  // never auto-resolved. Each candidate record travels with the verdict
+  // the row would get against it, so the person's answer, one contactId in
+  // `resolutions.chosen`, can be realised as that record's blanks-only
+  // update or nothing, never as a create of a third record.
+  const ambiguousByEmail = new Map((existing.ambiguousInCrm || []).map(a => [a.email, a]))
+  const candidateVerdicts = (row, entry) => (entry.candidates || []).map(candidate => {
+    const fill = fillAgainst(row, candidate.properties)
+    return Object.keys(fill).length
+      ? { contactId: candidate.id, verdict: 'update', fill }
+      : { contactId: candidate.id, verdict: 'nothing' }
+  })
 
   for (const row of rows) {
     // A row whose personal address was replaced by an approved enrichment
@@ -258,11 +294,13 @@ function dedupeVerdicts (rows, existing) {
     // emails differ. Presented, never auto-resolved.
     const replaced = row.replacedEmail && foldEmail(row.replacedEmail)
     if (replaced && ambiguousByEmail.has(replaced)) {
+      const entry = ambiguousByEmail.get(replaced)
       crmAmbiguousMatches.push({
         index: row.index,
         email: replaced,
-        contactIds: ambiguousByEmail.get(replaced),
-        why: 'The CRM holds more than one contact under the address this row replaced. Which record is this person is a judgment, presented and never auto-resolved.'
+        contactIds: entry.contactIds,
+        candidates: candidateVerdicts(row, entry),
+        why: 'The CRM holds more than one contact under the address this row replaced. Which record is this person is a judgment, presented and never auto-resolved: choose one by contactId, or exclude the row.'
       })
     }
     if (replaced && existing.byEmail[replaced]) {
@@ -285,11 +323,13 @@ function dedupeVerdicts (rows, existing) {
       continue
     }
     if (ambiguousByEmail.has(email)) {
+      const entry = ambiguousByEmail.get(email)
       crmAmbiguousMatches.push({
         index: row.index,
         email,
-        contactIds: ambiguousByEmail.get(email),
-        why: 'The CRM holds more than one contact under this email. A create would add a third and an update would pick one, so which record is this person is presented, never auto-resolved.'
+        contactIds: entry.contactIds,
+        candidates: candidateVerdicts(row, entry),
+        why: 'The CRM holds more than one contact under this email. A create would add a third and an update would pick one, so which record is this person is presented, never auto-resolved: choose one by contactId, or exclude the row.'
       })
       continue
     }
@@ -312,24 +352,7 @@ function dedupeVerdicts (rows, existing) {
       })
     }
 
-    const blank = field => {
-      const theirs = match.properties ? match.properties[field] : undefined
-      return theirs === undefined || theirs === null || String(theirs).trim() === ''
-    }
-    const fill = {}
-    for (const [field, value] of Object.entries(row.fields)) {
-      if (field === 'email' || field === 'company' || field === 'companyDomain') continue
-      if (blank(field)) fill[field] = value
-    }
-    // Persona and owner join the blanks-only fill on the same terms as every
-    // other field: only into a blank, and only carrying a recorded source
-    // (the artifact, routing, or an explicit confirmation). Without this, an
-    // existing contact with a blank persona stayed blank while the write
-    // contract promised the field. The lead source deliberately does not
-    // join: it is create-only, because it records where a NEW contact came
-    // from.
-    if (row.persona && row.personaSource && blank('persona')) fill.persona = row.persona
-    if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && blank('owner')) fill.owner = row.owner
+    const fill = fillAgainst(row, match.properties)
     if (Object.keys(fill).length) {
       verdicts.push({ index: row.index, verdict: 'update', contactId: match.id, fill })
     } else {
@@ -370,13 +393,24 @@ function dedupeVerdicts (rows, existing) {
  * creation means the portal was asked, not assumed.
  *
  * `resolutions` carries the person's answers to what dedupe presented:
- *   { "excluded": [{"index": n, "why": "..."}], "decided": [n, ...] }
+ *   { "excluded": [{"index": n, "why": "..."}], "decided": [n, ...],
+ *     "chosen": [{"index": n, "contactId": "..."}] }
  * `excluded` removes a row from the plan with its reason kept. `decided`
  * marks a row the person looked at and kept as it is. Every in-list
  * duplicate has to end with all but one of its rows excluded, or every kept
  * row marked decided when keeping several is deliberate. Every no-email row
  * and every company conflict has to be excluded or decided by index, so
  * nothing dedupe surfaced can fall between the steps unseen.
+ *
+ * `chosen` answers a CRM ambiguity, a store holding more than one contact
+ * under one of the row's addresses, by naming which of the presented
+ * candidates the row is. The row then proceeds as that record's blanks-only
+ * update, or as nothing when there is nothing blank to fill, and it wins
+ * over any verdict the row's other address earned. A bare `decided` cannot
+ * answer this question: the question is which record, `decided` names none,
+ * and reading it as permission to create planned a third record under an
+ * email the CRM already holds twice. An ambiguous row is chosen or
+ * excluded, never created.
  */
 function assemble (input) {
   if (input.config === undefined || input.config === null) {
@@ -445,6 +479,34 @@ function assemble (input) {
   const resolutions = input.resolutions || {}
   const excluded = new Map((resolutions.excluded || []).map(entry => [entry.index, entry.why || 'excluded by the person']))
   const decided = new Set(resolutions.decided || [])
+  const chosen = new Map((resolutions.chosen || []).map(entry => [entry.index, entry]))
+
+  // The candidates each ambiguous row was presented, by index: the union
+  // across its entries, because a row can be ambiguous under its current
+  // and its replaced address at once and one answer names the person.
+  const ambiguousCandidates = new Map()
+  for (const match of (input.dedupe.crmAmbiguousMatches || [])) {
+    if (!ambiguousCandidates.has(match.index)) ambiguousCandidates.set(match.index, [])
+    ambiguousCandidates.get(match.index).push(...(match.candidates || []))
+  }
+  // A chosen answer has to answer a question that was asked, with a
+  // candidate that was presented: anything else is a smuggled verdict.
+  for (const [index, pick] of chosen.entries()) {
+    const candidates = ambiguousCandidates.get(index)
+    if (!candidates) {
+      problems.push(`Row ${index} has a chosen contactId and no CRM ambiguity to answer. \`chosen\` answers only the ambiguities dedupe presented.`)
+    } else if (!candidates.length) {
+      problems.push(
+        `Row ${index} is chosen and its ambiguity carries no candidate records to realise the choice against. ` +
+        'Re-run dedupe from the saved search responses so each candidate travels with its verdict.'
+      )
+    } else if (!pick || !candidates.some(c => c.contactId === String(pick.contactId))) {
+      problems.push(
+        `Row ${index} is chosen as contact ${JSON.stringify(pick && pick.contactId)} and the presented candidates are ` +
+        `${candidates.map(c => c.contactId).join(', ')}. A choice names one of them.`
+      )
+    }
+  }
 
   // THE GATE RUNS AGAIN HERE, ON WHAT IS ACTUALLY IN THE PLAN. It ran
   // earlier in the conversation, but the assembly cannot know that, and a
@@ -491,12 +553,19 @@ function assemble (input) {
       )
     }
   }
+  // A CRM ambiguity is answered by choosing a record or excluding the row.
+  // `decided` deliberately does not unblock it: the question is which
+  // record this person is, `decided` names none, and reading it as
+  // permission planned a create, a third record under an email the CRM
+  // already holds twice, which is the exact thing the presentation exists
+  // to prevent.
   for (const match of (input.dedupe.crmAmbiguousMatches || [])) {
-    if (!excluded.has(match.index) && !decided.has(match.index)) {
+    if (!excluded.has(match.index) && !chosen.has(match.index)) {
       problems.push(
         `Row ${match.index}: the CRM holds more than one contact under ${match.email} ` +
-        `(ids ${(match.contactIds || []).join(', ')}), and nobody has decided it. Which record is this person is a ` +
-        'judgment, presented and never auto-resolved.'
+        `(ids ${(match.contactIds || []).join(', ')}), and nobody has chosen which record this person is. ` +
+        'Choose one by contactId in resolutions.chosen, or exclude the row: a create would add a third record, ' +
+        'so marking it decided is not an answer here.'
       )
     }
   }
@@ -528,6 +597,28 @@ function assemble (input) {
   const memberships = new Map()
   const nameToPair = new Map()
 
+  // THE FILL IS PROVED AGAINST THE GATED ROW, ENTRY BY ENTRY. Verdicts and
+  // candidates arrive as caller input, so a fill is a claim, not a fact:
+  // without this check a hand-edited fill could smuggle a value the row
+  // never carried, or a lead source onto an update, past a gate that only
+  // ever saw the rows. Each entry has to be the row's own sourced value,
+  // or its persona or owner with the source the design demands.
+  const proveFill = (row, fill) => {
+    for (const [field, value] of Object.entries(fill || {})) {
+      const fromFields = row.fields[field] === value && Boolean(row.fieldSources && row.fieldSources[field])
+      const fromPersona = field === 'persona' && row.persona === value && Boolean(row.personaSource)
+      const fromOwner = field === 'owner' && row.owner === value &&
+        (row.ownerSource === 'routing' || row.ownerSource === 'confirmed')
+      if (!fromFields && !fromPersona && !fromOwner) {
+        problems.push(
+          `Row ${row.index}: the update fill carries ${field} = ${JSON.stringify(value)}, which is not the row's own ` +
+          'sourced value. A fill is derived from the gated row, never supplied beside it, and the lead source never ' +
+          'rides on an update.'
+        )
+      }
+    }
+  }
+
   for (const row of input.rows) {
     if (excluded.has(row.index)) {
       contacts.excluded.push({ index: row.index, why: excluded.get(row.index) })
@@ -535,7 +626,27 @@ function assemble (input) {
     }
 
     const verdict = verdictByIndex.get(row.index)
-    if (!verdict) {
+    const candidates = ambiguousCandidates.get(row.index)
+    let isCreate = false
+    if (candidates) {
+      // An ambiguous row proceeds only as its chosen candidate, winning
+      // over any verdict the row's other address earned. The blocking and
+      // the pick's validation live above, so a row without a valid choice
+      // already has its problem named and is skipped here.
+      const pick = chosen.get(row.index)
+      const candidate = pick && candidates.find(c => c.contactId === String(pick.contactId))
+      if (!candidate) continue
+      if (candidate.verdict === 'update') {
+        proveFill(row, candidate.fill)
+        contacts.updates.push({ index: row.index, row, contactId: candidate.contactId, fill: candidate.fill })
+      } else {
+        contacts.nothing.push({
+          index: row.index,
+          contactId: candidate.contactId,
+          why: 'Chosen as this record, with every field this row carries already filled. Nothing to write.'
+        })
+      }
+    } else if (!verdict) {
       if (!decided.has(row.index)) {
         problems.push(`Row ${row.index} has no dedupe verdict and no decision. Every row in the plan has been through dedupe or past the person.`)
         continue
@@ -543,28 +654,12 @@ function assemble (input) {
       // A decided no-email row proceeds as a create the person chose, and the
       // plan says so rather than folding it in quietly.
       contacts.creates.push({ index: row.index, row, decidedWithoutDedupe: true })
+      isCreate = true
     } else if (verdict.verdict === 'create') {
       contacts.creates.push({ index: row.index, row })
+      isCreate = true
     } else if (verdict.verdict === 'update') {
-      // THE FILL IS PROVED AGAINST THE GATED ROW, ENTRY BY ENTRY. The
-      // verdicts arrive as caller input, so a fill is a claim, not a fact:
-      // without this check a hand-edited fill could smuggle a value the row
-      // never carried, or a lead source onto an update, past a gate that
-      // only ever saw the rows. Each entry has to be the row's own sourced
-      // value, or its persona or owner with the source the design demands.
-      for (const [field, value] of Object.entries(verdict.fill || {})) {
-        const fromFields = row.fields[field] === value && Boolean(row.fieldSources && row.fieldSources[field])
-        const fromPersona = field === 'persona' && row.persona === value && Boolean(row.personaSource)
-        const fromOwner = field === 'owner' && row.owner === value &&
-          (row.ownerSource === 'routing' || row.ownerSource === 'confirmed')
-        if (!fromFields && !fromPersona && !fromOwner) {
-          problems.push(
-            `Row ${row.index}: the update fill carries ${field} = ${JSON.stringify(value)}, which is not the row's own ` +
-            'sourced value. A fill is derived from the gated row, never supplied beside it, and the lead source never ' +
-            'rides on an update.'
-          )
-        }
-      }
+      proveFill(row, verdict.fill)
       contacts.updates.push({ index: row.index, row, contactId: verdict.contactId, fill: verdict.fill })
     } else {
       contacts.nothing.push({ index: row.index, contactId: verdict.contactId, why: verdict.why })
@@ -575,7 +670,6 @@ function assemble (input) {
     // and are left alone by the blanks-only rule, and a nothing row writes
     // nothing at all. The write contract states this scoping in as many
     // words.
-    const isCreate = !verdict || verdict.verdict === 'create'
     if (isCreate) {
       const company = row.fields.company
       if (!company) {

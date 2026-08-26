@@ -6471,3 +6471,57 @@ config maps one, the account create's intended set carries it, and the
 contact side is proved through the body it already compares. Pinned in
 both directions: a clean routed proof, a read-back without the type
 failing, and no RecordTypeId selected when config maps none.
+
+### Round 3 on the port build, Codex CLI confirming, 2026-08-26: five findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+required file whole, and every finding reproduced by the reviewer before
+it was reported. The round confirmed round 2 closed (the conditional
+RecordTypeId selection, both proofs, the pins on `what`) and every round-1
+change present; all five findings were round-1 fixes stopping one short of
+a downstream pair, the fault this file keeps recording.
+
+The two High. A CRM ambiguity could still create a third contact: the
+round-1 fix blocked an undecided ambiguous row, but `decided` unblocked
+it into the no-verdict branch, which plans a create, and the resolution
+shape could not carry a selected record at all. The search results now
+carry each ambiguous candidate whole, dedupe attaches to each candidate
+the verdict the row would get against it (blanks-only fill or nothing),
+and the resolution gained `chosen`, `{index, contactId}`, realised as
+that candidate's update or nothing through the same fill proof every
+update passes; `decided` no longer unblocks an ambiguous row, because
+the question is which record and `decided` names none, so the row is
+chosen or excluded, never created. And status responses were still bound
+to campaigns by array position, the exact saved-file ordering fault
+round 1 fixed for campaign and list lookups: the status read now selects
+CampaignId, `judgeStatusRead` takes the expected id and refuses rows
+carrying another campaign's, an unbindable row (no CampaignId) is
+refused too, and an empty answer stays fine because any swap involving a
+non-empty file is refused and empty-for-empty changes no reading.
+
+The two Medium, both the proof trusting what it read. The final proof
+never bound a read-back to the record it was fetched for, so a response
+filed under the wrong key, or one response reused under two keys, proved
+writes nothing read: every single-record read-back (contacts, accounts,
+campaigns, the flag) is now bound by the Id it carries, the status and
+member read-backs select CampaignId and bind by it, and the HubSpot
+half's prove got the same id binding for the same latent fault, the
+round-1 precedent. And the status proof re-accepted by coercion the
+wrong types the status judge refuses, `String()` on Label and `Number()`
+on SortOrder, so a SortOrder of "3" failed the judge and passed the
+proof; the proof now refuses the judge's malformed shapes and compares
+strictly.
+
+The Low: `config-draft`'s missing-argument message still named only
+HubSpot's identifiers, and now names both backends' per the draft's own
+wording.
+
+Eight new hand mutations, each asserted onto disk before its suite ran,
+each red in its named check, and each file restored byte-identical after:
+the status-read binding removed, the proof's Id binding removed, the
+status proof's type discipline coerced again, the member binding removed,
+`decided` unblocking ambiguity again, the candidates dropped from the
+search results, the HubSpot id binding removed, and the command layer's
+expected id dropped. The whole repository suite is green after all of it,
+and both skills and the design document say the new behaviour where they
+said the old.
