@@ -6188,7 +6188,8 @@ to stand in for the member status a HubSpot list cannot carry.
   plan that needs a campaign while the flag is off carries the User-record
   write as its own named line, in the write contract, shown in the
   confirmation summary, pushed before the campaign create and proved by
-  reading the flag back. The first draft of this design put the fix
+  reading the flag back, a read-back the build measures before anything
+  claims it. The first draft of this design put the fix
   behind a second yes outside the plan, which contradicted the standing
   rule that the push executes exactly the approved plan and nothing else;
   the round 1 review caught it the same day, and the fix now travels
@@ -6235,9 +6236,12 @@ queries.
 
 ### What the build must measure before it claims to work
 
-Update semantics on existing contacts, which the fill-blanks updates need,
-and the query shape that matches an account by the derived domain against
-`Website`. Nothing else is assumed instead of measured: the Lead object,
+Update semantics on existing contacts, which the fill-blanks updates need;
+the query shape that matches an account by the derived domain against
+`Website`; the campaign-by-name lookup and the read of a campaign's
+existing member-status rows, which the membership step runs; and the
+User-record read-back that proves the flag fix landed. Nothing else is
+assumed instead of measured: the Lead object,
 batch semantics against the per-record CLI route, and free-org volume
 limits stay out of the port's scope rather than being half-measured. The
 release gate is the acceptance pattern the HubSpot half closed twice over,
@@ -6270,3 +6274,17 @@ run had not happened after the gate closed twice over on 2026-08-26, the
 expired-record fault this file has logged before, both now say it ran;
 and two hand counts pointing at neighbouring lists ("the two measured
 sections", "the first two") are named items now.
+
+### Round 2 on the port design, Devin CLI, 2026-08-26: three findings, all taken
+
+No-tools route, per-file coverage stated, every inline document whole, and
+the round confirmed all of round 1's fixes closed at their pairs by line.
+The two that mattered were the same shape: a step's lookups stated as if
+measured when only what they return against a fresh campaign is. The
+campaign-by-name lookup, the read of a campaign's existing member-status
+rows, and the User-record read-back that proves the flag fix landed are
+all unmeasured query shapes now named in the membership step, in the
+Salesforce unmeasured list and in the build's to-measure list, so a
+builder cannot read the design as evidence the lookups already work. The
+third was a dropped pronoun that let "the CRM its config names" read as
+"the CRM's config names" in `run`'s opening line, now restored.
