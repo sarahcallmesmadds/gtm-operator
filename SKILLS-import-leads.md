@@ -214,8 +214,9 @@ and both execute only what the approved plan names.**
     duplicate contact create returns the existing id, both measured, both
     expected, and both folded into the report rather than treated as
     errors.
-12. **Verify.** Every created or updated record is fetched back by the id the
-    push returned, and the read-back is compared field by field against the
+12. **Verify.** Every created or updated record is fetched back: a created
+    record by the id the push returned, an updated one by the id the plan
+    already carried. The read-back is compared field by field against the
     approved plan. An id is a locator, not a proof; the comparison is the
     proof, and it says what it did not check.
 13. **Writeback** when the source was Notion: link each created record on its

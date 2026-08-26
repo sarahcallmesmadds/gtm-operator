@@ -155,6 +155,11 @@ check('an update body is the fill and nothing else', () => {
   assert.deepStrictEqual(body.properties, { jobtitle: 'Admiral', phone: '+15550102030' })
 })
 
+check('an update body refuses the lead source and unknown fields even when the plan was bypassed', () => {
+  const body = hubspot.contactUpdateBody(config(), { title: 'Admiral', leadSource: 'Imported', email: 'new@x.com', invented: 'x' })
+  assert.deepStrictEqual(body.properties, { jobtitle: 'Admiral' }, 'the lead source is create-only, and email and unknown fields never ride an update')
+})
+
 // -------------------------------------------------------------------- push
 
 const smallPlan = () => ({
@@ -386,6 +391,23 @@ check('readbackRequests fetches updates by the id the plan carried, not only the
   const update = requests.find(r => r.label === 'read back contact: row 3')
   assert.ok(update, 'the update read-back is requested')
   assert.ok(update.url.includes('/crm/v3/objects/contacts/301?'))
+})
+
+check('membership read-backs come from the plan, so a matched list is read as well as a created one', () => {
+  const requests = hubspot.readbackRequests(config(), smallPlan(), pushedIds())
+  const matched = requests.find(r => r.label === 'read back memberships: Summit - Attended')
+  assert.ok(matched, 'a run whose list already existed still has to prove who landed on it')
+  assert.ok(matched.url.includes('/crm/v3/lists/702/'))
+  const created = requests.find(r => r.label === 'read back memberships: Summit - Invited')
+  assert.ok(created.url.includes('/crm/v3/lists/701/'))
+})
+
+check('a plan built by an older step, without lists.creates and lists.matched, is refused by name', () => {
+  const stale = smallPlan()
+  delete stale.lists.creates
+  delete stale.lists.matched
+  assert.throws(() => hubspot.pushRequests(config(), stale), /older step/)
+  assert.throws(() => hubspot.readbackRequests(config(), stale, pushedIds()), /older step/)
 })
 
 // -------------------------------------------------------------- list lookups

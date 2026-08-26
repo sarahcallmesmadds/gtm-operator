@@ -5813,3 +5813,28 @@ absent mapping and a website with nowhere to land named in the plan rather
 than dropped; the weak count assertion on the clean proof became the
 planned writes asserted by name; and the `resolutions` docstring now states
 both keys. The suite is green after all of it.
+
+### Round 3 on the build, Codex CLI confirming, 2026-08-25: seven findings, all taken
+
+The confirming round asked whether rounds 1 and 2 left pairs open, and five
+of the seven were exactly that. The three that blocked: the update fill was
+caller input nothing proved, so a hand-edited fill could carry a value the
+gate never saw, or a lead source, onto a PATCH; the fill is now proved
+against the gated row entry by entry, and the payload builder holds an
+allowlist that refuses the lead source and unknown fields on any update. A
+run whose status lists all matched existing ones generated no membership
+read-back at all, because the reads came from the pushed ids rather than the
+plan, so the matched half of a normal run could never satisfy the proof;
+membership reads now come from the plan's own memberships. And a plan built
+by an older step, carrying only `lists.names`, was silently accepted and
+sent a membership add to list `undefined`; the obsolete shape is now refused
+by name in both the push and the read-backs. The rest: the named-month date
+arm now checks the day against its month, closing the half the slash fix did
+not reach; the automatic domain fallback fires only when a website property
+is mapped, so the refusal's remedy is no longer impossible for a decision
+that named no website, while an explicitly decided website with nowhere to
+land still blocks; the design's verify step now says an update is fetched by
+the id the plan carried; and a refusal that pointed at a command that does
+not exist now names the real route. The round confirmed the kept-rows guard,
+the listId arm, the exclusive-create write, the opaque placeholders and the
+email folding closed. The suite is green after all of it.

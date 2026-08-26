@@ -192,6 +192,19 @@ check('an impossible date is not date evidence: shape alone reported 2026-13-40 
   assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'Notes'), 'real dates still signal')
 })
 
+check('a named-month day has to exist in its month', () => {
+  const impossible = [
+    row(1, {}, { source: { When: 'Feb 31, 2026' } }),
+    row(2, {}, { source: { When: 'Apr 31' } })
+  ]
+  assert.deepStrictEqual(plan.eventSignals(impossible).dateColumns, [])
+  const real = [
+    row(1, {}, { source: { When: 'Feb 28, 2026' } }),
+    row(2, {}, { source: { When: 'Apr 30' } })
+  ]
+  assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'When'))
+})
+
 check('a slash date has to be a real day-and-month in one of its two orders', () => {
   const impossible = [
     row(1, {}, { source: { When: '31/02/2026' } }),
@@ -424,6 +437,36 @@ check('the lead source needs both halves: the artifact value and the mapped prop
   const result = plan.assemble(both)
   assert.strictEqual(result.ok, true)
   assert.deepStrictEqual(result.plan.leadSource, { property: 'lead_source', value: 'Content' })
+})
+
+check('an update fill is proved against the gated row: a smuggled value or a lead source blocks', () => {
+  // The verdicts arrive as caller input, so a fill is a claim. Without this
+  // check, a hand-edited fill pushed a value the gate never saw.
+  const smuggled = goodInput()
+  smuggled.dedupe.verdicts[1].fill = { title: 'Invented', leadSource: 'Imported' }
+  const result = plan.assemble(smuggled)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /Row 2: the update fill carries title/.test(p)))
+  assert.ok(result.problems.some(p => /leadSource/.test(p)))
+
+  const honest = goodInput()
+  assert.strictEqual(plan.assemble(honest).ok, true, 'the row\'s own sourced title still fills')
+})
+
+check('the domain fallback fires only when a website property is mapped; an explicit website without one blocks', () => {
+  const unmapped = goodInput()
+  delete unmapped.config.properties.company.website
+  unmapped.companyDecisions = { Acme: { decision: 'create' } }
+  unmapped.rows[0].fields.companyDomain = 'acme.example'
+  unmapped.rows[0].fieldSources.companyDomain = 'list'
+  const bare = plan.assemble(unmapped)
+  assert.strictEqual(bare.ok, true, JSON.stringify(bare.problems || []))
+  assert.strictEqual(bare.plan.companies.creates[0].website, null, 'no mapping, so the automatic fallback does not fire and the company is created bare')
+
+  unmapped.companyDecisions = { Acme: { decision: 'create', website: 'acme.example' } }
+  const explicit = plan.assemble(unmapped)
+  assert.strictEqual(explicit.ok, false)
+  assert.ok(explicit.problems.some(p => /decided as a create with a website/.test(p)))
 })
 
 check('a Notion-sourced plan writes back and a CSV plan never does', () => {
