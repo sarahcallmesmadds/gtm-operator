@@ -329,7 +329,14 @@ function judgeCampaignLookup (response, expectedName) {
     if (typeof record.Id !== 'string' || !record.Id) {
       return { outcome: 'unknown', why: 'The row carries no Id, so there is nothing to match against. Save the response whole and look at it.' }
     }
-    if (expectedName !== undefined && String(record.Name) !== String(expectedName)) {
+    // The Name is the binding, so a malformed one is refused before it is
+    // compared: String() coercion here read a null or an object as a name
+    // and judged the binding on the coerced spelling, the wrong-type fault
+    // the status judge refuses.
+    if (typeof record.Name !== 'string' || !record.Name.trim()) {
+      return { outcome: 'unknown', why: `The row carries ${JSON.stringify(record.Name === undefined ? null : record.Name)} for its Name, which is not a campaign name. Save the response whole and look at it.` }
+    }
+    if (expectedName !== undefined && record.Name !== String(expectedName)) {
       return {
         outcome: 'unknown',
         why: `The row is named ${JSON.stringify(record.Name)} where ${JSON.stringify(String(expectedName))} was asked for, so this response answers a different campaign's lookup. The saved files are out of order.`
@@ -909,15 +916,22 @@ function prove (config, plan, pushedIds, readbacks) {
       problems.push({ what: `campaign ${membership.campaign}`, why: `No campaign id is known for "${membership.campaign}", so the member read-back cannot be bound to the right campaign. Unproved fails the proof.` })
       continue
     }
-    const misfiled = result.records.find(r => typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId))
+    // The same discipline as the status proof: rows are bound to the
+    // campaign they were fetched for, and malformed values are refused
+    // rather than coerced, because a numeric ContactId read through
+    // String() could match a planned id the judge would have refused.
+    const misfiled = result.records.find(r =>
+      typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId) ||
+      typeof r.ContactId !== 'string' || !r.ContactId ||
+      typeof r.Status !== 'string' || !r.Status.trim())
     if (misfiled) {
       problems.push({
         what: `campaign ${membership.campaign}`,
-        why: `The member read-back holds a row with CampaignId ${JSON.stringify(misfiled.CampaignId === undefined ? null : misfiled.CampaignId)} where ${JSON.stringify(String(campaignId))} was fetched, so it answers a different campaign, and no membership is proved by it.`
+        why: `The member read-back holds a row this proof refuses to read: ContactId ${JSON.stringify(misfiled.ContactId === undefined ? null : misfiled.ContactId)}, Status ${JSON.stringify(misfiled.Status === undefined ? null : misfiled.Status)}, CampaignId ${JSON.stringify(misfiled.CampaignId === undefined ? null : misfiled.CampaignId)} where ${JSON.stringify(String(campaignId))} was fetched. Save the response the read-back printed, whole, and look at it.`
       })
       continue
     }
-    const onCampaign = new Map(result.records.map(r => [String(r.ContactId), String(r.Status)]))
+    const onCampaign = new Map(result.records.map(r => [r.ContactId, r.Status]))
     for (const index of membership.rows) {
       const id = (pushedIds.contacts || {})[index] ||
         ((plan.contacts.updates.find(u => u.index === index) || plan.contacts.nothing.find(n => n.index === index) || {}).contactId)

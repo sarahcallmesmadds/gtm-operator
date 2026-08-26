@@ -263,15 +263,29 @@ function listLookupRequests (names) {
  * absent is how a second `Summit - Invited` gets created beside the first.
  */
 function judgeListLookup (response, expectedName) {
+  // An id or a name is compared only after its type is checked, never
+  // through String() coercion: a truthy object listId read as
+  // "[object Object]" would send every membership add to a list that
+  // does not exist, and a coerced name would judge the binding on a
+  // spelling the response never carried. The measured shapes carry the
+  // id as a string or a number and the name as a string; anything else
+  // is a question.
+  const idShaped = value => typeof value === 'string' || typeof value === 'number'
   if (response && typeof response === 'object') {
     if (response.list && (response.list.listId || response.list.listId === 0)) {
+      if (!idShaped(response.list.listId)) {
+        return { outcome: 'unknown', why: `The envelope carries ${JSON.stringify(response.list.listId)} for its listId, which is not an id. Save the response whole and look at it.` }
+      }
       // The envelope carries the list's own name (measured 2026-08-26),
       // and where it does, the answer is bound to its question by it: two
       // saved files passed in the wrong order would otherwise file each
       // list's id under the other, and every membership would land on the
       // wrong list. The bare listId shape below carries no name to check.
+      if (response.list.name !== undefined && typeof response.list.name !== 'string') {
+        return { outcome: 'unknown', why: `The envelope carries ${JSON.stringify(response.list.name)} for its name, which is not a list name. Save the response whole and look at it.` }
+      }
       if (expectedName !== undefined && response.list.name !== undefined &&
-          String(response.list.name) !== String(expectedName)) {
+          response.list.name !== String(expectedName)) {
         return {
           outcome: 'unknown',
           why: `The response names the list ${JSON.stringify(response.list.name)} where ${JSON.stringify(String(expectedName))} was asked for, so it answers a different lookup. The saved files are out of order.`
@@ -280,6 +294,9 @@ function judgeListLookup (response, expectedName) {
       return { outcome: 'exists', listId: String(response.list.listId) }
     }
     if (response.listId || response.listId === 0) {
+      if (!idShaped(response.listId)) {
+        return { outcome: 'unknown', why: `The response carries ${JSON.stringify(response.listId)} for its listId, which is not an id. Save the response whole and look at it.` }
+      }
       return { outcome: 'exists', listId: String(response.listId) }
     }
     if (response.status === 'error' || response.category || response.message) {
@@ -685,6 +702,24 @@ function prove (config, plan, pushedIds, readbacks) {
         checked.push({ what: `list ${membership.list}, row ${index}` })
       }
     }
+  }
+
+  // THE PROOF SAYS WHAT IT CANNOT BIND. The measured membership envelope
+  // carries record ids and no list identity, so unlike every single-record
+  // read-back (bound by the id it carries) and the Salesforce half's
+  // campaign-scoped reads (bound by their rows' CampaignId), a membership
+  // response is bound only by the URL it was fetched from and the key it
+  // was saved under. A response saved under the wrong list cannot be
+  // detected here, and claiming otherwise would be the proof vouching for
+  // a binding nothing carries.
+  if (plan.lists.memberships.length) {
+    unchecked.push({
+      what: 'which list each membership read-back came from',
+      why:
+        'The measured membership envelope carries record ids and no list identity, so a membership response is bound ' +
+        'only by the URL it was fetched from and the key it was saved under, never by its own content. Fetch and save ' +
+        'them one list at a time.'
+    })
   }
 
   unchecked.push({

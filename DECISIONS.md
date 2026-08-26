@@ -6525,3 +6525,42 @@ search results, the HubSpot id binding removed, and the command layer's
 expected id dropped. The whole repository suite is green after all of it,
 and both skills and the design document say the new behaviour where they
 said the old.
+
+### Round 4 on the port build, Devin CLI confirming, 2026-08-26: three findings, two taken and one answered as a recorded limit
+
+No-tools route, per-file coverage stated, every inline document whole.
+The round confirmed no unreachable guard, no test passing without
+checking and no claim wider than the dated records, and found three
+sibling locations of round 3's rules.
+
+Taken. The member proof coerced ContactId and Status through String()
+while binding CampaignId strictly, so a malformed row a judge would
+refuse could still match a planned id; the member rows now pass the same
+type discipline the status proof holds, refused rather than coerced. And
+both lookup judges compared their bindings through String() coercion:
+`judgeCampaignLookup` refuses a row whose Name is not a non-empty string
+before any comparison, even when no expected name was passed, because
+the Name is the binding; `judgeListLookup` refuses a listId that is not
+a string or a number (the measured shapes, zero included) and a name
+that is present and not a string, because a truthy object listId read
+through String() would send every membership add to a list that does not
+exist. The push judges' id arms deliberately stay as they are: a created
+id is only ever used as a locator whose read-back is bound by that id
+and compared field by field, so a malformed id fails its read-back, a
+backstop the lookup ids do not have.
+
+Answered as the limit it is: the HubSpot membership proof cannot bind a
+response to its list, because the measured membership envelope carries
+record ids and no list identity, unlike every single-record read-back
+and the Salesforce campaign-scoped reads. Inventing a binding nothing
+carries would be the proof vouching for what it cannot see, so the
+proof now names the limit in its unchecked whenever memberships were
+planned, with the instruction to fetch and save them one list at a
+time, and both skills' documents and this design say the same where
+they describe the binding rule.
+
+Four new hand mutations, each asserted onto disk before its suite ran,
+each red in its named check, and each file restored byte-identical
+after: the Name type check removed, the listId type check removed, the
+member types coerced again, and the limitation note removed. The whole
+repository suite is green after all of it.
