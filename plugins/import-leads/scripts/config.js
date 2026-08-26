@@ -366,7 +366,31 @@ function draft (answers) {
   // just required, so it is refused by name. A custom-field org corrects
   // mailingFields itself, which keeps the correction an explicit, named
   // decision (round 4, 2026-08-26).
-  const contactOverrides = (answers.properties && answers.properties.contact) || {}
+  // A properties correction that is not a map cannot be read as one, and
+  // it is refused by the validator's own name for it rather than crashing
+  // at the override check or spreading a string's characters into the
+  // draft (round 7). Silently dropping it is not an option either: it is
+  // a person's correction, and losing it quietly writes a config they
+  // did not describe.
+  if (answers.properties !== undefined && answers.properties !== null &&
+      (typeof answers.properties !== 'object' || Array.isArray(answers.properties))) {
+    throw new Error(
+      'These answers do not make a working config:\n  properties is not a map. It holds the contact and company ' +
+      'field-name corrections, each a map of this plugin\'s field names to the portal\'s property names.'
+    )
+  }
+  const overridesOf = kind => {
+    const map = answers.properties && answers.properties[kind]
+    if (map === undefined || map === null) return {}
+    if (typeof map !== 'object' || Array.isArray(map)) {
+      throw new Error(
+        `These answers do not make a working config:\n  properties.${kind} is not a map. It maps this plugin's ` +
+        'field names to the portal\'s property names.'
+      )
+    }
+    return map
+  }
+  const contactOverrides = overridesOf('contact')
   if (crm === 'salesforce' && ('state' in contactOverrides || 'country' in contactOverrides)) {
     throw new Error(
       'These answers do not make a working config:\n  properties.contact.state and properties.contact.country are set ' +
@@ -380,7 +404,7 @@ function draft (answers) {
       defaults.contact,
       contactOverrides,
       crm === 'salesforce' ? { state: mailing.state.trim(), country: mailing.country.trim() } : {}),
-    company: Object.assign({}, defaults.company, (answers.properties && answers.properties.company) || {})
+    company: Object.assign({}, defaults.company, overridesOf('company'))
   }
   // Optional properties enter the draft only when the org named them. A null
   // or empty answer means "we do not have that property", and the honest

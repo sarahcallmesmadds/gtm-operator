@@ -68,6 +68,21 @@ check('an optional property mapping that is not a non-empty string is a problem,
   assert.throws(() => config.draft(bad), /properties\.contact\.owner/)
 })
 
+check('a properties correction that is not a map is refused by name, never crashed on or spread', () => {
+  // THE ROUND-7 REPRO: properties.contact as a string crashed the draft
+  // at the override check with a bare TypeError, and a string properties
+  // container would have dropped a person's corrections silently.
+  const contact = answers()
+  contact.properties = { contact: 'not-a-record' }
+  assert.throws(() => config.draft(contact), /properties\.contact is not a map/)
+  const container = answers()
+  container.properties = 'not-a-record'
+  assert.throws(() => config.draft(container), /properties is not a map/)
+  const company = answers()
+  company.properties = { company: ['Name'] }
+  assert.throws(() => config.draft(company), /properties\.company is not a map/)
+})
+
 check('a salesforce mapping that is not field-API-name shaped is refused: identifiers cannot be escaped into a query', () => {
   const sf = () => ({
     configVersion: config.CONFIG_VERSION,

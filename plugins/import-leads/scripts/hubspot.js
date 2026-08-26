@@ -136,19 +136,30 @@ function searchResults (config, responses) {
       if (!result || typeof result !== 'object' || Array.isArray(result)) {
         throw new Error(`Response ${at + 1} holds ${JSON.stringify(result === undefined ? null : result)} where a result should be, not a record. Save what the portal returned, whole.`)
       }
-      if (typeof result.id !== 'string' && typeof result.id !== 'number') {
+      if ((typeof result.id !== 'string' && typeof result.id !== 'number') || result.id === '') {
         throw new Error(`Response ${at + 1} holds a result with no id. Save what the portal returned.`)
       }
+      // The properties container is a record or the result is malformed:
+      // Object.entries over a string spreads its characters, none of them
+      // a mapped name, and the contact silently vanishes from the dedupe
+      // this search is the whole guard for (round 7).
+      if (result.properties !== undefined && result.properties !== null &&
+          (typeof result.properties !== 'object' || Array.isArray(result.properties))) {
+        throw new Error(`Response ${at + 1} holds a result whose properties is ${JSON.stringify(result.properties)}, not a record. Save what the portal returned, whole.`)
+      }
       const properties = {}
+      // Every mapped value is text on the measured surface, so a value
+      // that is present and not text is refused rather than carried, the
+      // same rule the Salesforce parser holds and the rule that started
+      // at email: a coerced email is an identity nothing can match, and
+      // the unmatched row plans as a duplicate create.
       for (const [name, value] of Object.entries(result.properties || {})) {
         const field = back[name]
-        if (field) properties[field] = value
-      }
-      // An email is text or the record is malformed, the same rule the
-      // Salesforce parser holds: a coerced email is an identity nothing
-      // can match, and the unmatched row plans as a duplicate create.
-      if (properties.email !== undefined && typeof properties.email !== 'string') {
-        throw new Error(`Response ${at + 1} holds a result whose email is ${JSON.stringify(properties.email)}, not text. Save what the portal returned, whole: a coerced email is an identity nothing can match.`)
+        if (!field || value === null || value === undefined) continue
+        if (typeof value !== 'string') {
+          throw new Error(`Response ${at + 1} holds a result whose ${name} is ${JSON.stringify(value)}, not text. Save what the portal returned, whole.`)
+        }
+        properties[field] = value
       }
       const email = properties.email ? properties.email.trim().toLowerCase() : null
       if (!email) continue
@@ -521,8 +532,12 @@ function judgeResponse (request, response) {
   // portal's own spelling, measured 2026-08-26. A duplicate add still
   // answers empty, the no-op arm above. The membership read-back is still
   // the proof.
+  // Ids that are not id-shaped are not the measured shape, so a malformed
+  // entry drops the whole answer to the unknown arm rather than being
+  // String()-spelled into the report (round 7).
   if (request.method === 'PUT' && request.url.includes('/memberships/add') &&
-      typeof response === 'object' && Array.isArray(response.recordsIdsAdded)) {
+      typeof response === 'object' && Array.isArray(response.recordsIdsAdded) &&
+      response.recordsIdsAdded.every(idShaped)) {
     return {
       outcome: 'done',
       added: response.recordsIdsAdded.map(String),
@@ -673,11 +688,19 @@ function prove (config, plan, pushedIds, readbacks) {
         problems.push({ what: `row ${create.index} association`, why: 'No association read-back was saved, and the plan promised this association. It is unproved, and unproved fails the proof.' })
       } else if (!expected) {
         problems.push({ what: `row ${create.index} association`, why: `No company id is known for "${company}", so the association cannot be checked against the right record.` })
+      // BOTH SIDES ARE ID-SHAPED BEFORE THEY CAN COMPARE: String() spelled
+      // an object toObjectId and an object planned id both
+      // "[object Object]" and marked the association checked (round 7).
+      } else if (typeof expected !== 'string' && typeof expected !== 'number') {
+        problems.push({ what: `row ${create.index} association`, why: `The plan or push report carries ${JSON.stringify(expected)} for company "${company}", which is not an id, so the association cannot be checked. Save the file and look at it.` })
       } else if (association.results.some(r => !r || typeof r !== 'object' || Array.isArray(r))) {
         // A null entry in a saved file is refused before toObjectId is
         // read on it, the same object question the sibling proofs ask.
         const odd = association.results.find(r => !r || typeof r !== 'object' || Array.isArray(r))
         problems.push({ what: `row ${create.index} association`, why: `The association read-back holds ${JSON.stringify(odd === undefined ? null : odd)}, not a record. Save the response the read-back printed, whole, and look at it.` })
+      } else if (association.results.some(r => r.toObjectId !== null && r.toObjectId !== undefined && typeof r.toObjectId !== 'string' && typeof r.toObjectId !== 'number')) {
+        const odd = association.results.find(r => r.toObjectId !== null && r.toObjectId !== undefined && typeof r.toObjectId !== 'string' && typeof r.toObjectId !== 'number')
+        problems.push({ what: `row ${create.index} association`, why: `The association read-back carries ${JSON.stringify(odd.toObjectId)} for toObjectId, which is not an id. A malformed value is refused rather than coerced equal.` })
       } else if (!association.results.some(r => String(r.toObjectId) === String(expected))) {
         problems.push({ what: `row ${create.index} association`, why: `The association to company ${expected} is not on the record that came back.` })
       } else {

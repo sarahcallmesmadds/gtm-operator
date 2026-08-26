@@ -368,6 +368,14 @@ check('a create response whose id is not id-shaped is never judged created: "[ob
 check('a search row that is not a record is refused by name, apart from a record with no Id', () => {
   assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([null])]), /not a record/)
   assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Email: 'x@y.com' }])]), /no Id/)
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '', Email: 'x@y.com' }])]), /no Id/)
+})
+
+check('a search value that is not text, and an AccountId that is not an id, are refused like the email', () => {
+  // Round 7: the round-1 email rule reaches its siblings. A mapped value
+  // or an AccountId read through String() is a spelling, not a value.
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 'x@y.com', Phone: { odd: true } }])]), /not text/)
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 'x@y.com', AccountId: { odd: true } }])]), /not an id/)
 })
 
 check('an empty answer to a PATCH is the measured 204 and points at the read-back; anywhere else it proves nothing', () => {
@@ -455,6 +463,25 @@ check('a clean set of read-backs proves every planned write by name and still sa
     assert.ok(checked.includes(expected), `expected "${expected}" among the checked, got: ${checked.join(' | ')}`)
   }
   assert.ok(proof.unchecked.some(u => /not named above/.test(u.what)), 'the proof says its own limits, every time')
+})
+
+check('an association proof refuses a malformed id on either side, never coerced equal as "[object Object]"', () => {
+  // THE ROUND-7 REPRO: an object AccountId against an object pushed id,
+  // both spelled "[object Object]" by String(), marked the association
+  // checked with zero problems.
+  // The sharpest form: an object planned id against the literal string
+  // "[object Object]" on the read-back, which String() coerces equal.
+  const ids = pushedIds()
+  ids.accounts.Acme = { odd: true }
+  const bothSides = cleanReadbacks()
+  bothSides.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: '[object Object]' })
+  const first = salesforce.prove(config(), smallPlan(), ids, bothSides)
+  assert.ok(first.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
+
+  const recordSide = cleanReadbacks()
+  recordSide.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: { odd: true } })
+  const second = salesforce.prove(config(), smallPlan(), pushedIds(), recordSide)
+  assert.ok(second.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
 })
 
 check('a wrong AccountId on the read-back is an association problem naming both records', () => {

@@ -444,6 +444,42 @@ check('a create response whose id is not id-shaped is never judged created: "[ob
 check('a search result that is not a record is refused by name, apart from a result with no id', () => {
   assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [null] }]), /not a record/)
   assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ properties: {} }] }]), /no id/)
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ id: '', properties: { email: 'x@y.com' } }] }]), /no id/)
+})
+
+check('a search result with a malformed properties container or value is refused, never read around', () => {
+  // Round 7: Object.entries over a string spreads its characters, none
+  // mapped, and the contact silently vanished from the dedupe; and the
+  // round-1 email rule reaches its sibling values.
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ id: '1', properties: 'not-a-record' }] }]), /not a record/)
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ id: '1', properties: { phone: { odd: true } } }] }]), /not text/)
+})
+
+check('an association proof refuses a malformed id on either side, never coerced equal as "[object Object]"', () => {
+  // THE ROUND-7 REPRO: an object toObjectId against an object pushed id,
+  // both spelled "[object Object]" by String(), marked the association
+  // checked with zero problems.
+  // The sharpest form: an object planned id against the literal string
+  // "[object Object]" on the read-back, which String() coerces equal.
+  const ids = pushedIds()
+  ids.companies.Acme = { odd: true }
+  const bothSides = cleanReadbacks()
+  bothSides.associations[1] = { results: [{ toObjectId: '[object Object]' }] }
+  const first = hubspot.prove(config(), smallPlan(), ids, bothSides)
+  assert.ok(first.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
+
+  const recordSide = cleanReadbacks()
+  recordSide.associations[1] = { results: [{ toObjectId: { odd: true } }] }
+  const second = hubspot.prove(config(), smallPlan(), pushedIds(), recordSide)
+  assert.ok(second.problems.some(p => /row 1 association/.test(p.what) && /not an id/.test(p.why)))
+})
+
+check('a membership add whose returned ids are not id-shaped is not the measured done shape', () => {
+  const judged = hubspot.judgeResponse(
+    { method: 'PUT', url: hubspot.BASE + '/crm/v3/lists/9/memberships/add', label: 'add' },
+    { recordsIdsAdded: [{ odd: true }] }
+  )
+  assert.strictEqual(judged.outcome, 'unknown')
 })
 
 check('a null entry in an association read-back is refused by the proof, never dereferenced', () => {

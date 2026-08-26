@@ -6846,7 +6846,7 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Thirty hand mutations across the build and its six review rounds,
+Forty-four hand mutations across the build and its seven review rounds,
 each asserted onto disk before its suite ran, each red in its named
 check, and each file restored byte-identical after: the probe judge's
 column binding removed, the count judge's type discipline coerced, the
@@ -6866,9 +6866,15 @@ removed, the whoami judge's string discipline removed, the draft's
 country override arm dropped alone, the judge command's malformed-config
 guard removed alone, the one-row read-back's not-a-record refusal
 removed, both create judges' id discipline coerced back to String(),
-both search parsers' not-a-record refusals removed, and the draft's
-problems gate emptied. The whole repository suite is green after all of
-it.
+both search parsers' not-a-record refusals removed, the draft's
+problems gate emptied, both association proofs' expected-id and
+read-back-id arms removed one at a time (four), the plan's companyId id
+arm removed, both search parsers' text refusals removed, the salesforce
+parser's AccountId refusal removed, both parsers' empty-id acceptance
+restored, the hubspot properties-container refusal removed, the
+membership judge's id discipline removed, and the draft's per-kind and
+container map refusals removed one at a time. The whole repository
+suite is green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -7004,3 +7010,31 @@ release-gate run and the second acceptance run, both 2026-08-26); the
 reviewer received only the follow-ups sections inline, which begin
 after both, so the claim was wider than the excerpt, not wider than the
 record. Six new mutations, recorded above.
+
+### Round 7 on the follow-ups, Codex CLI confirming, 2026-08-26: five findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole plus targeted reads beyond the diff, every finding
+reproduced before it was reported. The round confirmed rounds 5 and 6
+present and chased the id and record questions into the last readers
+that still coerced. The High was the sharpest finding of the whole
+sequence: both association proofs compared String() against String(),
+so an object id on both sides, or an object planned id against the
+literal string "[object Object]" on the read-back, marked the
+association checked with zero problems; both proofs now refuse a
+non-id-shaped value on either side by name, and the plan refuses a
+match decision whose companyId is not an id before it can enter the
+plan at all. The Mediums: the search parsers accepted a malformed
+properties container (a string's characters spread to no mapped name
+and the contact silently vanished from dedupe) and carried non-text
+mapped values that only email had been guarding against, so both
+parsers now refuse a non-record container, a non-text mapped value, a
+non-id AccountId and an empty-string id by name. The Lows: config.draft
+crashed with a bare TypeError on a properties correction that is not a
+map, and would have silently dropped a string properties container; it
+now refuses both by the validator's own names. And the membership-add
+judge String()-spelled malformed returned ids into its report; a
+non-id-shaped entry now drops the answer to the unknown arm as the
+unmeasured shape it is. Fourteen new mutations, recorded above,
+including the single-arm deletions on each side of both association
+proofs.

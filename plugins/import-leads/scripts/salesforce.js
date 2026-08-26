@@ -157,26 +157,41 @@ function searchResults (config, responses) {
       if (!record || typeof record !== 'object' || Array.isArray(record)) {
         throw new Error(`Response ${at + 1} holds ${JSON.stringify(record === undefined ? null : record)} where a record should be, not a record. Save what the CLI printed, whole.`)
       }
-      if (typeof record.Id !== 'string') {
+      if (typeof record.Id !== 'string' || !record.Id) {
         throw new Error(`Response ${at + 1} holds a record with no Id. Save what the CLI printed.`)
       }
       const properties = {}
+      // Every mapped value is text on the measured surface, so a value
+      // that is present and not text is refused rather than carried, the
+      // rule that started at email (round 1: String() coercion indexed an
+      // object email under its coerced spelling, the row's real address
+      // matched nothing, and the row planned as a create, a duplicate on
+      // the backend where this search is the whole guard) and reaches
+      // email's siblings in round 7.
       for (const [name, value] of Object.entries(record)) {
         const field = back[name]
-        if (field && value !== null && value !== undefined) properties[field] = value
+        if (!field || value === null || value === undefined) continue
+        if (typeof value !== 'string') {
+          throw new Error(`Response ${at + 1} holds a record whose ${name} is ${JSON.stringify(value)}, not text. Save what the CLI printed, whole.`)
+        }
+        properties[field] = value
       }
       // The company signal for the conflict check rides under the same
       // canonical name the HubSpot half uses. It is only ever read.
-      if (record.Account && typeof record.Account === 'object' && record.Account.Name) {
-        properties.company = record.Account.Name
+      if (record.Account && typeof record.Account === 'object' && record.Account.Name !== null && record.Account.Name !== undefined) {
+        if (typeof record.Account.Name !== 'string') {
+          throw new Error(`Response ${at + 1} holds a record whose Account.Name is ${JSON.stringify(record.Account.Name)}, not text. Save what the CLI printed, whole.`)
+        }
+        if (record.Account.Name) properties.company = record.Account.Name
       }
-      if (record.AccountId) properties.accountId = String(record.AccountId)
-      // An email is text or the record is malformed: String() coercion
-      // indexed an object email under its coerced spelling, the row's real
-      // address matched nothing, and the row planned as a create, a
-      // duplicate on the backend where this search is the whole guard.
-      if (properties.email !== undefined && typeof properties.email !== 'string') {
-        throw new Error(`Response ${at + 1} holds a record whose email is ${JSON.stringify(properties.email)}, not text. Save what the CLI printed, whole: a coerced email is an identity nothing can match.`)
+      if (record.AccountId !== null && record.AccountId !== undefined) {
+        // Id-shaped before it can bind, the same rule the proofs hold:
+        // String() would spell an object "[object Object]" into the
+        // conflict check (round 7).
+        if (typeof record.AccountId !== 'string' || !record.AccountId) {
+          throw new Error(`Response ${at + 1} holds a record whose AccountId is ${JSON.stringify(record.AccountId)}, not an id. Save what the CLI printed, whole.`)
+        }
+        properties.accountId = record.AccountId
       }
       const email = properties.email ? properties.email.trim().toLowerCase() : null
       if (!email) continue
@@ -1018,6 +1033,13 @@ function prove (config, plan, pushedIds, readbacks) {
         problems.push({ what: `row ${create.index} association`, why: 'No contact read-back, so the AccountId cannot be checked. Unproved fails the proof.' })
       } else if (!expected) {
         problems.push({ what: `row ${create.index} association`, why: `No account id is known for "${company}", so the association cannot be checked against the right record.` })
+      // BOTH SIDES ARE ID-SHAPED BEFORE THEY CAN COMPARE: String() spelled
+      // an object read-back id and an object planned id both
+      // "[object Object]" and marked the association checked (round 7).
+      } else if (typeof expected !== 'string' && typeof expected !== 'number') {
+        problems.push({ what: `row ${create.index} association`, why: `The plan or push report carries ${JSON.stringify(expected)} for account "${company}", which is not an id, so the association cannot be checked. Save the file and look at it.` })
+      } else if (record.AccountId !== null && record.AccountId !== undefined && typeof record.AccountId !== 'string') {
+        problems.push({ what: `row ${create.index} association`, why: `The contact came back with AccountId ${JSON.stringify(record.AccountId)}, which is not an id. A malformed value is refused rather than coerced equal.` })
       } else if (String(record.AccountId) !== String(expected)) {
         problems.push({ what: `row ${create.index} association`, why: `The contact came back with AccountId ${JSON.stringify(record.AccountId || null)} where account ${expected} was planned.` })
       } else {
