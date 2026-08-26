@@ -412,6 +412,23 @@ check('a property that came back different is a problem naming both values', () 
   assert.ok(proof.problems.some(p => /row 1, firstname/.test(p.what) && /"Ada"/.test(p.why) && /"Ad"/.test(p.why)))
 })
 
+check('a list lookup with a malformed listId or name is a question, never coerced', () => {
+  // A truthy object listId read through String() becomes "[object Object]"
+  // and every membership add goes to a list that does not exist; a
+  // non-string name judges the binding on a coerced spelling. Both are
+  // refused, the same wrong-type rule the status judge holds.
+  assert.strictEqual(hubspot.judgeListLookup({ list: { listId: { odd: true }, name: 'Summit - Invited' } }, 'Summit - Invited').outcome, 'unknown')
+  assert.strictEqual(hubspot.judgeListLookup({ list: { listId: 7, name: 3 } }, '3').outcome, 'unknown')
+  assert.strictEqual(hubspot.judgeListLookup({ listId: true }).outcome, 'unknown')
+  assert.deepStrictEqual(hubspot.judgeListLookup({ listId: 0 }), { outcome: 'exists', listId: '0' }, 'the measured numeric id, zero included, still matches')
+})
+
+check('the proof names the membership binding limit: the envelope carries no list identity', () => {
+  const proof = hubspot.prove(config(), smallPlan(), pushedIds(), cleanReadbacks())
+  assert.ok(proof.unchecked.some(u => /which list each membership read-back came from/.test(u.what)),
+    'a limit the proof cannot close is said, not silently carried')
+})
+
 check('a read-back answering a different record than was fetched fails the proof instead of proving it', () => {
   // The same binding rule the Salesforce half holds: a response filed
   // under the wrong key, or reused under two keys, proves nothing.

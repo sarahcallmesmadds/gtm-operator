@@ -328,7 +328,11 @@ proof**: the comparison is the proof, and it says what it did not check.
 Every read-back is bound to the record it was fetched for by the id it
 carries, and a campaign-scoped read by its rows' CampaignId, so a saved
 response filed under the wrong key, or reused under two, fails the proof
-instead of proving a write nothing read.
+instead of proving a write nothing read. The one read that carries
+nothing to bind by is HubSpot's list membership envelope, record ids
+with no list identity, so the proof names that limit in its unchecked
+rather than vouching for it: fetch and save membership read-backs one
+list at a time.
 Report both halves, what is proved and what is not, and never round up to
 "it worked". If a write did not land, say so loudly and show exactly which.
 

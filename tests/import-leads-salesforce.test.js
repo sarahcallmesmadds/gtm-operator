@@ -543,6 +543,27 @@ check('a campaign lookup with done not true, or a row with no Id, is a question,
   assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Name: 'Summit' }]), 'Summit').outcome, 'unknown', 'no Id, nothing to match against')
 })
 
+check('a campaign lookup row with a malformed Name is a question, never coerced into a binding', () => {
+  // String() read a null as "null" and an object as its coerced spelling,
+  // and judged the binding on a name the response never carried.
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701A', Name: null }]), 'Summit').outcome, 'unknown')
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701A', Name: { odd: true } }]), 'Summit').outcome, 'unknown')
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701A', Name: null }])).outcome, 'unknown', 'the Name is the binding, so it is refused even when no expected name was passed')
+})
+
+check('the member proof refuses malformed rows instead of coercing them into matches', () => {
+  const numericContact = cleanReadbacks()
+  numericContact.members['Spring Roadshow'] = queryEnvelope([{ Id: 'M3', ContactId: 3, Status: 'Attended', CampaignId: '701M' }])
+  const first = salesforce.prove(config(), smallPlan(), pushedIds(), numericContact)
+  assert.ok(first.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /refuses to read/.test(p.why)),
+    'a numeric ContactId cannot be coerced into matching a planned id')
+
+  const nullStatus = cleanReadbacks()
+  nullStatus.members['Spring Roadshow'] = queryEnvelope([{ Id: 'M3', ContactId: '003U', Status: null, CampaignId: '701M' }])
+  const second = salesforce.prove(config(), smallPlan(), pushedIds(), nullStatus)
+  assert.ok(second.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /refuses to read/.test(p.why)))
+})
+
 check('a status read refuses incomplete or malformed rows rather than planning creates beside them', () => {
   assert.strictEqual(salesforce.judgeStatusRead(queryEnvelope([], false)).ok, false, 'done not true withholds rows')
   assert.ok(/null/.test(salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: null, SortOrder: 1 }])).why))
@@ -654,7 +675,7 @@ check('a status or member read-back filed under the wrong campaign fails the pro
   const reusedMembers = cleanReadbacks()
   reusedMembers.members['Spring Roadshow'] = reusedMembers.members['Autumn Summit']
   const members = salesforce.prove(config(), smallPlan(), pushedIds(), reusedMembers)
-  assert.ok(members.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /answers a different campaign/.test(p.why)))
+  assert.ok(members.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /refuses to read/.test(p.why) && /"701M" was fetched/.test(p.why)))
 })
 
 check('the status proof refuses the wrong types the status judge refuses, instead of coercing them past it', () => {

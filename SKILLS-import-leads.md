@@ -345,7 +345,10 @@ and both execute only what the approved plan names.**
     it carries and a campaign-scoped read by its rows' CampaignId, and it
     refuses the malformed values the judges refuse, so a response saved
     under the wrong key, reused under two, or carrying a wordy number
-    fails the proof instead of passing it.
+    fails the proof instead of passing it. The one read that carries
+    nothing to bind by is HubSpot's list membership envelope, record ids
+    with no list identity, so the proof names that limit in its unchecked
+    rather than vouching for a binding nothing carries.
 13. **Writeback** when the source was Notion: link each created record on its
     source row, fill email only if blank. A writeback failure is reported and
     never fails the run, because the CRM is the system of record.
