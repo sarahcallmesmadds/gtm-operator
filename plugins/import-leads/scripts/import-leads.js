@@ -351,9 +351,12 @@ const commands = {
     }
     standing.artifacts = {
       note:
-        'The required-fields rule and the member-status grid live in Process and are checked by reading them there; the personas ' +
-        'and routing artifacts are optional. A missing required artifact is named, and `process:new` is where it gets written. ' +
-        'Validate what was read with validate-rules.'
+        'The required-fields rule and the member-status grid live in Process, which this script cannot reach: read them ' +
+        'through the connected client and validate what was read with validate-rules. The report has to keep two answers ' +
+        'apart: when the Process library itself cannot be reached (the foundation is not installed, or nothing is connected), ' +
+        'the artifacts are UNREACHABLE, and the rest of this standing report still stands on its own; when the library is ' +
+        'reachable and an artifact is not in it, that artifact is MISSING, named, with `process:new` as the place it gets ' +
+        'written. The personas and routing artifacts are optional either way.'
     }
     standing.autoCompanyCreation =
       'Standing risk: the portal may auto-create a company from an email domain and take the primary association (measured ' +

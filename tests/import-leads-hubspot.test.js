@@ -249,6 +249,14 @@ check('a body with an id judges as created', () => {
   assert.deepStrictEqual(judged, { outcome: 'created', id: '501' })
 })
 
+check('a list create answers with listId, the measured shape, and judges as created', () => {
+  const judged = hubspot.judgeResponse(
+    { method: 'POST', url: hubspot.BASE + '/crm/v3/lists', label: 'create list' },
+    { listId: 703, name: 'Summit - Invited' }
+  )
+  assert.deepStrictEqual(judged, { outcome: 'created', id: '703' })
+})
+
 check('the duplicate create refusal carries the existing id out of the error text, and is never an update', () => {
   const judged = hubspot.judgeResponse(
     { method: 'POST', url: hubspot.BASE + '/crm/v3/objects/contacts', label: 'create' },
@@ -318,7 +326,16 @@ const cleanReadbacks = () => ({
 check('a clean set of read-backs proves every planned write and still names what it did not check', () => {
   const proof = hubspot.prove(config(), smallPlan(), pushedIds(), cleanReadbacks())
   assert.deepStrictEqual(proof.problems, [], JSON.stringify(proof.problems))
-  assert.ok(proof.checked.length >= 8)
+  // Every planned write is asserted by name, not by count: a count passes
+  // when a whole category of check silently stops running.
+  const checked = proof.checked.map(c => c.what)
+  for (const expected of [
+    'row 1, firstName', 'row 2, firstName', 'row 1 association', 'row 2 association',
+    'row 3 (update), title', 'company Acme, name',
+    'list Summit - Invited, row 1', 'list Summit - Invited, row 2', 'list Summit - Attended, row 3'
+  ]) {
+    assert.ok(checked.includes(expected), `expected "${expected}" among the checked, got: ${checked.join(' | ')}`)
+  }
   assert.ok(proof.unchecked.some(u => /not named above/.test(u.what)), 'the proof says its own limits, every time')
 })
 

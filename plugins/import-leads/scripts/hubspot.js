@@ -169,7 +169,7 @@ function companySearchRequests (config, companies) {
       `company search: ${company.name}`,
       'POST',
       '/crm/v3/objects/companies/search',
-      { filterGroups: groups, properties: [nameProperty, websiteProperty, 'domain'], limit: 20 }
+      { filterGroups: groups, properties: [nameProperty, websiteProperty, 'domain'].filter(Boolean), limit: 20 }
     )
   })
 }
@@ -305,7 +305,9 @@ function pushRequests (config, plan) {
 
   for (const company of plan.companies.creates) {
     const properties = { [config.properties.company.name]: company.name }
-    if (company.website) properties[config.properties.company.website] = company.website
+    if (company.website && config.properties.company.website) {
+      properties[config.properties.company.website] = company.website
+    }
     requests.push(spec(`create company: ${company.name}`, 'POST', '/crm/v3/objects/companies', { properties }))
   }
 
@@ -382,6 +384,12 @@ function judgeResponse (request, response) {
   if (typeof response === 'object' && response.id) {
     return { outcome: 'created', id: String(response.id) }
   }
+  // A list create answers with `listId`, not `id`: the measured surface
+  // ("listId returned", 2026-08-25). Without this arm a successful list
+  // create judged as unknown, which reads as a push that half worked.
+  if (typeof response === 'object' && (response.listId || response.listId === 0)) {
+    return { outcome: 'created', id: String(response.listId) }
+  }
   if (typeof response === 'object' && (response.status === 'error' || response.category || response.message)) {
     const text = String(response.message || '')
     // The duplicate-contact reading is scoped to the request it was measured
@@ -424,7 +432,7 @@ function readbackRequests (config, plan, pushedIds) {
   }
   for (const [name, id] of Object.entries(pushedIds.companies || {})) {
     requests.push(spec(`read back company: ${name}`, 'GET',
-      `/crm/v3/objects/companies/${id}?properties=${[config.properties.company.name, config.properties.company.website].join(',')}`))
+      `/crm/v3/objects/companies/${id}?properties=${[config.properties.company.name, config.properties.company.website].filter(Boolean).join(',')}`))
   }
   for (const [name, id] of Object.entries(pushedIds.lists || {})) {
     requests.push(spec(`read back memberships: ${name}`, 'GET', `/crm/v3/lists/${id}/memberships`))
@@ -502,7 +510,9 @@ function prove (config, plan, pushedIds, readbacks) {
       continue
     }
     const intended = { properties: { [config.properties.company.name]: company.name } }
-    if (company.website) intended.properties[config.properties.company.website] = company.website
+    if (company.website && config.properties.company.website) {
+      intended.properties[config.properties.company.website] = company.website
+    }
     compareContact(`company ${company.name}`, intended, response)
   }
 

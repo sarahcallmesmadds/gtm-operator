@@ -192,6 +192,19 @@ check('an impossible date is not date evidence: shape alone reported 2026-13-40 
   assert.ok(plan.eventSignals(real).dateColumns.find(c => c.column === 'Notes'), 'real dates still signal')
 })
 
+check('a slash date has to be a real day-and-month in one of its two orders', () => {
+  const impossible = [
+    row(1, {}, { source: { When: '31/02/2026' } }),
+    row(2, {}, { source: { When: '45/45/2026' } })
+  ]
+  assert.deepStrictEqual(plan.eventSignals(impossible).dateColumns, [], 'February 31 is not a date in either order')
+  const american = [
+    row(1, {}, { source: { When: '12/31/2026' } }),
+    row(2, {}, { source: { When: '01/05/2026' } })
+  ]
+  assert.ok(plan.eventSignals(american).dateColumns.find(c => c.column === 'When'), 'month-first readings still signal')
+})
+
 // ------------------------------------------------------------- the assembly
 
 const goodInput = () => ({
@@ -344,6 +357,22 @@ check('an unresolved in-list duplicate blocks the plan until excluded or deliber
 
   input.resolutions = { decided: [1, 2] }
   assert.strictEqual(plan.assemble(input).ok, true, 'marking them decided is the person keeping both, deliberately')
+})
+
+check('excluding one of a three-way duplicate and deciding the kept two is a valid resolution', () => {
+  // The guard used to demand the EXCLUDED row in decided as well, so the
+  // exclusion itself made the resolution impossible.
+  const input = goodInput()
+  input.rows.push(row(3, { firstName: 'Ada', lastName: 'Byron', email: 'ada@x.com', company: 'Acme' }))
+  input.dedupe.verdicts.push({ index: 3, verdict: 'create' })
+  input.dedupe.inListDuplicates = [{ email: 'ada@x.com', rows: [1, 2, 3] }]
+  input.assignments.push({ index: 3, campaign: 'Autumn Summit', status: 'Invited' })
+  input.resolutions = { excluded: [{ index: 3, why: 'same person as row 1, thinner row' }], decided: [1, 2] }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+
+  input.resolutions = { excluded: [{ index: 3, why: 'same person as row 1' }], decided: [1] }
+  assert.ok(plan.assemble(input).problems.some(p => /share the email/.test(p)), 'a kept row nobody decided still blocks')
 })
 
 check('an undecided conflict and an undecided no-email row block the plan', () => {

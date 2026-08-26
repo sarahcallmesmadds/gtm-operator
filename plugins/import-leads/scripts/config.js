@@ -52,8 +52,11 @@ const CONTACT_PROPERTIES = {
 }
 
 const COMPANY_PROPERTIES = {
-  required: ['name', 'website'],
-  optional: []
+  // The write contract makes the website conditional ("when the list
+  // carries a domain"), so the mapping is optional too: an org without a
+  // website property still imports, its companies created bare.
+  required: ['name'],
+  optional: ['website']
 }
 
 /**
