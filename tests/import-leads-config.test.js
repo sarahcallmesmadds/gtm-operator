@@ -127,5 +127,71 @@ check('~ expands and a bare path passes through', () => {
   assert.strictEqual(config.resolvePath(undefined), null)
 })
 
+check('an absent crm reads as hubspot, because every config written before the field existed was written for HubSpot', () => {
+  assert.strictEqual(config.crmOf({}), 'hubspot')
+  assert.strictEqual(config.crmOf({ crm: 'salesforce' }), 'salesforce')
+  const hubspotDraft = config.draft(answers())
+  assert.ok(!('crm' in hubspotDraft), 'a hubspot draft leaves crm out, so the file existing installs already have stays the file a first run writes')
+  assert.deepStrictEqual(config.problems(hubspotDraft), [])
+})
+
+check('an unknown crm is refused by name, and nothing else about the file is guessed at', () => {
+  const draft = config.draft(answers())
+  draft.crm = 'pipedrive'
+  const wrong = config.problems(draft)
+  assert.ok(wrong.some(p => /pipedrive/.test(p) && /hubspot, salesforce/.test(p)))
+})
+
+/** A complete set of salesforce first-run answers, cloned per case. */
+const salesforceAnswers = () => ({
+  crm: 'salesforce',
+  orgAlias: 'acceptance-org',
+  aliasMapPath: '~/gtm/company-aliases.json'
+})
+
+check('a salesforce draft records the crm, the alias and the standard field names, and validates clean', () => {
+  const draft = config.draft(salesforceAnswers())
+  assert.strictEqual(draft.crm, 'salesforce')
+  assert.strictEqual(draft.orgAlias, 'acceptance-org')
+  assert.strictEqual(draft.properties.contact.firstName, 'FirstName')
+  assert.strictEqual(draft.properties.contact.city, 'MailingCity')
+  assert.strictEqual(draft.properties.company.name, 'Name')
+  assert.ok(!('portalId' in draft) && !('serviceKeyPath' in draft), 'nothing key-shaped or portal-shaped exists on this backend')
+  assert.deepStrictEqual(config.problems(draft), [])
+})
+
+check('a salesforce config refuses HubSpot identifiers, and a hubspot one refuses the org alias', () => {
+  const crossed = config.draft(salesforceAnswers())
+  crossed.serviceKeyPath = '~/keys/hubspot.txt'
+  assert.ok(config.problems(crossed).some(p => /serviceKeyPath is HubSpot's/.test(p)))
+  const portal = config.draft(salesforceAnswers())
+  portal.portalId = '111'
+  assert.ok(config.problems(portal).some(p => /portalId is HubSpot's identifier/.test(p)))
+  const aliased = config.draft(answers())
+  aliased.orgAlias = 'acceptance-org'
+  assert.ok(config.problems(aliased).some(p => /orgAlias is Salesforce's identifier/.test(p)))
+})
+
+check('a missing org alias is refused with the keychain named as where the credential actually lives', () => {
+  const missing = salesforceAnswers()
+  delete missing.orgAlias
+  assert.throws(() => config.draft(missing), /orgAlias is missing/)
+})
+
+check('recordTypeIds validate as contact and account ids or are refused by name', () => {
+  const typed = salesforceAnswers()
+  typed.recordTypeIds = { contact: '012RT' }
+  const draft = config.draft(typed)
+  assert.deepStrictEqual(draft.recordTypeIds, { contact: '012RT' })
+  assert.deepStrictEqual(config.problems(draft), [])
+
+  const wrongKind = config.draft(salesforceAnswers())
+  wrongKind.recordTypeIds = { lead: '012RT' }
+  assert.ok(config.problems(wrongKind).some(p => /recordTypeIds\.lead/.test(p) && /contact, account/.test(p)))
+  const emptyId = config.draft(salesforceAnswers())
+  emptyId.recordTypeIds = { contact: ' ' }
+  assert.ok(config.problems(emptyId).some(p => /recordTypeIds\.contact/.test(p)))
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

@@ -12,6 +12,7 @@
 
 const ingest = require('./ingest')
 const rules = require('./rules')
+const configModule = require('./config')
 
 // --------------------------------------------------------------------- gates
 
@@ -353,7 +354,11 @@ function dedupeVerdicts (rows, existing) {
  * nothing dedupe surfaced can fall between the steps unseen.
  */
 function assemble (input) {
-  for (const [key, why] of [
+  if (input.config === undefined || input.config === null) {
+    throw new Error('The plan cannot be assembled without config: the plugin config. Run that step first.')
+  }
+  const crm = configModule.crmOf(input.config)
+  const required = [
     ['rows', 'the ingested rows after aliases and gates'],
     ['events', 'the multi-event check output; it is mandatory before campaign setup'],
     ['dedupe', 'the dedupe verdicts'],
@@ -361,10 +366,22 @@ function assemble (input) {
     ['requiredFields', 'the required-fields rule'],
     ['campaigns', 'the campaigns the person decided after the multi-event check'],
     ['assignments', 'the per-row campaign and status assignments'],
-    ['companyDecisions', 'the person\'s match-or-create decision per company'],
-    ['listDecisions', 'the judged list lookups: which of the grid\'s lists already exist and which will be created'],
-    ['config', 'the plugin config']
-  ]) {
+    ['companyDecisions', 'the person\'s match-or-create decision per company']
+  ]
+  // The grid realises differently per backend, so what has to have been
+  // asked of the store differs too: lists on HubSpot, campaigns and their
+  // member-status rows on Salesforce, where the flag read rides along
+  // because campaign creation is refused while it is off.
+  if (crm === 'salesforce') {
+    required.push(
+      ['campaignDecisions', 'the judged campaign lookups: which campaigns already exist and which will be created'],
+      ['campaignStatuses', 'the judged status reads for the campaigns that exist, keyed by campaign name'],
+      ['marketingUser', 'the judged Marketing User flag read ({userId, on})']
+    )
+  } else {
+    required.push(['listDecisions', 'the judged list lookups: which of the grid\'s lists already exist and which will be created'])
+  }
+  for (const [key, why] of required) {
     if (input[key] === undefined || input[key] === null) {
       throw new Error(`The plan cannot be assembled without ${key}: ${why}. Run that step first.`)
     }
@@ -539,11 +556,19 @@ function assemble (input) {
 
     const rowAssignments = assignmentsByIndex.get(row.index) || []
     if (!rowAssignments.length) {
-      problems.push(`Row ${row.index} has no campaign and status assignment. Every row in the plan lands on the lists the grid names.`)
+      problems.push(`Row ${row.index} has no campaign and status assignment. Every row in the plan lands on the memberships the grid names.`)
     }
     for (const assignment of rowAssignments) {
       const campaign = input.campaigns.find(c => c.name === assignment.campaign)
       if (!campaign) continue // already reported by assignmentProblems
+      if (crm === 'salesforce') {
+        // The campaign and status pair is the membership's native identity
+        // on this backend, so there is no realised name to collide.
+        const key = `${assignment.campaign}␟${assignment.status}`
+        if (!memberships.has(key)) memberships.set(key, [])
+        memberships.get(key).push(row.index)
+        continue
+      }
       const name = wrongGrid.length ? null : rules.listName(grid, assignment.campaign, assignment.status)
       if (name === null) continue
       // TWO PAIRS REALISING ONE NAME IS A COLLISION, NOT A MERGE. The grid's
@@ -671,21 +696,93 @@ function assemble (input) {
     companies.matched.push({ name, companyId: String(decision.companyId), rows: [], fill: decision.fill })
   }
 
-  // The status lists: matched, or planned for creation, which needs the
-  // portal to have been asked. A list judged as existing gets its id; one
-  // judged absent is created; a name with no judged lookup blocks, because
-  // creating without looking is how a second copy of an existing list
-  // appears beside the first.
+  // The memberships' store side: matched, or planned for creation, which
+  // needs the store to have been asked. On HubSpot that is the status
+  // lists; on Salesforce it is the campaigns, their existing member-status
+  // rows, and the Marketing User flag, because campaign creation is
+  // refused while the flag is off (measured 2026-08-25). Either way, a
+  // name with no judged lookup blocks, because creating without looking is
+  // how a second copy of an existing record appears beside the first.
   const lists = { creates: [], matched: [] }
-  for (const name of [...memberships.keys()].sort()) {
-    const decision = input.listDecisions[name]
-    if (!decision || (decision.outcome !== 'exists' && decision.outcome !== 'absent')) {
-      problems.push(`The list "${name}" has no judged lookup (outcome exists or absent). Run list-queries, send the lookups, judge each response, and pass the outcomes by name.`)
-    } else if (decision.outcome === 'exists') {
-      if (!decision.listId) problems.push(`The list "${name}" is judged as existing with no listId. A match names the record it matched.`)
-      else lists.matched.push({ name, listId: String(decision.listId) })
-    } else {
-      lists.creates.push(name)
+  const campaignMemberships = { campaigns: { creates: [], matched: [] }, statuses: { creates: [] }, members: [], userFlagFix: null }
+  if (crm === 'salesforce') {
+    const statusesUsed = new Map()
+    for (const key of memberships.keys()) {
+      const [campaignName, status] = key.split('␟')
+      if (!statusesUsed.has(campaignName)) statusesUsed.set(campaignName, [])
+      if (!statusesUsed.get(campaignName).includes(status)) statusesUsed.get(campaignName).push(status)
+    }
+    for (const campaignName of [...statusesUsed.keys()].sort()) {
+      const decision = input.campaignDecisions[campaignName]
+      const campaign = input.campaigns.find(c => c.name === campaignName)
+      if (!decision || (decision.outcome !== 'exists' && decision.outcome !== 'absent')) {
+        problems.push(`The campaign "${campaignName}" has no judged lookup (outcome exists or absent). Run campaign-queries, send the lookups, judge each response, and pass the outcomes by name.`)
+        continue
+      }
+      if (decision.outcome === 'exists') {
+        if (!decision.campaignId) {
+          problems.push(`The campaign "${campaignName}" is judged as existing with no campaignId. A match names the record it matched.`)
+          continue
+        }
+        campaignMemberships.campaigns.matched.push({ name: campaignName, campaignId: String(decision.campaignId) })
+        const read = input.campaignStatuses[campaignName]
+        if (!read || !Array.isArray(read.labels) || typeof read.maxSortOrder !== 'number') {
+          problems.push(
+            `The campaign "${campaignName}" exists and its member-status rows have not been read ({labels, maxSortOrder}). ` +
+            'Run status-queries and status-judge: planning a status create without looking is how a second copy appears.'
+          )
+          continue
+        }
+        statusesUsed.get(campaignName)
+          .filter(status => !read.labels.includes(status))
+          .forEach((status, at) => {
+            campaignMemberships.statuses.creates.push({ campaign: campaignName, label: status, sortOrder: read.maxSortOrder + at + 1 })
+          })
+      } else {
+        campaignMemberships.campaigns.creates.push({ name: campaignName, type: campaign ? campaign.type : null })
+        // A fresh campaign carries Sent, the default, and Responded
+        // (measured 2026-08-25), so those two are never planned as creates.
+        statusesUsed.get(campaignName)
+          .filter(status => status !== 'Sent' && status !== 'Responded')
+          .forEach((status, at) => {
+            campaignMemberships.statuses.creates.push({ campaign: campaignName, label: status, sortOrder: 2 + at + 1 })
+          })
+      }
+    }
+    campaignMemberships.members = [...memberships.entries()].map(([key, rowIndexes]) => {
+      const [campaignName, status] = key.split('␟')
+      return { campaign: campaignName, status, rows: rowIndexes.sort((a, b) => a - b) }
+    }).sort((a, b) => (a.campaign + a.status).localeCompare(b.campaign + b.status))
+
+    const campaignFamilyWrites = campaignMemberships.campaigns.creates.length ||
+      campaignMemberships.statuses.creates.length || campaignMemberships.members.length
+    if (campaignFamilyWrites) {
+      const flag = input.marketingUser
+      if (!flag || typeof flag.on !== 'boolean' || !flag.userId) {
+        problems.push(
+          'The Marketing User flag has not been read ({userId, on}). Campaign creation is refused while it is off ' +
+          '(measured 2026-08-25), so a plan touching the campaign family is not assembled without the flag read. ' +
+          'Run flag-query and flag-judge.'
+        )
+      } else if (flag.on !== true) {
+        // The measured one-call fix rides the plan as its own named line,
+        // pushed before the campaign family and proved by reading the flag
+        // back. Striking it strikes the campaign half with it, said in the
+        // note rather than discovered mid-push.
+        campaignMemberships.userFlagFix = { userId: String(flag.userId) }
+      }
+    }
+  } else {
+    for (const name of [...memberships.keys()].sort()) {
+      const decision = input.listDecisions[name]
+      if (!decision || (decision.outcome !== 'exists' && decision.outcome !== 'absent')) {
+        problems.push(`The list "${name}" has no judged lookup (outcome exists or absent). Run list-queries, send the lookups, judge each response, and pass the outcomes by name.`)
+      } else if (decision.outcome === 'exists') {
+        if (!decision.listId) problems.push(`The list "${name}" is judged as existing with no listId. A match names the record it matched.`)
+        else lists.matched.push({ name, listId: String(decision.listId) })
+      } else {
+        lists.creates.push(name)
+      }
     }
   }
 
@@ -709,27 +806,33 @@ function assemble (input) {
       }
     : { kind: 'none', note: 'The source is a CSV, and a CSV source is never modified.' }
 
-  return {
-    ok: true,
-    plan: {
-      companies: { creates: companies.creates, matched: companies.matched },
-      contacts,
-      lists: {
-        names: [...memberships.keys()].sort(),
-        creates: lists.creates,
-        matched: lists.matched,
-        memberships: [...memberships.entries()].map(([name, rowIndexes]) => ({ list: name, rows: rowIndexes.sort((a, b) => a - b) }))
-      },
-      leadSource: leadSourceValue ? { property: leadSourceProperty, value: leadSourceValue } : null,
-      writeback,
-      autoCompanyCreation:
-        'This portal may auto-create a company from an email domain and take the primary association (measured 2026-08-25). ' +
-        'The plan names that collision rather than resolving it; what run does about it is deliberately Open.',
-      note:
-        'This plan is the whole of what the push may do. Show it in full, with the exclusions and their reasons, and push ' +
-        'only on an explicit yes. The push executes exactly this plan and nothing else.'
-    }
+  const assembled = {
+    companies: { creates: companies.creates, matched: companies.matched },
+    contacts,
+    leadSource: leadSourceValue ? { property: leadSourceProperty, value: leadSourceValue } : null,
+    writeback,
+    note:
+      'This plan is the whole of what the push may do. Show it in full, with the exclusions and their reasons, and push ' +
+      'only on an explicit yes. The push executes exactly this plan and nothing else.'
   }
+  if (crm === 'salesforce') {
+    assembled.campaignMemberships = campaignMemberships
+    assembled.autoCompanyCreation =
+      'No account auto-creation was observed on Salesforce and none is designed for; whether an org\'s own automation ' +
+      'creates accounts is unmeasured rather than known absent, so surprises in the read-backs are facts to record, not ' +
+      'errors to push past.'
+  } else {
+    assembled.lists = {
+      names: [...memberships.keys()].sort(),
+      creates: lists.creates,
+      matched: lists.matched,
+      memberships: [...memberships.entries()].map(([name, rowIndexes]) => ({ list: name, rows: rowIndexes.sort((a, b) => a - b) }))
+    }
+    assembled.autoCompanyCreation =
+      'This portal may auto-create a company from an email domain and take the primary association (measured 2026-08-25). ' +
+      'The plan names that collision rather than resolving it; what run does about it is deliberately Open.'
+  }
+  return { ok: true, plan: assembled }
 }
 
 module.exports = {

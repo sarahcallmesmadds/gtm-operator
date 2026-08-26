@@ -5,9 +5,15 @@
  *
  * `~/.claude/import-leads.config.json`, this plugin's own file. It is not the
  * foundation's config: `setup` writes that one and this plugin never reads it.
- * This file holds identifiers only. The portal, the property-name map, where
- * the Service Key lives (never the key itself), and the path to the company
- * alias map. Everything that is judgment lives in Process artifacts instead,
+ * This file holds identifiers only. The `crm` names the backend, and an
+ * absent `crm` reads as hubspot, because every config written before the
+ * field existed was written for HubSpot and nothing rewrites this file. On
+ * HubSpot: the portal, the property-name map, where the Service Key lives
+ * (never the key itself). On Salesforce: the org alias the `sf` CLI holds
+ * the credential under (nothing key-shaped exists on that backend), the
+ * field-name map in the org's own API names, and any record-type ids the
+ * org routes creates through. Both name the path to the company alias map.
+ * Everything that is judgment lives in Process artifacts instead,
  * and everything that is neither is asked about at the moment it matters.
  *
  * WHO WRITES IT. This plugin, once, with confirmation, on a first run with no
@@ -34,6 +40,17 @@ const CONFIG_VERSION = 1
 
 const CONFIG_PATH = process.env.IMPORT_LEADS_CONFIG ||
   path.join(os.homedir(), '.claude', 'import-leads.config.json')
+
+/** The backends this plugin can write. One per install, named by `crm`. */
+const CRMS = ['hubspot', 'salesforce']
+
+/**
+ * The backend a config names. Absent means hubspot: every config written
+ * before the field existed was written for HubSpot, nothing rewrites the
+ * file, and refusing them all with a version bump would break working
+ * installs to record a default they already live by.
+ */
+const crmOf = config => (config && config.crm !== undefined ? config.crm : 'hubspot')
 
 /**
  * The contact properties this plugin can fill, and whether the map may leave
@@ -87,6 +104,32 @@ const DEFAULT_PROPERTY_NAMES = {
   }
 }
 
+/**
+ * The Salesforce standard field API names, offered as the draft's starting
+ * point on that backend. The create shape (FirstName, LastName, Email,
+ * Title, AccountId) is measured 2026-08-25; the mailing address names are
+ * the platform's standard fields, proved for a given org by its own live
+ * run, the same standing the HubSpot defaults have. Optional fields (a
+ * LinkedIn URL custom field, a persona custom field, the lead source, the
+ * owner) have no default: an org maps them deliberately or not at all.
+ */
+const DEFAULT_SALESFORCE_FIELD_NAMES = {
+  contact: {
+    firstName: 'FirstName',
+    lastName: 'LastName',
+    email: 'Email',
+    phone: 'Phone',
+    title: 'Title',
+    city: 'MailingCity',
+    state: 'MailingState',
+    country: 'MailingCountry'
+  },
+  company: {
+    name: 'Name',
+    website: 'Website'
+  }
+}
+
 /** `~` expanded, so a path in the file reads the way a person writes one. */
 function resolvePath (p) {
   if (typeof p !== 'string' || !p.trim()) return null
@@ -116,17 +159,51 @@ function problems (config) {
     )
   }
 
-  if (typeof config.portalId !== 'string' || !/^\d+$/.test(config.portalId)) {
-    out.push('portalId has to be the portal id as a string of digits, the number HubSpot shows in the account menu.')
+  const crm = crmOf(config)
+  if (!CRMS.includes(crm)) {
+    out.push(`crm is ${JSON.stringify(config.crm)} and this plugin writes one of: ${CRMS.join(', ')}. An absent crm reads as hubspot.`)
+    return out
   }
 
-  for (const [field, why] of [
-    ['serviceKeyPath', 'where the Service Key lives. The key itself never enters this file.'],
-    ['aliasMapPath', 'the user-owned company alias map file.']
-  ]) {
-    if (!resolvePath(config[field])) {
-      out.push(`${field} is missing or empty. It names ${why}`)
+  if (crm === 'hubspot') {
+    if (typeof config.portalId !== 'string' || !/^\d+$/.test(config.portalId)) {
+      out.push('portalId has to be the portal id as a string of digits, the number HubSpot shows in the account menu.')
     }
+    if (!resolvePath(config.serviceKeyPath)) {
+      out.push('serviceKeyPath is missing or empty. It names where the Service Key lives. The key itself never enters this file.')
+    }
+    // A cross-backend identifier on a config is the tell of a mis-set crm,
+    // and refusing it here catches that before a run reads the wrong half.
+    if (config.orgAlias !== undefined) {
+      out.push('orgAlias is Salesforce\'s identifier and this config says hubspot. One backend per install: fix crm, or take the alias out.')
+    }
+  } else {
+    if (typeof config.orgAlias !== 'string' || !config.orgAlias.trim()) {
+      out.push('orgAlias is missing or empty. It names the org alias the `sf` CLI holds the credential under; the credential itself lives in the CLI keychain and never enters this file.')
+    }
+    if (config.portalId !== undefined) {
+      out.push('portalId is HubSpot\'s identifier and this config says salesforce. One backend per install: fix crm, or take the portal out.')
+    }
+    if (config.serviceKeyPath !== undefined) {
+      out.push('serviceKeyPath is HubSpot\'s. A Salesforce config carries nothing key-shaped, because the CLI keychain holds the credential.')
+    }
+    if (config.recordTypeIds !== undefined) {
+      if (!config.recordTypeIds || typeof config.recordTypeIds !== 'object' || Array.isArray(config.recordTypeIds)) {
+        out.push('recordTypeIds has to be an object mapping contact and account to record-type ids, or be left out.')
+      } else {
+        for (const [kind, id] of Object.entries(config.recordTypeIds)) {
+          if (kind !== 'contact' && kind !== 'account') {
+            out.push(`recordTypeIds.${kind} is not a record this plugin creates. Known: contact, account.`)
+          } else if (typeof id !== 'string' || !id.trim()) {
+            out.push(`recordTypeIds.${kind} has to be the record-type id as a non-empty string, or the key left out.`)
+          }
+        }
+      }
+    }
+  }
+
+  if (!resolvePath(config.aliasMapPath)) {
+    out.push('aliasMapPath is missing or empty. It names the user-owned company alias map file.')
   }
 
   for (const [kind, spec] of [['contact', CONTACT_PROPERTIES], ['company', COMPANY_PROPERTIES]]) {
@@ -185,9 +262,10 @@ function read () {
       missing: true,
       path: CONFIG_PATH,
       message:
-        `There is no config at ${CONFIG_PATH}. This is a first run: gather the portal id, the property names, ` +
-        'where the Service Key lives and the alias-map path, show what will be recorded, and write the file on an explicit yes. ' +
-        'Search for what can be found rather than asking anyone to type what could be looked up.'
+        `There is no config at ${CONFIG_PATH}. This is a first run: gather what the backend needs (the crm; on HubSpot ` +
+        'the portal id, the property names and where the Service Key lives; on Salesforce the org alias, the field names ' +
+        'and any record-type ids; and the alias-map path either way), show what will be recorded, and write the file on ' +
+        'an explicit yes. Search for what can be found rather than asking anyone to type what could be looked up.'
     }
   }
 
@@ -217,6 +295,8 @@ function read () {
     ok: true,
     path: CONFIG_PATH,
     config: parsed,
+    crm: crmOf(parsed),
+    // Null on Salesforce, where nothing key-shaped exists to name.
     serviceKeyPath: resolvePath(parsed.serviceKeyPath),
     aliasMapPath: resolvePath(parsed.aliasMapPath)
   }
@@ -231,11 +311,19 @@ function read () {
  */
 function draft (answers) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
-    throw new Error('draft needs an object of answers: portalId, serviceKeyPath, aliasMapPath, and any property-name corrections.')
+    throw new Error(
+      'draft needs an object of answers: the crm (absent means hubspot), then per backend its identifiers ' +
+      '(portalId and serviceKeyPath, or orgAlias and any recordTypeIds), aliasMapPath, and any name corrections.'
+    )
   }
+  const crm = answers.crm === undefined ? 'hubspot' : answers.crm
+  if (!CRMS.includes(crm)) {
+    throw new Error(`These answers do not make a working config:\n  crm is ${JSON.stringify(crm)} and this plugin writes one of: ${CRMS.join(', ')}.`)
+  }
+  const defaults = crm === 'salesforce' ? DEFAULT_SALESFORCE_FIELD_NAMES : DEFAULT_PROPERTY_NAMES
   const properties = {
-    contact: Object.assign({}, DEFAULT_PROPERTY_NAMES.contact, (answers.properties && answers.properties.contact) || {}),
-    company: Object.assign({}, DEFAULT_PROPERTY_NAMES.company, (answers.properties && answers.properties.company) || {})
+    contact: Object.assign({}, defaults.contact, (answers.properties && answers.properties.contact) || {}),
+    company: Object.assign({}, defaults.company, (answers.properties && answers.properties.company) || {})
   }
   // Optional properties enter the draft only when the org named them. A null
   // or empty answer means "we do not have that property", and the honest
@@ -248,10 +336,20 @@ function draft (answers) {
 
   const candidate = {
     configVersion: CONFIG_VERSION,
-    portalId: answers.portalId === undefined ? undefined : String(answers.portalId),
-    serviceKeyPath: answers.serviceKeyPath,
     aliasMapPath: answers.aliasMapPath,
     properties
+  }
+  if (crm === 'salesforce') {
+    // The crm is recorded explicitly on this backend. A hubspot draft
+    // leaves it out, so the file every existing install already has stays
+    // the file a first run writes.
+    candidate.crm = 'salesforce'
+    candidate.orgAlias = answers.orgAlias
+    if (answers.recordTypeIds !== undefined) candidate.recordTypeIds = answers.recordTypeIds
+  } else {
+    if (answers.crm !== undefined) candidate.crm = 'hubspot'
+    candidate.portalId = answers.portalId === undefined ? undefined : String(answers.portalId)
+    candidate.serviceKeyPath = answers.serviceKeyPath
   }
 
   const wrong = problems(candidate)
@@ -294,9 +392,12 @@ function write (candidate) {
 module.exports = {
   CONFIG_VERSION,
   CONFIG_PATH,
+  CRMS,
+  crmOf,
   CONTACT_PROPERTIES,
   COMPANY_PROPERTIES,
   DEFAULT_PROPERTY_NAMES,
+  DEFAULT_SALESFORCE_FIELD_NAMES,
   resolvePath,
   problems,
   read,

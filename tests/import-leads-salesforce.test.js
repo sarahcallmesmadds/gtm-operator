@@ -1,0 +1,515 @@
+'use strict'
+
+/**
+ * Tests for the Salesforce half: request building and response judging.
+ *
+ * WHAT A GREEN RUN HERE MEANS, said plainly: these suites prove the
+ * requests are built from the plan and the config as intended, and that
+ * the judges read the measured response shapes as measured (2026-08-25 and
+ * 2026-08-26). They cannot prove the org accepts any of it. The live
+ * acceptance run against a Developer Edition org is the release gate, and
+ * until it is recorded in DECISIONS.md nothing about the live surface is
+ * proved by this file.
+ *
+ * Run: node tests/import-leads-salesforce.test.js
+ */
+
+const assert = require('assert')
+
+const salesforce = require('../plugins/import-leads/scripts/salesforce')
+
+let failures = 0
+const check = (name, fn) => {
+  try {
+    fn()
+    console.log(`  ok    ${name}`)
+  } catch (err) {
+    failures++
+    console.log(`  FAIL  ${name}`)
+    console.log(`        ${err.message.split('\n').join('\n        ')}`)
+  }
+}
+
+console.log('\nimport-leads salesforce requests and judges\n')
+
+const config = () => ({
+  crm: 'salesforce',
+  orgAlias: 'acceptance-org',
+  properties: {
+    contact: {
+      firstName: 'FirstName',
+      lastName: 'LastName',
+      email: 'Email',
+      phone: 'Phone',
+      title: 'Title',
+      city: 'MailingCity',
+      state: 'MailingState',
+      country: 'MailingCountry',
+      persona: 'Persona__c',
+      leadSource: 'LeadSource'
+    },
+    company: { name: 'Name', website: 'Website' }
+  }
+})
+
+const row = (index, fields, extra) => Object.assign({
+  index,
+  source: {},
+  fields,
+  fieldSources: Object.fromEntries(Object.keys(fields).map(k => [k, 'list']))
+}, extra)
+
+const queryEnvelope = (records, done) => ({ status: 0, result: { records, totalSize: records.length, done: done === undefined ? true : done } })
+
+// -------------------------------------------------------------------- SOQL
+
+check('a SOQL literal escapes the apostrophe (measured) and the escape character itself', () => {
+  assert.strictEqual(salesforce.soqlLiteral("O'Brien"), "'O\\'Brien'")
+  assert.strictEqual(salesforce.soqlLiteral('a\\b'), "'a\\\\b'")
+})
+
+// ------------------------------------------------------------------- search
+
+check('searches batch emails 100 per request with IN, asking for every mapped field plus the account', () => {
+  const emails = Array.from({ length: 250 }, (_, i) => `p${i}@x.com`)
+  const requests = salesforce.searchRequests(config(), emails)
+  assert.strictEqual(requests.length, 3)
+  assert.strictEqual(requests[0].transport, 'query')
+  assert.strictEqual(requests[0].targetOrg, 'acceptance-org')
+  assert.ok(requests[0].soql.includes('Email IN ('))
+  assert.ok(requests[0].soql.includes('Title'), 'every mapped field is asked for, or blanks cannot be seen')
+  assert.ok(requests[0].soql.includes('Account.Name'), 'the account name rides along for the conflict check')
+  assert.ok(requests[0].soql.includes('AccountId'))
+  assert.strictEqual((requests[2].soql.match(/@x\.com/g) || []).length, 50)
+})
+
+check('emails fold and dedupe before searching, and an apostrophe cannot break the query', () => {
+  const requests = salesforce.searchRequests(config(), [" O'hara@X.com ", "o'hara@x.com"])
+  assert.strictEqual((requests[0].soql.match(/hara@x\.com/g) || []).length, 1)
+  assert.ok(requests[0].soql.includes("\\'"), 'the apostrophe travels escaped')
+})
+
+check('search results normalise to contacts by lowercased email, the account name under company', () => {
+  const record = {
+    attributes: { type: 'Contact' },
+    Id: '003X',
+    FirstName: 'Grace',
+    Email: 'Grace@X.com',
+    Title: 'Admiral',
+    AccountId: '001N',
+    Account: { attributes: { type: 'Account' }, Name: 'Navy' }
+  }
+  const result = salesforce.searchResults(config(), [queryEnvelope([record])])
+  assert.strictEqual(result.found, 1)
+  const match = result.byEmail['grace@x.com']
+  assert.strictEqual(match.id, '003X')
+  assert.strictEqual(match.properties.title, 'Admiral')
+  assert.strictEqual(match.properties.company, 'Navy', 'the nested dotted shape, measured 2026-08-26, reads as the conflict signal')
+  assert.strictEqual(match.properties.accountId, '001N')
+})
+
+check('a contact with no account reads without a company signal rather than crashing on the null', () => {
+  const record = { Id: '003X', Email: 'solo@x.com', Account: null, AccountId: null }
+  const result = salesforce.searchResults(config(), [queryEnvelope([record])])
+  assert.strictEqual(result.byEmail['solo@x.com'].properties.company, undefined)
+})
+
+check('an unrecognised envelope is refused: a guess would read as a CRM with nobody in it', () => {
+  assert.throws(() => salesforce.searchResults(config(), [{ records: [] }]), /measured query envelope/)
+})
+
+check('done not true is reported incomplete, because a withheld contact is an unseen duplicate', () => {
+  const result = salesforce.searchResults(config(), [queryEnvelope([], false)])
+  assert.strictEqual(result.incomplete.length, 1)
+})
+
+check('the domain lookup is its own request against Website, never OR-ed into the name search', () => {
+  const requests = salesforce.companySearchRequests(config(), [
+    { name: "O'Brien Co", domain: 'obrien.example' },
+    { name: 'Bare Co', domain: null }
+  ])
+  assert.strictEqual(requests.length, 3)
+  const byName = requests.find(r => r.label === "company search: O'Brien Co")
+  assert.ok(byName.soql.includes("LIKE '%O\\'Brien Co%'"))
+  const byDomain = requests.find(r => r.label === "company search by domain: O'Brien Co")
+  assert.ok(byDomain.soql.includes("Website LIKE '%obrien.example%'"), 'the bare-domain LIKE finds the prefixed form, measured 2026-08-26')
+  assert.ok(!requests.find(r => r.label === 'company search by domain: Bare Co'), 'no domain, no domain request')
+})
+
+// -------------------------------------------------------------------- bodies
+
+check('a create body carries mapped fields, the persona only with its source, and the lead source', () => {
+  const withPersona = row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@x.com', company: 'Acme' },
+    { persona: 'Marketing Leader', personaSource: 'personas-artifact' })
+  const body = salesforce.contactCreateBody(config(), withPersona, { property: 'LeadSource', value: 'Content' })
+  assert.deepStrictEqual(body, {
+    FirstName: 'Ada',
+    LastName: 'Lovelace',
+    Email: 'ada@x.com',
+    Persona__c: 'Marketing Leader',
+    LeadSource: 'Content'
+  })
+  assert.ok(!('AccountId' in body), 'the association is added by the push, which alone knows the id or token')
+})
+
+check('a sourceless field never enters a create body, even when the caller skipped the gate', () => {
+  const smuggled = row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' })
+  smuggled.fields.title = 'Invented'
+  delete smuggled.fieldSources.title
+  const body = salesforce.contactCreateBody(config(), smuggled, null)
+  assert.ok(!('Title' in body), 'a value with no source is refused at the payload as well as at the gate')
+})
+
+check('a configured contact record-type id rides every create, and an unconfigured one never appears', () => {
+  const typed = config()
+  typed.recordTypeIds = { contact: '012RT' }
+  const body = salesforce.contactCreateBody(typed, row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' }), null)
+  assert.strictEqual(body.RecordTypeId, '012RT')
+  const plain = salesforce.contactCreateBody(config(), row(1, { firstName: 'Ada', lastName: 'L', email: 'a@x.com' }), null)
+  assert.ok(!('RecordTypeId' in plain))
+})
+
+check('an update body is the fill and nothing else, and refuses the lead source and unknown fields', () => {
+  const body = salesforce.contactUpdateBody(config(), { title: 'Admiral', leadSource: 'Imported', email: 'new@x.com', invented: 'x' })
+  assert.deepStrictEqual(body, { Title: 'Admiral' }, 'the lead source is create-only, and email and unknown fields never ride an update')
+})
+
+// ------------------------------------------- campaigns, statuses, the flag
+
+check('campaign lookups are one exact-name query per campaign, escaped', () => {
+  const requests = salesforce.campaignLookupRequests(config(), [{ name: "Autumn O'Summit", type: 'Event' }])
+  assert.strictEqual(requests.length, 1)
+  assert.ok(requests[0].soql.includes("WHERE Name = 'Autumn O\\'Summit'"))
+})
+
+check('a campaign lookup judges one row as a match, an empty set as absent, and two rows as a question', () => {
+  assert.deepStrictEqual(
+    salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701A', Name: 'Summit' }])),
+    { outcome: 'exists', campaignId: '701A' }
+  )
+  assert.deepStrictEqual(salesforce.judgeCampaignLookup(queryEnvelope([])), { outcome: 'absent' }, 'the measured absent answer is an empty result set, not an error')
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Id: 'A' }, { Id: 'B' }])).outcome, 'unknown', 'two campaigns with one name is a judgment, not a coin flip')
+  assert.strictEqual(salesforce.judgeCampaignLookup({ odd: true }).outcome, 'unknown', 'an unrecognised answer read as absent would create a duplicate campaign')
+})
+
+check('status reads go only to campaigns judged as existing, and judge to labels with the highest sort order', () => {
+  const requests = salesforce.statusReadRequests(config(), {
+    Summit: { outcome: 'exists', campaignId: '701A' },
+    Roadshow: { outcome: 'absent' }
+  })
+  assert.strictEqual(requests.length, 1)
+  assert.ok(requests[0].soql.includes("CampaignId = '701A'"))
+  const judged = salesforce.judgeStatusRead(queryEnvelope([
+    { Id: 'S1', Label: 'Sent', SortOrder: 1, IsDefault: true, HasResponded: false },
+    { Id: 'S2', Label: 'Responded', SortOrder: 2, IsDefault: false, HasResponded: true }
+  ]))
+  assert.deepStrictEqual(judged, { ok: true, labels: ['Sent', 'Responded'], maxSortOrder: 2 })
+  assert.strictEqual(salesforce.judgeStatusRead({ odd: true }).ok, false)
+})
+
+check('the flag flow: whoami without an id, the flag read with one, and one judge reading both measured shapes', () => {
+  const whoami = salesforce.flagRequest(config(), null)
+  assert.strictEqual(whoami.transport, 'cli')
+  assert.deepStrictEqual(whoami.args, ['org', 'display', 'user'])
+  const flagRead = salesforce.flagRequest(config(), '005U')
+  assert.ok(flagRead.soql.includes('UserPermissionsMarketingUser'))
+  assert.ok(flagRead.soql.includes("'005U'"))
+
+  const step1 = salesforce.judgeFlag({ status: 0, result: { id: '005U', username: 'x' } })
+  assert.deepStrictEqual({ ok: step1.ok, userId: step1.userId }, { ok: true, userId: '005U' })
+  assert.ok(step1.next, 'the whoami answer says to run the flag read next')
+  const on = salesforce.judgeFlag(queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: true }]))
+  assert.deepStrictEqual(on, { ok: true, userId: '005U', on: true })
+  const off = salesforce.judgeFlag(queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: false }]))
+  assert.strictEqual(off.on, false)
+  assert.strictEqual(salesforce.judgeFlag({ odd: true }).ok, false)
+})
+
+// -------------------------------------------------------------------- push
+
+const smallPlan = () => ({
+  companies: {
+    creates: [{ name: 'Acme', website: 'acme.example', rows: [1] }],
+    matched: [{ name: 'Navy', companyId: '001N', rows: [2] }]
+  },
+  contacts: {
+    creates: [
+      { index: 1, row: row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@x.com', company: 'Acme' }) },
+      { index: 2, row: row(2, { firstName: 'Grace', lastName: 'Hopper', email: 'grace@x.com', company: 'Navy' }) }
+    ],
+    updates: [{ index: 3, contactId: '003U', fill: { title: 'Countess' } }],
+    nothing: [],
+    excluded: []
+  },
+  campaignMemberships: {
+    campaigns: {
+      creates: [{ name: 'Autumn Summit', type: 'Event' }],
+      matched: [{ name: 'Spring Roadshow', campaignId: '701M' }]
+    },
+    statuses: {
+      creates: [{ campaign: 'Autumn Summit', label: 'Invited', sortOrder: 3 }]
+    },
+    members: [
+      { campaign: 'Autumn Summit', status: 'Invited', rows: [1, 2] },
+      { campaign: 'Spring Roadshow', status: 'Attended', rows: [3] }
+    ],
+    userFlagFix: null
+  },
+  leadSource: null,
+  writeback: { kind: 'none' }
+})
+
+check('the push emits accounts, contacts, campaigns, statuses and members in dependency order, all REST', () => {
+  const { requests } = salesforce.pushRequests(config(), smallPlan())
+  const labels = requests.map(r => r.label)
+  assert.ok(labels.indexOf('create account: Acme') < labels.indexOf('create contact: row 1'))
+  assert.ok(labels.indexOf('create contact: row 1') < labels.indexOf('create campaign: Autumn Summit'))
+  assert.ok(labels.indexOf('create campaign: Autumn Summit') < labels.indexOf('create member status: Autumn Summit / Invited'))
+  assert.ok(labels.indexOf('create member status: Autumn Summit / Invited') < labels.indexOf('add member: row 1 to Autumn Summit / Invited'))
+  assert.ok(requests.every(r => r.transport === 'rest'), 'every push write is a REST spec: the values route cannot carry an apostrophe, measured 2026-08-26')
+})
+
+check('the association is the AccountId field on the contact create, token for a create and id for a match', () => {
+  const { requests, placeholders } = salesforce.pushRequests(config(), smallPlan())
+  const toAcme = requests.find(r => r.label === 'create contact: row 1')
+  assert.strictEqual(toAcme.body.AccountId, '{account:1}')
+  const toNavy = requests.find(r => r.label === 'create contact: row 2')
+  assert.strictEqual(toNavy.body.AccountId, '001N', 'a matched account already has its id')
+  assert.deepStrictEqual(placeholders['{account:1}'], { kind: 'account', key: 'Acme' })
+  assert.deepStrictEqual(placeholders['{contact:1}'], { kind: 'contact', key: '1' })
+})
+
+check('members reference creates by token and existing contacts by their known id, with the campaign resolved the same way', () => {
+  const { requests } = salesforce.pushRequests(config(), smallPlan())
+  const invited = requests.filter(r => r.label.startsWith('add member: row') && r.label.includes('Autumn Summit'))
+  assert.deepStrictEqual(invited.map(r => r.body.ContactId), ['{contact:1}', '{contact:2}'])
+  assert.ok(invited.every(r => r.body.CampaignId === '{campaign:1}'))
+  assert.ok(invited.every(r => r.body.Status === 'Invited'))
+  const attended = requests.find(r => r.label === 'add member: row 3 to Spring Roadshow / Attended')
+  assert.deepStrictEqual({ c: attended.body.CampaignId, p: attended.body.ContactId }, { c: '701M', p: '003U' }, 'matched campaign and update row are addressed by their ids')
+})
+
+check('the flag fix, when the plan carries it, is one User PATCH before anything in the campaign family', () => {
+  const plan = smallPlan()
+  plan.campaignMemberships.userFlagFix = { userId: '005U' }
+  const { requests } = salesforce.pushRequests(config(), plan)
+  const labels = requests.map(r => r.label)
+  const fix = requests.find(r => r.label === 'fix marketing-user flag')
+  assert.ok(fix, 'the fix is in the push')
+  assert.strictEqual(fix.method, 'PATCH')
+  assert.ok(fix.path.endsWith('/sobjects/User/005U'))
+  assert.deepStrictEqual(fix.body, { UserPermissionsMarketingUser: true })
+  assert.ok(labels.indexOf('fix marketing-user flag') < labels.indexOf('create campaign: Autumn Summit'))
+  const without = salesforce.pushRequests(config(), smallPlan())
+  assert.ok(!without.requests.find(r => r.label === 'fix marketing-user flag'), 'no fix planned, no User write')
+})
+
+check('an adoption fill on a matched account is one PATCH by its id, empty halves dropped', () => {
+  const plan = smallPlan()
+  plan.companies.matched[0].fill = { name: 'Navy Proper', website: '  ' }
+  const { requests } = salesforce.pushRequests(config(), plan)
+  const fill = requests.find(r => r.label === 'fill account: Navy')
+  assert.strictEqual(fill.method, 'PATCH')
+  assert.ok(fill.path.endsWith('/sobjects/Account/001N'))
+  assert.deepStrictEqual(fill.body, { Name: 'Navy Proper' }, 'the empty half is dropped, the real half is sent')
+  plan.companies.matched[0].fill = { name: '', website: ' ' }
+  assert.ok(!salesforce.pushRequests(config(), plan).requests.find(r => r.label === 'fill account: Navy'), 'an all-empty fill emits nothing')
+})
+
+check('a member row with no known id and no planned create is refused as the plan bug it is', () => {
+  const plan = smallPlan()
+  plan.campaignMemberships.members[0].rows.push(99)
+  assert.throws(() => salesforce.pushRequests(config(), plan), /Row 99/)
+})
+
+check('a plan without the salesforce membership shape is refused by name, in push, readbacks and prove', () => {
+  const stale = smallPlan()
+  delete stale.campaignMemberships
+  assert.throws(() => salesforce.pushRequests(config(), stale), /older step or edited by hand/)
+  assert.throws(() => salesforce.readbackRequests(config(), stale, {}), /older step or edited by hand/)
+  assert.throws(() => salesforce.prove(config(), stale, {}, {}), /older step or edited by hand/)
+})
+
+// ------------------------------------------------------------------- judging
+
+check('the bare REST create envelope judges as created, and the wrapped data-command one does too', () => {
+  const request = { label: 'create', method: 'POST', path: '/services/data/v67.0/sobjects/Account' }
+  assert.deepStrictEqual(salesforce.judgeResponse(request, { id: '001A', success: true, errors: [] }), { outcome: 'created', id: '001A' })
+  assert.deepStrictEqual(salesforce.judgeResponse(request, { status: 0, result: { id: '001A', success: true, errors: [] } }), { outcome: 'created', id: '001A' })
+})
+
+check('an empty answer to a PATCH is the measured 204 and points at the read-back; anywhere else it proves nothing', () => {
+  const patch = { label: 'fill', method: 'PATCH', path: '/services/data/v67.0/sobjects/Account/001A' }
+  assert.strictEqual(salesforce.judgeResponse(patch, '').outcome, 'done-unproved')
+  assert.strictEqual(salesforce.judgeResponse(patch, {}).outcome, 'done-unproved')
+  const post = { label: 'create', method: 'POST', path: '/services/data/v67.0/sobjects/Account' }
+  assert.strictEqual(salesforce.judgeResponse(post, '').outcome, 'unknown')
+})
+
+check('the duplicate member is folded into the report, scoped to the member create it was measured on', () => {
+  const member = { label: 'add member', method: 'POST', path: '/services/data/v67.0/sobjects/CampaignMember' }
+  const judged = salesforce.judgeResponse(member, [{ message: 'Already a campaign member.', errorCode: 'DUPLICATE_VALUE' }])
+  assert.strictEqual(judged.outcome, 'duplicate-member')
+  assert.ok(/existing row was not/.test(judged.why))
+  const elsewhere = salesforce.judgeResponse(
+    { label: 'create contact', method: 'POST', path: '/services/data/v67.0/sobjects/Contact' },
+    [{ message: 'Already a campaign member.', errorCode: 'DUPLICATE_VALUE' }]
+  )
+  assert.strictEqual(elsewhere.outcome, 'failed', 'the duplicate reading is scoped to the request it was measured on')
+})
+
+check('both measured error shapes judge as failed with the message carried', () => {
+  const request = { label: 'create', method: 'POST', path: '/services/data/v67.0/sobjects/Contact' }
+  const restError = salesforce.judgeResponse(request, [{ message: 'Required fields are missing: [LastName]', errorCode: 'REQUIRED_FIELD_MISSING' }])
+  assert.strictEqual(restError.outcome, 'failed')
+  assert.ok(/LastName/.test(restError.why))
+  const cliError = salesforce.judgeResponse(request, { name: 'INVALID_FIELD', message: "No such column 'City__c' on sobject of type Contact", exitCode: 1 })
+  assert.strictEqual(cliError.outcome, 'failed')
+  assert.ok(/City__c/.test(cliError.why))
+})
+
+check('an unmeasured shape is unknown, never guessed', () => {
+  assert.strictEqual(salesforce.judgeResponse({ label: 'x', method: 'POST', path: 'y' }, { odd: true }).outcome, 'unknown')
+})
+
+// -------------------------------------------------------------------- prove
+
+const pushedIds = () => ({
+  contacts: { 1: '003A', 2: '003B' },
+  accounts: { Acme: '001A' },
+  campaigns: { 'Autumn Summit': '701A' }
+})
+
+const contactRecord = (id, fields) => queryEnvelope([Object.assign({ Id: id }, fields)])
+
+const cleanReadbacks = () => ({
+  contacts: {
+    1: contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: '001A' }),
+    2: contactRecord('003B', { FirstName: 'Grace', LastName: 'Hopper', Email: 'grace@x.com', AccountId: '001N' }),
+    3: contactRecord('003U', { Title: 'Countess' })
+  },
+  accounts: {
+    Acme: queryEnvelope([{ Id: '001A', Name: 'Acme', Website: 'acme.example' }])
+  },
+  members: {
+    'Autumn Summit': queryEnvelope([
+      { Id: 'M1', ContactId: '003A', Status: 'Invited' },
+      { Id: 'M2', ContactId: '003B', Status: 'Invited' }
+    ]),
+    'Spring Roadshow': queryEnvelope([{ Id: 'M3', ContactId: '003U', Status: 'Attended' }])
+  }
+})
+
+check('a clean set of read-backs proves every planned write by name and still says what it did not check', () => {
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), cleanReadbacks())
+  assert.deepStrictEqual(proof.problems, [], JSON.stringify(proof.problems))
+  const checked = proof.checked.map(c => c.what)
+  for (const expected of [
+    'row 1, firstName', 'row 2, firstName', 'row 1 association', 'row 2 association',
+    'row 3 (update), title', 'account Acme, Name',
+    'campaign Autumn Summit, row 1', 'campaign Autumn Summit, row 2', 'campaign Spring Roadshow, row 3'
+  ]) {
+    assert.ok(checked.includes(expected), `expected "${expected}" among the checked, got: ${checked.join(' | ')}`)
+  }
+  assert.ok(proof.unchecked.some(u => /not named above/.test(u.what)), 'the proof says its own limits, every time')
+})
+
+check('a wrong AccountId on the read-back is an association problem naming both records', () => {
+  const readbacks = cleanReadbacks()
+  readbacks.contacts[1] = contactRecord('003A', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: '001WRONG' })
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /row 1 association/.test(p.what) && /001A/.test(p.why)))
+})
+
+check('a member missing, or on the campaign with the wrong status, is a problem, not a pass', () => {
+  const missing = cleanReadbacks()
+  missing.members['Autumn Summit'] = queryEnvelope([{ Id: 'M1', ContactId: '003A', Status: 'Invited' }])
+  const first = salesforce.prove(config(), smallPlan(), pushedIds(), missing)
+  assert.ok(first.problems.some(p => /campaign Autumn Summit, row 2/.test(p.what) && /not in the member read-back/.test(p.why)))
+
+  const wrongStatus = cleanReadbacks()
+  wrongStatus.members['Autumn Summit'].result.records[0].Status = 'Sent'
+  const second = salesforce.prove(config(), smallPlan(), pushedIds(), wrongStatus)
+  assert.ok(second.problems.some(p => /campaign Autumn Summit, row 1/.test(p.what) && /"Sent"/.test(p.why)))
+})
+
+check('an absent member read-back fails the proof: skipping the fetch cannot pass', () => {
+  const readbacks = cleanReadbacks()
+  delete readbacks.members['Spring Roadshow']
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /unproved fails the proof/.test(p.why)))
+})
+
+check('a planned flag fix is proved by the flag reading true, and fails loudly otherwise', () => {
+  const plan = smallPlan()
+  plan.campaignMemberships.userFlagFix = { userId: '005U' }
+  const readbacks = cleanReadbacks()
+  readbacks.userFlag = queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: true }])
+  const proof = salesforce.prove(config(), plan, pushedIds(), readbacks)
+  assert.deepStrictEqual(proof.problems, [], JSON.stringify(proof.problems))
+  assert.ok(proof.checked.some(c => c.what === 'marketing-user flag'))
+
+  readbacks.userFlag = queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: false }])
+  const stillOff = salesforce.prove(config(), plan, pushedIds(), readbacks)
+  assert.ok(stillOff.problems.some(p => /marketing-user flag/.test(p.what) && /still off/.test(p.why)))
+
+  delete readbacks.userFlag
+  const absent = salesforce.prove(config(), plan, pushedIds(), readbacks)
+  assert.ok(absent.problems.some(p => /marketing-user flag/.test(p.what) && /Unproved fails the proof/.test(p.why)))
+})
+
+check('an adoption fill is read back by the matched id and proved, and a promised fill with no read-back fails', () => {
+  const plan = smallPlan()
+  plan.companies.matched[0].fill = { name: 'Navy Proper' }
+  const requests = salesforce.readbackRequests(config(), plan, pushedIds())
+  const read = requests.find(r => r.label === 'read back account: Navy')
+  assert.ok(read.soql.includes("'001N'"))
+
+  const withFill = cleanReadbacks()
+  withFill.accounts.Navy = queryEnvelope([{ Id: '001N', Name: 'Navy Proper' }])
+  const clean = salesforce.prove(config(), plan, pushedIds(), withFill)
+  assert.deepStrictEqual(clean.problems, [], JSON.stringify(clean.problems))
+  assert.ok(clean.checked.some(c => /account Navy \(fill\)/.test(c.what)))
+
+  const absent = salesforce.prove(config(), plan, pushedIds(), cleanReadbacks())
+  assert.ok(absent.problems.some(p => /account Navy \(fill\)/.test(p.what)))
+})
+
+check('member read-backs come from the plan, so a matched campaign is read as well as a created one', () => {
+  const requests = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
+  const matched = requests.find(r => r.label === 'read back members: Spring Roadshow')
+  assert.ok(matched, 'a run whose campaign already existed still has to prove who landed on it')
+  assert.ok(matched.soql.includes("'701M'"))
+  const created = requests.find(r => r.label === 'read back members: Autumn Summit')
+  assert.ok(created.soql.includes("'701A'"))
+})
+
+check('update read-backs come from the plan ids, and every read-back is a query spec on the org alias', () => {
+  const requests = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
+  const update = requests.find(r => r.label === 'read back contact: row 3')
+  assert.ok(update.soql.includes("'003U'"))
+  assert.ok(requests.every(r => r.transport === 'query' && r.targetOrg === 'acceptance-org'))
+})
+
+// -------------------------------------------------------------------- check
+
+check('the probe is one cheap query and its judge trusts only the measured envelope', () => {
+  const request = salesforce.probeRequest(config())
+  assert.strictEqual(request.transport, 'query')
+  assert.ok(request.soql.includes('LIMIT 1'))
+  assert.strictEqual(salesforce.judgeProbe(queryEnvelope([])).alive, true)
+  assert.strictEqual(salesforce.judgeProbe({ name: 'NamedOrgNotFound', message: 'No authorization found' }).alive, false)
+  assert.strictEqual(salesforce.judgeProbe('ok').alive, false, 'an unrecognised answer is not proof of life')
+})
+
+check('org display judges Connected as ok and anything else as not proved', () => {
+  assert.deepStrictEqual(
+    salesforce.judgeOrgDisplay({ status: 0, result: { connectedStatus: 'Connected', apiVersion: '67.0' } }),
+    { ok: true, apiVersion: '67.0' }
+  )
+  assert.strictEqual(salesforce.judgeOrgDisplay({ status: 0, result: { connectedStatus: 'Unknown' } }).ok, false)
+  assert.strictEqual(salesforce.judgeOrgDisplay({ odd: true }).ok, false)
+})
+
+console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
+process.exit(failures ? 1 : 0)
