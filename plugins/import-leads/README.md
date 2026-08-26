@@ -36,9 +36,11 @@ key-shaped exists on that backend), the field-name map in the org's own API
 names, and any record-type ids. Both name the path to the
 company alias map. The plugin writes that file once, with confirmation, on a
 first run, and nothing else writes it. On a salesforce first run the draft
-asks the org which state and country fields it carries, one read-only
-query, because a picklist org refuses the plain mailing fields' values and
-a plain org lacks the code fields (both branches measured 2026-08-26).
+asks the org which state and country fields it carries, two read-only
+queries with one measured verdict per field, and refuses to assemble
+without the judged pair: a picklist org refuses the plain mailing fields'
+values, and a column an org does not carry is refused by name (both
+branches measured 2026-08-26).
 
 The organisation's rules are Process artifacts, read at run time: the
 required-fields rule, the campaign member-status grid, and optionally

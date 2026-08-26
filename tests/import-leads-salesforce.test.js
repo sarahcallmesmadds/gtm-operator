@@ -767,12 +767,10 @@ check('the probe judge answers per field, bound both arms, so a mixed org gets a
   const refusal = column => ({ name: 'INVALID_FIELD', message: "Invalid field: '" + column + "'", exitCode: 1 })
 
   const codes = salesforce.judgeMailingFieldsProbe(aggregate('stateProbe', 3), aggregate('countryProbe', 4))
-  assert.deepStrictEqual(codes, {
-    ok: true,
-    codeFields: { state: true, country: true },
-    use: { state: 'MailingStateCode', country: 'MailingCountryCode' },
-    why: codes.why
-  })
+  assert.strictEqual(codes.ok, true)
+  assert.deepStrictEqual(codes.codeFields, { state: true, country: true })
+  assert.deepStrictEqual(codes.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
+  assert.ok(/measured/.test(codes.why), 'the why states the measured basis')
   assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate('stateProbe', 0), aggregate('countryProbe', 0)).ok, true, 'an empty org still answers the aggregates')
 
   const plain = salesforce.judgeMailingFieldsProbe(refusal('MailingStateCode'), refusal('MailingCountryCode'))
@@ -813,6 +811,20 @@ check('the lead and contact counts are two named aggregates on the configured or
   assert.strictEqual(requests[1].label, 'count leads')
   assert.strictEqual(requests[1].soql, 'SELECT COUNT(Id) leads FROM Lead')
   assert.ok(requests.every(r => r.targetOrg === 'acceptance-org' && r.transport === 'query'))
+})
+
+check('the older judges refuse a null or non-object row instead of crashing on property access', () => {
+  // Round 4: the named object-question lived only in the two new judges,
+  // and a null row in a saved file crashed the older ones.
+  const campaign = salesforce.judgeCampaignLookup({ status: 0, result: { records: [null], totalSize: 1, done: true } }, 'Summit')
+  assert.strictEqual(campaign.outcome, 'unknown')
+  assert.ok(/not a record/.test(campaign.why))
+  const status = salesforce.judgeStatusRead({ status: 0, result: { records: [null], totalSize: 1, done: true } }, '701A')
+  assert.strictEqual(status.ok, false)
+  assert.ok(/not a record/.test(status.why))
+  const flag = salesforce.judgeFlag({ status: 0, result: { records: [null], totalSize: 1, done: true } })
+  assert.strictEqual(flag.ok, false)
+  assert.ok(/not a record/.test(flag.why))
 })
 
 check('the count judge binds each answer to its question by the alias key, so reversed files are refused', () => {

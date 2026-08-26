@@ -286,8 +286,9 @@ function read () {
       path: CONFIG_PATH,
       message:
         `There is no config at ${CONFIG_PATH}. This is a first run: gather what the backend needs (the crm; on HubSpot ` +
-        'the portal id, the property names and where the Service Key lives; on Salesforce the org alias, the field names ' +
-        'and any record-type ids; and the alias-map path either way), show what will be recorded, and write the file on ' +
+        'the portal id, the property names and where the Service Key lives; on Salesforce the org alias, the judged ' +
+        'mailingFields pair from mailing-fields-probe, the field names and any record-type ids; and the alias-map path ' +
+        'either way), show what will be recorded, and write the file on ' +
         'an explicit yes. Search for what can be found rather than asking anyone to type what could be looked up.'
     }
   }
@@ -360,12 +361,25 @@ function draft (answers) {
       )
     }
   }
+  // The judged pair is the one home for the state and country names: a
+  // properties override for either would route around the probe the draft
+  // just required, so it is refused by name. A custom-field org corrects
+  // mailingFields itself, which keeps the correction an explicit, named
+  // decision (round 4, 2026-08-26).
+  const contactOverrides = (answers.properties && answers.properties.contact) || {}
+  if (crm === 'salesforce' && ('state' in contactOverrides || 'country' in contactOverrides)) {
+    throw new Error(
+      'These answers do not make a working config:\n  properties.contact.state and properties.contact.country are set ' +
+      'through mailingFields on salesforce, the judged probe answer, and nowhere else. Correct mailingFields itself ' +
+      'rather than overriding beside it.'
+    )
+  }
   const defaults = crm === 'salesforce' ? DEFAULT_SALESFORCE_FIELD_NAMES : DEFAULT_PROPERTY_NAMES
   const properties = {
     contact: Object.assign({},
       defaults.contact,
-      crm === 'salesforce' ? { state: mailing.state.trim(), country: mailing.country.trim() } : {},
-      (answers.properties && answers.properties.contact) || {}),
+      contactOverrides,
+      crm === 'salesforce' ? { state: mailing.state.trim(), country: mailing.country.trim() } : {}),
     company: Object.assign({}, defaults.company, (answers.properties && answers.properties.company) || {})
   }
   // Optional properties enter the draft only when the org named them. A null
