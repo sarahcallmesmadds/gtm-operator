@@ -424,10 +424,19 @@ const commands = {
     if (!judged.ok) process.exit(1)
   },
 
-  // The two first-run commands deliberately read no config: they run while
-  // the config draft is being gathered, before the file exists, which is
-  // the whole point of asking the org which mailing fields it carries.
+  // The two first-run commands deliberately require no config: they run
+  // while the config draft is being gathered, before the file exists,
+  // which is the whole point of asking the org which mailing fields it
+  // carries. But a config that already exists and names hubspot is a
+  // different situation, refused by name like every other cross-backend
+  // command: there is nothing to probe on that backend, and the wrong-org
+  // probe was round 2's routing finding.
   'mailing-fields-probe' (orgAlias) {
+    const existing = config.read()
+    if (existing.ok && existing.crm === 'hubspot') {
+      console.error('mailing-fields-probe is the salesforce route and this install\'s config says hubspot. On hubspot the property names are the portal\'s own and there is nothing to probe: correct them in conversation at the draft.')
+      process.exit(1)
+    }
     if (!orgAlias) {
       throw new Error(
         'mailing-fields-probe needs the org alias the sf CLI holds the credential under. It runs on a salesforce ' +
@@ -444,6 +453,11 @@ const commands = {
   },
 
   'mailing-fields-judge' (responseFile) {
+    const existing = config.read()
+    if (existing.ok && existing.crm === 'hubspot') {
+      console.error('mailing-fields-judge is the salesforce route and this install\'s config says hubspot. On hubspot the property names are the portal\'s own and there is nothing to probe: correct them in conversation at the draft.')
+      process.exit(1)
+    }
     if (!responseFile) throw new Error('mailing-fields-judge needs the saved probe response.')
     const judged = salesforce.judgeMailingFieldsProbe(readJson(responseFile))
     console.log(JSON.stringify(judged, null, 2))

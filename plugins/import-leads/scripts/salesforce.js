@@ -493,11 +493,15 @@ function mailingFieldsProbeRequest (orgAlias) {
   if (typeof orgAlias !== 'string' || !orgAlias.trim()) {
     throw new Error('mailingFieldsProbeRequest needs the org alias the sf CLI holds the credential under.')
   }
-  // A named aggregate, not a bare select: the answer then carries its
-  // question as the `probe` key on its one row, on an empty org as well
-  // as a full one, so an unrelated saved success cannot pass as this
-  // probe's answer. Envelope measured 2026-08-26.
-  return query('mailing-fields probe', orgAlias.trim(), 'SELECT COUNT(MailingStateCode) probe FROM Contact')
+  // A named aggregate over BOTH code fields, not a bare select: the
+  // answer then carries its question as the two alias keys on its one
+  // row, on an empty org as well as a full one, so an unrelated saved
+  // success cannot pass as this probe's answer, and the pair the judge
+  // offers is probed per org rather than assumed co-present (the round-2
+  // finding: nothing measured says the two code fields always travel
+  // together). Envelope measured 2026-08-26.
+  return query('mailing-fields probe', orgAlias.trim(),
+    'SELECT COUNT(MailingStateCode) stateProbe, COUNT(MailingCountryCode) countryProbe FROM Contact')
 }
 
 /**
@@ -526,27 +530,39 @@ function judgeMailingFieldsProbe (response) {
       return { ok: false, why: `The response holds ${result.records.length} rows where the aggregate probe answers exactly one. Save the probe response whole and look at it.` }
     }
     const row = result.records[0]
-    if (typeof row.probe !== 'number' || !Number.isFinite(row.probe)) {
-      return { ok: false, why: 'The row carries no `probe` count, so this successful answer belongs to a different query. Save the probe response whole and look at it: reading it as a picklist org would write a config against the wrong org.' }
+    // The row is questioned before it is read, like every other judged
+    // value: a malformed saved file with a non-object entry is a refusal,
+    // never a crash.
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      return { ok: false, why: `The response's one row is ${JSON.stringify(row === undefined ? null : row)}, not a record. Save the probe response whole and look at it.` }
+    }
+    if (typeof row.stateProbe !== 'number' || !Number.isFinite(row.stateProbe) ||
+        typeof row.countryProbe !== 'number' || !Number.isFinite(row.countryProbe)) {
+      return { ok: false, why: 'The row does not carry both the `stateProbe` and `countryProbe` counts, so this successful answer belongs to a different query. Save the probe response whole and look at it: reading it as a picklist org would write a config against the wrong org.' }
     }
     return {
       ok: true,
       codeFields: true,
       use: { state: 'MailingStateCode', country: 'MailingCountryCode' },
-      why: 'The org answered the code-field aggregate, so state and country picklists are on and the code fields take the ISO codes a list carries (measured 2026-08-26).'
+      why: 'The org answered the aggregate over both code fields, so state and country picklists are on and the code fields take the ISO codes a list carries (measured 2026-08-26).'
     }
   }
+  // The refusal's message echoes the refused query (both measured
+  // spellings), so a refusal of THIS probe names the probed columns and a
+  // refusal of some other query does not: the binding holds on this arm
+  // the same way the alias keys hold it on the success arm.
   if (response && typeof response === 'object' && response.name === 'INVALID_FIELD' &&
-      typeof response.message === 'string' && response.message.includes('MailingStateCode')) {
+      typeof response.message === 'string' &&
+      (response.message.includes('MailingStateCode') || response.message.includes('MailingCountryCode'))) {
     return {
       ok: true,
       codeFields: false,
       use: { state: 'MailingState', country: 'MailingCountry' },
-      why: 'The org refused the code-field aggregate with INVALID_FIELD naming MailingStateCode, so picklists are off and the plain fields are the ones that exist (error shape measured 2026-08-26).'
+      why: 'The org refused the code-field aggregate with INVALID_FIELD naming a probed column, so at least one code field does not exist there and the plain fields are the pair to offer (error shape measured 2026-08-26).'
     }
   }
   if (response && typeof response === 'object' && response.name === 'INVALID_FIELD') {
-    return { ok: false, why: 'The response is INVALID_FIELD about a column that is not the probed one, so it answers a different question. Save the probe response whole and look at it.' }
+    return { ok: false, why: 'The response is INVALID_FIELD about a column that is not a probed one, so it answers a different question. Save the probe response whole and look at it.' }
   }
   return { ok: false, why: 'The response is neither the measured aggregate envelope nor the measured INVALID_FIELD shape, so what this org carries is not known. Save it whole and look at it: a guessed pair fails every contact create or names fields the org does not have.' }
 }
@@ -589,7 +605,13 @@ function judgeLeadContactCounts (contactResponse, leadResponse) {
     if (result.records.length !== 1) {
       return { why: `The ${key} response holds ${result.records.length} rows where the aggregate answers exactly one. Save it whole and look at it.` }
     }
-    const value = result.records[0][key]
+    const row = result.records[0]
+    // Questioned before it is read: a non-object row is a refusal, not a
+    // crash, the same discipline every judged value here holds.
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      return { why: `The ${key} response's one row is ${JSON.stringify(row === undefined ? null : row)}, not a record. Save it whole and look at it.` }
+    }
+    const value = row[key]
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       return { why: `The ${key} response's row carries no \`${key}\` count, so it answers a different question, or the saved files are out of order. Save both responses whole, in the order the requests were emitted.` }
     }
