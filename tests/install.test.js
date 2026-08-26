@@ -1045,8 +1045,8 @@ check('a proof with no recorded definitions is refused too', () => {
 })
 
 check('a withdrawn proof takes the completion claim with it', () => {
-  // Every other plugin decides whether to trust this workspace by reading
-  // `state`, not by reading the proof. A config left saying `complete` with no
+  // Every plugin that reads this config decides whether to trust this
+  // workspace by reading `state`, not by reading the proof. A config left saying `complete` with no
   // verification is the proof being withdrawn where nobody looks.
   setUpConfig()
   config.recordVerified('2026-08-18T00:00:00Z')
