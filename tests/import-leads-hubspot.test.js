@@ -412,6 +412,20 @@ check('a property that came back different is a problem naming both values', () 
   assert.ok(proof.problems.some(p => /row 1, firstname/.test(p.what) && /"Ada"/.test(p.why) && /"Ad"/.test(p.why)))
 })
 
+check('a read-back answering a different record than was fetched fails the proof instead of proving it', () => {
+  // The same binding rule the Salesforce half holds: a response filed
+  // under the wrong key, or reused under two keys, proves nothing.
+  const wrongContact = cleanReadbacks()
+  wrongContact.contacts[1] = { id: '999', properties: { firstname: 'Ada', lastname: 'Lovelace', email: 'ada@x.com' } }
+  const contacts = hubspot.prove(config(), smallPlan(), pushedIds(), wrongContact)
+  assert.ok(contacts.problems.some(p => /^row 1$/.test(p.what) && /answers a different record/.test(p.why)))
+
+  const wrongCompany = cleanReadbacks()
+  wrongCompany.companies.Acme = { id: '999', properties: { name: 'Acme', website: 'acme.example' } }
+  const companies = hubspot.prove(config(), smallPlan(), pushedIds(), wrongCompany)
+  assert.ok(companies.problems.some(p => /company Acme/.test(p.what) && /answers a different record/.test(p.why)))
+})
+
 check('a missing association and a missing membership are problems, not passes', () => {
   const readbacks = cleanReadbacks()
   readbacks.associations[1] = { results: [] }

@@ -107,7 +107,13 @@ const commands = {
   },
 
   'config-draft' (answersFile) {
-    if (!answersFile) throw new Error('config-draft needs the answers file: portalId, serviceKeyPath, aliasMapPath, and any property corrections.')
+    if (!answersFile) {
+      throw new Error(
+        'config-draft needs the answers file: the crm (absent means hubspot), then per backend its identifiers ' +
+        '(portalId and serviceKeyPath on hubspot; orgAlias and any recordTypeIds on salesforce), aliasMapPath, and any ' +
+        'property corrections.'
+      )
+    }
     console.log(JSON.stringify({
       draft: config.draft(readJson(answersFile)),
       note: 'Show this whole file and write it only on an explicit yes, with config-write. It is written once.'
@@ -380,7 +386,11 @@ const commands = {
     const campaignStatuses = {}
     const refused = []
     existing.forEach((name, at) => {
-      const judged = salesforce.judgeStatusRead(responses[at])
+      // The judge binds each answer to its campaign by the CampaignId the
+      // rows carry, the same rule campaign-judge holds by Name, so two
+      // saved files passed in the wrong order surface as questions instead
+      // of crediting each campaign with the other's statuses.
+      const judged = salesforce.judgeStatusRead(responses[at], source[name].campaignId)
       if (judged.ok) campaignStatuses[name] = { labels: judged.labels, maxSortOrder: judged.maxSortOrder }
       else refused.push({ name, why: judged.why })
     })

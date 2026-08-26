@@ -576,9 +576,20 @@ function prove (config, plan, pushedIds, readbacks) {
   const unchecked = []
   const back = reverseContactMap(config)
 
-  const compareContact = (label, intended, response) => {
+  // THE READ-BACK IS BOUND TO THE RECORD IT WAS FETCHED FOR, by the id the
+  // measured GET envelope carries. Without this, a saved response filed
+  // under the wrong key, or one response reused under two keys, proves a
+  // write nothing read; the Salesforce half holds the same rule.
+  const compareContact = (label, intended, response, expectedId) => {
     if (!response || typeof response !== 'object' || !response.properties) {
       problems.push({ what: label, why: 'No read-back to compare, so nothing about this write is proved.' })
+      return
+    }
+    if (String(response.id) !== String(expectedId)) {
+      problems.push({
+        what: label,
+        why: `The read-back carries id ${JSON.stringify(response.id === undefined ? null : response.id)} where ${JSON.stringify(String(expectedId))} was fetched, so it answers a different record, and nothing about this write is proved by it.`
+      })
       return
     }
     for (const [name, sent] of Object.entries(intended.properties)) {
@@ -597,7 +608,7 @@ function prove (config, plan, pushedIds, readbacks) {
       problems.push({ what: `row ${create.index}`, why: 'The push report has no id for this create, so there is nothing to read back. It is not proved.' })
       continue
     }
-    compareContact(`row ${create.index}`, contactCreateBody(config, create.row, plan.leadSource), (readbacks.contacts || {})[create.index])
+    compareContact(`row ${create.index}`, contactCreateBody(config, create.row, plan.leadSource), (readbacks.contacts || {})[create.index], id)
 
     const company = create.row.fields.company
     if (company) {
@@ -620,7 +631,7 @@ function prove (config, plan, pushedIds, readbacks) {
   }
 
   for (const update of plan.contacts.updates) {
-    compareContact(`row ${update.index} (update)`, contactUpdateBody(config, update.fill), (readbacks.contacts || {})[update.index])
+    compareContact(`row ${update.index} (update)`, contactUpdateBody(config, update.fill), (readbacks.contacts || {})[update.index], update.contactId)
   }
 
   for (const company of plan.companies.creates) {
@@ -634,7 +645,7 @@ function prove (config, plan, pushedIds, readbacks) {
     if (company.website && config.properties.company.website) {
       intended.properties[config.properties.company.website] = company.website
     }
-    compareContact(`company ${company.name}`, intended, response)
+    compareContact(`company ${company.name}`, intended, response, id)
   }
 
   // The adoption fill is proved like every other write: the plan promised
@@ -651,7 +662,7 @@ function prove (config, plan, pushedIds, readbacks) {
       intended.properties[config.properties.company.website] = matched.fill.website
     }
     if (!Object.keys(intended.properties).length) continue
-    compareContact(`company ${matched.name} (fill)`, intended, (readbacks.companies || {})[matched.name])
+    compareContact(`company ${matched.name} (fill)`, intended, (readbacks.companies || {})[matched.name], matched.companyId)
   }
 
   for (const membership of plan.lists.memberships) {

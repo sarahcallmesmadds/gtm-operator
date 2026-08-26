@@ -170,14 +170,19 @@ function searchResults (config, responses) {
       // org enforces no email uniqueness this design has measured, so the
       // ambiguity is real here where HubSpot's portal makes it impossible.
       // Keeping either record would silently decide which person the row
-      // is, so neither is kept and the collision is surfaced by email.
+      // is, so neither is kept as the match and the collision is surfaced
+      // by email, each candidate carried whole so the person's answer can
+      // be realised as that record's blanks-only fill rather than falling
+      // through to a create of a third record.
       if (ambiguous.has(email)) {
-        const ids = ambiguous.get(email)
-        if (!ids.includes(String(record.Id))) ids.push(String(record.Id))
+        const candidates = ambiguous.get(email)
+        if (!candidates.some(c => c.id === String(record.Id))) {
+          candidates.push({ id: String(record.Id), properties })
+        }
         continue
       }
       if (byEmail[email] && byEmail[email].id !== String(record.Id)) {
-        ambiguous.set(email, [byEmail[email].id, String(record.Id)])
+        ambiguous.set(email, [byEmail[email], { id: String(record.Id), properties }])
         delete byEmail[email]
         continue
       }
@@ -187,7 +192,11 @@ function searchResults (config, responses) {
 
   return {
     byEmail,
-    ambiguousInCrm: [...ambiguous.entries()].map(([email, contactIds]) => ({ email, contactIds })),
+    ambiguousInCrm: [...ambiguous.entries()].map(([email, candidates]) => ({
+      email,
+      contactIds: candidates.map(c => c.id),
+      candidates
+    })),
     incomplete,
     found: Object.keys(byEmail).length
   }
@@ -349,17 +358,33 @@ function statusReadRequests (config, campaignDecisions) {
   const requests = []
   for (const [name, decision] of Object.entries(campaignDecisions)) {
     if (!decision || decision.outcome !== 'exists') continue
+    // CampaignId is selected so the answer carries its own question: the
+    // judge binds each row to the campaign it was asked about, the same
+    // rule the campaign lookup holds by Name, or two reversed saved files
+    // credit each campaign with the other's statuses.
     requests.push(query(
       `status read: ${name}`,
       config.orgAlias,
-      `SELECT Id, Label, SortOrder, IsDefault, HasResponded FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(decision.campaignId)}`
+      `SELECT Id, Label, SortOrder, IsDefault, HasResponded, CampaignId FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(decision.campaignId)}`
     ))
   }
   return requests
 }
 
-/** The labels a campaign's status read holds, with the highest SortOrder. */
-function judgeStatusRead (response) {
+/**
+ * The labels a campaign's status read holds, with the highest SortOrder.
+ *
+ * THE ANSWER IS BOUND TO ITS QUESTION BY THE CampaignId ITS ROWS CARRY,
+ * not by the order the files were passed in: responses judged by position
+ * alone let two reversed saves credit each campaign with the other one's
+ * statuses, planning a duplicate of a row that exists and omitting the one
+ * that does not. An empty answer carries nothing to bind, and needs
+ * nothing: swapping it with another empty answer changes no reading, and
+ * swapping it with a non-empty one puts rows under the wrong campaign,
+ * which is refused here, so the caller judging the whole batch stops
+ * before any misfiled reading reaches a plan.
+ */
+function judgeStatusRead (response, expectedCampaignId) {
   const result = queryRecords(response)
   if (!result) {
     return { ok: false, why: 'The response is not the measured query envelope. A guessed status list would plan creates beside rows that already exist.' }
@@ -376,6 +401,17 @@ function judgeStatusRead (response) {
     }
     if (typeof record.SortOrder !== 'number' || !Number.isFinite(record.SortOrder)) {
       return { ok: false, why: `The status row ${JSON.stringify(record.Label)} carries ${JSON.stringify(record.SortOrder)} for its SortOrder, which is not a number. Save the response whole and look at it.` }
+    }
+    if (expectedCampaignId !== undefined) {
+      if (typeof record.CampaignId !== 'string' || !record.CampaignId) {
+        return { ok: false, why: `The status row ${JSON.stringify(record.Label)} carries no CampaignId to bind it to its campaign. Save the response the status read printed, whole.` }
+      }
+      if (String(record.CampaignId) !== String(expectedCampaignId)) {
+        return {
+          ok: false,
+          why: `The status row ${JSON.stringify(record.Label)} carries CampaignId ${JSON.stringify(record.CampaignId)} where ${JSON.stringify(String(expectedCampaignId))} was asked about, so this response answers a different campaign's status read. The saved files are out of order.`
+        }
+      }
     }
   }
   const labels = result.records.map(r => r.Label)
@@ -666,8 +702,11 @@ function readbackRequests (config, plan, pushedIds) {
     const matched = memberships.campaigns.matched.find(m => m.name === name)
     const id = matched ? matched.campaignId : (pushedIds.campaigns || {})[name]
     if (!id) continue // no id means the create never returned one; prove fails it as an absent read-back
+    // CampaignId rides every campaign-scoped read-back so the proof can
+    // bind the rows to the campaign they were fetched for: a saved
+    // response filed under the wrong campaign must fail, not prove it.
     requests.push(query(`read back statuses: ${name}`, org,
-      `SELECT Id, Label, SortOrder FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(id)}`))
+      `SELECT Id, Label, SortOrder, CampaignId FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(id)}`))
   }
   // Member reads come from the plan, not from the pushed ids, the same
   // rule the HubSpot half records: a run whose campaigns all matched
@@ -678,7 +717,7 @@ function readbackRequests (config, plan, pushedIds) {
     const id = matched ? matched.campaignId : (pushedIds.campaigns || {})[name]
     if (!id) continue // no id means the create never returned one; prove fails it as an absent read-back
     requests.push(query(`read back members: ${name}`, org,
-      `SELECT Id, ContactId, Status FROM CampaignMember WHERE CampaignId = ${soqlLiteral(id)}`))
+      `SELECT Id, ContactId, Status, CampaignId FROM CampaignMember WHERE CampaignId = ${soqlLiteral(id)}`))
   }
   if (memberships.userFlagFix) {
     requests.push(query('read back marketing-user flag', org,
@@ -711,11 +750,29 @@ function prove (config, plan, pushedIds, readbacks) {
     return result.records[0]
   }
 
-  const compareRecord = (label, intended, record) => {
+  // THE READ-BACK IS BOUND TO THE RECORD IT WAS FETCHED FOR, by the Id it
+  // carries. Without this, a saved response filed under the wrong key, or
+  // one response reused under two keys, proves a write nothing read: the
+  // query asked for one id and the answer names which record it is, so a
+  // different id is a different record's read-back, not this write's proof.
+  const boundRecord = (label, response, expectedId, missingWhy) => {
+    const record = recordFrom(response)
     if (!record) {
-      problems.push({ what: label, why: 'No read-back to compare, so nothing about this write is proved.' })
-      return
+      problems.push({ what: label, why: missingWhy || 'No read-back to compare, so nothing about this write is proved.' })
+      return null
     }
+    if (typeof record.Id !== 'string' || String(record.Id) !== String(expectedId)) {
+      problems.push({
+        what: label,
+        why: `The read-back carries Id ${JSON.stringify(record.Id === undefined ? null : record.Id)} where ${JSON.stringify(String(expectedId))} was fetched, so it answers a different record, and nothing about this write is proved by it.`
+      })
+      return null
+    }
+    return record
+  }
+
+  const compareRecord = (label, intended, record) => {
+    if (!record) return // boundRecord already named why
     for (const [name, sent] of Object.entries(intended)) {
       const got = record[name]
       if (got === undefined || got === null || String(got) !== String(sent)) {
@@ -732,7 +789,7 @@ function prove (config, plan, pushedIds, readbacks) {
       problems.push({ what: `row ${create.index}`, why: 'The push report has no id for this create, so there is nothing to read back. It is not proved.' })
       continue
     }
-    const record = recordFrom((readbacks.contacts || {})[create.index])
+    const record = boundRecord(`row ${create.index}`, (readbacks.contacts || {})[create.index], id)
     compareRecord(`row ${create.index}`, contactCreateBody(config, create.row, plan.leadSource), record)
 
     const company = create.row.fields.company
@@ -752,7 +809,8 @@ function prove (config, plan, pushedIds, readbacks) {
   }
 
   for (const update of plan.contacts.updates) {
-    compareRecord(`row ${update.index} (update)`, contactUpdateBody(config, update.fill), recordFrom((readbacks.contacts || {})[update.index]))
+    compareRecord(`row ${update.index} (update)`, contactUpdateBody(config, update.fill),
+      boundRecord(`row ${update.index} (update)`, (readbacks.contacts || {})[update.index], update.contactId))
   }
 
   for (const company of plan.companies.creates) {
@@ -770,7 +828,7 @@ function prove (config, plan, pushedIds, readbacks) {
     if (config.recordTypeIds && config.recordTypeIds.account) {
       intended.RecordTypeId = config.recordTypeIds.account
     }
-    compareRecord(`account ${company.name}`, intended, recordFrom((readbacks.accounts || {})[company.name]))
+    compareRecord(`account ${company.name}`, intended, boundRecord(`account ${company.name}`, (readbacks.accounts || {})[company.name], id))
   }
 
   for (const matched of plan.companies.matched) {
@@ -782,7 +840,8 @@ function prove (config, plan, pushedIds, readbacks) {
       intended[config.properties.company.website] = matched.fill.website
     }
     if (!Object.keys(intended).length) continue
-    compareRecord(`account ${matched.name} (fill)`, intended, recordFrom((readbacks.accounts || {})[matched.name]))
+    compareRecord(`account ${matched.name} (fill)`, intended,
+      boundRecord(`account ${matched.name} (fill)`, (readbacks.accounts || {})[matched.name], matched.companyId))
   }
 
   for (const campaign of memberships.campaigns.creates) {
@@ -791,22 +850,51 @@ function prove (config, plan, pushedIds, readbacks) {
       problems.push({ what: `campaign ${campaign.name}`, why: 'The push report has no id for this campaign, so there is nothing to read back. It is not proved.' })
       continue
     }
-    compareRecord(`campaign ${campaign.name}`, { Name: campaign.name }, recordFrom((readbacks.campaigns || {})[campaign.name]))
+    compareRecord(`campaign ${campaign.name}`, { Name: campaign.name }, boundRecord(`campaign ${campaign.name}`, (readbacks.campaigns || {})[campaign.name], id))
+  }
+
+  // A campaign-scoped read-back is bound to its campaign the same way a
+  // single-record one is bound to its Id: by the CampaignId its rows carry.
+  const campaignIdOf = name => {
+    const matched = memberships.campaigns.matched.find(m => m.name === name)
+    return matched ? matched.campaignId : (pushedIds.campaigns || {})[name]
   }
 
   for (const status of memberships.statuses.creates) {
+    const label = `status ${status.campaign} / ${status.label}`
     const result = queryRecords((readbacks.statusRows || {})[status.campaign])
     if (!result || result.done !== true) {
-      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: 'No status read-back was saved, and the plan created this status row. It is unproved, and unproved fails the proof.' })
+      problems.push({ what: label, why: 'No status read-back was saved, and the plan created this status row. It is unproved, and unproved fails the proof.' })
       continue
     }
-    const row = result.records.find(r => String(r.Label) === status.label)
+    const campaignId = campaignIdOf(status.campaign)
+    if (!campaignId) {
+      problems.push({ what: label, why: `No campaign id is known for "${status.campaign}", so the read-back cannot be bound to the right campaign. Unproved fails the proof.` })
+      continue
+    }
+    // THE PROOF HOLDS THE JUDGE'S OWN TYPE DISCIPLINE. A wordy SortOrder or
+    // a null Label the status judge refuses cannot be re-accepted here by
+    // String() and Number() coercion, and every row is bound to the
+    // campaign it was fetched for: a malformed or misfiled read-back
+    // proves nothing.
+    const misread = result.records.find(r =>
+      typeof r.Label !== 'string' || !r.Label.trim() ||
+      typeof r.SortOrder !== 'number' || !Number.isFinite(r.SortOrder) ||
+      typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId))
+    if (misread) {
+      problems.push({
+        what: label,
+        why: `The status read-back holds a row this proof refuses to read: Label ${JSON.stringify(misread.Label === undefined ? null : misread.Label)}, SortOrder ${JSON.stringify(misread.SortOrder === undefined ? null : misread.SortOrder)}, CampaignId ${JSON.stringify(misread.CampaignId === undefined ? null : misread.CampaignId)} where ${JSON.stringify(String(campaignId))} was fetched. Save the response the read-back printed, whole, and look at it.`
+      })
+      continue
+    }
+    const row = result.records.find(r => r.Label === status.label)
     if (!row) {
-      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: 'The status row is not in the read-back. The create did not land.' })
-    } else if (Number(row.SortOrder) !== status.sortOrder) {
-      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: `Sent SortOrder ${status.sortOrder} and the row came back with ${JSON.stringify(row.SortOrder)}.` })
+      problems.push({ what: label, why: 'The status row is not in the read-back. The create did not land.' })
+    } else if (row.SortOrder !== status.sortOrder) {
+      problems.push({ what: label, why: `Sent SortOrder ${status.sortOrder} and the row came back with ${JSON.stringify(row.SortOrder)}.` })
     } else {
-      checked.push({ what: `status ${status.campaign} / ${status.label}` })
+      checked.push({ what: label })
     }
   }
 
@@ -814,6 +902,19 @@ function prove (config, plan, pushedIds, readbacks) {
     const result = queryRecords((readbacks.members || {})[membership.campaign])
     if (!result) {
       problems.push({ what: `campaign ${membership.campaign}`, why: 'No member read-back was saved, and the plan put rows on this campaign. Who landed there is unproved, and unproved fails the proof.' })
+      continue
+    }
+    const campaignId = campaignIdOf(membership.campaign)
+    if (!campaignId) {
+      problems.push({ what: `campaign ${membership.campaign}`, why: `No campaign id is known for "${membership.campaign}", so the member read-back cannot be bound to the right campaign. Unproved fails the proof.` })
+      continue
+    }
+    const misfiled = result.records.find(r => typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId))
+    if (misfiled) {
+      problems.push({
+        what: `campaign ${membership.campaign}`,
+        why: `The member read-back holds a row with CampaignId ${JSON.stringify(misfiled.CampaignId === undefined ? null : misfiled.CampaignId)} where ${JSON.stringify(String(campaignId))} was fetched, so it answers a different campaign, and no membership is proved by it.`
+      })
       continue
     }
     const onCampaign = new Map(result.records.map(r => [String(r.ContactId), String(r.Status)]))
@@ -833,9 +934,10 @@ function prove (config, plan, pushedIds, readbacks) {
   }
 
   if (memberships.userFlagFix) {
-    const record = recordFrom(readbacks.userFlag)
+    const record = boundRecord('marketing-user flag', readbacks.userFlag, memberships.userFlagFix.userId,
+      'The plan fixed the flag and no read-back was saved. Unproved fails the proof.')
     if (!record) {
-      problems.push({ what: 'marketing-user flag', why: 'The plan fixed the flag and no read-back was saved. Unproved fails the proof.' })
+      // boundRecord already named why: absent, or a different User record.
     } else if (record.UserPermissionsMarketingUser !== true) {
       problems.push({ what: 'marketing-user flag', why: 'The read-back says the flag is still off, so the fix did not land.' })
     } else {

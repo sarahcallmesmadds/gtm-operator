@@ -267,7 +267,14 @@ and both execute only what the approved plan names.**
    absent: the search is the whole guard, and the plan treats it that way
    rather than counting on a refusal to catch what the search missed.
    Duplicates and cross-company conflicts are always presented, never
-   auto-resolved.
+   auto-resolved. A store holding more than one contact under one of a
+   row's addresses, possible on Salesforce where no uniqueness is
+   measured, is presented as its own question, which record this person
+   is, with each candidate carrying the verdict the row would get against
+   it; the answer names one candidate and is realised as that record's
+   blanks-only update or as nothing to write. Marking such a row decided
+   is not an answer, because a create would add a third record: the row is
+   chosen or excluded, never created.
 8. **Multi-event detection, mandatory before campaign setup.** A list that
    covers several events or assets becomes several campaigns, and the signals
    (dates, locations, event names) are checked even outside the obvious
@@ -277,7 +284,11 @@ and both execute only what the approved plan names.**
    Salesforce: the campaign itself, matched by name or planned, and the
    grid's statuses for it, each matched against the campaign's existing
    member-status rows (a fresh campaign carries Sent and Responded,
-   measured 2026-08-25) or planned as a create. The lookups themselves,
+   measured 2026-08-25) or planned as a create. Every lookup's answer is
+   bound to its question by what the answer itself carries, the campaign
+   lookup by its row's Name and the status read by its rows' CampaignId,
+   so saved responses passed in the wrong order surface as questions
+   rather than crediting one campaign with another's records. The lookups themselves,
    the campaign by name with its empty-result absent answer and a
    campaign's status rows, were measured on 2026-08-26. A Salesforce org
    whose Marketing User flag is off refuses campaign creation outright
@@ -329,7 +340,12 @@ and both execute only what the approved plan names.**
     record by the id the push returned, an updated one by the id the plan
     already carried. The read-back is compared field by field against the
     approved plan. An id is a locator, not a proof; the comparison is the
-    proof, and it says what it did not check.
+    proof, and it says what it did not check. The proof also binds every
+    read-back to the record it was fetched for, a single record by the id
+    it carries and a campaign-scoped read by its rows' CampaignId, and it
+    refuses the malformed values the judges refuse, so a response saved
+    under the wrong key, reused under two, or carrying a wordy number
+    fails the proof instead of passing it.
 13. **Writeback** when the source was Notion: link each created record on its
     source row, fill email only if blank. A writeback failure is reported and
     never fails the run, because the CRM is the system of record.

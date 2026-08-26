@@ -396,17 +396,17 @@ const cleanReadbacks = () => ({
   },
   statusRows: {
     'Autumn Summit': queryEnvelope([
-      { Id: 'S1', Label: 'Sent', SortOrder: 1 },
-      { Id: 'S2', Label: 'Responded', SortOrder: 2 },
-      { Id: 'S3', Label: 'Invited', SortOrder: 3 }
+      { Id: 'S1', Label: 'Sent', SortOrder: 1, CampaignId: '701A' },
+      { Id: 'S2', Label: 'Responded', SortOrder: 2, CampaignId: '701A' },
+      { Id: 'S3', Label: 'Invited', SortOrder: 3, CampaignId: '701A' }
     ])
   },
   members: {
     'Autumn Summit': queryEnvelope([
-      { Id: 'M1', ContactId: '003A', Status: 'Invited' },
-      { Id: 'M2', ContactId: '003B', Status: 'Invited' }
+      { Id: 'M1', ContactId: '003A', Status: 'Invited', CampaignId: '701A' },
+      { Id: 'M2', ContactId: '003B', Status: 'Invited', CampaignId: '701A' }
     ]),
-    'Spring Roadshow': queryEnvelope([{ Id: 'M3', ContactId: '003U', Status: 'Attended' }])
+    'Spring Roadshow': queryEnvelope([{ Id: 'M3', ContactId: '003U', Status: 'Attended', CampaignId: '701M' }])
   }
 })
 
@@ -434,7 +434,7 @@ check('a wrong AccountId on the read-back is an association problem naming both 
 
 check('a member missing, or on the campaign with the wrong status, is a problem, not a pass', () => {
   const missing = cleanReadbacks()
-  missing.members['Autumn Summit'] = queryEnvelope([{ Id: 'M1', ContactId: '003A', Status: 'Invited' }])
+  missing.members['Autumn Summit'] = queryEnvelope([{ Id: 'M1', ContactId: '003A', Status: 'Invited', CampaignId: '701A' }])
   const first = salesforce.prove(config(), smallPlan(), pushedIds(), missing)
   assert.ok(first.problems.some(p => /campaign Autumn Summit, row 2/.test(p.what) && /not in the member read-back/.test(p.why)))
 
@@ -520,7 +520,14 @@ check('two CRM contacts under one email are surfaced as ambiguous, with neither 
     { Id: '003C', Email: 'solo@x.com', FirstName: 'C' }
   ])])
   assert.ok(!('shared@x.com' in result.byEmail), 'keeping either record would silently decide which person the row is')
-  assert.deepStrictEqual(result.ambiguousInCrm, [{ email: 'shared@x.com', contactIds: ['003A', '003B'] }])
+  assert.strictEqual(result.ambiguousInCrm.length, 1)
+  assert.strictEqual(result.ambiguousInCrm[0].email, 'shared@x.com')
+  assert.deepStrictEqual(result.ambiguousInCrm[0].contactIds, ['003A', '003B'])
+  // Each candidate travels whole, so a chosen answer can be realised as
+  // that record's blanks-only fill rather than falling through to a create.
+  assert.deepStrictEqual(result.ambiguousInCrm[0].candidates.map(c => c.id), ['003A', '003B'])
+  assert.strictEqual(result.ambiguousInCrm[0].candidates[0].properties.firstName, 'A')
+  assert.strictEqual(result.ambiguousInCrm[0].candidates[1].properties.firstName, 'B')
   assert.strictEqual(result.byEmail['solo@x.com'].id, '003C', 'an unambiguous match still matches')
 })
 
@@ -540,6 +547,20 @@ check('a status read refuses incomplete or malformed rows rather than planning c
   assert.strictEqual(salesforce.judgeStatusRead(queryEnvelope([], false)).ok, false, 'done not true withholds rows')
   assert.ok(/null/.test(salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: null, SortOrder: 1 }])).why))
   assert.ok(/"later"/.test(salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: 'Sent', SortOrder: 'later' }])).why))
+})
+
+check('a status read is bound to its campaign by CampaignId, so reversed files cannot credit the wrong campaign', () => {
+  const requests = salesforce.statusReadRequests(config(), { Summit: { outcome: 'exists', campaignId: '701A' } })
+  assert.ok(requests[0].soql.includes('CampaignId,') || /,\s*CampaignId\b/.test(requests[0].soql), 'the select carries CampaignId so the answer carries its own question')
+
+  const alphaRows = queryEnvelope([{ Id: 'S1', Label: 'Invited', SortOrder: 3, CampaignId: '701A' }])
+  assert.strictEqual(salesforce.judgeStatusRead(alphaRows, '701A').ok, true, 'the right campaign\'s rows judge clean')
+  const reversed = salesforce.judgeStatusRead(alphaRows, '701B')
+  assert.strictEqual(reversed.ok, false, 'another campaign\'s rows are a question, never that campaign\'s statuses')
+  assert.ok(/out of order/.test(reversed.why))
+  const unbindable = salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: 'Invited', SortOrder: 3 }]), '701A')
+  assert.strictEqual(unbindable.ok, false, 'a row with no CampaignId cannot be bound and is refused')
+  assert.strictEqual(salesforce.judgeStatusRead(queryEnvelope([]), '701B').ok, true, 'an empty answer carries nothing to bind and needs nothing')
 })
 
 check('the flag judge refuses a non-boolean flag and an incomplete answer: a misread flag is a privileged write', () => {
@@ -565,7 +586,7 @@ check('a created campaign and a created status row are read back and proved, and
   assert.ok(second.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /unproved fails the proof/.test(p.why)))
 
   const missingRow = cleanReadbacks()
-  missingRow.statusRows['Autumn Summit'] = queryEnvelope([{ Id: 'S1', Label: 'Sent', SortOrder: 1 }])
+  missingRow.statusRows['Autumn Summit'] = queryEnvelope([{ Id: 'S1', Label: 'Sent', SortOrder: 1, CampaignId: '701A' }])
   const third = salesforce.prove(config(), smallPlan(), pushedIds(), missingRow)
   assert.ok(third.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /did not land/.test(p.why)))
 
@@ -598,6 +619,61 @@ check('a configured record type is selected by the read-backs and proved on both
 
   const untyped = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
   assert.ok(!untyped.find(r => r.soql && r.soql.includes('RecordTypeId')), 'no configured type, nothing selected for it')
+})
+
+check('a read-back answering a different record than was fetched fails the proof instead of proving it', () => {
+  // The reviewer's round-3 repro: the query asked for one campaign and a
+  // response naming another produced zero problems. Every single-record
+  // read-back is bound by the Id it carries now.
+  const wrongCampaign = cleanReadbacks()
+  wrongCampaign.campaigns['Autumn Summit'] = queryEnvelope([{ Id: '701OLD', Name: 'Autumn Summit' }])
+  const campaignProof = salesforce.prove(config(), smallPlan(), pushedIds(), wrongCampaign)
+  assert.ok(campaignProof.problems.some(p => /campaign Autumn Summit/.test(p.what) && /answers a different record/.test(p.why)))
+
+  const wrongContact = cleanReadbacks()
+  wrongContact.contacts[1] = contactRecord('003OTHER', { FirstName: 'Ada', LastName: 'Lovelace', Email: 'ada@x.com', AccountId: '001A' })
+  const contactProof = salesforce.prove(config(), smallPlan(), pushedIds(), wrongContact)
+  assert.ok(contactProof.problems.some(p => /row 1/.test(p.what) && /answers a different record/.test(p.why)))
+
+  const wrongFlagUser = cleanReadbacks()
+  const plan = smallPlan()
+  plan.campaignMemberships.userFlagFix = { userId: '005U' }
+  wrongFlagUser.userFlag = queryEnvelope([{ Id: '005OTHER', UserPermissionsMarketingUser: true }])
+  const flagProof = salesforce.prove(config(), plan, pushedIds(), wrongFlagUser)
+  assert.ok(flagProof.problems.some(p => /marketing-user flag/.test(p.what) && /answers a different record/.test(p.why)))
+})
+
+check('a status or member read-back filed under the wrong campaign fails the proof by its CampaignId', () => {
+  // Reusing one campaign's saved response under another "proved" both
+  // status writes in the round-3 repro. The rows' CampaignId binds them.
+  const reusedStatuses = cleanReadbacks()
+  reusedStatuses.statusRows['Autumn Summit'] = queryEnvelope([{ Id: 'S9', Label: 'Invited', SortOrder: 3, CampaignId: '701M' }])
+  const statuses = salesforce.prove(config(), smallPlan(), pushedIds(), reusedStatuses)
+  assert.ok(statuses.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /"701A" was fetched/.test(p.why)))
+
+  const reusedMembers = cleanReadbacks()
+  reusedMembers.members['Spring Roadshow'] = reusedMembers.members['Autumn Summit']
+  const members = salesforce.prove(config(), smallPlan(), pushedIds(), reusedMembers)
+  assert.ok(members.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /answers a different campaign/.test(p.why)))
+})
+
+check('the status proof refuses the wrong types the status judge refuses, instead of coercing them past it', () => {
+  // The round-3 repro for the proof-side pair: SortOrder "3" was refused
+  // by judgeStatusRead and then re-accepted by Number() in prove.
+  const wordySort = cleanReadbacks()
+  wordySort.statusRows['Autumn Summit'].result.records[2].SortOrder = '3'
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), wordySort)
+  assert.ok(proof.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /refuses to read/.test(p.why)),
+    'a wordy SortOrder cannot pass the proof after failing the judge')
+  assert.ok(!proof.checked.some(c => c.what === 'status Autumn Summit / Invited'), 'and it is not marked checked')
+})
+
+check('member and status read-back queries select CampaignId so the proof can bind them', () => {
+  const requests = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
+  const members = requests.find(r => r.label === 'read back members: Autumn Summit')
+  assert.ok(/,\s*CampaignId\b/.test(members.soql))
+  const statuses = requests.find(r => r.label === 'read back statuses: Autumn Summit')
+  assert.ok(/,\s*CampaignId\b/.test(statuses.soql))
 })
 
 check('org display judges Connected as ok and anything else as not proved', () => {
