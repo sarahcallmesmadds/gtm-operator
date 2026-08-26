@@ -6846,7 +6846,7 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Forty-five hand mutations across the build and its eight review rounds,
+Fifty hand mutations across the build and its nine review rounds,
 each asserted onto disk before its suite ran, each red in its named
 check, and each file restored byte-identical after: the probe judge's
 column binding removed, the count judge's type discipline coerced, the
@@ -6873,9 +6873,11 @@ arm removed, both search parsers' text refusals removed, the salesforce
 parser's AccountId refusal removed, both parsers' empty-id acceptance
 restored, the hubspot properties-container refusal removed, the
 membership judge's id discipline removed, the draft's per-kind and
-container map refusals removed one at a time, and the adoption loop's
-companyId id arm removed. The whole repository suite is green after all
-of it.
+container map refusals removed one at a time, the adoption loop's
+companyId id arm removed, the Account-container refusal removed, both
+association proofs' null exemption restored one at a time, and the
+membership judge's and membership proof's empty-id acceptance restored
+one at a time. The whole repository suite is green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -7053,3 +7055,23 @@ companyId around the guard and into the adoption PATCH URL as
 id-shaped with the same words, and the round-7 plan check exercises the
 adoption path beside the needed-companies one. One new mutation,
 recorded above.
+
+### Round 9 on the follow-ups, Codex CLI confirming, 2026-08-26: three findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole, every finding reproduced before it was reported.
+The round confirmed round 8 closed and found three places round 7's
+rule still stopped short. The first Medium: the Salesforce parser read
+Account.Name only when Account happened to be an object, so a present
+container that is not a record was silently skipped, the company signal
+discarded, and the mandatory cross-company conflict question routed
+around; a malformed Account container is now refused by name, the same
+rule the HubSpot properties container got in round 7. The second
+Medium, the subtle one: both association proofs' id arms exempted null
+and undefined, so a planned id carrying the literal string "undefined"
+compared equal to a read-back with no AccountId or toObjectId through
+String(); the exemption is gone, and a missing value is refused with
+the same words as a malformed one. The Low: an empty string still
+counted as id-shaped in the membership-add judge and the membership
+proof's entry predicate; both refuse it now. Five new mutations,
+recorded above, each restoring one removed exemption alone.

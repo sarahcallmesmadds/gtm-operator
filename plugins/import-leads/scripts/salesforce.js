@@ -177,12 +177,21 @@ function searchResults (config, responses) {
         properties[field] = value
       }
       // The company signal for the conflict check rides under the same
-      // canonical name the HubSpot half uses. It is only ever read.
-      if (record.Account && typeof record.Account === 'object' && record.Account.Name !== null && record.Account.Name !== undefined) {
-        if (typeof record.Account.Name !== 'string') {
-          throw new Error(`Response ${at + 1} holds a record whose Account.Name is ${JSON.stringify(record.Account.Name)}, not text. Save what the CLI printed, whole.`)
+      // canonical name the HubSpot half uses. It is only ever read. A
+      // present container that is not a record is refused rather than
+      // skipped: silently discarding it dropped the company signal and
+      // routed around the mandatory cross-company conflict question
+      // (round 9).
+      if (record.Account !== null && record.Account !== undefined) {
+        if (typeof record.Account !== 'object' || Array.isArray(record.Account)) {
+          throw new Error(`Response ${at + 1} holds a record whose Account is ${JSON.stringify(record.Account)}, not a record. Save what the CLI printed, whole.`)
         }
-        if (record.Account.Name) properties.company = record.Account.Name
+        if (record.Account.Name !== null && record.Account.Name !== undefined) {
+          if (typeof record.Account.Name !== 'string') {
+            throw new Error(`Response ${at + 1} holds a record whose Account.Name is ${JSON.stringify(record.Account.Name)}, not text. Save what the CLI printed, whole.`)
+          }
+          if (record.Account.Name) properties.company = record.Account.Name
+        }
       }
       if (record.AccountId !== null && record.AccountId !== undefined) {
         // Id-shaped before it can bind, the same rule the proofs hold:
@@ -1038,9 +1047,12 @@ function prove (config, plan, pushedIds, readbacks) {
       // "[object Object]" and marked the association checked (round 7).
       } else if (typeof expected !== 'string' && typeof expected !== 'number') {
         problems.push({ what: `row ${create.index} association`, why: `The plan or push report carries ${JSON.stringify(expected)} for account "${company}", which is not an id, so the association cannot be checked. Save the file and look at it.` })
-      } else if (record.AccountId !== null && record.AccountId !== undefined && typeof record.AccountId !== 'string') {
-        problems.push({ what: `row ${create.index} association`, why: `The contact came back with AccountId ${JSON.stringify(record.AccountId)}, which is not an id. A malformed value is refused rather than coerced equal.` })
-      } else if (String(record.AccountId) !== String(expected)) {
+      } else if (typeof record.AccountId !== 'string' || !record.AccountId) {
+        // No null or undefined exemption: String(undefined) spells
+        // "undefined", and a planned id carrying that literal string
+        // compared equal to a missing AccountId (round 9).
+        problems.push({ what: `row ${create.index} association`, why: `The contact came back with ${JSON.stringify(record.AccountId === undefined ? null : record.AccountId)} for AccountId where account ${expected} was planned, which is not an id. A missing or malformed value is refused rather than coerced equal.` })
+      } else if (record.AccountId !== String(expected)) {
         problems.push({ what: `row ${create.index} association`, why: `The contact came back with AccountId ${JSON.stringify(record.AccountId || null)} where account ${expected} was planned.` })
       } else {
         checked.push({ what: `row ${create.index} association` })
