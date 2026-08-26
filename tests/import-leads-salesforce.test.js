@@ -710,6 +710,30 @@ check('a field that came back as a number is refused by the proof, not coerced e
   assert.ok(!proof.checked.some(c => /row 3 \(update\)/.test(c.what)), 'and it is not marked checked')
 })
 
+check('a lead-linked member row is skipped by the proof, not refused: it can prove nothing about contacts', () => {
+  // A matched campaign in a real org can hold members linked to a Lead,
+  // and those rows carry ContactId null. The Devin app's PR round caught
+  // the type guard refusing the whole read-back over them, reporting a
+  // correctly landed push as failed.
+  const withLead = cleanReadbacks()
+  withLead.members['Spring Roadshow'] = queryEnvelope([
+    { Id: 'M3', ContactId: '003U', Status: 'Attended', CampaignId: '701M' },
+    { Id: 'M9', ContactId: null, Status: 'Sent', CampaignId: '701M' }
+  ])
+  const proof = salesforce.prove(config(), smallPlan(), pushedIds(), withLead)
+  assert.deepStrictEqual(proof.problems, [], JSON.stringify(proof.problems))
+  assert.ok(proof.checked.some(c => c.what === 'campaign Spring Roadshow, row 3'))
+
+  const wrongCampaignLead = cleanReadbacks()
+  wrongCampaignLead.members['Spring Roadshow'] = queryEnvelope([
+    { Id: 'M3', ContactId: '003U', Status: 'Attended', CampaignId: '701M' },
+    { Id: 'M9', ContactId: null, Status: 'Sent', CampaignId: '701OTHER' }
+  ])
+  const misfiled = salesforce.prove(config(), smallPlan(), pushedIds(), wrongCampaignLead)
+  assert.ok(misfiled.problems.some(p => /campaign Spring Roadshow/.test(p.what) && /refuses to read/.test(p.why)),
+    'a lead row is still bound by its CampaignId before it is skipped')
+})
+
 check('member and status read-back queries select CampaignId so the proof can bind them', () => {
   const requests = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
   const members = requests.find(r => r.label === 'read back members: Autumn Summit')

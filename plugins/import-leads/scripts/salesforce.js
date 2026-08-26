@@ -933,10 +933,20 @@ function prove (config, plan, pushedIds, readbacks) {
     // campaign they were fetched for, and malformed values are refused
     // rather than coerced, because a numeric ContactId read through
     // String() could match a planned id the judge would have refused.
+    //
+    // A ROW WITH NO ContactId IS A DIFFERENT ANSWER FROM A MALFORMED ONE.
+    // A matched campaign in a real org can hold members linked to a Lead,
+    // and those rows carry ContactId null; the Lead object is out of this
+    // plugin's scope by recorded decision, such a row can neither satisfy
+    // nor contradict a planned contact membership, and refusing the whole
+    // read-back over it reported a correctly landed push as failed. A
+    // null ContactId row is skipped after its CampaignId binding is
+    // checked; a ContactId that is present and not a string stays refused
+    // as the wrong type it is.
     const misfiled = result.records.find(r =>
       typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId) ||
-      typeof r.ContactId !== 'string' || !r.ContactId ||
-      typeof r.Status !== 'string' || !r.Status.trim())
+      (r.ContactId !== null && r.ContactId !== undefined && typeof r.ContactId !== 'string') ||
+      (typeof r.ContactId === 'string' && (!r.ContactId || typeof r.Status !== 'string' || !r.Status.trim())))
     if (misfiled) {
       problems.push({
         what: `campaign ${membership.campaign}`,
@@ -944,7 +954,7 @@ function prove (config, plan, pushedIds, readbacks) {
       })
       continue
     }
-    const onCampaign = new Map(result.records.map(r => [r.ContactId, r.Status]))
+    const onCampaign = new Map(result.records.filter(r => typeof r.ContactId === 'string').map(r => [r.ContactId, r.Status]))
     for (const index of membership.rows) {
       const id = (pushedIds.contacts || {})[index] ||
         ((plan.contacts.updates.find(u => u.index === index) || plan.contacts.nothing.find(n => n.index === index) || {}).contactId)
