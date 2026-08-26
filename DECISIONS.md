@@ -6120,3 +6120,85 @@ portal, verified by read-backs, torn down cleanly. Run one did it and
 taught seven corrections. Run two did it on the corrected pipeline and
 taught nothing new, which is what finished looks like. The Salesforce
 port cycle is the queue's next item and starts from a settled design.
+
+## import-leads: the Salesforce port designed, 2026-08-26
+
+Sarah's ask of 2026-08-26 un-parked the port, the backend rule's real
+request, and this is its design cycle, started in the clean session she
+called for after run two. Everything in this section is design; the build
+follows it through the full review order, and nothing here claims a
+measurement the 2026-08-25 session did not make. The design lives in
+`SKILLS-import-leads.md`; this section records the decisions and their
+reasoning.
+
+### One CRM per install, chosen by config
+
+The one-store rule survives the port as one CRM per install. The private
+config gains a `crm` field naming `hubspot` or `salesforce`, and an absent
+field reads as `hubspot`, because every config written before the field
+existed was written for HubSpot and nothing rewrites this file; a wrong
+value is fixed by hand, the standing rule. For Salesforce the config holds
+the org alias the `sf` CLI keychain answers for, the field-name map in the
+org's own API names, and any record-type ids the org routes creates
+through, which is the home the design pull request promised them. No key
+file exists on this backend: the CLI holds the credential, so the
+no-credentials rule is satisfied by construction rather than by care.
+
+### Contacts and accounts, not leads
+
+The question the design carried since 2026-08-25 is answered by the
+plugin's own floor rather than by a preference: no contact is created
+without its company matched or planned, and a Lead is companyless by
+design, with conversion machinery nothing here has measured. So the port
+lands Contacts and Accounts, the Lead object stays unmeasured and out of
+scope, and a lead-based org's import is Open work waiting for a user who
+asks for it, the same trigger the port itself waited on.
+
+### The grid maps onto native member statuses
+
+What the 2026-08-25 decision promised, now specified. One campaign per
+campaign from the multi-event step, matched by name or planned; the grid's
+statuses matched against the campaign's own member-status rows, a fresh
+campaign carrying Sent and Responded, or planned as creates, one plain
+call each, measured where the reference needed Apex. The list-naming
+convention is HubSpot's alone and does not travel, because it exists only
+to stand in for the member status a HubSpot list cannot carry.
+
+### What differs per backend is said where it differs
+
+- The company association is the contact's own `AccountId` field, one
+  write rather than a second call.
+- Salesforce auto-creates nothing from an email domain, so the collision
+  the HubSpot company step names does not exist there, and the Open item
+  about reading that setting stays HubSpot's.
+- No measured email-uniqueness backstop: duplicate rules are org
+  configuration, so the dedupe search is the whole guard on that backend
+  and the plan treats it that way rather than counting on a refusal to
+  catch what the search missed.
+- A duplicate campaign member is a hard individual error with the existing
+  row untouched, folded into the report beside HubSpot's silent no-op:
+  the same partial-success expectation in the other store's spelling.
+- The Marketing User flag: `check` reads it and names it, because campaign
+  creation is refused while it is off, and naming is the whole of
+  `check`'s job. `run` blocks a plan that needs a campaign at the
+  membership step and offers the measured one-call fix behind its own
+  explicit yes, separate from the plan's confirmation, because the plan's
+  yes covers the plan and this writes the org's User record, which the
+  write contract does not cover.
+- The email opt-out stays out of the write contract on both backends:
+  HubSpot's lives in unmeasured subscription statuses, Salesforce's plain
+  field is org-dependent, measured absent from a fresh Developer Edition
+  org, and nothing in the pipeline reads an opt-out from a source list
+  anyway.
+
+### What the build must measure before it claims to work
+
+Update semantics on existing contacts, which the fill-blanks updates need,
+and the query shape that matches an account by the derived domain against
+`Website`. Nothing else is assumed instead of measured: the Lead object,
+batch semantics against the per-record CLI route, and free-org volume
+limits stay out of the port's scope rather than being half-measured. The
+release gate is the acceptance pattern the HubSpot half closed twice over,
+run against a Developer Edition org: a fresh invented list, pre-created
+fixtures playing the already-in-CRM records, push, prove field by field,
+teardown with every deletion confirmed by count read-backs.
