@@ -630,5 +630,103 @@ check('a Notion-sourced plan writes back and a CSV plan never does', () => {
   assert.strictEqual(result.plan.writeback.kind, 'notion')
 })
 
+// ------------------------------------------------ the salesforce assembly
+
+const salesforceInput = () => {
+  const input = goodInput()
+  delete input.listDecisions
+  input.config = {
+    crm: 'salesforce',
+    orgAlias: 'acceptance-org',
+    properties: { contact: { email: 'Email' }, company: { name: 'Name', website: 'Website' } }
+  }
+  input.campaigns = [
+    { name: 'Autumn Summit', type: 'Event' },
+    { name: 'Spring Roadshow', type: 'Event' }
+  ]
+  input.assignments = [
+    { index: 1, campaign: 'Autumn Summit', status: 'Invited' },
+    { index: 2, campaign: 'Spring Roadshow', status: 'Attended' }
+  ]
+  input.campaignDecisions = {
+    'Autumn Summit': { outcome: 'absent' },
+    'Spring Roadshow': { outcome: 'exists', campaignId: '701M' }
+  }
+  input.campaignStatuses = {
+    'Spring Roadshow': { labels: ['Sent', 'Responded'], maxSortOrder: 2 }
+  }
+  input.marketingUser = { userId: '005U', on: true }
+  return input
+}
+
+check('a salesforce plan realises memberships as campaigns and native statuses, with no lists at all', () => {
+  const result = plan.assemble(salesforceInput())
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.ok(!('lists' in result.plan), 'the list realisation is HubSpot\'s and does not travel')
+  const m = result.plan.campaignMemberships
+  assert.deepStrictEqual(m.campaigns.creates, [{ name: 'Autumn Summit', type: 'Event' }])
+  assert.deepStrictEqual(m.campaigns.matched, [{ name: 'Spring Roadshow', campaignId: '701M' }])
+  assert.deepStrictEqual(m.statuses.creates, [
+    { campaign: 'Autumn Summit', label: 'Invited', sortOrder: 3 },
+    { campaign: 'Spring Roadshow', label: 'Attended', sortOrder: 3 }
+  ], 'a fresh campaign already carries Sent and Responded, so a new status starts at 3; a matched one starts past its own rows')
+  assert.deepStrictEqual(m.members, [
+    { campaign: 'Autumn Summit', status: 'Invited', rows: [1] },
+    { campaign: 'Spring Roadshow', status: 'Attended', rows: [2] }
+  ])
+  assert.strictEqual(m.userFlagFix, null, 'the flag reads on, so there is nothing to fix')
+})
+
+check('Sent and Responded are never planned as creates on a new campaign: a fresh campaign carries them', () => {
+  const input = salesforceInput()
+  input.grid.types.Event.push('Sent')
+  input.assignments[0].status = 'Sent'
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.ok(!result.plan.campaignMemberships.statuses.creates.some(s => s.label === 'Sent'))
+  assert.ok(result.plan.campaignMemberships.members.some(m => m.status === 'Sent'), 'the membership itself still lands')
+})
+
+check('the flag off puts the one-call fix in the plan; unread or malformed, the plan refuses to assemble', () => {
+  const off = salesforceInput()
+  off.marketingUser = { userId: '005U', on: false }
+  const result = plan.assemble(off)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.deepStrictEqual(result.plan.campaignMemberships.userFlagFix, { userId: '005U' })
+
+  const malformed = salesforceInput()
+  malformed.marketingUser = { on: 'maybe' }
+  const refused = plan.assemble(malformed)
+  assert.strictEqual(refused.ok, false)
+  assert.ok(refused.problems.some(p => /Marketing User flag has not been read/.test(p)))
+
+  const absent = salesforceInput()
+  delete absent.marketingUser
+  assert.throws(() => plan.assemble(absent), /cannot be assembled without marketingUser/)
+})
+
+check('a campaign with no judged lookup blocks: matched or planned means the org was asked', () => {
+  const input = salesforceInput()
+  delete input.campaignDecisions['Autumn Summit']
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /"Autumn Summit" has no judged lookup/.test(p)))
+})
+
+check('a matched campaign whose status rows were never read blocks, because a blind create is a second copy', () => {
+  const input = salesforceInput()
+  delete input.campaignStatuses['Spring Roadshow']
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, false)
+  assert.ok(result.problems.some(p => /"Spring Roadshow" exists and its member-status rows have not been read/.test(p)))
+})
+
+check('listDecisions are not demanded on salesforce, and campaignDecisions are not demanded on hubspot', () => {
+  assert.strictEqual(plan.assemble(salesforceInput()).ok, true, 'no listDecisions anywhere in the input')
+  const hubspotInput = goodInput()
+  assert.strictEqual(plan.assemble(hubspotInput).ok, true, 'no campaignDecisions, campaignStatuses or marketingUser in the input')
+  assert.ok(!('campaignMemberships' in plan.assemble(hubspotInput).plan), 'a hubspot plan carries lists, not campaigns')
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

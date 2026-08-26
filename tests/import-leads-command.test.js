@@ -196,5 +196,85 @@ check('a domain column still wins over derivation, recorded as such', () => {
   assert.strictEqual(acme.domainSource, 'column')
 })
 
+// ------------------------------------------------- the salesforce dispatch
+
+// The same commands against a salesforce config emit sf CLI specs, and the
+// backend-specific commands refuse the other backend by name. The config
+// file is the suite's own temp file, swapped in place; each run() is a
+// fresh child process reading it cold.
+fs.writeFileSync(CONFIG, JSON.stringify({
+  configVersion: 1,
+  crm: 'salesforce',
+  orgAlias: 'acceptance-org',
+  aliasMapPath: aliasPath,
+  properties: {
+    contact: { firstName: 'FirstName', lastName: 'LastName', email: 'Email', phone: 'Phone', title: 'Title', city: 'MailingCity', state: 'MailingState', country: 'MailingCountry' },
+    company: { name: 'Name', website: 'Website' }
+  }
+}, null, 2))
+
+check('check-standing on salesforce reports the alias with nothing key-shaped, and names the flag', () => {
+  const result = run('check-standing')
+  assert.strictEqual(result.status, 0)
+  const standing = JSON.parse(result.stdout)
+  assert.strictEqual(standing.config.crm, 'salesforce')
+  assert.strictEqual(standing.config.orgAlias, 'acceptance-org')
+  assert.ok(!('serviceKey' in standing), 'the credential lives in the CLI keychain, so there is no key file to check')
+  assert.strictEqual(standing.orgDisplay.request.transport, 'cli')
+  assert.ok(/Marketing User/.test(standing.marketingUserFlag.note))
+  assert.strictEqual(standing.probe.request.transport, 'query')
+  assert.ok(/unmeasured rather than known absent/.test(standing.autoCompanyCreation))
+})
+
+check('dedupe-queries on salesforce emits SOQL specs and the sf send note', () => {
+  const rows = path.join(TEMP, 'sf-rows.json')
+  fs.writeFileSync(rows, JSON.stringify([
+    { index: 1, source: {}, fields: { email: 'ada@acme.example' }, fieldSources: { email: 'list' } }
+  ]))
+  const parsed = JSON.parse(run('dedupe-queries', rows).stdout)
+  assert.strictEqual(parsed.requests[0].transport, 'query')
+  assert.ok(parsed.requests[0].soql.includes('Email IN ('))
+  assert.ok(/sf data query/.test(parsed.note))
+  assert.ok(!/Service Key/.test(parsed.note), 'nothing key-shaped is mentioned on this backend')
+})
+
+check('list-queries refuses a salesforce config and points at the campaign route, and the reverse', () => {
+  const grid = path.join(TEMP, 'sf-grid.json')
+  fs.writeFileSync(grid, JSON.stringify({ naming: '{campaign} - {status}', types: { Event: ['Invited'] } }))
+  const refused = run('list-queries', grid, grid, grid)
+  assert.notStrictEqual(refused.status, 0)
+  assert.ok(/campaign-queries/.test(refused.stderr))
+
+  const campaigns = path.join(TEMP, 'sf-campaigns.json')
+  fs.writeFileSync(campaigns, JSON.stringify([{ name: 'Summit', type: 'Event' }]))
+  const good = run('campaign-queries', campaigns)
+  assert.strictEqual(good.status, 0)
+  const parsed = JSON.parse(good.stdout)
+  assert.ok(parsed.requests[0].soql.includes("WHERE Name = 'Summit'"))
+})
+
+check('the flag flow runs whoami first and the flag read second, judged by one command', () => {
+  const first = JSON.parse(run('flag-query').stdout)
+  assert.deepStrictEqual(first.request.args, ['org', 'display', 'user'])
+  const whoami = path.join(TEMP, 'whoami.json')
+  fs.writeFileSync(whoami, JSON.stringify({ status: 0, result: { id: '005U' } }))
+  const step1 = JSON.parse(run('flag-judge', whoami).stdout)
+  assert.strictEqual(step1.userId, '005U')
+  const second = JSON.parse(run('flag-query', '005U').stdout)
+  assert.ok(second.request.soql.includes('UserPermissionsMarketingUser'))
+  const flag = path.join(TEMP, 'flag.json')
+  fs.writeFileSync(flag, JSON.stringify({ status: 0, result: { records: [{ Id: '005U', UserPermissionsMarketingUser: false }], totalSize: 1, done: true } }))
+  const step2 = JSON.parse(run('flag-judge', flag).stdout)
+  assert.deepStrictEqual(step2, { ok: true, userId: '005U', on: false })
+})
+
+check('status-queries with no existing campaign says so instead of emitting nothing silently', () => {
+  const decisions = path.join(TEMP, 'sf-decisions.json')
+  fs.writeFileSync(decisions, JSON.stringify({ campaignDecisions: { Summit: { outcome: 'absent' } } }))
+  const parsed = JSON.parse(run('status-queries', decisions).stdout)
+  assert.deepStrictEqual(parsed.requests, [])
+  assert.ok(/Sent and Responded/.test(parsed.note))
+})
+
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
 process.exit(failures ? 1 : 0)

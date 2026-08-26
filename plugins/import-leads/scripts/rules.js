@@ -214,9 +214,12 @@ function requiredFieldsProblems (rules) {
  * for two different things, and two campaigns' members silently merge.
  * `types` says which statuses exist per campaign type. On HubSpot the grid
  * becomes one list per status per campaign (a list carries no member status
- * of its own, measured 2026-08-25); the Salesforce port reads the same grid
- * onto native member statuses, which is why the grid lives in Process and
- * not in this code.
+ * of its own, measured 2026-08-25); on Salesforce the same grid maps onto
+ * native member statuses, which is why the grid lives in Process and
+ * not in this code. The naming template below is HubSpot's realisation and
+ * is still validated on both backends, because one grid artifact serves
+ * every install and a template that names two lists one name is broken
+ * wherever it lives.
  */
 function gridProblems (grid) {
   if (!grid || typeof grid !== 'object' || Array.isArray(grid)) {

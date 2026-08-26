@@ -1,0 +1,804 @@
+'use strict'
+
+/**
+ * The Salesforce half: every request this plugin sends to a Salesforce org
+ * is built here, and every response it acts on is judged here. The skill
+ * runs the `sf` CLI; the credential lives in the CLI's keychain under the
+ * alias config names, so nothing key-shaped exists anywhere in this flow.
+ *
+ * THE TRANSPORT, measured 2026-08-26. Queries and deletes go through the
+ * data commands (`sf data query --json`). Writes go through
+ * `sf api request rest` with a JSON body file, because the data commands'
+ * `--values` parser refuses a value carrying an apostrophe in either
+ * spelling, and names like O'Brien are ordinary list data. A REST create
+ * answers the bare `{id, success, errors}` envelope; a REST PATCH answers
+ * HTTP 204 with an empty body, so the read-back is its only proof.
+ *
+ * WHAT IS MEASURED AND WHAT IS NOT. The surfaces below were measured
+ * against a real Developer Edition org on 2026-08-25 and 2026-08-26:
+ * creates for Account, Contact (with AccountId as a field on the create),
+ * Campaign, CampaignMemberStatus and CampaignMember; SOQL with IN, LIKE
+ * (case-insensitive, `_` a wildcard), the `\'` escape and dotted
+ * relationship fields arriving nested; partial updates touching only the
+ * named field; the campaign-by-name lookup answering an empty result set
+ * for an absent name; the member-status read; the Marketing User flag
+ * readable and settable; the duplicate member failing individually with
+ * the existing row untouched. The dated summaries are in `DECISIONS.md`,
+ * and the live acceptance run is what proves the assembled pipeline:
+ * nothing here claims to work until it has.
+ */
+
+const API = '/services/data/v67.0'
+
+/**
+ * A request spec: what to send. The skill composes the CLI call:
+ *
+ *   query  sf data query --target-org <alias> --query <soql> --json
+ *   rest   sf api request rest <path> --method <method> --body @<file>
+ *            --target-org <alias>   (the body written to a file first;
+ *            no --body flag at all when the spec carries none)
+ *   cli    sf <args...> --target-org <alias> --json
+ */
+function spec (label, shape) {
+  return Object.assign({ label }, shape)
+}
+
+const query = (label, targetOrg, soql) => spec(label, { transport: 'query', targetOrg, soql })
+const rest = (label, targetOrg, method, path, body) => {
+  const out = spec(label, { transport: 'rest', targetOrg, method, path })
+  if (body !== undefined) out.body = body
+  return out
+}
+
+/**
+ * A SOQL string literal. The apostrophe escape is measured (2026-08-26);
+ * the backslash escape is the same rule applied to the escape character
+ * itself, or a value ending in a backslash would swallow the closing
+ * quote.
+ */
+const soqlLiteral = value => "'" + String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"
+
+/**
+ * The org's field API name for a canonical contact field, from config.
+ * Same contract as the HubSpot half: absent optional fields return null
+ * and the caller decides whether that is fine or a problem.
+ */
+const contactField = (config, field) => (config.properties.contact[field] === undefined ? null : config.properties.contact[field])
+
+/** The reverse map, field API name back to canonical, for reading rows. */
+function reverseContactMap (config) {
+  const back = {}
+  for (const [field, name] of Object.entries(config.properties.contact)) {
+    back[name] = field
+  }
+  return back
+}
+
+/** Every mapped contact field API name a contact read should ask for. */
+function contactFieldNames (config) {
+  return [...new Set(Object.values(config.properties.contact))]
+}
+
+/** The measured query envelope, or null. `--json` wraps records in result. */
+function queryRecords (response) {
+  if (response && typeof response === 'object' && response.status === 0 &&
+      response.result && Array.isArray(response.result.records)) {
+    return response.result
+  }
+  return null
+}
+
+// ------------------------------------------------------------------- search
+
+/** The same reference batch size the HubSpot half carries. */
+const SEARCH_BATCH = 100
+
+/**
+ * The dedupe searches: SOQL IN on the mapped email field, batched. Each
+ * asks for every mapped field plus AccountId and Account.Name, because the
+ * blanks-only fill cannot know what is blank without reading what is
+ * there, and the cross-company conflict check needs the account's name.
+ * The dotted field arrives nested, `Account: {Name}`, measured 2026-08-26.
+ */
+function searchRequests (config, emails) {
+  if (!Array.isArray(emails)) throw new Error('searchRequests needs the list of emails to look for.')
+  const unique = [...new Set(
+    emails.filter(e => typeof e === 'string' && e.trim()).map(e => e.trim().toLowerCase())
+  )]
+  const fields = [...new Set(contactFieldNames(config).concat(['Id', 'AccountId', 'Account.Name']))]
+  const requests = []
+  for (let at = 0; at < unique.length; at += SEARCH_BATCH) {
+    const batch = unique.slice(at, at + SEARCH_BATCH)
+    requests.push(query(
+      `dedupe search ${requests.length + 1}`,
+      config.orgAlias,
+      `SELECT ${fields.join(', ')} FROM Contact WHERE ${contactField(config, 'email')} IN (${batch.map(soqlLiteral).join(', ')})`
+    ))
+  }
+  return requests
+}
+
+/**
+ * The search responses, normalised to contacts by lowercased email, the
+ * same shape the HubSpot half hands the dedupe. Anything but the measured
+ * query envelope is refused: a guess that produces an empty map reads
+ * exactly like a CRM with nobody in it, and every row would plan as a
+ * create.
+ *
+ * COMPLETENESS IS REPORTED, NOT ASSUMED. `done` has only ever been seen
+ * true; a response carrying `done: false` was cut short, and a contact
+ * left unfetched is a duplicate the plan would not see.
+ */
+function searchResults (config, responses) {
+  if (!Array.isArray(responses)) {
+    throw new Error('searchResults needs the array of saved query responses, one per request, in order.')
+  }
+  const back = reverseContactMap(config)
+  const byEmail = {}
+  const incomplete = []
+
+  responses.forEach((response, at) => {
+    const result = queryRecords(response)
+    if (!result) {
+      throw new Error(
+        `Response ${at + 1} is not the measured query envelope ({status: 0, result: {records}}). ` +
+        'Save what the CLI printed, whole. Guessing at another shape would read as a CRM with nobody in it.'
+      )
+    }
+    if (result.done !== true) {
+      incomplete.push({ response: at + 1, why: 'The response says done is not true, so records were withheld. A duplicate could be among them.' })
+    }
+    for (const record of result.records) {
+      if (!record || typeof record.Id !== 'string') {
+        throw new Error(`Response ${at + 1} holds a record with no Id. Save what the CLI printed.`)
+      }
+      const properties = {}
+      for (const [name, value] of Object.entries(record)) {
+        const field = back[name]
+        if (field && value !== null && value !== undefined) properties[field] = value
+      }
+      // The company signal for the conflict check rides under the same
+      // canonical name the HubSpot half uses. It is only ever read.
+      if (record.Account && typeof record.Account === 'object' && record.Account.Name) {
+        properties.company = record.Account.Name
+      }
+      if (record.AccountId) properties.accountId = String(record.AccountId)
+      const email = properties.email ? String(properties.email).trim().toLowerCase() : null
+      if (!email) continue
+      byEmail[email] = { id: String(record.Id), properties }
+    }
+  })
+
+  return { byEmail, incomplete, found: Object.keys(byEmail).length }
+}
+
+/**
+ * Account lookups for the matching step, one request per company: by name
+ * and, wherever a domain is known, by domain against the Website field.
+ * LIKE is measured case-insensitive with `%` and `_` as wildcards, so the
+ * fetch can only be wider than the question, never narrower; the judge of
+ * the candidates is the person, shown the evidence, and a wildcard in a
+ * name only adds candidates to decline.
+ */
+function companySearchRequests (config, companies) {
+  if (!Array.isArray(companies)) throw new Error('companySearchRequests needs [{name, domain}] entries.')
+  const nameField = config.properties.company.name
+  const websiteField = config.properties.company.website
+  const fields = ['Id', nameField, websiteField].filter(Boolean)
+  const select = `SELECT ${[...new Set(fields)].join(', ')} FROM Account`
+  const requests = []
+  for (const company of companies) {
+    requests.push(query(
+      `company search: ${company.name}`,
+      config.orgAlias,
+      `${select} WHERE ${nameField} LIKE ${soqlLiteral('%' + company.name + '%')} LIMIT 20`
+    ))
+    // Its own request, never OR-ed into the name search, the same rule the
+    // HubSpot half records: a broad name can fill the page and push the
+    // domain hit off it. The Website match is deliberately broad (LIKE on
+    // the bare domain finds the https://www form, measured 2026-08-26) and
+    // the person sees the candidates.
+    if (company.domain && websiteField) {
+      requests.push(query(
+        `company search by domain: ${company.name}`,
+        config.orgAlias,
+        `${select} WHERE ${websiteField} LIKE ${soqlLiteral('%' + company.domain + '%')} LIMIT 20`
+      ))
+    }
+  }
+  return requests
+}
+
+// -------------------------------------------------------------------- writes
+
+/**
+ * The REST body for a contact create. Only fields that name a source,
+ * enforced here as well as at the gate; the lead source goes on creates
+ * only; persona and owner only when config maps a field and the value
+ * names its source. The AccountId is added by the push, because only the
+ * push knows whether it is a matched id or a token, and the record-type
+ * id rides along when config carries one.
+ */
+function contactCreateBody (config, row, leadSource) {
+  const body = {}
+  for (const [field, value] of Object.entries(row.fields)) {
+    if (field === 'company' || field === 'companyDomain') continue
+    if (!(row.fieldSources && row.fieldSources[field])) continue
+    const name = contactField(config, field)
+    if (!name) continue
+    body[name] = value
+  }
+  if (row.persona && row.personaSource && contactField(config, 'persona')) {
+    body[contactField(config, 'persona')] = row.persona
+  }
+  if (row.owner && (row.ownerSource === 'routing' || row.ownerSource === 'confirmed') && contactField(config, 'owner')) {
+    body[contactField(config, 'owner')] = row.owner
+  }
+  if (leadSource) body[leadSource.property] = leadSource.value
+  if (config.recordTypeIds && config.recordTypeIds.contact) body.RecordTypeId = config.recordTypeIds.contact
+  return body
+}
+
+/** The blanks-only fill as a REST PATCH body. Same field set as HubSpot's. */
+const UPDATE_FIELDS = new Set([
+  'firstName', 'lastName', 'phone', 'title', 'city', 'state', 'country', 'linkedinUrl', 'persona', 'owner'
+])
+
+function contactUpdateBody (config, fill) {
+  const body = {}
+  for (const [field, value] of Object.entries(fill)) {
+    if (!UPDATE_FIELDS.has(field)) continue
+    const name = contactField(config, field)
+    if (!name) continue
+    body[name] = value
+  }
+  return body
+}
+
+// -------------------------------------------- campaigns, statuses, the flag
+
+/**
+ * The campaign lookups: matched, or planned for creation, which means
+ * asking the org before planning a create. One exact-name query per
+ * campaign; the by-name lookup and its empty answer for an absent name
+ * are both measured (2026-08-26).
+ */
+function campaignLookupRequests (config, campaigns) {
+  if (!Array.isArray(campaigns)) throw new Error('campaignLookupRequests needs the campaigns the person decided.')
+  return campaigns.map(campaign => query(
+    `campaign lookup: ${campaign.name}`,
+    config.orgAlias,
+    `SELECT Id, Name FROM Campaign WHERE Name = ${soqlLiteral(campaign.name)}`
+  ))
+}
+
+/**
+ * What a saved campaign lookup means. One row is a match with its id; an
+ * empty result set is the measured absent answer and plans a create; two
+ * or more rows is a question, because picking between two campaigns with
+ * one name is a judgment; anything else is a question too, because
+ * reading an unrecognised answer as absent is how a second copy of an
+ * existing campaign appears beside the first.
+ */
+function judgeCampaignLookup (response) {
+  const result = queryRecords(response)
+  if (!result) {
+    return { outcome: 'unknown', why: 'The response is not the measured query envelope, so its meaning is not known here. Reading it as absent would create a duplicate campaign.' }
+  }
+  if (result.records.length === 1) {
+    return { outcome: 'exists', campaignId: String(result.records[0].Id) }
+  }
+  if (result.records.length === 0) {
+    return { outcome: 'absent' }
+  }
+  return {
+    outcome: 'unknown',
+    why: `The org holds ${result.records.length} campaigns with this exact name. Which one the memberships belong on is the person's call, decided by id.`
+  }
+}
+
+/**
+ * The member-status reads for the campaigns that already exist. What a
+ * fresh campaign carries (Sent, the default, and Responded) is measured;
+ * these reads are what tell a matched campaign's actual rows.
+ */
+function statusReadRequests (config, campaignDecisions) {
+  if (!campaignDecisions || typeof campaignDecisions !== 'object' || Array.isArray(campaignDecisions)) {
+    throw new Error('statusReadRequests needs the judged campaign decisions, keyed by campaign name.')
+  }
+  const requests = []
+  for (const [name, decision] of Object.entries(campaignDecisions)) {
+    if (!decision || decision.outcome !== 'exists') continue
+    requests.push(query(
+      `status read: ${name}`,
+      config.orgAlias,
+      `SELECT Id, Label, SortOrder, IsDefault, HasResponded FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(decision.campaignId)}`
+    ))
+  }
+  return requests
+}
+
+/** The labels a campaign's status read holds, with the highest SortOrder. */
+function judgeStatusRead (response) {
+  const result = queryRecords(response)
+  if (!result) {
+    return { ok: false, why: 'The response is not the measured query envelope. A guessed status list would plan creates beside rows that already exist.' }
+  }
+  const labels = result.records.map(r => String(r.Label))
+  const maxSortOrder = result.records.reduce((max, r) => Math.max(max, Number(r.SortOrder) || 0), 0)
+  return { ok: true, labels, maxSortOrder }
+}
+
+/**
+ * The Marketing User flag flow. Without a user id the request is the
+ * CLI's own whoami; with one it is the flag read. `judgeFlag` reads
+ * either measured answer and says which it got, so one judge covers the
+ * two-step lookup without a shape being guessed at.
+ */
+function flagRequest (config, userId) {
+  if (!userId) {
+    return spec('whoami', { transport: 'cli', targetOrg: config.orgAlias, args: ['org', 'display', 'user'] })
+  }
+  return query('marketing-user flag', config.orgAlias,
+    `SELECT Id, UserPermissionsMarketingUser FROM User WHERE Id = ${soqlLiteral(userId)}`)
+}
+
+function judgeFlag (response) {
+  if (response && typeof response === 'object' && response.status === 0 &&
+      response.result && typeof response.result === 'object') {
+    const result = response.result
+    if (Array.isArray(result.records)) {
+      if (result.records.length !== 1) {
+        return { ok: false, why: `The flag query returned ${result.records.length} users where one id should return one. Look at the saved response.` }
+      }
+      const record = result.records[0]
+      return { ok: true, userId: String(record.Id), on: record.UserPermissionsMarketingUser === true }
+    }
+    if (result.id) {
+      return { ok: true, userId: String(result.id), next: 'Run flag-query again with this user id to read the flag itself.' }
+    }
+  }
+  return { ok: false, why: 'The response is neither the whoami answer nor the flag query envelope, both measured 2026-08-26. Save it whole and look at it.' }
+}
+
+// ---------------------------------------------------------------- the push
+
+/**
+ * The salesforce plan shape, asserted rather than defaulted, the same
+ * rule the HubSpot half applies to its lists: a plan built by an older
+ * step or edited by hand is a plan to rebuild, not to guess at.
+ */
+function assertPlanShape (plan, who) {
+  const m = plan && plan.campaignMemberships
+  if (!plan || !m || !m.campaigns || !Array.isArray(m.campaigns.creates) || !Array.isArray(m.campaigns.matched) ||
+      !m.statuses || !Array.isArray(m.statuses.creates) || !Array.isArray(m.members) ||
+      m.userFlagFix === undefined) {
+    throw new Error(
+      `${who} needs a plan whose campaignMemberships carry \`campaigns\`, \`statuses\`, \`members\` and \`userFlagFix\`, ` +
+      'which the plan command builds from the judged campaign lookups and status reads. This plan does not, so it was ' +
+      'built by an older step or edited by hand: run `plan` again rather than pushing a guess.'
+    )
+  }
+}
+
+/**
+ * The push, as request specs in dependency order: accounts first, then
+ * the adoption fills, then the flag fix when the plan carries one, then
+ * contacts (each create carrying its AccountId, because on this backend
+ * the association is a field on the create), then campaigns, then member
+ * statuses, then members.
+ *
+ * Tokens are the HubSpot half's opaque numbered ones, `{account:1}`,
+ * `{contact:12}`, `{campaign:2}`, with the legend in `placeholders`.
+ */
+function pushRequests (config, plan) {
+  assertPlanShape(plan, 'push')
+  const requests = []
+  const placeholders = {}
+  const org = config.orgAlias
+  const memberships = plan.campaignMemberships
+
+  const accountToken = new Map()
+  plan.companies.creates.forEach((company, at) => {
+    const token = `{account:${at + 1}}`
+    accountToken.set(company.name, token)
+    placeholders[token] = { kind: 'account', key: company.name }
+  })
+  const campaignToken = new Map()
+  memberships.campaigns.creates.forEach((campaign, at) => {
+    const token = `{campaign:${at + 1}}`
+    campaignToken.set(campaign.name, token)
+    placeholders[token] = { kind: 'campaign', key: campaign.name }
+  })
+  for (const create of plan.contacts.creates) {
+    placeholders[`{contact:${create.index}}`] = { kind: 'contact', key: String(create.index) }
+  }
+
+  const contactRef = index => {
+    const create = plan.contacts.creates.find(c => c.index === index)
+    if (create) return `{contact:${index}}`
+    const known = plan.contacts.updates.find(u => u.index === index) ||
+      plan.contacts.nothing.find(n => n.index === index)
+    if (known && known.contactId) return String(known.contactId)
+    throw new Error(`Row ${index} is on a membership and is neither a planned create nor a row with a known contact id. The plan is inconsistent, and this is a bug in this plugin, not in the list.`)
+  }
+  const accountIdFor = name => {
+    const matched = plan.companies.matched.find(m => m.name === name)
+    return matched ? matched.companyId : accountToken.get(name)
+  }
+  const campaignIdFor = name => {
+    const matched = memberships.campaigns.matched.find(m => m.name === name)
+    return matched ? matched.campaignId : campaignToken.get(name)
+  }
+
+  for (const company of plan.companies.creates) {
+    const body = { [config.properties.company.name]: company.name }
+    if (company.website && config.properties.company.website) {
+      body[config.properties.company.website] = company.website
+    }
+    if (config.recordTypeIds && config.recordTypeIds.account) body.RecordTypeId = config.recordTypeIds.account
+    requests.push(rest(`create account: ${company.name}`, org, 'POST', `${API}/sobjects/Account`, body))
+  }
+
+  // The adoption fill on a matched account, one PATCH by the id the match
+  // names, empty values dropped even when the caller skipped the plan's
+  // refusal, the same belt-and-braces as the HubSpot half.
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    const filled = value => typeof value === 'string' && value.trim()
+    const body = {}
+    if (filled(matched.fill.name)) body[config.properties.company.name] = matched.fill.name
+    if (filled(matched.fill.website) && config.properties.company.website) {
+      body[config.properties.company.website] = matched.fill.website
+    }
+    if (!Object.keys(body).length) continue
+    requests.push(rest(`fill account: ${matched.name}`, org, 'PATCH', `${API}/sobjects/Account/${matched.companyId}`, body))
+  }
+
+  // The flag fix, before anything in the campaign family, because campaign
+  // creation is refused while the flag is off (measured 2026-08-25). It is
+  // in the plan, shown in the confirmation summary, and proved by its
+  // read-back like every write.
+  if (memberships.userFlagFix) {
+    requests.push(rest(
+      'fix marketing-user flag',
+      org, 'PATCH', `${API}/sobjects/User/${memberships.userFlagFix.userId}`,
+      { UserPermissionsMarketingUser: true }
+    ))
+  }
+
+  for (const create of plan.contacts.creates) {
+    const body = contactCreateBody(config, create.row, plan.leadSource)
+    const company = create.row.fields.company
+    if (company) body.AccountId = accountIdFor(company)
+    requests.push(rest(`create contact: row ${create.index}`, org, 'POST', `${API}/sobjects/Contact`, body))
+  }
+  for (const update of plan.contacts.updates) {
+    requests.push(rest(`update contact: row ${update.index}`, org, 'PATCH', `${API}/sobjects/Contact/${update.contactId}`, contactUpdateBody(config, update.fill)))
+  }
+
+  for (const campaign of memberships.campaigns.creates) {
+    requests.push(rest(`create campaign: ${campaign.name}`, org, 'POST', `${API}/sobjects/Campaign`, { Name: campaign.name }))
+  }
+  for (const status of memberships.statuses.creates) {
+    requests.push(rest(
+      `create member status: ${status.campaign} / ${status.label}`,
+      org, 'POST', `${API}/sobjects/CampaignMemberStatus`,
+      { CampaignId: campaignIdFor(status.campaign), Label: status.label, SortOrder: status.sortOrder }
+    ))
+  }
+  for (const membership of memberships.members) {
+    for (const index of membership.rows) {
+      requests.push(rest(
+        `add member: row ${index} to ${membership.campaign} / ${membership.status}`,
+        org, 'POST', `${API}/sobjects/CampaignMember`,
+        { CampaignId: campaignIdFor(membership.campaign), ContactId: contactRef(index), Status: membership.status }
+      ))
+    }
+  }
+
+  return {
+    requests,
+    placeholders,
+    note:
+      'Send in this order. Every `{kind:number}` token stands for an id that does not exist yet; `placeholders` says which ' +
+      'record each one is, and as each create returns its id, substitute it for that exact token in the later requests. ' +
+      'One record failing does not stop the rest: partial success is per record, and judge-push reads the saved responses. ' +
+      'Nothing beyond these requests is approved.'
+  }
+}
+
+/**
+ * What a saved push response means, per the measured behaviours.
+ *
+ *   created           the bare REST create envelope, id with success true
+ *   done-unproved     an empty answer to a PATCH: the measured 204 carries
+ *                     no body, so the read-back is the only proof
+ *   duplicate-member  the member create refused individually with the
+ *                     existing row untouched, folded into the report
+ *   failed            either measured error shape, reported as itself
+ */
+function judgeResponse (request, response) {
+  const isPatch = request.method === 'PATCH'
+  if (response === null || response === undefined || response === '' ||
+      (typeof response === 'object' && !Array.isArray(response) && !Object.keys(response).length)) {
+    if (isPatch) {
+      return { outcome: 'done-unproved', why: 'A REST PATCH answers 204 with no body (measured 2026-08-26), so nothing about it is proved until its read-back is compared.' }
+    }
+    return { outcome: 'unknown', why: 'The response is empty and this request is not one whose empty response has a measured meaning. Nothing about it is proved.' }
+  }
+  if (typeof response === 'object' && !Array.isArray(response) && response.id && response.success === true) {
+    return { outcome: 'created', id: String(response.id) }
+  }
+  // The data commands wrap their result; a caller that sent a write that
+  // way still gets its id read, because both envelopes are measured.
+  if (typeof response === 'object' && response.status === 0 && response.result &&
+      response.result.id && response.result.success === true) {
+    return { outcome: 'created', id: String(response.result.id) }
+  }
+  const errors = Array.isArray(response)
+    ? response.filter(e => e && (e.message || e.errorCode))
+    : (typeof response === 'object' && (response.name || response.exitCode !== undefined) && response.message ? [response] : [])
+  if (errors.length) {
+    const text = errors.map(e => e.message || e.errorCode || e.name).join('; ')
+    const isMemberCreate = request.method === 'POST' && String(request.path || '').endsWith('/sobjects/CampaignMember')
+    if (isMemberCreate && /Already a campaign member/i.test(text)) {
+      return {
+        outcome: 'duplicate-member',
+        why:
+          'The org refused this member add because the contact is already on the campaign, and the existing row was not ' +
+          'changed by the failed insert (measured 2026-08-25). Folded into the report; the membership read-back is still the proof.'
+      }
+    }
+    return { outcome: 'failed', why: text }
+  }
+  return { outcome: 'unknown', why: 'The response is not a shape whose meaning has been measured. Save it whole and judge it by hand rather than guessing.' }
+}
+
+// ----------------------------------------------------------------- read-backs
+
+/**
+ * The read-back queries for everything the push claims to have written:
+ * contacts by id (creates by the pushed ids, updates by the ids the plan
+ * carried), accounts by id (creates and adoption fills), the members per
+ * campaign, and the flag when the plan fixed it.
+ */
+function readbackRequests (config, plan, pushedIds) {
+  assertPlanShape(plan, 'readbacks')
+  const requests = []
+  const org = config.orgAlias
+  const memberships = plan.campaignMemberships
+  const contactSelect = `SELECT ${[...new Set(contactFieldNames(config).concat(['Id', 'AccountId']))].join(', ')} FROM Contact`
+  const accountSelect = `SELECT ${['Id', config.properties.company.name, config.properties.company.website].filter(Boolean).join(', ')} FROM Account`
+
+  for (const [key, id] of Object.entries(pushedIds.contacts || {})) {
+    requests.push(query(`read back contact: row ${key}`, org, `${contactSelect} WHERE Id = ${soqlLiteral(id)}`))
+  }
+  for (const update of plan.contacts.updates) {
+    requests.push(query(`read back contact: row ${update.index}`, org, `${contactSelect} WHERE Id = ${soqlLiteral(update.contactId)}`))
+  }
+  for (const [name, id] of Object.entries(pushedIds.accounts || {})) {
+    requests.push(query(`read back account: ${name}`, org, `${accountSelect} WHERE Id = ${soqlLiteral(id)}`))
+  }
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    requests.push(query(`read back account: ${matched.name}`, org, `${accountSelect} WHERE Id = ${soqlLiteral(matched.companyId)}`))
+  }
+  // Member reads come from the plan, not from the pushed ids, the same
+  // rule the HubSpot half records: a run whose campaigns all matched
+  // existing ones still has to prove who landed on them.
+  const campaigns = [...new Set(memberships.members.map(m => m.campaign))]
+  for (const name of campaigns) {
+    const matched = memberships.campaigns.matched.find(m => m.name === name)
+    const id = matched ? matched.campaignId : (pushedIds.campaigns || {})[name]
+    if (!id) continue // no id means the create never returned one; prove fails it as an absent read-back
+    requests.push(query(`read back members: ${name}`, org,
+      `SELECT Id, ContactId, Status FROM CampaignMember WHERE CampaignId = ${soqlLiteral(id)}`))
+  }
+  if (memberships.userFlagFix) {
+    requests.push(query('read back marketing-user flag', org,
+      `SELECT Id, UserPermissionsMarketingUser FROM User WHERE Id = ${soqlLiteral(memberships.userFlagFix.userId)}`))
+  }
+  return requests
+}
+
+/**
+ * The proof: the read-backs compared field by field against the approved
+ * plan. An id is a locator, not a proof; the comparison is the proof, and
+ * it says what it did not check.
+ *
+ * `readbacks` is `{contacts: {"<row index>": response}, accounts:
+ * {"<name>": response}, members: {"<campaign name>": response},
+ * userFlag: response}`, each response saved as the CLI printed it.
+ */
+function prove (config, plan, pushedIds, readbacks) {
+  assertPlanShape(plan, 'prove')
+  const problems = []
+  const checked = []
+  const unchecked = []
+  const back = reverseContactMap(config)
+  const memberships = plan.campaignMemberships
+
+  const recordFrom = response => {
+    const result = queryRecords(response)
+    if (!result || result.records.length !== 1) return null
+    return result.records[0]
+  }
+
+  const compareRecord = (label, intended, record) => {
+    if (!record) {
+      problems.push({ what: label, why: 'No read-back to compare, so nothing about this write is proved.' })
+      return
+    }
+    for (const [name, sent] of Object.entries(intended)) {
+      const got = record[name]
+      if (got === undefined || got === null || String(got) !== String(sent)) {
+        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got === undefined ? null : got)}.` })
+      } else {
+        checked.push({ what: `${label}, ${back[name] || name}` })
+      }
+    }
+  }
+
+  for (const create of plan.contacts.creates) {
+    const id = (pushedIds.contacts || {})[create.index]
+    if (!id) {
+      problems.push({ what: `row ${create.index}`, why: 'The push report has no id for this create, so there is nothing to read back. It is not proved.' })
+      continue
+    }
+    const record = recordFrom((readbacks.contacts || {})[create.index])
+    compareRecord(`row ${create.index}`, contactCreateBody(config, create.row, plan.leadSource), record)
+
+    const company = create.row.fields.company
+    if (company) {
+      const expected = (plan.companies.matched.find(m => m.name === company) || {}).companyId ||
+        (pushedIds.accounts || {})[company]
+      if (!record) {
+        problems.push({ what: `row ${create.index} association`, why: 'No contact read-back, so the AccountId cannot be checked. Unproved fails the proof.' })
+      } else if (!expected) {
+        problems.push({ what: `row ${create.index} association`, why: `No account id is known for "${company}", so the association cannot be checked against the right record.` })
+      } else if (String(record.AccountId) !== String(expected)) {
+        problems.push({ what: `row ${create.index} association`, why: `The contact came back with AccountId ${JSON.stringify(record.AccountId || null)} where account ${expected} was planned.` })
+      } else {
+        checked.push({ what: `row ${create.index} association` })
+      }
+    }
+  }
+
+  for (const update of plan.contacts.updates) {
+    compareRecord(`row ${update.index} (update)`, contactUpdateBody(config, update.fill), recordFrom((readbacks.contacts || {})[update.index]))
+  }
+
+  for (const company of plan.companies.creates) {
+    const id = (pushedIds.accounts || {})[company.name]
+    if (!id) {
+      problems.push({ what: `account ${company.name}`, why: 'The push report has no id for this account, so there is nothing to read back.' })
+      continue
+    }
+    const intended = { [config.properties.company.name]: company.name }
+    if (company.website && config.properties.company.website) {
+      intended[config.properties.company.website] = company.website
+    }
+    compareRecord(`account ${company.name}`, intended, recordFrom((readbacks.accounts || {})[company.name]))
+  }
+
+  for (const matched of plan.companies.matched) {
+    if (!matched.fill || !Object.keys(matched.fill).length) continue
+    const filled = value => typeof value === 'string' && value.trim()
+    const intended = {}
+    if (filled(matched.fill.name)) intended[config.properties.company.name] = matched.fill.name
+    if (filled(matched.fill.website) && config.properties.company.website) {
+      intended[config.properties.company.website] = matched.fill.website
+    }
+    if (!Object.keys(intended).length) continue
+    compareRecord(`account ${matched.name} (fill)`, intended, recordFrom((readbacks.accounts || {})[matched.name]))
+  }
+
+  for (const membership of memberships.members) {
+    const result = queryRecords((readbacks.members || {})[membership.campaign])
+    if (!result) {
+      problems.push({ what: `campaign ${membership.campaign}`, why: 'No member read-back was saved, and the plan put rows on this campaign. Who landed there is unproved, and unproved fails the proof.' })
+      continue
+    }
+    const onCampaign = new Map(result.records.map(r => [String(r.ContactId), String(r.Status)]))
+    for (const index of membership.rows) {
+      const id = (pushedIds.contacts || {})[index] ||
+        ((plan.contacts.updates.find(u => u.index === index) || plan.contacts.nothing.find(n => n.index === index) || {}).contactId)
+      if (!id) {
+        unchecked.push({ what: `campaign ${membership.campaign}, row ${index}`, why: 'No contact id is known for this row, so its membership cannot be checked.' })
+      } else if (!onCampaign.has(String(id))) {
+        problems.push({ what: `campaign ${membership.campaign}, row ${index}`, why: 'The contact is not in the member read-back. The add did not land.' })
+      } else if (onCampaign.get(String(id)) !== membership.status) {
+        problems.push({ what: `campaign ${membership.campaign}, row ${index}`, why: `The member is on the campaign with status ${JSON.stringify(onCampaign.get(String(id)))} where ${JSON.stringify(membership.status)} was planned.` })
+      } else {
+        checked.push({ what: `campaign ${membership.campaign}, row ${index}` })
+      }
+    }
+  }
+
+  if (memberships.userFlagFix) {
+    const record = recordFrom(readbacks.userFlag)
+    if (!record) {
+      problems.push({ what: 'marketing-user flag', why: 'The plan fixed the flag and no read-back was saved. Unproved fails the proof.' })
+    } else if (record.UserPermissionsMarketingUser !== true) {
+      problems.push({ what: 'marketing-user flag', why: 'The read-back says the flag is still off, so the fix did not land.' })
+    } else {
+      checked.push({ what: 'marketing-user flag' })
+    }
+  }
+
+  unchecked.push({
+    what: 'everything not named above',
+    why: 'Only planned writes were compared. Fields the plan did not send, and records it did not touch, were not read.'
+  })
+
+  return { problems, checked, unchecked }
+}
+
+// -------------------------------------------------------------------- check
+
+/**
+ * The aliveness probe for `check`: the cheapest read that exercises the
+ * keychain credential. Nothing paid, nothing written.
+ */
+function probeRequest (config) {
+  return query('connection probe', config.orgAlias, 'SELECT Id FROM Contact LIMIT 1')
+}
+
+function judgeProbe (response) {
+  if (queryRecords(response)) {
+    return { alive: true, why: 'The org answered a read with the measured envelope. The credential works for reads; writes are proved only by the live run.' }
+  }
+  if (response && typeof response === 'object' && (response.name || response.message)) {
+    return { alive: false, why: `The CLI refused the probe: ${response.message || response.name}.` }
+  }
+  return { alive: false, why: 'The probe response is not a shape this recognises, so the connection is not proved alive. Save the response whole and look at it.' }
+}
+
+/** The alias-resolution check for check-standing: read-only, judged by shape. */
+function orgDisplayRequest (config) {
+  return spec('org display', { transport: 'cli', targetOrg: config.orgAlias, args: ['org', 'display'] })
+}
+
+function judgeOrgDisplay (response) {
+  if (response && typeof response === 'object' && response.status === 0 &&
+      response.result && response.result.connectedStatus === 'Connected') {
+    return { ok: true, apiVersion: response.result.apiVersion || null }
+  }
+  if (response && typeof response === 'object' && response.result && response.result.connectedStatus) {
+    return { ok: false, why: `The org answered with connectedStatus ${JSON.stringify(response.result.connectedStatus)}, not Connected.` }
+  }
+  return { ok: false, why: 'The response is not the measured org-display envelope, so the alias is not proved to resolve. Save it whole and look at it.' }
+}
+
+module.exports = {
+  API,
+  SEARCH_BATCH,
+  UPDATE_FIELDS,
+  spec,
+  soqlLiteral,
+  contactField,
+  reverseContactMap,
+  contactFieldNames,
+  queryRecords,
+  searchRequests,
+  searchResults,
+  companySearchRequests,
+  contactCreateBody,
+  contactUpdateBody,
+  campaignLookupRequests,
+  judgeCampaignLookup,
+  statusReadRequests,
+  judgeStatusRead,
+  flagRequest,
+  judgeFlag,
+  assertPlanShape,
+  pushRequests,
+  judgeResponse,
+  readbackRequests,
+  prove,
+  probeRequest,
+  judgeProbe,
+  orgDisplayRequest,
+  judgeOrgDisplay
+}
