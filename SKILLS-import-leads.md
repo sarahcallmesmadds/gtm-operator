@@ -308,8 +308,9 @@ and both execute only what the approved plan names.**
     request to send and no response to judge, and the gate, the payload
     builders and config's validation enforce the same field lists, so a
     field waved through in conversation still cannot reach a payload.
-    Then the confirmation summary: the whole plan, company creates and
-    adoption fills, contact creates and updates, exclusions, the
+    Then the confirmation summary: the whole plan, company creates,
+    adoption fills and associations, contact creates and updates,
+    exclusions, the
     membership writes (list
     creates and memberships on HubSpot; campaign, member-status and
     campaign-member creates on Salesforce, with the Marketing User flag
