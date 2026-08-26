@@ -241,6 +241,14 @@ function dedupeVerdicts (rows, existing) {
   const conflicts = []
   const unchecked = []
   const replacedEmailMatches = []
+  const crmAmbiguousMatches = []
+
+  // A store that holds two contacts under one email (possible on
+  // Salesforce, where no uniqueness has been measured) answers a question
+  // with a question: which record is this person. Neither record is kept
+  // by the search results, and every row on the email is presented here,
+  // never auto-resolved.
+  const ambiguousByEmail = new Map((existing.ambiguousInCrm || []).map(a => [a.email, a.contactIds]))
 
   for (const row of rows) {
     // A row whose personal address was replaced by an approved enrichment
@@ -249,6 +257,14 @@ function dedupeVerdicts (rows, existing) {
     // duplicate, because the portal accepts a second record when the
     // emails differ. Presented, never auto-resolved.
     const replaced = row.replacedEmail && foldEmail(row.replacedEmail)
+    if (replaced && ambiguousByEmail.has(replaced)) {
+      crmAmbiguousMatches.push({
+        index: row.index,
+        email: replaced,
+        contactIds: ambiguousByEmail.get(replaced),
+        why: 'The CRM holds more than one contact under the address this row replaced. Which record is this person is a judgment, presented and never auto-resolved.'
+      })
+    }
     if (replaced && existing.byEmail[replaced]) {
       replacedEmailMatches.push({
         index: row.index,
@@ -265,6 +281,15 @@ function dedupeVerdicts (rows, existing) {
       unchecked.push({
         index: row.index,
         why: 'The row has no email, and the dedupe check matches by email, so whether this person is already in the CRM is unknown. Unknown and new are different answers, and this row needs a decision.'
+      })
+      continue
+    }
+    if (ambiguousByEmail.has(email)) {
+      crmAmbiguousMatches.push({
+        index: row.index,
+        email,
+        contactIds: ambiguousByEmail.get(email),
+        why: 'The CRM holds more than one contact under this email. A create would add a third and an update would pick one, so which record is this person is presented, never auto-resolved.'
       })
       continue
     }
@@ -317,7 +342,7 @@ function dedupeVerdicts (rows, existing) {
     }
   }
 
-  return { verdicts, inListDuplicates, conflicts, unchecked, replacedEmailMatches }
+  return { verdicts, inListDuplicates, conflicts, unchecked, replacedEmailMatches, crmAmbiguousMatches }
 }
 
 // ------------------------------------------------------------ the assembly
@@ -463,6 +488,15 @@ function assemble (input) {
       problems.push(
         `Row ${match.index}: the CRM already holds a contact (id ${match.contactId}) under the address this row replaced ` +
         `(${match.replacedEmail}), and nobody has decided it. A replaced address's own match is presented, never auto-resolved.`
+      )
+    }
+  }
+  for (const match of (input.dedupe.crmAmbiguousMatches || [])) {
+    if (!excluded.has(match.index) && !decided.has(match.index)) {
+      problems.push(
+        `Row ${match.index}: the CRM holds more than one contact under ${match.email} ` +
+        `(ids ${(match.contactIds || []).join(', ')}), and nobody has decided it. Which record is this person is a ` +
+        'judgment, presented and never auto-resolved.'
       )
     }
   }
@@ -754,14 +788,17 @@ function assemble (input) {
       return { campaign: campaignName, status, rows: rowIndexes.sort((a, b) => a - b) }
     }).sort((a, b) => (a.campaign + a.status).localeCompare(b.campaign + b.status))
 
-    const campaignFamilyWrites = campaignMemberships.campaigns.creates.length ||
-      campaignMemberships.statuses.creates.length || campaignMemberships.members.length
-    if (campaignFamilyWrites) {
+    // THE FIX IS SCOPED TO THE MEASURED REFUSAL. What is measured is
+    // campaign CREATION refused while the flag is off; whether member and
+    // status writes are refused too is unmeasured, so they do not justify
+    // a privileged User write, and if the org refuses one of them the
+    // push's own per-record report says so.
+    if (campaignMemberships.campaigns.creates.length) {
       const flag = input.marketingUser
       if (!flag || typeof flag.on !== 'boolean' || !flag.userId) {
         problems.push(
           'The Marketing User flag has not been read ({userId, on}). Campaign creation is refused while it is off ' +
-          '(measured 2026-08-25), so a plan touching the campaign family is not assembled without the flag read. ' +
+          '(measured 2026-08-25), so a plan that creates a campaign is not assembled without the flag read. ' +
           'Run flag-query and flag-judge.'
         )
       } else if (flag.on !== true) {

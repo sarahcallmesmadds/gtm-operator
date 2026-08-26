@@ -6426,3 +6426,34 @@ org, a fresh invented list with pre-created fixtures playing the
 already-in-CRM records, push, prove field by field, teardown confirmed by
 count read-backs, recorded here. Until that run happens the Salesforce
 half has not been watched doing its job, and its README says so.
+
+### Round 1 on the port build, Codex CLI, 2026-08-26: seven findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+changed script whole, and every finding reproduced by the reviewer before
+it was reported. The two High were pair-misses of exactly the shape the
+prompt asked it to hunt. Two CRM contacts under one email, possible on a
+store with no measured uniqueness, were silently collapsed to whichever
+record arrived last; the search results now surface the ambiguity with
+neither record kept, dedupe gives such rows no verdict, and the assembly
+blocks them until excluded or decided, the same handling every other
+ambiguity gets. And the campaign lookups were bound to their campaigns by
+array position with the response's own Name discarded, so two reversed
+saved files filed each campaign's id under the other; the judge now binds
+the answer to its question by the name the row carries, and the HubSpot
+list judge got the same fix for the same latent fault, its envelope's
+name checked where it carries one. The Mediums: the wrong-type question
+asked of the new judges (done not true, a row with no Id, a null Label, a
+wordy SortOrder, a non-boolean flag all read as valid answers; every one
+refuses now, because a misread flag is a privileged write and a misread
+status plans a duplicate); campaign and status creates were never read
+back or proved, the unread-write fault this file has recorded before, and
+both now have read-backs compared like every other write; and the flag
+fix was planned for any campaign-family write where the measured refusal
+covers campaign creation alone, so it is scoped to creates, with a
+refused member or status write left to the push's own per-record report
+rather than justifying a privileged User write nothing measured. The
+Lows: the root README's release-gate claim scoped to the HubSpot half,
+and the marketplace entry's tags gaining salesforce. Six new mutations,
+each asserted landed and each red in its named check; the whole suite is
+green.

@@ -20,10 +20,12 @@ run against a live workspace is recorded in `DECISIONS.md`.
 that flow has been run end to end against a live Notion workspace. The
 writing plugins are built and reviewed, and what each one has and has not run
 against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
-`import-leads`, is built and has passed its release gate twice over: two
+`import-leads`, is built for one CRM per install, HubSpot or Salesforce. Its
+HubSpot half has passed its release gate twice over: two
 acceptance runs against a real portal on 2026-08-26, every write proved by
 read-back and the portal torn down to its starting state each time, recorded
-in `DECISIONS.md`.
+in `DECISIONS.md`. Its Salesforce half is built on live measurements and its
+own acceptance run is its remaining gate.
 
 **It has been run by its author and by nobody else**, and never against a
 workspace that already had something in it. Every failure it has survived was

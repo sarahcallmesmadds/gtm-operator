@@ -135,6 +135,7 @@ function searchResults (config, responses) {
   }
   const back = reverseContactMap(config)
   const byEmail = {}
+  const ambiguous = new Map()
   const incomplete = []
 
   responses.forEach((response, at) => {
@@ -165,11 +166,31 @@ function searchResults (config, responses) {
       if (record.AccountId) properties.accountId = String(record.AccountId)
       const email = properties.email ? String(properties.email).trim().toLowerCase() : null
       if (!email) continue
+      // TWO CRM RECORDS UNDER ONE EMAIL ARE A QUESTION, NOT A PICK. This
+      // org enforces no email uniqueness this design has measured, so the
+      // ambiguity is real here where HubSpot's portal makes it impossible.
+      // Keeping either record would silently decide which person the row
+      // is, so neither is kept and the collision is surfaced by email.
+      if (ambiguous.has(email)) {
+        const ids = ambiguous.get(email)
+        if (!ids.includes(String(record.Id))) ids.push(String(record.Id))
+        continue
+      }
+      if (byEmail[email] && byEmail[email].id !== String(record.Id)) {
+        ambiguous.set(email, [byEmail[email].id, String(record.Id)])
+        delete byEmail[email]
+        continue
+      }
       byEmail[email] = { id: String(record.Id), properties }
     }
   })
 
-  return { byEmail, incomplete, found: Object.keys(byEmail).length }
+  return {
+    byEmail,
+    ambiguousInCrm: [...ambiguous.entries()].map(([email, contactIds]) => ({ email, contactIds })),
+    incomplete,
+    found: Object.keys(byEmail).length
+  }
 }
 
 /**
@@ -273,20 +294,39 @@ function campaignLookupRequests (config, campaigns) {
 }
 
 /**
- * What a saved campaign lookup means. One row is a match with its id; an
- * empty result set is the measured absent answer and plans a create; two
- * or more rows is a question, because picking between two campaigns with
- * one name is a judgment; anything else is a question too, because
- * reading an unrecognised answer as absent is how a second copy of an
- * existing campaign appears beside the first.
+ * What a saved campaign lookup means. One row carrying the asked-for name
+ * is a match with its id; an empty result set is the measured absent
+ * answer and plans a create; two or more rows is a question, because
+ * picking between two campaigns with one name is a judgment; anything
+ * else is a question too, because reading an unrecognised answer as
+ * absent is how a second copy of an existing campaign appears beside the
+ * first.
+ *
+ * THE ANSWER IS BOUND TO ITS QUESTION BY THE NAME IT CARRIES, not by the
+ * order the files were passed in. Responses judged by position alone let
+ * two reversed saves file each campaign's id under the other one, and
+ * every membership would then land on the wrong campaign.
  */
-function judgeCampaignLookup (response) {
+function judgeCampaignLookup (response, expectedName) {
   const result = queryRecords(response)
   if (!result) {
     return { outcome: 'unknown', why: 'The response is not the measured query envelope, so its meaning is not known here. Reading it as absent would create a duplicate campaign.' }
   }
+  if (result.done !== true) {
+    return { outcome: 'unknown', why: 'The response says done is not true, so records were withheld. Absence cannot be read from an incomplete answer.' }
+  }
   if (result.records.length === 1) {
-    return { outcome: 'exists', campaignId: String(result.records[0].Id) }
+    const record = result.records[0]
+    if (typeof record.Id !== 'string' || !record.Id) {
+      return { outcome: 'unknown', why: 'The row carries no Id, so there is nothing to match against. Save the response whole and look at it.' }
+    }
+    if (expectedName !== undefined && String(record.Name) !== String(expectedName)) {
+      return {
+        outcome: 'unknown',
+        why: `The row is named ${JSON.stringify(record.Name)} where ${JSON.stringify(String(expectedName))} was asked for, so this response answers a different campaign's lookup. The saved files are out of order.`
+      }
+    }
+    return { outcome: 'exists', campaignId: String(record.Id) }
   }
   if (result.records.length === 0) {
     return { outcome: 'absent' }
@@ -324,8 +364,22 @@ function judgeStatusRead (response) {
   if (!result) {
     return { ok: false, why: 'The response is not the measured query envelope. A guessed status list would plan creates beside rows that already exist.' }
   }
-  const labels = result.records.map(r => String(r.Label))
-  const maxSortOrder = result.records.reduce((max, r) => Math.max(max, Number(r.SortOrder) || 0), 0)
+  if (result.done !== true) {
+    return { ok: false, why: 'The response says done is not true, so status rows were withheld, and a withheld row is a duplicate the plan would create beside.' }
+  }
+  // A malformed row is refused rather than read: a null Label becoming the
+  // string "null" and a wordy SortOrder becoming 0 would plan creates
+  // beside rows that exist, which is the exact thing this read prevents.
+  for (const record of result.records) {
+    if (typeof record.Label !== 'string' || !record.Label.trim()) {
+      return { ok: false, why: `A status row carries ${JSON.stringify(record.Label)} for its Label, which is not a status name. Save the response whole and look at it.` }
+    }
+    if (typeof record.SortOrder !== 'number' || !Number.isFinite(record.SortOrder)) {
+      return { ok: false, why: `The status row ${JSON.stringify(record.Label)} carries ${JSON.stringify(record.SortOrder)} for its SortOrder, which is not a number. Save the response whole and look at it.` }
+    }
+  }
+  const labels = result.records.map(r => r.Label)
+  const maxSortOrder = result.records.reduce((max, r) => Math.max(max, r.SortOrder), 0)
   return { ok: true, labels, maxSortOrder }
 }
 
@@ -348,11 +402,23 @@ function judgeFlag (response) {
       response.result && typeof response.result === 'object') {
     const result = response.result
     if (Array.isArray(result.records)) {
+      if (result.done !== true) {
+        return { ok: false, why: 'The response says done is not true, so records were withheld. The flag is not read from an incomplete answer.' }
+      }
       if (result.records.length !== 1) {
         return { ok: false, why: `The flag query returned ${result.records.length} users where one id should return one. Look at the saved response.` }
       }
       const record = result.records[0]
-      return { ok: true, userId: String(record.Id), on: record.UserPermissionsMarketingUser === true }
+      if (typeof record.Id !== 'string' || !record.Id) {
+        return { ok: false, why: 'The row carries no Id. Save the response whole and look at it.' }
+      }
+      // Strictly the boolean, because "false" the string and an absent
+      // field both read falsy, and a User update planned off a misread
+      // flag is a privileged write nothing justified.
+      if (record.UserPermissionsMarketingUser !== true && record.UserPermissionsMarketingUser !== false) {
+        return { ok: false, why: `The row carries ${JSON.stringify(record.UserPermissionsMarketingUser)} for the flag, which is not the boolean the measured read returns. Save the response whole and look at it.` }
+      }
+      return { ok: true, userId: record.Id, on: record.UserPermissionsMarketingUser }
     }
     if (result.id) {
       return { ok: true, userId: String(result.id), next: 'Run flag-query again with this user id to read the flag itself.' }
@@ -584,6 +650,20 @@ function readbackRequests (config, plan, pushedIds) {
     if (!matched.fill || !Object.keys(matched.fill).length) continue
     requests.push(query(`read back account: ${matched.name}`, org, `${accountSelect} WHERE Id = ${soqlLiteral(matched.companyId)}`))
   }
+  // A created campaign and a created status row are writes like any
+  // other, and an unread one is unproved: the campaign by its pushed id,
+  // and the status rows of every campaign the plan created statuses on.
+  for (const [name, id] of Object.entries(pushedIds.campaigns || {})) {
+    requests.push(query(`read back campaign: ${name}`, org, `SELECT Id, Name FROM Campaign WHERE Id = ${soqlLiteral(id)}`))
+  }
+  const statusCampaigns = [...new Set(memberships.statuses.creates.map(s => s.campaign))]
+  for (const name of statusCampaigns) {
+    const matched = memberships.campaigns.matched.find(m => m.name === name)
+    const id = matched ? matched.campaignId : (pushedIds.campaigns || {})[name]
+    if (!id) continue // no id means the create never returned one; prove fails it as an absent read-back
+    requests.push(query(`read back statuses: ${name}`, org,
+      `SELECT Id, Label, SortOrder FROM CampaignMemberStatus WHERE CampaignId = ${soqlLiteral(id)}`))
+  }
   // Member reads come from the plan, not from the pushed ids, the same
   // rule the HubSpot half records: a run whose campaigns all matched
   // existing ones still has to prove who landed on them.
@@ -608,7 +688,8 @@ function readbackRequests (config, plan, pushedIds) {
  * it says what it did not check.
  *
  * `readbacks` is `{contacts: {"<row index>": response}, accounts:
- * {"<name>": response}, members: {"<campaign name>": response},
+ * {"<name>": response}, campaigns: {"<name>": response}, statusRows:
+ * {"<campaign name>": response}, members: {"<campaign name>": response},
  * userFlag: response}`, each response saved as the CLI printed it.
  */
 function prove (config, plan, pushedIds, readbacks) {
@@ -621,7 +702,7 @@ function prove (config, plan, pushedIds, readbacks) {
 
   const recordFrom = response => {
     const result = queryRecords(response)
-    if (!result || result.records.length !== 1) return null
+    if (!result || result.done !== true || result.records.length !== 1) return null
     return result.records[0]
   }
 
@@ -692,6 +773,31 @@ function prove (config, plan, pushedIds, readbacks) {
     }
     if (!Object.keys(intended).length) continue
     compareRecord(`account ${matched.name} (fill)`, intended, recordFrom((readbacks.accounts || {})[matched.name]))
+  }
+
+  for (const campaign of memberships.campaigns.creates) {
+    const id = (pushedIds.campaigns || {})[campaign.name]
+    if (!id) {
+      problems.push({ what: `campaign ${campaign.name}`, why: 'The push report has no id for this campaign, so there is nothing to read back. It is not proved.' })
+      continue
+    }
+    compareRecord(`campaign ${campaign.name}`, { Name: campaign.name }, recordFrom((readbacks.campaigns || {})[campaign.name]))
+  }
+
+  for (const status of memberships.statuses.creates) {
+    const result = queryRecords((readbacks.statusRows || {})[status.campaign])
+    if (!result || result.done !== true) {
+      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: 'No status read-back was saved, and the plan created this status row. It is unproved, and unproved fails the proof.' })
+      continue
+    }
+    const row = result.records.find(r => String(r.Label) === status.label)
+    if (!row) {
+      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: 'The status row is not in the read-back. The create did not land.' })
+    } else if (Number(row.SortOrder) !== status.sortOrder) {
+      problems.push({ what: `status ${status.campaign} / ${status.label}`, why: `Sent SortOrder ${status.sortOrder} and the row came back with ${JSON.stringify(row.SortOrder)}.` })
+    } else {
+      checked.push({ what: `status ${status.campaign} / ${status.label}` })
+    }
   }
 
   for (const membership of memberships.members) {

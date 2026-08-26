@@ -117,7 +117,9 @@
         "hubspot",
         "gtm",
         "leads",
-        "import"
+        "import",
+        "salesforce",
+        "crm"
       ]
     }
   ]

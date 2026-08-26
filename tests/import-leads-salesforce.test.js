@@ -391,6 +391,16 @@ const cleanReadbacks = () => ({
   accounts: {
     Acme: queryEnvelope([{ Id: '001A', Name: 'Acme', Website: 'acme.example' }])
   },
+  campaigns: {
+    'Autumn Summit': queryEnvelope([{ Id: '701A', Name: 'Autumn Summit' }])
+  },
+  statusRows: {
+    'Autumn Summit': queryEnvelope([
+      { Id: 'S1', Label: 'Sent', SortOrder: 1 },
+      { Id: 'S2', Label: 'Responded', SortOrder: 2 },
+      { Id: 'S3', Label: 'Invited', SortOrder: 3 }
+    ])
+  },
   members: {
     'Autumn Summit': queryEnvelope([
       { Id: 'M1', ContactId: '003A', Status: 'Invited' },
@@ -407,6 +417,7 @@ check('a clean set of read-backs proves every planned write by name and still sa
   for (const expected of [
     'row 1, firstName', 'row 2, firstName', 'row 1 association', 'row 2 association',
     'row 3 (update), title', 'account Acme, Name',
+    'campaign Autumn Summit, Name', 'status Autumn Summit / Invited',
     'campaign Autumn Summit, row 1', 'campaign Autumn Summit, row 2', 'campaign Spring Roadshow, row 3'
   ]) {
     assert.ok(checked.includes(expected), `expected "${expected}" among the checked, got: ${checked.join(' | ')}`)
@@ -500,6 +511,68 @@ check('the probe is one cheap query and its judge trusts only the measured envel
   assert.strictEqual(salesforce.judgeProbe(queryEnvelope([])).alive, true)
   assert.strictEqual(salesforce.judgeProbe({ name: 'NamedOrgNotFound', message: 'No authorization found' }).alive, false)
   assert.strictEqual(salesforce.judgeProbe('ok').alive, false, 'an unrecognised answer is not proof of life')
+})
+
+check('two CRM contacts under one email are surfaced as ambiguous, with neither kept as the match', () => {
+  const result = salesforce.searchResults(config(), [queryEnvelope([
+    { Id: '003A', Email: 'shared@x.com', FirstName: 'A' },
+    { Id: '003B', Email: 'shared@x.com', FirstName: 'B' },
+    { Id: '003C', Email: 'solo@x.com', FirstName: 'C' }
+  ])])
+  assert.ok(!('shared@x.com' in result.byEmail), 'keeping either record would silently decide which person the row is')
+  assert.deepStrictEqual(result.ambiguousInCrm, [{ email: 'shared@x.com', contactIds: ['003A', '003B'] }])
+  assert.strictEqual(result.byEmail['solo@x.com'].id, '003C', 'an unambiguous match still matches')
+})
+
+check('a campaign lookup answering a different name than it was asked is a question, so reversed files cannot mis-file ids', () => {
+  const judged = salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701B', Name: 'Spring Roadshow' }]), 'Autumn Summit')
+  assert.strictEqual(judged.outcome, 'unknown')
+  assert.ok(/out of order/.test(judged.why))
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Id: '701A', Name: 'Autumn Summit' }]), 'Autumn Summit').outcome, 'exists')
+})
+
+check('a campaign lookup with done not true, or a row with no Id, is a question, never an absence or a match', () => {
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([], false)).outcome, 'unknown', 'an incomplete answer cannot prove absence')
+  assert.strictEqual(salesforce.judgeCampaignLookup(queryEnvelope([{ Name: 'Summit' }]), 'Summit').outcome, 'unknown', 'no Id, nothing to match against')
+})
+
+check('a status read refuses incomplete or malformed rows rather than planning creates beside them', () => {
+  assert.strictEqual(salesforce.judgeStatusRead(queryEnvelope([], false)).ok, false, 'done not true withholds rows')
+  assert.ok(/null/.test(salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: null, SortOrder: 1 }])).why))
+  assert.ok(/"later"/.test(salesforce.judgeStatusRead(queryEnvelope([{ Id: 'S1', Label: 'Sent', SortOrder: 'later' }])).why))
+})
+
+check('the flag judge refuses a non-boolean flag and an incomplete answer: a misread flag is a privileged write', () => {
+  assert.strictEqual(salesforce.judgeFlag(queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: 'false' }])).ok, false)
+  assert.strictEqual(salesforce.judgeFlag(queryEnvelope([{ Id: '005U' }])).ok, false, 'an absent flag field is not the real false')
+  assert.strictEqual(salesforce.judgeFlag(queryEnvelope([{ Id: '005U', UserPermissionsMarketingUser: false }], false)).ok, false, 'done not true withholds records')
+})
+
+check('a created campaign and a created status row are read back and proved, and an absent read-back fails', () => {
+  const requests = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
+  assert.ok(requests.find(r => r.label === 'read back campaign: Autumn Summit'), 'the campaign create is a write like any other')
+  const statuses = requests.find(r => r.label === 'read back statuses: Autumn Summit')
+  assert.ok(statuses.soql.includes('CampaignMemberStatus'))
+
+  const noCampaign = cleanReadbacks()
+  delete noCampaign.campaigns['Autumn Summit']
+  const first = salesforce.prove(config(), smallPlan(), pushedIds(), noCampaign)
+  assert.ok(first.problems.some(p => /campaign Autumn Summit$/.test(p.what) || (/campaign Autumn Summit/.test(p.what) && /No read-back/.test(p.why))))
+
+  const noStatuses = cleanReadbacks()
+  delete noStatuses.statusRows['Autumn Summit']
+  const second = salesforce.prove(config(), smallPlan(), pushedIds(), noStatuses)
+  assert.ok(second.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /unproved fails the proof/.test(p.why)))
+
+  const missingRow = cleanReadbacks()
+  missingRow.statusRows['Autumn Summit'] = queryEnvelope([{ Id: 'S1', Label: 'Sent', SortOrder: 1 }])
+  const third = salesforce.prove(config(), smallPlan(), pushedIds(), missingRow)
+  assert.ok(third.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /did not land/.test(p.why)))
+
+  const wrongSort = cleanReadbacks()
+  wrongSort.statusRows['Autumn Summit'].result.records[2].SortOrder = 9
+  const fourth = salesforce.prove(config(), smallPlan(), pushedIds(), wrongSort)
+  assert.ok(fourth.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /SortOrder/.test(p.why)))
 })
 
 check('org display judges Connected as ok and anything else as not proved', () => {
