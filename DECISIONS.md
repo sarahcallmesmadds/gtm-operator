@@ -6288,3 +6288,17 @@ Salesforce unmeasured list and in the build's to-measure list, so a
 builder cannot read the design as evidence the lookups already work. The
 third was a dropped pronoun that let "the CRM its config names" read as
 "the CRM's config names" in `run`'s opening line, now restored.
+
+### Round 3 on the port design, Codex CLI confirming, 2026-08-26: one finding, taken
+
+The confirming round reported every round 1 and round 2 fix complete at
+its paired location and found the one place the port had not reached: the
+adopted-company fill was still specified as one HubSpot-shaped PATCH, and
+neither the write inventory nor the confirmation summary named company
+updates at all, so a Salesforce builder could have omitted the adoption
+fill or run an Account update the mandatory summary never covered. The
+fill is now one update per backend, HubSpot's PATCH or the CLI's record
+update with its semantics on the build's unmeasured list, and adoption
+fills are named in the write inventory and the confirmation summary,
+which also closes a latent gap in the HubSpot wording that run one's
+correction had left implicit.

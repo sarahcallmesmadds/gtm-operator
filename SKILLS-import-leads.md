@@ -189,7 +189,7 @@ companies and contacts, showing what it found for confirmation rather than
 asking anyone to type what it could look up. Reads the Process artifacts
 above, its own config, and the alias map that config names. Writes what the
 approved plan names and nothing else: contact creates and updates, company
-creates and associations, the membership writes (list creates and
+creates, adoption fills and associations, the membership writes (list creates and
 memberships on HubSpot; campaign, member-status and campaign-member
 creates on Salesforce, with the Marketing User flag fix when the plan
 carries it), and the writeback
@@ -234,7 +234,9 @@ and both execute only what the approved plan names.**
    name is presented like any duplicate, adopt (filling only fields the
    candidate's own evidence showed empty) or create beside, decided by the
    person. An adoption's fill rides the plan whether or not any create
-   needs that company, is pushed as one PATCH, and is proved by its
+   needs that company, is pushed as one update (HubSpot's PATCH; the
+   CLI's record update on Salesforce, whose semantics are on the build's
+   unmeasured list), and is proved by its
    read-back like every other write. A planned company carries
    its name and its website on the write contract's terms: the decision's
    explicit website wins, the list's domain is the automatic fallback, both
@@ -306,8 +308,9 @@ and both execute only what the approved plan names.**
     request to send and no response to judge, and the gate, the payload
     builders and config's validation enforce the same field lists, so a
     field waved through in conversation still cannot reach a payload.
-    Then the confirmation summary: the whole plan, company creates,
-    contact creates and updates, exclusions, the membership writes (list
+    Then the confirmation summary: the whole plan, company creates and
+    adoption fills, contact creates and updates, exclusions, the
+    membership writes (list
     creates and memberships on HubSpot; campaign, member-status and
     campaign-member creates on Salesforce, with the Marketing User flag
     fix when the plan carries it),
