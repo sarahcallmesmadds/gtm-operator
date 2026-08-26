@@ -594,7 +594,7 @@ check('a configured record type is selected by the read-backs and proved on both
   assert.ok(proof.checked.some(c => c.what === 'row 1, RecordTypeId'))
 
   const wrongType = salesforce.prove(typed, smallPlan(), pushedIds(), cleanReadbacks())
-  assert.ok(wrongType.problems.some(p => /RecordTypeId/.test(p.why)), 'a read-back without the type fails rather than passing unproved')
+  assert.ok(wrongType.problems.some(p => /RecordTypeId/.test(p.what)), 'a read-back without the type fails rather than passing unproved')
 
   const untyped = salesforce.readbackRequests(config(), smallPlan(), pushedIds())
   assert.ok(!untyped.find(r => r.soql && r.soql.includes('RecordTypeId')), 'no configured type, nothing selected for it')
