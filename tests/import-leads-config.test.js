@@ -230,6 +230,11 @@ check('a state or country override beside mailingFields is refused: the judged p
   const smuggled = salesforceAnswers()
   smuggled.properties = { contact: { state: 'SomeOtherField' } }
   assert.throws(() => config.draft(smuggled), /set.*through mailingFields.*nowhere else/s)
+  // Both halves, separately: round 5 found this name promising the pair
+  // while deleting the country arm alone stayed green.
+  const country = salesforceAnswers()
+  country.properties = { contact: { country: 'SomeOtherField' } }
+  assert.throws(() => config.draft(country), /set.*through mailingFields.*nowhere else/s)
 })
 
 check('a missing org alias is refused with the keychain named as where the credential actually lives', () => {

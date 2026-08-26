@@ -482,8 +482,14 @@ function judgeFlag (response) {
       }
       return { ok: true, userId: record.Id, on: record.UserPermissionsMarketingUser }
     }
-    if (result.id) {
-      return { ok: true, userId: String(result.id), next: 'Run flag-query again with this user id to read the flag itself.' }
+    if (result.id !== undefined && result.id !== null) {
+      // The id is id-shaped before it is handed on: String() would spell
+      // an object id "[object Object]" straight into the flag query, the
+      // same coercion the flag arm above already refuses.
+      if (typeof result.id !== 'string' || !result.id) {
+        return { ok: false, why: `The whoami answer carries ${JSON.stringify(result.id)} for the user id, which is not the id the measured read returns. Save the response whole and look at it.` }
+      }
+      return { ok: true, userId: result.id, next: 'Run flag-query again with this user id to read the flag itself.' }
     }
   }
   return { ok: false, why: 'The response is neither the whoami answer nor the flag query envelope, both measured 2026-08-26. Save it whole and look at it.' }
@@ -498,8 +504,9 @@ function judgeFlag (response) {
  * FIELD_INTEGRITY_EXCEPTION, measured 2026-08-26 in the acceptance run),
  * and only a picklist org has the code fields at all, so neither pair of
  * defaults is right for every org. The org itself is asked, one read-only
- * query, before the config draft offers field names. The alias comes in
- * directly because this runs on a first run, before any config exists.
+ * query per code field, before the config draft offers field names. The
+ * alias comes in directly because this runs on a first run, before any
+ * config exists.
  */
 function mailingFieldsProbeRequests (orgAlias) {
   if (typeof orgAlias !== 'string' || !orgAlias.trim()) {
@@ -520,20 +527,23 @@ function mailingFieldsProbeRequests (orgAlias) {
 }
 
 /**
- * What the probe's saved answer means, every branch measured 2026-08-26.
- * The aggregate envelope, one row carrying the `probe` count, means the
- * code fields exist (state and country picklists are on) and the draft
- * offers MailingStateCode and MailingCountryCode, which accept the ISO
- * codes a list carries and from which the org derives the label fields.
- * The data commands' error shape, `name` INVALID_FIELD with the message
- * naming the probed column (both measured spellings name it), means they
- * do not exist and the draft offers the plain fields.
+ * What the probes' saved answers mean, every branch measured 2026-08-26,
+ * one verdict per code field. An aggregate envelope whose one row
+ * carries that probe's own alias count (`stateProbe` or `countryProbe`)
+ * means that code field exists (its picklist is on) and the draft
+ * offers the code field name, which accepts the ISO codes a list
+ * carries and from which the org derives the label field. The data
+ * commands' error shape, `name` INVALID_FIELD with the message naming
+ * the probed column (both measured spellings name it), means it does
+ * not exist and the draft offers the plain field. The two verdicts are
+ * independent, so a mixed org gets a measured mixed pair.
  *
- * THE ANSWER IS BOUND TO ITS QUESTION, on both arms: a successful
- * envelope without the `probe` key, or an INVALID_FIELD about some other
- * column, answers a different question and is refused rather than read,
- * because the wrong pair here is either every contact create failing at
- * the push or a config naming fields the org does not have.
+ * THE ANSWER IS BOUND TO ITS QUESTION, on both arms of each probe: a
+ * successful envelope without that probe's alias key, or an
+ * INVALID_FIELD about some other column, answers a different question
+ * and is refused rather than read, because the wrong pair here is
+ * either every contact create failing at the push or a config naming
+ * fields the org does not have.
  */
 function judgeMailingFieldsProbe (stateResponse, countryResponse) {
   // One verdict per probed field, each answer bound to its own question:
@@ -1058,7 +1068,17 @@ function prove (config, plan, pushedIds, readbacks) {
     // a null Label the status judge refuses cannot be re-accepted here by
     // String() and Number() coercion, and every row is bound to the
     // campaign it was fetched for: a malformed or misfiled read-back
-    // proves nothing.
+    // proves nothing. That starts with the row being a record at all: a
+    // null entry in a saved file is refused, never dereferenced, the
+    // round-4 object question the judges already ask.
+    const unreadable = result.records.findIndex(r => !r || typeof r !== 'object' || Array.isArray(r))
+    if (unreadable !== -1) {
+      problems.push({
+        what: label,
+        why: `The status read-back's row ${unreadable} is ${JSON.stringify(result.records[unreadable] === undefined ? null : result.records[unreadable])}, not a record. Save the response the read-back printed, whole, and look at it.`
+      })
+      continue
+    }
     const misread = result.records.find(r =>
       typeof r.Label !== 'string' || !r.Label.trim() ||
       typeof r.SortOrder !== 'number' || !Number.isFinite(r.SortOrder) ||
@@ -1104,7 +1124,17 @@ function prove (config, plan, pushedIds, readbacks) {
     // read-back over it reported a correctly landed push as failed. A
     // null ContactId row is skipped after its CampaignId binding is
     // checked; a ContactId that is present and not a string stays refused
-    // as the wrong type it is.
+    // as the wrong type it is. And a row that is not a record at all is
+    // refused before anything on it is read, the same round-4 object
+    // question the status proof and the judges ask.
+    const unreadable = result.records.findIndex(r => !r || typeof r !== 'object' || Array.isArray(r))
+    if (unreadable !== -1) {
+      problems.push({
+        what: `campaign ${membership.campaign}`,
+        why: `The member read-back's row ${unreadable} is ${JSON.stringify(result.records[unreadable] === undefined ? null : result.records[unreadable])}, not a record. Save the response the read-back printed, whole, and look at it.`
+      })
+      continue
+    }
     const misfiled = result.records.find(r =>
       typeof r.CampaignId !== 'string' || String(r.CampaignId) !== String(campaignId) ||
       (r.ContactId !== null && r.ContactId !== undefined && typeof r.ContactId !== 'string') ||

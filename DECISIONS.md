@@ -6846,21 +6846,26 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Eighteen hand mutations across the build and its four review rounds, each
-asserted onto disk before its suite ran, each red in its named check, and
-each file restored byte-identical after: the probe judge's column binding
-removed, the count judge's type discipline coerced, the probe's alias
-check dropped, the probe command made to read config, the probe judge's
-success-arm binding removed, the count judge's alias binding loosened to
-any numeric value, the count builder's aliases dropped, each of the two
-judge commands made to swallow a refusal, the probe judge's half-pair
-acceptance restored, its non-object row check dropped, the wrong-backend
-guard on the first-run commands removed, the draft's mailingFields
-requirement dropped, the refusal arm's column binding removed, the
-malformed-config guard dropped, a grouped variant smuggled into the
-probe query past the exact-form pins, the older judges' non-object row
-refusals removed, and the draft's state/country override refusal
-dropped. The whole repository suite is green after all of it.
+Twenty-four hand mutations across the build and its five review rounds,
+each asserted onto disk before its suite ran, each red in its named
+check, and each file restored byte-identical after: the probe judge's
+column binding removed, the count judge's type discipline coerced, the
+probe's alias check dropped, the probe command made to read config, the
+probe judge's success-arm binding removed, the count judge's alias
+binding loosened to any numeric value, the count builder's aliases
+dropped, each of the two judge commands made to swallow a refusal, the
+probe judge's half-pair acceptance restored, its non-object row check
+dropped, the wrong-backend guard on the first-run commands removed, the
+draft's mailingFields requirement dropped, the refusal arm's column
+binding removed, the malformed-config guard dropped, a grouped variant
+smuggled into the probe query past the exact-form pins, the older
+judges' non-object row refusals removed, the draft's state/country
+override refusal dropped, the status proof's row guard removed, the
+member proof's row guard removed, the association proof's row guard
+removed, the whoami judge's string discipline removed, the draft's
+country override arm dropped alone, and the judge command's
+malformed-config guard removed alone. The whole repository suite is
+green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -6950,3 +6955,25 @@ judgeFlag now refuse it by name. And two test gaps: a deep-equal that
 asserted the judge's why against itself now checks content, and the
 command layer exercises the mixed pair. Two new mutations, recorded
 above.
+
+### Round 5 on the follow-ups, Codex CLI confirming, 2026-08-26: four findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+requested file whole, every finding reproduced before it was reported.
+The round confirmed rounds 3 and 4 present and found where round 4
+stopped short. The Medium was round 4's own pattern one step wider: the
+object question reached the three older judges while the proof paths
+beside them still dereferenced rows unquestioned, so a null entry in a
+saved status, member or association read-back crashed the proof instead
+of failing it; all three now refuse a non-record row by name before
+anything on it is read. The Lows: the whoami judge tested only
+truthiness and String()-coerced an object id to "[object Object]",
+handing the flag query a spelling instead of an id, and now requires
+the string the measured read returns; the probe's internal comments
+still described the pre-round-3 whole-pair one-query design while the
+code beneath them asked per-field, and now say what the code does; and
+two test names promised both halves while exercising one, so the
+override test now refuses the country half separately and the
+malformed-config subsection now exercises the judge command's duplicate
+guard beside the probe's. Six new mutations, recorded above, four for
+the new guards and two of them the reviewer's own single-arm deletions.

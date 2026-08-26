@@ -390,6 +390,23 @@ check('a config that already exists and says hubspot refuses both first-run prob
   })()
   assert.notStrictEqual(broken.status, 0)
   assert.ok(/cannot be read/.test(broken.stderr))
+
+  // Round 5: the same guard is duplicated on the judge command, so it
+  // gets the same exercise. Deleting either copy has to go red here,
+  // not stay green behind its sibling.
+  const brokenJudge = (() => {
+    try {
+      const stdout = execFileSync('node', [SCRIPT, 'mailing-fields-judge', brokenConfig, brokenConfig], {
+        env: Object.assign({}, process.env, { IMPORT_LEADS_CONFIG: brokenConfig }),
+        encoding: 'utf8'
+      })
+      return { status: 0, stdout, stderr: '' }
+    } catch (error) {
+      return { status: error.status, stdout: error.stdout || '', stderr: error.stderr || '' }
+    }
+  })()
+  assert.notStrictEqual(brokenJudge.status, 0)
+  assert.ok(/cannot be read/.test(brokenJudge.stderr))
 })
 
 check('mailing-fields-judge answers the pair to offer, and exits non-zero on a shape it does not know', () => {

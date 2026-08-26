@@ -433,6 +433,15 @@ check('a read-back or membership entry whose id is not an id fails the proof ins
   assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /refuses to read/.test(p.why)))
 })
 
+check('a null entry in an association read-back is refused by the proof, never dereferenced', () => {
+  // THE ROUND-5 REPRO: [null] in the association results crashed on
+  // toObjectId where the sibling proofs refuse a non-record row.
+  const readbacks = cleanReadbacks()
+  readbacks.associations[1] = { results: [null] }
+  const proof = hubspot.prove(config(), smallPlan(), pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /row 1 association/.test(p.what) && /not a record/.test(p.why)))
+})
+
 check('a property that came back as a number is refused by the proof, not coerced equal', () => {
   const plan = smallPlan()
   plan.contacts.updates[0].fill = { title: '42' }

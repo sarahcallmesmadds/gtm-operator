@@ -233,6 +233,16 @@ check('the flag flow: whoami without an id, the flag read with one, and one judg
   assert.strictEqual(salesforce.judgeFlag({ odd: true }).ok, false)
 })
 
+check('the whoami answer must carry a string id: an object id is refused, never spelled "[object Object]"', () => {
+  // THE ROUND-5 REPRO: {"result":{"id":{"odd":true}}} came back
+  // ok with userId "[object Object]", handed to the flag query.
+  const odd = salesforce.judgeFlag({ status: 0, result: { id: { odd: true } } })
+  assert.strictEqual(odd.ok, false)
+  assert.ok(/not the id/.test(odd.why))
+  assert.strictEqual(salesforce.judgeFlag({ status: 0, result: { id: '' } }).ok, false)
+  assert.strictEqual(salesforce.judgeFlag({ status: 0, result: { id: 7 } }).ok, false)
+})
+
 // -------------------------------------------------------------------- push
 
 const smallPlan = () => ({
@@ -450,6 +460,21 @@ check('a member missing, or on the campaign with the wrong status, is a problem,
   wrongStatus.members['Autumn Summit'].result.records[0].Status = 'Sent'
   const second = salesforce.prove(config(), smallPlan(), pushedIds(), wrongStatus)
   assert.ok(second.problems.some(p => /campaign Autumn Summit, row 1/.test(p.what) && /"Sent"/.test(p.why)))
+})
+
+check('a null row in a status or member read-back is refused by the proof, never dereferenced', () => {
+  // THE ROUND-5 REPRO: the round-4 object question reached the judges
+  // but not these proof siblings, and a [null] read-back crashed the
+  // proof on property access instead of failing it.
+  const status = cleanReadbacks()
+  status.statusRows['Autumn Summit'] = queryEnvelope([null])
+  const first = salesforce.prove(config(), smallPlan(), pushedIds(), status)
+  assert.ok(first.problems.some(p => /status Autumn Summit/.test(p.what) && /not a record/.test(p.why)))
+
+  const members = cleanReadbacks()
+  members.members['Autumn Summit'] = queryEnvelope([null])
+  const second = salesforce.prove(config(), smallPlan(), pushedIds(), members)
+  assert.ok(second.problems.some(p => /campaign Autumn Summit/.test(p.what) && /not a record/.test(p.why)))
 })
 
 check('an absent member read-back fails the proof: skipping the fetch cannot pass', () => {
