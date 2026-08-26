@@ -6054,3 +6054,13 @@ keeps recording, a fix stopping one short of where it had to reach:
    belt-and-braces the sourceless-field rule already uses.
 
 The suite is green after all of it.
+
+### Round 4 on the corrections, Devin CLI confirming, 2026-08-26: nothing found
+
+The confirming round the review order requires, no-tools route, per-file
+coverage stated with eleven files whole and DECISIONS.md by its diff. It
+confirmed every fix from the three rounds closed at its call sites, by
+line, and reported no new document-to-code gap, no regression, and no
+test that cannot fail. Four rounds in all on the corrections: four, one
+answered as the deliberate line it marked, three, then nothing. The
+Devin GitHub app's body on the final head is the remaining gate.
