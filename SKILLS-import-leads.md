@@ -36,8 +36,8 @@ logic, and identity moves into these homes:
   standing rule is asked about at the moment it matters.
 
 Nothing organisation-specific from the reference appears in this repository:
-not its picklist values, not its record type ids, not its field API names, not
-its routing. Each of those becomes a config entry or a Process artifact that
+not its value lists, not its internal ids, not its field names, not its
+routing. Each of those becomes a config entry or a Process artifact that
 the installing organisation fills with its own answers.
 
 ---
@@ -352,10 +352,11 @@ down cleanly.
    `setup` writes config, which is true while this plugin is design only and
    stops being true the day it is built. The deferral and its expiry are
    recorded in `DECISIONS.md`, round 5 of this design's review.
-5. **What `run` does about automatic company creation.** `check` reports the
-   setting; whether `run` should ask for it off, or adopt the portal's
-   auto-created companies into its matching, needs the build's first real
-   list rather than a guess here.
+5. **What `run` does about automatic company creation.** `check` names the
+   risk; whether the setting itself can be read from the API is unmeasured
+   and part of this item, and whether `run` should ask for it off, or adopt
+   the portal's auto-created companies into its matching, needs the build's
+   first real list rather than a guess here.
 6. **The email opt-out.** HubSpot's subscription statuses are a separate,
    unmeasured surface, so the opt-out is out of the write contract until a
    measurement session says how it behaves.

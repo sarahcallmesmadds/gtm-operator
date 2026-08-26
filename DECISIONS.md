@@ -5581,8 +5581,9 @@ rule asks for: a real request, then evidence.
 
 ### What was measured, and where the full records live
 
-Both sessions proved every create by a read-back and tore their test records
-down, with the teardown confirmed. The raw records, which carry her account
+Both sessions proved every create by a read-back and removed their test
+records afterwards, deletion on the Salesforce side and archival on the
+HubSpot side, each confirmed by read-backs. The raw records, which carry her account
 identifiers, live in the local run files and never enter this public
 repository.
 
@@ -5654,3 +5655,14 @@ measurement record it was missing from, and "every claim proved by a
 read-back" narrowed to creates by read-back and refusals by their measured
 responses; two Salesforce-era terms (org for portal) corrected; and the
 hand counts beside the trap and behaviour lists dropped.
+
+### Round 2 on the HubSpot pull request, Devin CLI confirming, 2026-08-25: three findings, all taken
+
+All three were pairs of earlier fixes, per-file coverage stated and every
+file whole. The Open item on automatic company creation still said `check`
+reports the setting after round 1 softened `check` itself, the half the
+first fix did not reach; the teardown wording disagreed between the design
+(archived) and the record (torn down), settled by saying what each store
+actually does, deletion on Salesforce and archival on HubSpot; and the
+rebuild paragraph still described the reference in one CRM's vocabulary,
+now generalised so the reference's stack is not fingerprinted.
