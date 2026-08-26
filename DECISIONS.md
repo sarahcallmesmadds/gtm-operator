@@ -6846,7 +6846,7 @@ and only a genuinely missing file gets first-run treatment.
 
 ### What was proved by breaking it
 
-Twenty-four hand mutations across the build and its five review rounds,
+Thirty hand mutations across the build and its six review rounds,
 each asserted onto disk before its suite ran, each red in its named
 check, and each file restored byte-identical after: the probe judge's
 column binding removed, the count judge's type discipline coerced, the
@@ -6863,9 +6863,12 @@ judges' non-object row refusals removed, the draft's state/country
 override refusal dropped, the status proof's row guard removed, the
 member proof's row guard removed, the association proof's row guard
 removed, the whoami judge's string discipline removed, the draft's
-country override arm dropped alone, and the judge command's
-malformed-config guard removed alone. The whole repository suite is
-green after all of it.
+country override arm dropped alone, the judge command's malformed-config
+guard removed alone, the one-row read-back's not-a-record refusal
+removed, both create judges' id discipline coerced back to String(),
+both search parsers' not-a-record refusals removed, and the draft's
+problems gate emptied. The whole repository suite is green after all of
+it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -6977,3 +6980,27 @@ override test now refuses the country half separately and the
 malformed-config subsection now exercises the judge command's duplicate
 guard beside the probe's. Six new mutations, recorded above, four for
 the new guards and two of them the reviewer's own single-arm deletions.
+
+### Round 6 on the follow-ups, Devin CLI confirming, 2026-08-26: six findings, five taken and one answered from the record
+
+No-tools route, per-document coverage stated, every inline document
+whole. The round confirmed round 5 present and chased its rule into the
+remaining response readers, the same one-step-wider shape as every
+confirming round before it. Taken: the one-row read-back path
+(`boundRecord`) now refuses a row that is not a record by name instead
+of reporting a malformed saved file as an absent read-back or a
+wrong-Id one; both backends' create judges require an id-shaped id
+before answering `created`, so an object id falls to the unknown arm
+instead of String()-coercing to "[object Object]" and seeding every
+read-back fetch built on it, the whoami rule at its siblings; both
+search parsers now split a row that is not a record from a record with
+no id, so the refusal names which of two different problems the person
+is looking for; and three test gaps closed, the object-id refusal on
+both create judges, the one-row not-a-record proof path, and
+config.draft exercised directly with a non-string optional mapping.
+Answered from the record, no change: the README's "HubSpot's gate has
+passed twice" is supported by the two dated records in this file (the
+release-gate run and the second acceptance run, both 2026-08-26); the
+reviewer received only the follow-ups sections inline, which begin
+after both, so the claim was wider than the excerpt, not wider than the
+record. Six new mutations, recorded above.

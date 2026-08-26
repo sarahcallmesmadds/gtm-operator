@@ -433,6 +433,19 @@ check('a read-back or membership entry whose id is not an id fails the proof ins
   assert.ok(second.problems.some(p => /list Summit - Invited/.test(p.what) && /refuses to read/.test(p.why)))
 })
 
+check('a create response whose id is not id-shaped is never judged created: "[object Object]" is not an id', () => {
+  // THE ROUND-6 REPRO: an object id String()-coerced into a created
+  // verdict on any of the three measured create envelopes.
+  assert.strictEqual(hubspot.judgeResponse({ method: 'POST', url: 'x', label: 'create' }, { id: { odd: true } }).outcome, 'unknown')
+  assert.strictEqual(hubspot.judgeResponse({ method: 'POST', url: 'x', label: 'list' }, { listId: { odd: true } }).outcome, 'unknown')
+  assert.strictEqual(hubspot.judgeResponse({ method: 'POST', url: 'x', label: 'list' }, { list: { listId: { odd: true } } }).outcome, 'unknown')
+})
+
+check('a search result that is not a record is refused by name, apart from a result with no id', () => {
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [null] }]), /not a record/)
+  assert.throws(() => hubspot.searchResults(config(), [{ total: 1, results: [{ properties: {} }] }]), /no id/)
+})
+
 check('a null entry in an association read-back is refused by the proof, never dereferenced', () => {
   // THE ROUND-5 REPRO: [null] in the association results crashed on
   // toObjectId where the sibling proofs refuse a non-record row.

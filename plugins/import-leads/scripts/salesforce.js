@@ -150,7 +150,14 @@ function searchResults (config, responses) {
       incomplete.push({ response: at + 1, why: 'The response says done is not true, so records were withheld. A duplicate could be among them.' })
     }
     for (const record of result.records) {
-      if (!record || typeof record.Id !== 'string') {
+      // A row that is not a record is a different answer from a record
+      // with no Id, and the refusal names which (round 6): the person
+      // goes looking for a mangled saved file in one case and a strange
+      // org answer in the other.
+      if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        throw new Error(`Response ${at + 1} holds ${JSON.stringify(record === undefined ? null : record)} where a record should be, not a record. Save what the CLI printed, whole.`)
+      }
+      if (typeof record.Id !== 'string') {
         throw new Error(`Response ${at + 1} holds a record with no Id. Save what the CLI printed.`)
       }
       const properties = {}
@@ -815,13 +822,21 @@ function judgeResponse (request, response) {
     }
     return { outcome: 'unknown', why: 'The response is empty and this request is not one whose empty response has a measured meaning. Nothing about it is proved.' }
   }
-  if (typeof response === 'object' && !Array.isArray(response) && response.id && response.success === true) {
+  // The id has to be id-shaped before it can be a created verdict: the
+  // measured envelopes carry text ids, and String() would spell an object
+  // "[object Object]" into every read-back fetch built on it, the same
+  // coercion the whoami judge refuses (round 6). A malformed id falls
+  // through to the unknown arm, which says to judge the saved response
+  // by hand.
+  const idShaped = value => typeof value === 'string' || typeof value === 'number'
+  if (typeof response === 'object' && !Array.isArray(response) && response.id &&
+      idShaped(response.id) && response.success === true) {
     return { outcome: 'created', id: String(response.id) }
   }
   // The data commands wrap their result; a caller that sent a write that
   // way still gets its id read, because both envelopes are measured.
   if (typeof response === 'object' && response.status === 0 && response.result &&
-      response.result.id && response.result.success === true) {
+      response.result.id && idShaped(response.result.id) && response.result.success === true) {
     return { outcome: 'created', id: String(response.result.id) }
   }
   const errors = Array.isArray(response)
@@ -931,8 +946,11 @@ function prove (config, plan, pushedIds, readbacks) {
   const memberships = plan.campaignMemberships
 
   const recordFrom = response => {
+    // undefined means no usable envelope; the one row itself comes back
+    // whatever it is, so a null row reads as the malformed read-back it
+    // is rather than as an absent one.
     const result = queryRecords(response)
-    if (!result || result.done !== true || result.records.length !== 1) return null
+    if (!result || result.done !== true || result.records.length !== 1) return undefined
     return result.records[0]
   }
 
@@ -943,8 +961,16 @@ function prove (config, plan, pushedIds, readbacks) {
   // different id is a different record's read-back, not this write's proof.
   const boundRecord = (label, response, expectedId, missingWhy) => {
     const record = recordFrom(response)
-    if (!record) {
+    if (record === undefined) {
       problems.push({ what: label, why: missingWhy || 'No read-back to compare, so nothing about this write is proved.' })
+      return null
+    }
+    // The one row is a record before anything on it is read, the same
+    // object question the judges and the row proofs ask (rounds 4 and
+    // 6): a null row in a saved file is a malformed read-back, not an
+    // absent one, and the difference is what the person goes looking at.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      problems.push({ what: label, why: `The read-back's one row is ${JSON.stringify(record)}, not a record. Save the response the read-back printed, whole, and look at it.` })
       return null
     }
     if (typeof record.Id !== 'string' || String(record.Id) !== String(expectedId)) {
