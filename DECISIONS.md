@@ -6302,3 +6302,15 @@ update with its semantics on the build's unmeasured list, and adoption
 fills are named in the write inventory and the confirmation summary,
 which also closes a latent gap in the HubSpot wording that run one's
 correction had left implicit.
+
+### Round 4 on the port design, Devin CLI confirming, 2026-08-26: one finding, taken
+
+Per-document coverage stated, every inline document whole. The round
+confirmed round 3's adoption-fill fix complete at all three of its homes,
+no earlier fix reopened, no unsupported Salesforce claim and no hand
+count, and found the one write still named in the inventory and absent
+from the confirmation summary: the contact-to-company association, a
+distinct write on HubSpot that the mandatory pre-push summary never
+showed. The summary names it now. The gap predates this branch, the
+original summary never named associations either, and it became visible
+when round 3 put the two lists side by side.
