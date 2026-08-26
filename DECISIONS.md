@@ -6823,30 +6823,36 @@ than left as first-run guidance. Neither pair of state and country field
 names is right for every org: a picklist org refuses the plain fields'
 values (`FIELD_INTEGRITY_EXCEPTION` on "US", measured in the acceptance
 run) and only a picklist org carries the code fields at all. So the first
-run asks the org, one read-only named aggregate
-(`SELECT COUNT(MailingStateCode) probe FROM Contact`), before the draft
-is shown. Every branch is measured 2026-08-26: the aggregate envelope
-from a picklist org, one row carrying the `probe` count on an empty org
-as well as a full one, and the data commands' refusal shape, `name`
-INVALID_FIELD with the message naming the column in both measured
-spellings, from an org that lacks it. Both arms are bound to the probed
-question: a successful answer without the `probe` key, and an
-INVALID_FIELD about another column, are questions rather than verdicts,
-the same saved-file discipline every other judge holds. The probe and its
-judge deliberately read no config, because they run while the draft's
-answers are still being gathered.
+run asks the org, one read-only named aggregate over both code fields
+(`SELECT COUNT(MailingStateCode) stateProbe, COUNT(MailingCountryCode)
+countryProbe FROM Contact`), before the draft is shown. Every branch is
+measured 2026-08-26: the aggregate envelope from a picklist org, one row
+carrying both alias counts on an empty org as well as a full one, and the
+data commands' refusal shape, `name` INVALID_FIELD with a message that
+echoes the refused query and so names the probed columns, in both
+measured spellings, from an org that lacks one. Both arms are bound to
+the probed question: a successful answer without both alias keys, and an
+INVALID_FIELD naming no probed column, are questions rather than
+verdicts, the same saved-file discipline every other judge holds. The
+pair the judge offers is probed per org rather than assumed co-present
+(round 2's finding). The probe and its judge require no config, because
+they run while the draft's answers are still being gathered; a config
+that already exists and names hubspot refuses them by name, like every
+cross-backend command.
 
 ### What was proved by breaking it
 
-Nine hand mutations across the build and its first review round, each
+Twelve hand mutations across the build and its two review rounds, each
 asserted onto disk before its suite ran, each red in its named check, and
 each file restored byte-identical after: the probe judge's column binding
 removed, the count judge's type discipline coerced, the probe's alias
 check dropped, the probe command made to read config, the probe judge's
 success-arm binding removed, the count judge's alias binding loosened to
-any numeric value, the count builder's aliases dropped, and each of the
-two judge commands made to swallow a refusal. The whole repository suite
-is green after all of it.
+any numeric value, the count builder's aliases dropped, each of the two
+judge commands made to swallow a refusal, the probe judge's half-pair
+acceptance restored, its non-object row check dropped, and the
+wrong-backend guard on the first-run commands removed. The whole
+repository suite is green after all of it.
 
 ### Round 1 on the follow-ups, Codex CLI, 2026-08-26: six findings, all taken
 
@@ -6872,3 +6878,25 @@ home for excluded fields named only the opt-out where every other
 document names the marketing status beside it, now naming both; and
 three new checks carried no deliberate-break proof, now covered by the
 round's five new mutations, recorded above.
+
+### Round 2 on the follow-ups, Devin CLI, 2026-08-26: six findings, all taken
+
+No-tools route, per-document coverage stated, every inline document
+whole. The round confirmed round 1's fixes present and found their
+missing halves, the shape this file says confirming rounds find. The
+probe asked the org about one column while its judge answered for the
+pair, an unmeasured co-presence assumption; the probe now asks the named
+aggregate over both code fields, measured the same day, the judge
+requires both alias counts, and the refusal arm binds on either probed
+column, whose name the measured error message carries because it echoes
+the refused query. Both new judges read their one row's properties
+without questioning whether the row is an object, so a malformed saved
+file crashed instead of refusing; both now refuse a non-object row by
+name. The first-run commands, deliberately runnable without config, ran
+just as happily against an install whose config names hubspot; they now
+refuse that config by name while a missing one still proceeds, which
+keeps the first-run purpose and closes the wrong-backend route. And the
+command tests pinned less than the fixes they cover: the probe test now
+pins the exact named-aggregate form, and the judge test asserts `ok` and
+`codeFields` beside the pair. Three new mutations, recorded above, prove
+the three new arms.

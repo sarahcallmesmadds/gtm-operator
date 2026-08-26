@@ -313,7 +313,8 @@ check('status-judge binds each response to its campaign, so reversed saved files
 check('mailing-fields-probe runs with no config at all, because it belongs to the first run', () => {
   // The probe answers which field names the config draft should offer, so
   // it cannot depend on the config existing. Point the override at a path
-  // holding nothing and it still emits the spec.
+  // holding nothing and it still emits the spec, asking the named
+  // aggregate over both code fields.
   const result = (() => {
     try {
       const stdout = execFileSync('node', [SCRIPT, 'mailing-fields-probe', 'first-run-org'], {
@@ -328,18 +329,58 @@ check('mailing-fields-probe runs with no config at all, because it belongs to th
   assert.strictEqual(result.status, 0)
   const parsed = JSON.parse(result.stdout)
   assert.strictEqual(parsed.request.targetOrg, 'first-run-org')
-  assert.ok(/MailingStateCode/.test(parsed.request.soql))
+  assert.ok(/SELECT COUNT\(MailingStateCode\) stateProbe, COUNT\(MailingCountryCode\) countryProbe FROM Contact/.test(parsed.request.soql),
+    'the named-aggregate form is the binding, so the test pins it exactly')
 
   const bare = run('mailing-fields-probe')
   assert.notStrictEqual(bare.status, 0)
   assert.ok(/org alias/.test(bare.stderr))
 })
 
+check('a config that already exists and says hubspot refuses both first-run probe commands by name', () => {
+  // Round 2's routing finding: no-config is the first run and proceeds,
+  // but an install whose config names hubspot has nothing to probe and a
+  // wrong-org probe should be refused like every cross-backend command.
+  const hubspotConfig = path.join(TEMP, 'hubspot-config.json')
+  fs.writeFileSync(hubspotConfig, JSON.stringify({
+    configVersion: 1,
+    portalId: '111222333',
+    serviceKeyPath: path.join(TEMP, 'service-key.txt'),
+    aliasMapPath: path.join(TEMP, 'aliases.json'),
+    properties: {
+      contact: { firstName: 'firstname', lastName: 'lastname', email: 'email', phone: 'phone', title: 'jobtitle', city: 'city', state: 'state', country: 'country' },
+      company: { name: 'name' }
+    }
+  }))
+  const runHubspot = (...args) => {
+    try {
+      const stdout = execFileSync('node', [SCRIPT, ...args], {
+        env: Object.assign({}, process.env, { IMPORT_LEADS_CONFIG: hubspotConfig }),
+        encoding: 'utf8'
+      })
+      return { status: 0, stdout, stderr: '' }
+    } catch (error) {
+      return { status: error.status, stdout: error.stdout || '', stderr: error.stderr || '' }
+    }
+  }
+  const probe = runHubspot('mailing-fields-probe', 'some-org')
+  assert.notStrictEqual(probe.status, 0)
+  assert.ok(/says hubspot/.test(probe.stderr))
+  const judge = runHubspot('mailing-fields-judge', hubspotConfig)
+  assert.notStrictEqual(judge.status, 0)
+  assert.ok(/says hubspot/.test(judge.stderr))
+})
+
 check('mailing-fields-judge answers the pair to offer, and exits non-zero on a shape it does not know', () => {
   const picklist = path.join(TEMP, 'sf-probe-picklist.json')
-  fs.writeFileSync(picklist, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, probe: 3 }], totalSize: 1, done: true } }))
-  const codes = JSON.parse(run('mailing-fields-judge', picklist).stdout)
-  assert.deepStrictEqual(codes.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
+  fs.writeFileSync(picklist, JSON.stringify({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, stateProbe: 3, countryProbe: 4 }], totalSize: 1, done: true } }))
+  const judged = JSON.parse(run('mailing-fields-judge', picklist).stdout)
+  // ok and codeFields are asserted as well as the pair: round 2 found a
+  // test that would have passed a judge answering the right pair under a
+  // refusal.
+  assert.strictEqual(judged.ok, true)
+  assert.strictEqual(judged.codeFields, true)
+  assert.deepStrictEqual(judged.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
 
   const odd = path.join(TEMP, 'sf-probe-odd.json')
   fs.writeFileSync(odd, JSON.stringify({ odd: true }))

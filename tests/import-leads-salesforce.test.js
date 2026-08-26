@@ -751,24 +751,28 @@ check('org display judges Connected as ok and anything else as not proved', () =
   assert.strictEqual(salesforce.judgeOrgDisplay({ odd: true }).ok, false)
 })
 
-check('the mailing-fields probe takes a bare alias, asks the named aggregate, and refuses an empty alias', () => {
+check('the mailing-fields probe takes a bare alias, asks the named aggregate over both code fields, and refuses an empty alias', () => {
   const request = salesforce.mailingFieldsProbeRequest('first-run-org')
   assert.strictEqual(request.transport, 'query')
   assert.strictEqual(request.targetOrg, 'first-run-org')
-  assert.ok(/SELECT COUNT\(MailingStateCode\) probe FROM Contact/.test(request.soql))
+  // Both columns probed, each under its own alias: the round-2 finding
+  // was the judge answering for a pair the request never asked the org
+  // about.
+  assert.ok(/SELECT COUNT\(MailingStateCode\) stateProbe, COUNT\(MailingCountryCode\) countryProbe FROM Contact/.test(request.soql))
   assert.throws(() => salesforce.mailingFieldsProbeRequest('  '), /org alias/)
 })
 
 check('the probe judge reads the measured branches and binds both arms to the probed question', () => {
-  // Every branch measured 2026-08-26: the aggregate envelope from a
-  // picklist org, and the data commands' INVALID_FIELD error shape from a
-  // column the org does not have (both message spellings name the column).
-  const aggregate = n => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, probe: n }], totalSize: 1, done: true } })
-  const picklist = salesforce.judgeMailingFieldsProbe(aggregate(3))
+  // Every branch measured 2026-08-26: the two-alias aggregate envelope
+  // from a picklist org, and the data commands' INVALID_FIELD error shape
+  // whose message echoes the refused query and so names the probed
+  // columns, in both measured spellings.
+  const aggregate = (s, c) => ({ status: 0, result: { records: [{ attributes: { type: 'AggregateResult' }, stateProbe: s, countryProbe: c }], totalSize: 1, done: true } })
+  const picklist = salesforce.judgeMailingFieldsProbe(aggregate(3, 4))
   assert.strictEqual(picklist.ok, true)
   assert.strictEqual(picklist.codeFields, true)
   assert.deepStrictEqual(picklist.use, { state: 'MailingStateCode', country: 'MailingCountryCode' })
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate(0)).ok, true, 'an empty org still answers the aggregate')
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(aggregate(0, 0)).ok, true, 'an empty org still answers the aggregate')
 
   const plain = salesforce.judgeMailingFieldsProbe({
     name: 'INVALID_FIELD',
@@ -780,23 +784,32 @@ check('the probe judge reads the measured branches and binds both arms to the pr
   assert.deepStrictEqual(plain.use, { state: 'MailingState', country: 'MailingCountry' })
   assert.strictEqual(salesforce.judgeMailingFieldsProbe({
     name: 'INVALID_FIELD',
-    message: "No such column 'MailingStateCode' on entity 'Contact'.",
+    message: "No such column 'MailingCountryCode' on entity 'Contact'.",
     exitCode: 1
-  }).codeFields, false, 'the bare-select spelling of the refusal is read too')
+  }).codeFields, false, 'either probed column, either measured spelling')
 
-  // THE SUCCESS ARM IS BOUND: a successful answer belonging to a different
-  // query (the round-1 repro, a row carrying only an Id) is refused, not
-  // read as a picklist org.
+  // THE SUCCESS ARM IS BOUND: a successful answer belonging to a
+  // different query (the round-1 repro, a row carrying only an Id, and
+  // round 2's half-pair variant) is refused, not read as a picklist org.
   const unrelated = salesforce.judgeMailingFieldsProbe({
     status: 0, result: { records: [{ Id: '003X' }], totalSize: 1, done: true }
   })
   assert.strictEqual(unrelated.ok, false)
   assert.ok(/different query/.test(unrelated.why))
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe(
+    { status: 0, result: { records: [{ stateProbe: 3 }], totalSize: 1, done: true } }
+  ).ok, false, 'half the pair is not the pair')
   assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [], totalSize: 0, done: true } }).ok, false,
     'a rowless success carries nothing to bind and is refused')
-  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [{ probe: 1 }], totalSize: 1, done: false } }).ok, false)
+  assert.strictEqual(salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: [{ stateProbe: 1, countryProbe: 1 }], totalSize: 1, done: false } }).ok, false)
 
-  // The refusal arm was already bound: INVALID_FIELD about another column
+  // A malformed saved file with a non-object row is a refusal, never a
+  // crash: the round-2 wrong-type finding.
+  const nonObject = salesforce.judgeMailingFieldsProbe({ status: 0, result: { records: ['odd'], totalSize: 1, done: true } })
+  assert.strictEqual(nonObject.ok, false)
+  assert.ok(/not a record/.test(nonObject.why))
+
+  // The refusal arm stays bound: INVALID_FIELD about another column
   // answers a different question.
   const otherColumn = salesforce.judgeMailingFieldsProbe({
     name: 'INVALID_FIELD',
@@ -842,6 +855,11 @@ check('the count judge binds each answer to its question by the alias key, so re
   assert.strictEqual(salesforce.judgeLeadContactCounts(envelope('contacts', 20), envelope('leads', '22')).ok, false)
   assert.strictEqual(salesforce.judgeLeadContactCounts({ status: 0, result: { records: [{ contacts: 20 }], totalSize: 1, done: false } }, envelope('leads', 22)).ok, false)
   assert.strictEqual(salesforce.judgeLeadContactCounts(null, envelope('leads', 22)).ok, false)
+  // A non-object row is a refusal, never a crash: round 2's wrong-type
+  // finding, the same discipline the probe judge holds.
+  const nonObject = salesforce.judgeLeadContactCounts({ status: 0, result: { records: [7], totalSize: 1, done: true } }, envelope('leads', 22))
+  assert.strictEqual(nonObject.ok, false)
+  assert.ok(/not a record/.test(nonObject.why))
 })
 
 console.log(failures ? `\n${failures} failed.\n` : '\nAll checks passed.\n')
