@@ -5666,3 +5666,9 @@ first fix did not reach; the teardown wording disagreed between the design
 actually does, deletion on Salesforce and archival on HubSpot; and the
 rebuild paragraph still described the reference in one CRM's vocabulary,
 now generalised so the reference's stack is not fingerprinted.
+
+### Round 3 on the HubSpot pull request, Codex CLI confirming, 2026-08-25: nothing found
+
+The confirming round the review order requires, with per-file coverage
+stated and every file whole. It reported all three round-2 pairs closed
+and nothing remaining in the changed set.
