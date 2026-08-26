@@ -6064,3 +6064,59 @@ line, and reported no new document-to-code gap, no regression, and no
 test that cannot fail. Four rounds in all on the corrections: four, one
 answered as the deliberate line it marked, three, then nothing. The
 Devin GitHub app's body on the final head is the remaining gate.
+
+## import-leads: the second acceptance run, the corrected pipeline's perfect pass, 2026-08-26
+
+Sarah's instruction after run one: edit the skill, then run it again on a
+whole new invented list until a perfect end-to-end pass, with a few
+people already in the portal. Run two ran the same day the corrections
+merged, against the same real free portal, and came back perfect:
+nineteen writes, zero unknown judgments, fifty proof checks with zero
+problems, and a teardown with every removal confirmed by read-back. The
+raw records, ids and responses stay in the local run files, outside this
+public repository.
+
+### What run two proved that run one could not
+
+- **The `nothing` verdict, live.** A pre-created contact already carrying
+  every field the list had was matched, judged nothing-to-write, had
+  nothing written to it, and still landed on its status list by its own
+  CRM id.
+- **The derived-domain search doing its job, both ways.** A pre-created
+  named company was found by name and by the domain derived from its
+  rows' work emails, a clean match. A pre-created NAMELESS company,
+  planted to mimic the portal's own auto-created artifacts, was invisible
+  to name search and surfaced only by the derived domain, exactly the
+  miss the correction exists to prevent.
+- **Adoption riding the plan.** The nameless company's fill was carried
+  by the plan as a matched-company fill, pushed as one PATCH, and proved
+  inside the same proof as every other write. Run one had needed a write
+  beside the plan for the identical situation.
+- **The free-mail detector and the checkpoint as built steps.** The
+  detector flagged the planted gmail row on its own; the enrichment
+  offer ran before removal (both lookups made, both empty, invented
+  people); and the pre-push checkpoint was asked in her recorded words,
+  her answer no other fields.
+- **The three judge arms measured in round one, firing live.** Every
+  association judged done, every list create read through its envelope,
+  every membership add judged done carrying the portal's own
+  `recordsIdsAdded`, zero unknown outcomes across the push.
+- **The companies-first fixture order kept the portal quiet.** With
+  domain-carrying companies in place before any contact existed, the
+  portal auto-created nothing, consistent with run one's observation.
+
+### The judgment batch, hers
+
+Adopt the nameless company and write its name in; keep the real Pia and
+drop the row carrying her email under another name, a planted data-entry
+mistake; Clay lookups before removal for the no-email and free-mail
+rows; no other fields to stamp; the mixed status split for fuller
+coverage. The gate refused the planted no-last-name row on its own.
+
+### The release gate, closed twice over
+
+The design's release gate asked for one real list end to end against a
+portal, verified by read-backs, torn down cleanly. Run one did it and
+taught seven corrections. Run two did it on the corrected pipeline and
+taught nothing new, which is what finished looks like. The Salesforce
+port cycle is the queue's next item and starts from a settled design.
