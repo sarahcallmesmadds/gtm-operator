@@ -49,6 +49,19 @@ check('no file reads as a first run, not as an error', () => {
   assert.ok(/first run/.test(result.message), 'the refusal has to say this is a first run, or the skill treats it as breakage')
 })
 
+check('an optional property mapping that is not a non-empty string is a problem, not a skipped key', () => {
+  // The round-5 repro: an object mapping slid past the checks and the
+  // payload builder emitted a property named "[object Object]", a
+  // request targeting an invented CRM field.
+  const draft = config.draft(answers())
+  draft.properties.contact.owner = { odd: true }
+  assert.ok(config.problems(draft).some(p => /properties\.contact\.owner/.test(p) && /non-empty string/.test(p)))
+  draft.properties.contact.owner = '  '
+  assert.ok(config.problems(draft).some(p => /properties\.contact\.owner/.test(p) && /non-empty string/.test(p)))
+  draft.properties.contact.owner = 'hubspot_owner_id'
+  assert.deepStrictEqual(config.problems(draft), [], 'a real name still validates clean')
+})
+
 check('the draft fills the portal default property names and validates clean', () => {
   const draft = config.draft(answers())
   assert.strictEqual(draft.configVersion, config.CONFIG_VERSION)

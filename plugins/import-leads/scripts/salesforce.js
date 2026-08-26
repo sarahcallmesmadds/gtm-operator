@@ -164,7 +164,14 @@ function searchResults (config, responses) {
         properties.company = record.Account.Name
       }
       if (record.AccountId) properties.accountId = String(record.AccountId)
-      const email = properties.email ? String(properties.email).trim().toLowerCase() : null
+      // An email is text or the record is malformed: String() coercion
+      // indexed an object email under its coerced spelling, the row's real
+      // address matched nothing, and the row planned as a create, a
+      // duplicate on the backend where this search is the whole guard.
+      if (properties.email !== undefined && typeof properties.email !== 'string') {
+        throw new Error(`Response ${at + 1} holds a record whose email is ${JSON.stringify(properties.email)}, not text. Save what the CLI printed, whole: a coerced email is an identity nothing can match.`)
+      }
+      const email = properties.email ? properties.email.trim().toLowerCase() : null
       if (!email) continue
       // TWO CRM RECORDS UNDER ONE EMAIL ARE A QUESTION, NOT A PICK. This
       // org enforces no email uniqueness this design has measured, so the
@@ -782,8 +789,14 @@ function prove (config, plan, pushedIds, readbacks) {
     if (!record) return // boundRecord already named why
     for (const [name, sent] of Object.entries(intended)) {
       const got = record[name]
-      if (got === undefined || got === null || String(got) !== String(sent)) {
-        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got === undefined ? null : got)}.` })
+      // Every value this proof compares was sent as text, and the measured
+      // read-backs answer text, so a non-string is refused rather than
+      // coerced equal: String() read a numeric 42 as a faithful echo of
+      // the string "42", which is a malformed response passing the proof.
+      if (typeof got !== 'string') {
+        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got === undefined ? null : got)}, which is not text. A malformed value is refused rather than coerced equal.` })
+      } else if (got !== String(sent)) {
+        problems.push({ what: `${label}, ${name}`, why: `Sent ${JSON.stringify(sent)} and the record came back with ${JSON.stringify(got)}.` })
       } else {
         checked.push({ what: `${label}, ${back[name] || name}` })
       }

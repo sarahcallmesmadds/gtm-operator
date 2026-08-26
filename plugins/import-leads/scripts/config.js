@@ -224,6 +224,11 @@ function problems (config) {
           `Known: ${spec.required.concat(spec.optional).join(', ')}. ` +
           'A field the write contract does not carry is not made writable by mapping it.'
         )
+      } else if (spec.optional.includes(field) && (typeof map[field] !== 'string' || !map[field].trim())) {
+        // The required fields are type-checked above; an optional one is a
+        // real property name or the key is left out, because a coerced
+        // mapping becomes a request targeting an invented CRM field.
+        out.push(`properties.${kind}.${field} has to be the property name as a non-empty string, or the key left out.`)
       }
     }
     if (map) {

@@ -150,6 +150,16 @@ check('raw search responses are refused: dedupe reads only the judged results', 
   assert.throws(() => plan.dedupeVerdicts([], { results: [] }), /byEmail/)
 })
 
+check('a row whose email is not text is refused by dedupe, never coerced into an identity', () => {
+  const bad = row(1, { firstName: 'A', lastName: 'B' })
+  bad.fields.email = { odd: true }
+  bad.fieldSources.email = 'list'
+  assert.throws(() => plan.dedupeVerdicts([bad], existing({})), /not text/)
+
+  const badReplaced = row(2, { firstName: 'A', lastName: 'B', email: 'a@x.com' }, { replacedEmail: { odd: true } })
+  assert.throws(() => plan.dedupeVerdicts([badReplaced], existing({})), /not text/)
+})
+
 check('a contact stored under a replaced address is surfaced: the original is an identity too', () => {
   // An approved enrichment replacement moves the row to the work address
   // and keeps the personal one on `replacedEmail`. Without this check the
@@ -719,6 +729,20 @@ check('a matched campaign whose status rows were never read blocks, because a bl
   const result = plan.assemble(input)
   assert.strictEqual(result.ok, false)
   assert.ok(result.problems.some(p => /"Spring Roadshow" exists and its member-status rows have not been read/.test(p)))
+})
+
+check('a malformed status read blocks the plan the same way an absent one does', () => {
+  // The round-5 repro: labels carrying an object passed the array check,
+  // matched nothing, and every status planned as a blind create.
+  const badLabels = salesforceInput()
+  badLabels.campaignStatuses['Spring Roadshow'] = { labels: [{ odd: true }], maxSortOrder: 2 }
+  const first = plan.assemble(badLabels)
+  assert.strictEqual(first.ok, false)
+  assert.ok(first.problems.some(p => /"Spring Roadshow"/.test(p) && /malformed/.test(p)))
+
+  const wordySort = salesforceInput()
+  wordySort.campaignStatuses['Spring Roadshow'] = { labels: ['Sent', 'Responded'], maxSortOrder: NaN }
+  assert.ok(plan.assemble(wordySort).problems.some(p => /"Spring Roadshow"/.test(p) && /malformed/.test(p)))
 })
 
 check('a CRM holding two contacts under one email blocks the row until decided, and dedupe gives it no verdict', () => {

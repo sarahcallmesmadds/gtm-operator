@@ -6547,7 +6547,13 @@ through String() would send every membership add to a list that does not
 exist. The push judges' id arms deliberately stay as they are: a created
 id is only ever used as a locator whose read-back is bound by that id
 and compared field by field, so a malformed id fails its read-back, a
-backstop the lookup ids do not have.
+backstop the lookup ids do not have. **This paragraph originally claimed
+that backstop while the HubSpot binding still compared ids through
+String() coercion, so at the time it was written the backstop did not
+hold there: round 5 reproduced an object id binding to an object
+locator, both coerced to one spelling. The binding is type-strict as of
+round 5's answer, which is what makes the recorded reasoning true, and
+the claim is corrected here rather than left standing.**
 
 Answered as the limit it is: the HubSpot membership proof cannot bind a
 response to its list, because the measured membership envelope carries
@@ -6564,3 +6570,47 @@ each red in its named check, and each file restored byte-identical
 after: the Name type check removed, the listId type check removed, the
 member types coerced again, and the limitation note removed. The whole
 repository suite is green after all of it.
+
+### Round 5 on the port build, Codex CLI confirming, 2026-08-26: five findings, all taken
+
+High effort confirmed by the banner, per-file coverage stated, every
+file whole and the fresh diff whole, every finding reproduced by the
+reviewer before it was reported. The round confirmed every recorded
+round-3 and round-4 change present, and found five places the same
+type-discipline rule had not reached, one of them refuting a round-4
+record's claim as it stood.
+
+The High: both search parsers coerced a CRM record's email through
+String(), so an object email indexed under its coerced spelling, the
+row's real address matched nothing, and the row planned as a duplicate
+create, worst on Salesforce where the search is the whole guard. Both
+parsers now refuse a present non-string email by name, and dedupe's own
+fold refuses a non-string row email or replacedEmail the same way,
+because a coerced email is an identity nothing can match.
+
+The Mediums. The HubSpot read-back binding compared ids through
+String(), so an object read-back id bound to an object pushed locator,
+both spelled "[object Object]", which meant the backstop round 4 cited
+for leaving the push judges' id arms untyped did not hold at the time;
+the binding now requires an id-shaped value (string or number) before
+comparing, membership entries are validated to record ids the same way,
+and the round-4 record is corrected in place above. Both proofs'
+field comparisons read a numeric 42 as a faithful echo of the string
+"42"; every compared value was sent as text and the measured read-backs
+answer text, so a non-string read-back value is refused rather than
+coerced equal, on both halves. The assembly validated `campaignStatuses`
+to its shape and not its entries, so a label that could never match a
+grid status planned every status as a blind create; labels are now
+non-empty strings and maxSortOrder a finite number, or the campaign
+blocks as malformed. And config's optional property mappings skipped the
+type check the required ones get, so an object mapping became a payload
+property named "[object Object]", a request targeting an invented CRM
+field; an optional mapping is now a non-empty string or the key is left
+out, refused at the gate.
+
+Seven new hand mutations, each asserted onto disk before its suite ran,
+each red in its named check, and each file restored byte-identical
+after: each parser's email check removed, dedupe's fold loosened, the
+id-shape binding removed, each proof's text arm coerced again, the
+status-read entry validation removed, and the optional-mapping check
+removed. The whole repository suite is green after all of it.

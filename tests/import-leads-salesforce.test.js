@@ -118,6 +118,14 @@ check('an unrecognised envelope is refused: a guess would read as a CRM with nob
   assert.throws(() => salesforce.searchResults(config(), [{ records: [] }]), /measured query envelope/)
 })
 
+check('a search record whose email is not text is refused, never coerced into an identity', () => {
+  // A coerced object email indexed under "[object object]" matched
+  // nothing, and the row planned as a duplicate create on the backend
+  // where this search is the whole guard.
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: { odd: true } }])]), /not text/)
+  assert.throws(() => salesforce.searchResults(config(), [queryEnvelope([{ Id: '003X', Email: 42 }])]), /not text/)
+})
+
 check('done not true is reported incomplete, because a withheld contact is an unseen duplicate', () => {
   const result = salesforce.searchResults(config(), [queryEnvelope([], false)])
   assert.strictEqual(result.incomplete.length, 1)
@@ -687,6 +695,19 @@ check('the status proof refuses the wrong types the status judge refuses, instea
   assert.ok(proof.problems.some(p => /status Autumn Summit \/ Invited/.test(p.what) && /refuses to read/.test(p.why)),
     'a wordy SortOrder cannot pass the proof after failing the judge')
   assert.ok(!proof.checked.some(c => c.what === 'status Autumn Summit / Invited'), 'and it is not marked checked')
+})
+
+check('a field that came back as a number is refused by the proof, not coerced equal', () => {
+  // The round-5 repro: the string "42" sent and numeric 42 back passed
+  // through String() as a faithful echo. The measured read-backs answer
+  // text, so a non-string is a malformed value, refused.
+  const plan = smallPlan()
+  plan.contacts.updates[0].fill = { title: '42' }
+  const readbacks = cleanReadbacks()
+  readbacks.contacts[3] = contactRecord('003U', { Title: 42 })
+  const proof = salesforce.prove(config(), plan, pushedIds(), readbacks)
+  assert.ok(proof.problems.some(p => /row 3 \(update\), Title/.test(p.what) && /not text/.test(p.why)))
+  assert.ok(!proof.checked.some(c => /row 3 \(update\)/.test(c.what)), 'and it is not marked checked')
 })
 
 check('member and status read-back queries select CampaignId so the proof can bind them', () => {
