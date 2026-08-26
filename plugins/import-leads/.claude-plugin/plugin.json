@@ -1,7 +1,7 @@
 {
   "name": "import-leads",
-  "version": "0.1.0",
-  "description": "Takes a lead list from wherever it lives and lands it in HubSpot correctly: mapped, deduped, matched to companies, on the status lists the org's grid names, verified by reading every write back, and written back to a Notion source. Every write sits behind one confirmation, nothing is invented to complete a row, and nobody is guessed. The first job plugin: it owns no database, reads no foundation config, and keeps a private config of its own that nothing else reads or writes.",
+  "version": "0.2.0",
+  "description": "Takes a lead list from wherever it lives and lands it in the CRM config names, HubSpot or Salesforce, correctly: mapped, deduped, matched to companies, on the memberships the org's grid names (status lists on HubSpot, native member statuses on Salesforce), verified by reading every write back, and written back to a Notion source. Every write sits behind one confirmation, nothing is invented to complete a row, and nobody is guessed. The first job plugin: it owns no database, reads no foundation config, and keeps a private config of its own that nothing else reads or writes.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"
@@ -11,6 +11,7 @@
   "license": "MIT",
   "keywords": [
     "hubspot",
+    "salesforce",
     "gtm",
     "leads",
     "import",

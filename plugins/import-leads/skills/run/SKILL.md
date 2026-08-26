@@ -1,14 +1,16 @@
 ---
 name: run
-description: Import one named lead list into HubSpot, planned end to end and pushed only after an explicit yes. Use when a lead list arrives, the user says "import this list", "get these leads into HubSpot", "load this conference CSV", or hands over a CSV file or a Notion page of contacts. Reads the one named source, the CRM, the Process artifacts, its own config and the alias map; writes exactly what the approved plan names, verifies by reading every write back, and writes back to a Notion source. Writes nothing without an explicit yes.
-allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page
+description: Import one named lead list into the CRM config names, HubSpot or Salesforce, planned end to end and pushed only after an explicit yes. Use when a lead list arrives, the user says "import this list", "get these leads into HubSpot", "get these leads into Salesforce", "load this conference CSV", or hands over a CSV file or a Notion page of contacts. Reads the one named source, the CRM, the Process artifacts, its own config and the alias map; writes exactly what the approved plan names, verifies by reading every write back, and writes back to a Notion source. Writes nothing without an explicit yes.
+allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page
 ---
 
 # run
 
-Take one named list and land the approved rows in HubSpot: cleaned, deduped,
-matched to companies, on the status lists the grid names, verified by reading
-the writes back.
+Take one named list and land the approved rows in the CRM config names:
+cleaned, deduped, matched to companies, on the memberships the grid names,
+verified by reading the writes back. One CRM per install: config's `crm`
+says which, and everything backend-specific below says which half it
+belongs to.
 
 **The line this skill holds: everything before the confirmation plans, and the
 push executes exactly the approved plan.** Nothing is invented to complete a
@@ -17,16 +19,16 @@ row, nobody is guessed, and a value with no source is refused.
 ## How this skill works
 
 **`scripts/import-leads.js` decides what to send and what an answer means. You
-send it.** Every HubSpot request is built by the script as a spec with a
-method, a url and a body; you send each with the Service Key as a bearer
-header, read from the file config names, and save the response whole for the
-script to judge.
+send it.** Every CRM request is built by the script as a spec; you send each
+the way its backend sends things, and save the response whole for the script
+to judge.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/import-leads.js" <command> <args>
 ```
 
-Send a request spec like this, with the key coming straight from its file into
+**On HubSpot** a spec carries a method, a url and a body. Send it with the
+Service Key as a bearer header, the key coming straight from its file into
 the header and never into the conversation:
 
 ```bash
@@ -37,20 +39,39 @@ curl -sS -X <method> "<url>" \
 ```
 
 **Never print, echo or paste the key, and never put it in a file this plugin
-writes.** The path is config's; the contents are curl's alone. Save every
-response to a file as it came back: the judging commands refuse reshaped
-copies, because a reshaped response reads as whatever the reshaping assumed.
+writes.** The path is config's; the contents are curl's alone.
+
+**On Salesforce** the credential lives in the `sf` CLI keychain under the
+alias every spec carries as `targetOrg`, so there is nothing key-shaped to
+handle at all. A spec's `transport` says how it goes:
+
+```bash
+# transport: query
+sf data query --target-org <targetOrg> --query <soql> --json > response.json
+# transport: rest  (write the spec's body to a file first; no --body when the spec carries none)
+sf api request rest <path> --method <method> --body @<body.json> --target-org <targetOrg> > response.json
+# transport: cli
+sf <args...> --target-org <targetOrg> --json > response.json
+```
+
+Save every response to a file exactly as it came back: the judging commands
+refuse reshaped copies, because a reshaped response reads as whatever the
+reshaping assumed. A successful REST PATCH answers 204 with an empty body
+(measured 2026-08-26), so an empty file there is the expected shape, judged
+as unproved-until-read-back rather than as an error.
 
 **The live surface is proved by the live run, not by this file.** The request
-shapes are rebuilt from the 2026-08-25 measurements; until the release gate
-has run one real list end to end, treat any surprising response as a fact to
-record, not an error to push past.
+shapes are rebuilt from the 2026-08-25 and 2026-08-26 measurements; until
+each backend's release gate has run one real list end to end, treat any
+surprising response as a fact to record, not an error to push past.
 
 ## Step 0. Config, once
 
 Run `config-show`. If it refuses because there is no config, this is the first
-run: gather the portal id, where the Service Key lives, the alias-map path and
-any property corrections, searching for what can be found rather than asking
+run: gather what the backend needs (the `crm`; on HubSpot the portal id and
+where the Service Key lives; on Salesforce the org alias and any record-type
+ids; the alias-map path and any name corrections either way), searching for
+what can be found rather than asking
 anyone to type what could be looked up. Then `config-draft`, show the whole
 draft, and `config-write` only on an explicit yes. The file is written once;
 any other refusal is fixed by hand, not rewritten.
@@ -175,11 +196,14 @@ On a create decision, a website the person names wins; otherwise the list's
 domain fills in automatically where config maps a website property, and an
 org that maps none gets the company created bare.
 
-The portal may auto-create a company from an email domain and take the
-primary association. The plan names that collision; do not resolve it
-silently. Measured 2026-08-26: it did not fire when a company already
+On HubSpot the portal may auto-create a company from an email domain and
+take the primary association. The plan names that collision; do not resolve
+it silently. Measured 2026-08-26: it did not fire when a company already
 carrying the domain existed, and the portal derived that company's `domain`
-from the website the push set.
+from the website the push set. On Salesforce nothing like it was observed
+and none is designed for; whether an org's own automation creates accounts
+is unmeasured rather than known absent, so a surprise in the read-backs is
+a fact to record.
 
 ## Step 7. Dedupe
 
@@ -197,21 +221,38 @@ person whether this is one campaign or several. **The expensive mistake is
 one campaign wrapped around three events, discovered after the memberships
 are written.** The plan refuses to assemble without this step's output.
 
-## Step 9. Statuses and lists
+## Step 9. Statuses and memberships
 
 With the campaigns decided, assign each row its status from the grid, by
 campaign type and what is known about the person's engagement. **A row the
 grid does not cover is a question, not a default.** The script validates
-every assignment against the grid and names the lists by the grid's own
-convention, one list per status per campaign.
+every assignment against the grid.
 
-Then the lists are **matched, or planned for creation**, never assumed
-absent: `list-queries` realises the names and builds one lookup per list,
-you send them, and `list-judge` turns the saved responses into the
-decisions the plan needs. A list that exists gets its id and new members; a
-list judged absent is created; an answer the judge does not recognise is a
-question, because reading it as absent is how a second copy of an existing
-list appears.
+**On HubSpot** the grid realises as lists, one per status per campaign,
+named by the grid's own convention, and the lists are **matched, or planned
+for creation**, never assumed absent: `list-queries` realises the names and
+builds one lookup per list, you send them, and `list-judge` turns the saved
+responses into the decisions the plan needs. A list that exists gets its id
+and new members; a list judged absent is created; an answer the judge does
+not recognise is a question, because reading it as absent is how a second
+copy of an existing list appears.
+
+**On Salesforce** the grid maps onto native member statuses, and the same
+asked-not-assumed rule runs three lookups. `campaign-queries` builds one
+exact-name lookup per campaign and `campaign-judge` turns the responses
+into decisions; a campaign that exists gets its id, an empty answer plans a
+create, and two campaigns with one name is a question. `status-queries`
+reads the existing member-status rows of every matched campaign and
+`status-judge` hands the plan their labels, so a status create is planned
+only where the row genuinely is not there (a fresh campaign carries Sent
+and Responded, measured 2026-08-25). And `flag-query` with `flag-judge`
+read the user record's Marketing User flag, whoami first and the flag read
+second, because campaign creation is refused while it is off (measured
+2026-08-25): a plan that needs a campaign while the flag is off carries the
+measured one-call fix to the operator's own User record as its own named
+line, pushed before the campaign family and proved by reading the flag
+back. Striking that line strikes the campaign half of the plan with it,
+and the run says so rather than pushing a plan that dies.
 
 ## Step 10. The checkpoint, the plan, and the one confirmation
 
@@ -237,15 +278,19 @@ config's own validation already enforce, so a field waved through here
 still cannot reach a payload.
 
 Then write the inputs file (rows, events output, dedupe output, grid,
-required fields, campaigns, assignments, company decisions, list decisions,
-resolutions) and run `plan`. It refuses, by name, anything undecided, and it
-re-runs the gate on what is actually in it, so nothing between the steps can
-have slipped past the floor.
+required fields, campaigns, assignments, company decisions, the membership
+decisions the backend's lookups produced, resolutions; on Salesforce also
+the judged flag read) and run `plan`. It refuses, by name, anything
+undecided, and it re-runs the gate on what is actually in it, so nothing
+between the steps can have slipped past the floor.
 
-**Show the whole plan inline**: company creates, contact creates and updates,
-the exclusions with their reasons, list creates and memberships, the lead
-source, and the writeback the run will make. Then ask, and **write only on an
-explicit yes**. Anything ambiguous is not yet confirmed.
+**Show the whole plan inline**: company creates, adoption fills and
+associations, contact creates and updates, the exclusions with their
+reasons, the membership writes (list creates and memberships on HubSpot;
+campaign, member-status and campaign-member creates on Salesforce, with the
+Marketing User flag fix when the plan carries it), the lead source, and the
+writeback the run will make. Then ask, and **write only on an explicit
+yes**. Anything ambiguous is not yet confirmed.
 
 ## Step 11. Push, exactly the plan
 
@@ -257,9 +302,13 @@ response. Partial success is per record: one refusal does not stop the
 rest.
 
 Then `judge-push`. The measured cases fold into the report rather than
-becoming errors: a duplicate list add is a silent no-op, and a duplicate
-contact create is refused carrying the existing record's id. **Report that
-refusal with its id. Never improvise an update nobody approved.**
+becoming errors. On HubSpot: a duplicate list add is a silent no-op, and a
+duplicate contact create is refused carrying the existing record's id.
+**Report that refusal with its id. Never improvise an update nobody
+approved.** On Salesforce: a duplicate campaign member fails individually
+with the existing row untouched, folded into the report, and a REST PATCH
+answering nothing is the measured 204, judged as unproved until its
+read-back rather than as a success or a failure.
 
 ## Step 12. Verify, by reading back
 
@@ -270,7 +319,10 @@ Report both halves, what is proved and what is not, and never round up to
 
 ## Step 13. Writeback, Notion sources only
 
-`writeback` emits the entries in batches. Link each created record on its
+`writeback` emits the entries in batches; on Salesforce it takes the
+instance url as its third argument, read from the org display answer,
+because config holds no url to build a record link from. Link each created
+record on its
 source row; fill email only where the source row is blank at write time. **A
 writeback failure is reported and never fails the run**: the CRM is the
 system of record. A CSV source is never modified.
@@ -304,5 +356,6 @@ anywhere.
    map.
 2. **Whether this is one campaign or several.** The multi-event check is
    mandatory, and its signals are shown rather than concluded from.
-3. **Which status list each row lands on**, read from the grid and never from
+3. **Which membership each row lands on**, the status list on HubSpot and
+   the member status on Salesforce, read from the grid and never from
    a built-in table. An uncovered row is a question.

@@ -6326,3 +6326,103 @@ reported the same and named the checks it ran. Six rounds in all on the
 design: eight, three, one, one, then nothing twice, every finding real
 and none needing her. The Devin GitHub app's body on the pull request is
 the remaining gate, read from the body per the standing rule.
+
+## import-leads: the Salesforce port built to its fixture-provable core, 2026-08-26
+
+The build the merged design mandated, in the order calendar set and every
+build since has followed: measure what the design named, build what
+fixtures can prove, and leave the live acceptance run as the release gate.
+The plugin is at 0.2.0. `plugins/import-leads/scripts/salesforce.js` is
+the Salesforce half, mirroring the HubSpot half's surface; config carries
+the `crm` field with per-backend validation; the assembly realises the
+grid per backend; the command layer dispatches, with the campaign, status
+and flag commands beside the list commands; and both skills say which
+half each backend-specific step belongs to.
+
+### The build's measurement session, run first
+
+The design named update semantics, the domain-match query shape, the
+membership lookups and the flag read-back as the build's to measure, and
+all of them were measured against the same Developer Edition org before a
+line was written, every test record deleted afterwards with the deletions
+confirmed by count queries. The dated facts: a partial update changes only
+the named field and overwrites an occupied one silently, so the
+fill-blanks gate is the only guard, the same standing HubSpot's PATCH
+has; the bare-domain LIKE on `Website` finds the prefixed form,
+case-insensitively, with `_` a wildcard, so a domain pattern over-fetches
+at worst and the person judges the candidates; the campaign-by-name
+lookup answers the row, and an absent name answers an empty result set
+rather than an error; the member-status read carries Label, SortOrder,
+IsDefault and HasResponded; the Marketing User flag reads back through
+SOQL on the User record; a dotted `Account.Name` select arrives nested;
+and an unknown field on a create refuses with `INVALID_FIELD`, nothing
+created. The raw captures live in the local run files beside the
+2026-08-25 notes.
+
+### The write transport is the CLI's REST command, settled by a refusal
+
+The design left the exact output shape as the build's to pin, and the
+first measurement moved the transport itself: the data commands' `--values`
+parser refuses a value carrying an apostrophe, in both the plain and the
+backslash-escaped spelling, before anything reaches the org. Names like
+O'Brien are ordinary list data, so the values route cannot carry writes.
+Writes go through `sf api request rest` with a JSON body file, which
+carries any character: the create answers the bare `{id, success, errors}`
+envelope, a PATCH answers HTTP 204 with an empty body so its read-back is
+its only proof, and a REST error arrives as an array of `{message,
+errorCode}` objects beside the data commands' `{name, message, exitCode}`
+shape. All measured, all judged as measured, and the judge treats an empty
+PATCH answer as unproved-until-read-back rather than as a success or a
+failure.
+
+### Decisions the build made inside the design's lines
+
+- **A status create carries Label, CampaignId and SortOrder, and nothing
+  invents HasResponded.** The grid names statuses and says nothing about
+  responded-ness, so the build does not guess it: a created status takes
+  the platform's default, and an org that wants responded semantics on a
+  custom status sets them in Salesforce. Recorded rather than silently
+  defaulted, and the sort order continues past a matched campaign's own
+  highest row, or past Sent and Responded on a fresh one.
+- **Sent and Responded are never planned as creates on a new campaign**,
+  because a fresh campaign already carries them, measured 2026-08-25. A
+  membership onto them still lands.
+- **Two campaigns with one exact name is a question, not a match.** The
+  by-name lookup judges one row as a match, an empty set as absent, and
+  anything else as the person's call, because picking between two
+  campaigns wearing one name is a judgment.
+- **The cross-backend identifiers refuse each other.** A salesforce config
+  carrying a portalId or a serviceKeyPath, or a hubspot config carrying an
+  orgAlias, is refused by name, because a mis-set `crm` should be caught
+  at the config rather than discovered as a wrong-store run.
+- **The hubspot-only commands refuse a salesforce config by name and point
+  at the real route**, and the reverse, rather than answering with the
+  wrong backend's requests.
+- **The Salesforce writeback takes the instance url as an argument**, read
+  from the org display answer, because config holds no url and a guessed
+  record link is the kind of quiet invention this plugin refuses. The
+  record URL shape stays unmeasured on both backends and the writeback
+  says to confirm the first link opens.
+
+### What was proved by breaking it
+
+Nine hand mutations, each asserted onto disk before its suite ran and each
+restored from git after: the SOQL escape removed, the duplicate-member arm
+unscoped, the association comparison disabled, the flag fix dropped from
+the push, the Sent-and-Responded filter dropped, the flag-off fix never
+planned, unread status rows accepted, the cross-backend key refusal
+removed, and list-queries answering a salesforce config. Every one went
+red in its named check. The whole repository suite is green after the
+build, with the HubSpot half's behaviour pinned unchanged by its existing
+suites.
+
+### What a green suite here means, and does not
+
+The suites prove the requests are built from the plan and the config as
+intended, and that the judges read the measured shapes as measured. They
+prove nothing about the org accepting the assembled pipeline: the release
+gate is unchanged, one real list end to end against a Developer Edition
+org, a fresh invented list with pre-created fixtures playing the
+already-in-CRM records, push, prove field by field, teardown confirmed by
+count read-backs, recorded here. Until that run happens the Salesforce
+half has not been watched doing its job, and its README says so.
