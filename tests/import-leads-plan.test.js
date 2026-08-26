@@ -721,6 +721,41 @@ check('a matched campaign whose status rows were never read blocks, because a bl
   assert.ok(result.problems.some(p => /"Spring Roadshow" exists and its member-status rows have not been read/.test(p)))
 })
 
+check('a CRM holding two contacts under one email blocks the row until decided, and dedupe gives it no verdict', () => {
+  const rows = [row(1, { firstName: 'Ada', lastName: 'Lovelace', email: 'shared@x.com', company: 'Acme' })]
+  const result = plan.dedupeVerdicts(rows, { byEmail: {}, ambiguousInCrm: [{ email: 'shared@x.com', contactIds: ['003A', '003B'] }] })
+  assert.deepStrictEqual(result.verdicts, [], 'a create would add a third record and an update would pick one')
+  assert.strictEqual(result.crmAmbiguousMatches.length, 1)
+  assert.deepStrictEqual(result.crmAmbiguousMatches[0].contactIds, ['003A', '003B'])
+
+  const input = goodInput()
+  input.dedupe.crmAmbiguousMatches = [{ index: 1, email: 'ada@x.com', contactIds: ['003A', '003B'] }]
+  const blocked = plan.assemble(input)
+  assert.strictEqual(blocked.ok, false)
+  assert.ok(blocked.problems.some(p => /Row 1/.test(p) && /more than one contact under ada@x\.com/.test(p)))
+  input.resolutions = { excluded: [{ index: 1, why: 'ambiguous in the CRM, handled by hand' }] }
+  assert.strictEqual(plan.assemble(input).ok, true, 'excluding the row resolves it')
+})
+
+check('a replaced address the CRM holds two contacts under is surfaced the same way', () => {
+  const moved = row(1, { firstName: 'Vik', lastName: 'Moss', email: 'vik@peatmarsh.example' }, { replacedEmail: 'vik.moss@gmail.com' })
+  const result = plan.dedupeVerdicts([moved], { byEmail: {}, ambiguousInCrm: [{ email: 'vik.moss@gmail.com', contactIds: ['003A', '003B'] }] })
+  assert.strictEqual(result.crmAmbiguousMatches.length, 1)
+  assert.ok(/address this row replaced/.test(result.crmAmbiguousMatches[0].why))
+})
+
+check('the flag fix is planned only for a campaign create, the measured refusal, never for members alone', () => {
+  const input = salesforceInput()
+  input.campaignDecisions['Autumn Summit'] = { outcome: 'exists', campaignId: '701A' }
+  input.campaignStatuses['Autumn Summit'] = { labels: ['Sent', 'Responded', 'Invited'], maxSortOrder: 3 }
+  input.marketingUser = { userId: '005U', on: false }
+  const result = plan.assemble(input)
+  assert.strictEqual(result.ok, true, JSON.stringify(result.problems || []))
+  assert.strictEqual(result.plan.campaignMemberships.campaigns.creates.length, 0)
+  assert.strictEqual(result.plan.campaignMemberships.userFlagFix, null,
+    'members and statuses alone do not justify a privileged User write; a refusal there is the push\'s per-record report to make')
+})
+
 check('listDecisions are not demanded on salesforce, and campaignDecisions are not demanded on hubspot', () => {
   assert.strictEqual(plan.assemble(salesforceInput()).ok, true, 'no listDecisions anywhere in the input')
   const hubspotInput = goodInput()

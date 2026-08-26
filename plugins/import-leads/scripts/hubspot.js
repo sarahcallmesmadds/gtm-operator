@@ -262,9 +262,21 @@ function listLookupRequests (names) {
  * create; unknown is a question, because reading an unrecognised answer as
  * absent is how a second `Summit - Invited` gets created beside the first.
  */
-function judgeListLookup (response) {
+function judgeListLookup (response, expectedName) {
   if (response && typeof response === 'object') {
     if (response.list && (response.list.listId || response.list.listId === 0)) {
+      // The envelope carries the list's own name (measured 2026-08-26),
+      // and where it does, the answer is bound to its question by it: two
+      // saved files passed in the wrong order would otherwise file each
+      // list's id under the other, and every membership would land on the
+      // wrong list. The bare listId shape below carries no name to check.
+      if (expectedName !== undefined && response.list.name !== undefined &&
+          String(response.list.name) !== String(expectedName)) {
+        return {
+          outcome: 'unknown',
+          why: `The response names the list ${JSON.stringify(response.list.name)} where ${JSON.stringify(String(expectedName))} was asked for, so it answers a different lookup. The saved files are out of order.`
+        }
+      }
       return { outcome: 'exists', listId: String(response.list.listId) }
     }
     if (response.listId || response.listId === 0) {

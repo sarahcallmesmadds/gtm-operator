@@ -530,6 +530,14 @@ check('list lookups are one GET per name, url-encoded', () => {
   assert.ok(requests[0].url.endsWith('/crm/v3/lists/object-type-id/0-1/name/Summit%20-%20Invited'))
 })
 
+check('a lookup answering a different name than it was asked is a question, so reversed files cannot mis-file ids', () => {
+  const judged = hubspot.judgeListLookup({ list: { listId: 701, name: 'Summit - Attended' } }, 'Summit - Invited')
+  assert.strictEqual(judged.outcome, 'unknown')
+  assert.ok(/out of order/.test(judged.why))
+  assert.strictEqual(hubspot.judgeListLookup({ list: { listId: 701, name: 'Summit - Invited' } }, 'Summit - Invited').outcome, 'exists')
+  assert.strictEqual(hubspot.judgeListLookup({ list: { listId: 701 } }, 'Summit - Invited').outcome, 'exists', 'an envelope carrying no name has nothing to check against')
+})
+
 check('a lookup judges exists with its id, not-found as absent, and anything else as a question', () => {
   assert.deepStrictEqual(hubspot.judgeListLookup({ list: { listId: 701 } }), { outcome: 'exists', listId: '701' })
   assert.strictEqual(hubspot.judgeListLookup({ status: 'error', category: 'NOT_FOUND', message: 'no list by that name' }).outcome, 'absent')

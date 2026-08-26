@@ -300,7 +300,10 @@ const commands = {
     const decisions = {}
     const unknown = []
     names.forEach((name, at) => {
-      const judged = hubspot.judgeListLookup(responses[at])
+      // The name binds the answer to its question where the response
+      // carries one, the same rule campaign-judge holds on the other
+      // backend, so reversed saved files surface as questions.
+      const judged = hubspot.judgeListLookup(responses[at], name)
       decisions[name] = judged
       if (judged.outcome === 'unknown') unknown.push({ name, why: judged.why })
     })
@@ -335,7 +338,10 @@ const commands = {
     const decisions = {}
     const unknown = []
     campaigns.forEach((campaign, at) => {
-      const judged = salesforce.judgeCampaignLookup(responses[at])
+      // The judge binds the answer to its question by the name the row
+      // carries, so two saved files passed in the wrong order surface as
+      // questions instead of filing each campaign's id under the other.
+      const judged = salesforce.judgeCampaignLookup(responses[at], campaign.name)
       decisions[campaign.name] = judged
       if (judged.outcome === 'unknown') unknown.push({ name: campaign.name, why: judged.why })
     })
