@@ -5687,3 +5687,65 @@ private config named beside it. A repository-wide search for the same wording
 in other homes found none: the other plugin READMEs, the root documents and
 the install skill already carry the scoped wording from rounds 3 to 5. The
 suite ran green after the re-vendor.
+
+## import-leads: built to its fixture-provable core, 2026-08-25
+
+The build order calendar set and the design carried: everything provable by
+fixtures first, the live surface measured before anything claims to work.
+This is the first half. `plugins/import-leads/` now exists with the two
+skills, the command layer (`scripts/import-leads.js`), and the modules under
+it: the private config (read, draft, one write, refusals), ingest (the CSV
+parser with the reference's BOM handling, the header mapping proposed and
+confirmed rather than guessed, the Notion entry shape), the org's rules (the
+alias map, the required-fields rule, the grid, personas), the judgment
+(gates, the multi-event signals, the dedupe verdicts, the assembly that
+refuses anything undecided by name), and the HubSpot half (request builders
+and response judges, the push in dependency order with placeholders, the
+read-back proof that says what it did not check). Five fixture suites cover
+them, and the whole repository suite runs green.
+
+### What a green suite here means, and does not
+
+The suites prove the pipeline's own logic against fixtures. They prove
+nothing about the portal: the request shapes are rebuilt from the 2026-08-25
+measurement summaries (the raw records stay in the local run files, outside
+this repository), and the release gate is unchanged, one real list end to
+end against a portal, verified by read-backs, torn down cleanly, recorded
+here. Until that run happens this plugin has not been watched doing its job,
+and its README says so.
+
+### Decisions the build made inside the design's lines
+
+- **The alias map's shape is settled**: `{"aliases": {"variant":
+  "canonical"}}`, matching case-insensitively with whitespace collapsed and
+  nothing looser. Suffix stripping and every other "are these one company"
+  question stays with the person, whose settled answers land in the map.
+  Settled against fixtures; its first real list is the live run's.
+- **`check` without the foundation**: the standing half runs everything of
+  this plugin's own and reports Process artifacts as unreachable rather than
+  missing, which are different answers. The per-list half needs only config
+  and the CRM.
+- **The transport is the skill's, the key is the file's.** Scripts build
+  request specs; the skill sends them with the bearer read from the file
+  config names at send time. The key never passes through the scripts, never
+  appears in a spec, and the standing check proves the key file exists
+  without reading a byte of it into any output.
+- **The reference's operational constants carry over as constants**: email
+  dedupe batches of 100 and Notion writeback batches of 10, carried from a
+  pipeline that ran in production rather than re-derived, and said so in the
+  code.
+- **A row with no email is unchecked, not new.** The dedupe cannot ask the
+  CRM about it, so it comes back as its own kind of answer and the plan
+  refuses to assemble until a person decides it. Folding it into `create`
+  would have been a guess wearing a verdict's clothes.
+
+### What the plan deliberately refuses
+
+The assembly returns problems, by name, for: a create whose company is
+neither matched nor planned, an in-list duplicate nobody resolved, a
+cross-company conflict nobody decided, a no-email row nobody decided, an
+owner with no recorded source, a status or campaign the grid does not cover,
+a lead-source value with no mapped property or the reverse, and campaign
+setup without the multi-event check having run. Each of these is a rule the
+design states in as many words, enforced where the plan is assembled rather
+than trusted to conversation.

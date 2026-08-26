@@ -1,9 +1,10 @@
 # gtm-operator
 
 A Claude Code marketplace that builds a go-to-market operating system in Notion.
-The design is one plugin per foundation object under `plugins/`, built from the
-design documents at the root. `setup`, `calendar`, `process`, `memos`,
-`projects` and `software` are built.
+The design is one plugin per foundation object under `plugins/`, plus job
+plugins named for the work they do, built from the design documents at the
+root. `setup`, `calendar`, `process`, `memos`, `projects`, `software` and
+`import-leads` are built.
 
 **The design lives in the root documents, not in this file.** `DECISIONS.md`
 holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
@@ -17,7 +18,9 @@ would be a copy, and copies drift.
   config file the other foundation plugins read. The only plugin that creates
   the foundation's databases or touches the foundation's config. A job plugin may keep
   a private config file of its own, which no other plugin reads or writes;
-  `SKILLS-import-leads.md` defines the first such plugin
+  `plugins/import-leads/` is the first such plugin, defined by
+  `SKILLS-import-leads.md`. It vendors nothing from `shared/` and reads no
+  foundation config
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
 - `plugins/calendar/`, `plugins/process/`, `plugins/memos/`,
   `plugins/projects/`, `plugins/software/`: writing plugins. Each reads config

@@ -20,7 +20,9 @@ run against a live workspace is recorded in `DECISIONS.md`.
 that flow has been run end to end against a live Notion workspace. The
 writing plugins are built and reviewed, and what each one has and has not run
 against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
-`import-leads`, is design only.
+`import-leads`, is built to its fixture-provable core and has not run against
+a live portal: its release gate, one real list end to end, is still ahead of
+it.
 
 **It has been run by its author and by nobody else**, and never against a
 workspace that already had something in it. Every failure it has survived was
@@ -100,10 +102,10 @@ named for the work it does, and owns no database.
 | [`projects`](plugins/projects) | Projects and Tasks | Built |
 | [`software`](plugins/software) | Software | Built |
 | [`calendar`](plugins/calendar) | Calendar | Built |
+| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot | Built to its fixture-provable core. The live acceptance run is its release gate and has not happened |
 
-Job plugins come after the foundation ships, not alongside it. The first,
-[`import-leads`](SKILLS-import-leads.md), is designed and not yet built;
-outbound email follows.
+Job plugins come after the foundation ships, not alongside it. `import-leads`
+is the first; outbound email follows.
 
 ## What is in this repository
 
