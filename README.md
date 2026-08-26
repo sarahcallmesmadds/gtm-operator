@@ -24,8 +24,10 @@ against a live workspace is recorded in `DECISIONS.md`. The first job plugin,
 HubSpot half has passed its release gate twice over: two
 acceptance runs against a real portal on 2026-08-26, every write proved by
 read-back and the portal torn down to its starting state each time, recorded
-in `DECISIONS.md`. Its Salesforce half is built on live measurements and its
-own acceptance run is its remaining gate.
+in `DECISIONS.md`. Its Salesforce half passed its release gate the same day:
+one acceptance run against a Developer Edition org, every write proved by
+read-back and the org torn down to its starting state, recorded in
+`DECISIONS.md` beside the two org behaviours the run surfaced.
 
 **It has been run by its author and by nobody else**, and never against a
 workspace that already had something in it. Every failure it has survived was
@@ -105,7 +107,7 @@ named for the work it does, and owns no database.
 | [`projects`](plugins/projects) | Projects and Tasks | Built |
 | [`software`](plugins/software) | Software | Built |
 | [`calendar`](plugins/calendar) | Calendar | Built |
-| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot or Salesforce, one per install | Built. HubSpot's release gate, the live acceptance run, passed twice on 2026-08-26; the Salesforce half is built and its own acceptance run is its remaining gate |
+| [`import-leads`](plugins/import-leads) | No database. Imports lead lists into HubSpot or Salesforce, one per install | Built. Both release gates have passed: HubSpot's twice on 2026-08-26, and Salesforce's the same day against a Developer Edition org, all recorded in `DECISIONS.md` |
 
 Job plugins come after the foundation ships, not alongside it. `import-leads`
 is the first; outbound email follows.

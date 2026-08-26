@@ -6658,3 +6658,108 @@ each red in its named check, and each file restored byte-identical
 after: the lead-row skip reverted, and the identifier check removed. The
 whole repository suite is green after all of it. The app's pass on the
 final head, and then the live acceptance run, are the remaining gates.
+
+## import-leads: the Salesforce acceptance run, the release gate closes, 2026-08-26
+
+The run the port's design and both READMEs named as the gate, run the same
+day the port merged, with Sarah in the session for the judgment batch and
+the push yes. One fresh invented ten-row list end to end against the same
+free Developer Edition org as every measurement session, mirroring
+acceptance run two's shape with the Salesforce arms the port added:
+pre-created fixtures playing the already-in-CRM records (a clean-match
+account, a domain-matched account wearing a different name, a blanks-only
+contact, a complete contact, two contacts sharing one email, a matched
+campaign, a lead-linked member on that campaign, and the Marketing User
+flag turned off), every pipeline step through the plugin's own commands
+with every response saved whole, push on her explicit yes, a field-by-field
+proof, and a teardown confirmed by count read-backs. The raw records live
+in the local run files, outside this public repository.
+
+The run used a run-local config through `IMPORT_LEADS_CONFIG`, written by
+the plugin's own config-draft and config-write flow on her explicit yes.
+The standing HubSpot config was not touched; nothing rewrites that file.
+
+### What the org taught, none of it visible to a suite
+
+- **A state/country-picklist org refuses the plain text fields.** The
+  fresh Developer Edition org has state and country picklists enabled and
+  refused `MailingCountry` `"US"` with `FIELD_INTEGRITY_EXCEPTION` before
+  anything else was written. The code fields were measured as the remedy:
+  `MailingStateCode` and `MailingCountryCode` accept the ISO codes a list
+  actually carries, echo them back exactly, and the org derives the label
+  fields from them. The fix is the design's own mechanism, the config
+  field map, edited by hand per the wrong-value rule; the run's config
+  maps `state` and `country` to the code fields and the proof compares
+  the codes. Open question for a build session, not settled here: the
+  config-draft defaults still offer `MailingState` and `MailingCountry`,
+  so a picklist org corrects them in conversation at first run, and a
+  fresh Developer Edition org is a picklist org, so the defaults point
+  wrong for the likeliest first org a user tries.
+- **A fresh Developer Edition org ships an active standard duplicate
+  rule.** The deliberate same-person fixture (same first name, last name
+  and email as an existing contact) was refused with
+  `DUPLICATES_DETECTED`, an array-of-errors envelope carrying
+  `allowSave: true` and the matched record, from
+  `Standard_Contact_Duplicate_Rule` on a fuzzy match. The rule did not
+  fire on any of the three genuine creates, distinct people sharing a
+  domain with existing contacts. This refines the earlier "no uniqueness
+  refusal has ever been observed": the standard rule is same-person
+  detection, not email uniqueness, and the design's stance stands as
+  written, the dedupe search is the whole guard, with the org's refusal
+  read by the push judge as the per-record failure shape it is. The
+  fixture itself went in through the REST duplicate-rule bypass header,
+  a fixture-transport detail, not a pipeline behaviour.
+- **Deleting a campaign cascades its member rows as well as its
+  member-status rows**, both confirmed by count queries reading 0 in the
+  teardown. Only the status-row cascade had been measured before.
+
+### What ran, and what it proved live for the first time
+
+Nineteen writes in dependency order, fifteen answering the bare create
+envelope and four the empty 204 a PATCH answers, judged done-unproved
+until their read-backs; no failures, no unknowns; then a 52-check
+field-by-field proof with zero problems. The arms that had only ever been
+fixture-proved, each watched doing its job:
+
+- **The `chosen` resolution.** The dedupe search surfaced the two
+  contacts under one email as an ambiguity with both candidates carried
+  whole, each wearing the verdict the row would get against it. Her
+  answer named the blanks-only candidate, and the plan realised it as
+  exactly that record's blanks-only update, proved by its bound
+  read-back. No third record existed at any point.
+- **The adoption fill.** The domain-derived search surfaced the account
+  wearing a different name (the Salesforce counterpart of run two's
+  nameless company, since this platform requires a Name on every
+  Account). Her adoption rode the plan as one Account PATCH filling the
+  name, and both creates on that company associated to the adopted id.
+- **The flag fix.** The flag read answered off, the plan carried the fix
+  as its own named line, the push sent it before the campaign create,
+  and the read-back proved the flag true, with the campaign create
+  landing behind it.
+- **The lead-row skip.** The matched campaign's member read-back carried
+  the lead-linked row, ContactId null, beside the three planned
+  contacts, and the proof skipped it after its CampaignId binding
+  instead of failing a correctly landed push, exactly the round-7
+  behaviour.
+- **Status creates on both campaign shapes side by side.** The matched
+  campaign's statuses were read live (Sent and Responded, highest sort
+  order 2) and its creates continued past them; the fresh campaign's
+  creates sat beside the Sent and Responded it was born with, never
+  planned as creates.
+
+Her judgment batch: the enrichment offers taken first (Clay lookups on
+the no-email row, the free-mail row and the gate-refused row found
+nothing, the people being invented), four exclusions with their reasons
+kept in the plan, the choice, the adoption, the created company's
+website, and the checkpoint question answered with no further fields.
+
+Teardown: campaigns deleted first so member and status rows cascade, then
+contacts, the lead, the accounts, every count reading 0, and the flag
+left true, where it stood before the fixtures. The org ended as it
+started.
+
+**The gate is closed.** Both READMEs and the skills document said the
+Salesforce half had not been watched doing its job until this run was
+recorded here; those lines now carry the dated record instead, in this
+same change, per the expired-record fault this file has logged twice
+before.

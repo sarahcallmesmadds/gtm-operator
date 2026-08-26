@@ -56,16 +56,20 @@ covered by the fixture suites in `tests/`. Each backend's release gate is one
 real list run end to end with every write proved by read-back and the store
 torn down to its starting state. **HubSpot's gate has passed twice**: the
 acceptance run of 2026-08-26 and a second run the same day on the corrected
-pipeline, both recorded in `DECISIONS.md`. **Salesforce's gate has not run**:
-the Salesforce half is built on the 2026-08-25 and 2026-08-26 measurements,
-its request shapes proved by fixtures only, and until its acceptance run is
-recorded in `DECISIONS.md` that half has not been watched doing its job.
+pipeline, both recorded in `DECISIONS.md`. **Salesforce's gate has passed**:
+the acceptance run of 2026-08-26 against a Developer Edition org, nineteen
+writes, a field-by-field proof of every one, and a teardown confirmed by
+count read-backs, recorded in `DECISIONS.md` beside the two org behaviours
+the run surfaced (state and country picklists refusing the plain mailing
+fields, and the org's active standard duplicate rule).
 
 Unmeasured and deliberately open: whether HubSpot's auto-company-creation
 setting can be read from the API (the matching half was answered on
 2026-08-26, when the company search gained the domain half beside the name);
 the email opt-out (HubSpot's subscription statuses are a separate surface,
 and Salesforce's plain field is org-dependent); batch surfaces and rate
-limits at volume on both backends; the Lead object entirely; and whatever
-duplicate rules a Salesforce org configures, which is why the dedupe search
-is the whole guard there.
+limits at volume on both backends; the Lead object entirely; and the full
+behaviour of org-configured Salesforce duplicate rules, which is why the
+dedupe search is the whole guard there (the acceptance run observed the
+standard rule refuse one deliberate same-person create, recorded in
+`DECISIONS.md`).
