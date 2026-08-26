@@ -188,7 +188,9 @@ and both execute only what the approved plan names.**
    never guessed.
 5. **Company names normalised** against the alias map.
 6. **Companies matched, or planned for creation.** A planned company carries
-   its name and, when the list has a domain, its website. HubSpot itself
+   its name and its website on the write contract's terms: the decision's
+   explicit website wins, the list's domain is the automatic fallback, both
+   only where config maps a website property. HubSpot itself
    auto-creates companies from email domains and takes the primary
    association (measured 2026-08-25), so the plan names that collision
    rather than letting it happen silently; what `run` ultimately does about

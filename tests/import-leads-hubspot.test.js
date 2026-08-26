@@ -415,6 +415,7 @@ check('a plan missing lists.memberships is refused the same way, not crashed thr
   delete edited.lists.memberships
   assert.throws(() => hubspot.pushRequests(config(), edited), /older step or edited by hand/)
   assert.throws(() => hubspot.readbackRequests(config(), edited, pushedIds()), /older step or edited by hand/)
+  assert.throws(() => hubspot.prove(config(), edited, pushedIds(), cleanReadbacks()), /older step or edited by hand/, 'prove is directly invokable and guards the shape like the other two')
 })
 
 // -------------------------------------------------------------- list lookups

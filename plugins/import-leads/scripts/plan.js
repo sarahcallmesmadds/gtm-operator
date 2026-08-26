@@ -63,7 +63,11 @@ function gate (rows, requiredFieldsRules) {
  */
 const EVENT_WORDS = ['webinar', 'conference', 'summit', 'expo', 'event', 'roadshow', 'workshop', 'dinner', 'meetup', 'booth', 'session']
 
-const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.]\d{2,4}|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+\d{4})?)\s*$/i
+// The month names are spelled out as their real forms, longest first,
+// rather than a prefix plus `[a-z]*`: the loose tail read "Janitor 15,
+// 2026" as a date, which is a false multi-event signal handed to a person
+// as evidence.
+const DATE_LIKE = /^\s*(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.]\d{2,4}|(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\.?\s+(\d{1,2})(?:,?\s+\d{4})?)\s*$/i
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 const DAYS_IN = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -92,7 +96,7 @@ function dateLike (value) {
     const b = Number(slashB)
     return readable(a, b) || readable(b, a)
   }
-  return readable(Number(monthDay), MONTHS.indexOf(monthName.toLowerCase()) + 1)
+  return readable(Number(monthDay), MONTHS.indexOf(monthName.slice(0, 3).toLowerCase()) + 1)
 }
 
 /**
