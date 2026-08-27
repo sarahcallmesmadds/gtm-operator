@@ -37,6 +37,11 @@ Read the transcript from whatever call recorder is connected, which `setup`
 asked about, or notes the user pastes, or both. **Do not read a recording the
 user did not point you at.**
 
+When the connected recorder is Granola, use its meeting search and read tools.
+Raw transcripts come from `get_meeting_transcript` and require a paid Granola
+plan; when that tool is unavailable, work from the meeting notes or ask the
+user to provide the transcript rather than claiming it was read.
+
 If reading the transcript in full is the work, do that before writing
 anything. A decision on page nine reads exactly like no decision if page nine
 was never read.

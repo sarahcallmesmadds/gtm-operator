@@ -74,6 +74,11 @@ receipts, renewal notices, support threads, product announcements. Collect
 each as `{ what, where, kind }` — `where` down to the file or the message,
 because nothing is absorbed anonymously — and run `backfill-candidates`.
 
+When the named contract folder is in Box, use the packaged Box connector to
+find files inside that folder and read their content. Do not widen the search
+to the rest of Box. A Google Drive folder uses the user's existing Drive
+connection instead.
+
 **The two sources are not equally good, and every candidate says which it
 rests on.** A contract proves an agreement on these terms and can fill the
 whole contract group. An email proves the tool is in use and fills the name

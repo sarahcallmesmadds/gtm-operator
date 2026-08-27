@@ -28,6 +28,11 @@ Scope is the user's to set, and the defaults lean closed, the same rules as
 | Call recordings | Whatever recorder is connected, which `setup` asked about. Off unless one is |
 | Date range | Applies to every source. There is no unbounded read |
 
+When that recorder is Granola, use its meeting search and read tools inside the
+approved date range. `get_meeting_transcript` is available only on paid Granola
+plans, so fall back to the meeting notes or report the transcript as unread
+when the tool is unavailable.
+
 **Do not read outside what the user pointed at.** Every candidate must say
 where it came from, down to the channel, the thread, or the meeting and date,
 because this skill reads things people said rather than things they wrote for

@@ -55,7 +55,7 @@ a backfill candidate is not permission to create it.
 
 ## Connectors
 
-Notion is required. Atlassian, Box and Granola are packaged as optional
+Notion is required. Atlassian and Granola are packaged as optional
 sources for discovery and backfill. `CONNECTORS.md` names their exact roles and
 the sources, such as Drive, Slack and email, that can be used through an
 existing Claude connection but are not configured by this plugin.

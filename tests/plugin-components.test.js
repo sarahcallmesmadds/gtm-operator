@@ -29,11 +29,44 @@ const ENDPOINTS = {
 const EXPECTED = {
   setup: ['notion'],
   calendar: ['notion'],
-  process: ['notion', 'atlassian', 'box', 'granola'],
+  process: ['notion', 'atlassian', 'granola'],
   memos: ['notion', 'granola'],
   projects: ['notion', 'granola'],
   software: ['notion', 'box'],
   'import-leads': ['notion']
+}
+
+// A connector also needs a concrete consuming surface. These references keep
+// the inventory from becoming self-fulfilling: changing EXPECTED and the MCP
+// manifest is insufficient unless a skill or executable contract names how
+// the plugin uses the service.
+const SUPPORT = {
+  setup: {
+    notion: ['plugins/setup/skills/install/SKILL.md', /mcp__\*__notion-create-database/]
+  },
+  calendar: {
+    notion: ['plugins/calendar/skills/new/SKILL.md', /mcp__\*__notion-create-pages/]
+  },
+  process: {
+    notion: ['plugins/process/skills/new/SKILL.md', /mcp__\*__notion-create-pages/],
+    atlassian: ['plugins/process/scripts/backfill.js', /Confluence space/],
+    granola: ['plugins/process/skills/backfill/SKILL.md', /"recorder": "granola"/]
+  },
+  memos: {
+    notion: ['plugins/memos/skills/meeting-notes/SKILL.md', /mcp__\*__notion-create-pages/],
+    granola: ['plugins/memos/skills/meeting-notes/SKILL.md', /connected recorder is Granola/]
+  },
+  projects: {
+    notion: ['plugins/projects/skills/problem-statement/SKILL.md', /mcp__\*__notion-create-pages/],
+    granola: ['plugins/projects/skills/problem-scan/SKILL.md', /recorder is Granola/]
+  },
+  software: {
+    notion: ['plugins/software/skills/backfill/SKILL.md', /mcp__\*__notion-create-pages/],
+    box: ['plugins/software/skills/backfill/SKILL.md', /packaged Box connector/]
+  },
+  'import-leads': {
+    notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]
+  }
 }
 
 let failures = 0
@@ -55,6 +88,24 @@ check('the expected connector map covers every marketplace plugin and nothing el
   const expected = Object.keys(EXPECTED).sort()
   assert.deepStrictEqual(expected, listed,
     'EXPECTED must change with marketplace.json so a new plugin cannot ship without a connector decision')
+})
+
+check('every declared connector has capability evidence outside its manifest and inventory', () => {
+  assert.deepStrictEqual(Object.keys(SUPPORT).sort(), Object.keys(EXPECTED).sort(),
+    'SUPPORT must cover the same plugins as EXPECTED')
+
+  for (const [plugin, connectors] of Object.entries(SUPPORT)) {
+    assert.deepStrictEqual(Object.keys(connectors).sort(), EXPECTED[plugin].slice().sort(),
+      `${plugin}: SUPPORT must cover every expected connector and nothing else`)
+
+    for (const [connector, [relativePath, pattern]] of Object.entries(connectors)) {
+      const supportPath = path.join(ROOT, relativePath)
+      assert.ok(fs.existsSync(supportPath), `${plugin}/${connector}: support file ${relativePath} is missing`)
+      const supportText = fs.readFileSync(supportPath, 'utf8')
+      assert.match(supportText, pattern,
+        `${plugin}/${connector}: ${relativePath} does not contain the promised capability evidence`)
+    }
+  }
 })
 
 for (const entry of marketplace.plugins) {
