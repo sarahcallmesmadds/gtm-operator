@@ -7096,7 +7096,7 @@ Nothing in the code read them and every finding they carried was already
 recorded here.
 
 **The one that was not simply deleted.** `REVIEW-codex-2026-08-17.md` was cited
-by fourteen comments across `shared/`, the five vendored copies, a test and a
+by sixteen comments across `shared/`, the five vendored copies, a test and a
 plugin README, as the record of a measurement: Notion answers a select value the
 property does not have with a hard 400 `validation_error` naming the value and
 listing the allowed ones, for `select` and `multi_select` alike, all or nothing
@@ -7114,3 +7114,40 @@ is where a reader who hits an old name learns where the file went.
 **The mechanical cost.** Eight `readFileSync` paths in four test files, and
 roughly 250 name references across 68 files. No markdown link anywhere pointed
 at a moved file, so nothing linked broke.
+
+### Round 1 on the root tidy, Codex CLI, 2026-08-26: six findings, all taken
+
+Per-file coverage stated, high reasoning confirmed by the banner. Every finding
+was checked against the files before being accepted, and a sweep for each
+finding's whole class found no seventh.
+
+1. **Three places still named the old convention**, `SCHEMA-*.md`, which no
+   longer exists: `plugins/setup/scripts/manifest.js`, `plugins/setup/SKILLS.md`
+   and `tests/schema-agrees-with-design.test.js`. The first also said the files
+   were at the repository root. The blanket rename replaced exact filenames and
+   could not see a glob.
+2. **The move made three sentences false.** `plugins/{memos,process,projects}/SCHEMA.md`
+   each said "`DECISIONS.md` in this folder", which was true while they sat
+   beside it at the root and became wrong the moment they moved. This is the
+   class of damage `TESTLOG-2026-08-18.md` already records from a blanket
+   rename, arriving from the opposite direction: not text the rename touched,
+   but text the rename invalidated by moving the file around it.
+3. **The prose-count skip was wider than its own reason.** It excluded the
+   basenames `SCHEMA.md` and `SKILLS.md` at any depth under `plugins/`, while
+   the exception is for plugin-root design documents and nothing else. A future
+   nested document or fixture carrying either name would have lost prose-count
+   coverage silently. The test now matches `plugins/<plugin>/{SCHEMA,SKILLS}.md`
+   and nothing deeper, proved both ways: the suite stays green with the twelve
+   skipped, and a planted `plugins/memos/skills/nested-probe/SCHEMA.md` carrying
+   a stale count went red.
+4. **The entry above understated its own sweep.** It said fourteen citations
+   were repointed. Counted off the diff, it is sixteen: three in `shared/`,
+   eleven across the five vendored copies, plus `tests/config-contract.test.js`
+   and `plugins/calendar/README.md`. The fourteen came from an early count of
+   files rather than lines, and it had reached this file, the commit message and
+   the pull request body before anyone checked it.
+
+`.bak/` holds an untracked backup copy of the deleted review, which the reviewer
+read. It is gitignored, was never public, and is not part of this change.
+
+Suite green after all of it, 1,456 checks.

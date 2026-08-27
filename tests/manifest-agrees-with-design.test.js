@@ -205,12 +205,18 @@ check('every count written in prose agrees with the manifest', () => {
     // comments explain concepts, and "one relation with a synced property" is
     // not a count of anything.
     if (!/\.(md|json)$/.test(file)) continue
+    const rel = path.relative(ROOT, file)
     // The design documents, out of scope since 2026-08-18 and living inside
     // `plugins/` since the 2026-08-26 root tidy. See note 3 above: they discuss
     // subsets constantly, and every hit this walk takes from them is a local
     // quantity rather than a total.
-    if (/(^|[/\\])(SCHEMA|SKILLS)\.md$/.test(file)) continue
-    const rel = path.relative(ROOT, file)
+    //
+    // Matched at the plugin root and nowhere deeper, on purpose. Excluding the
+    // basename at any depth would exempt a future nested document or fixture
+    // that happens to carry the name, and lose its prose-count coverage
+    // silently. There are exactly twelve of these and they all sit one level
+    // down (Codex round 1, 2026-08-26).
+    if (/^plugins[/\\][^/\\]+[/\\](SCHEMA|SKILLS)\.md$/.test(rel)) continue
     for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
       // An explicit note that a number is historical, e.g. a count that used to
       // be wrong. Without this, describing the bug becomes the bug.

@@ -4,7 +4,7 @@
 values and option order live here and nowhere else. Anything in another document
 that restates them is a copy, and copies drift.
 
-`DECISIONS.md` in this folder holds the reasoning, the reversals, and the rules
+`DECISIONS.md` at the repository root holds the reasoning, the reversals, and the rules
 about what not to re-propose. It points here rather than repeating any of it.
 
 When `sarahcallmesmadds/gtm-operator` exists, the plugin's own machine-readable

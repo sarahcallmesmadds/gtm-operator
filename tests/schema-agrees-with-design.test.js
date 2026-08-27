@@ -4,7 +4,7 @@
  * Every property in the design documents must exist in schema.js, and nothing
  * may exist in schema.js that the documents do not define.
  *
- * The SCHEMA-*.md files are the definition. schema.js is their machine-readable
+ * Each plugin's own SCHEMA.md is the definition. schema.js is their machine-readable
  * form, transcribed by hand, and transcription is where things go missing
  * quietly. A field left out does not fail loudly at install: it produces a
  * database that looks right, and the skill that needed that field fails later

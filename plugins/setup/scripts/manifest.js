@@ -17,8 +17,8 @@
  * So: to add a database, a property or a relation, edit this file only. If you
  * find yourself typing a number anywhere else in this plugin, that is the bug.
  *
- * Field names and value lists are defined by the SCHEMA-*.md files at the repo
- * root. This file is the machine-readable form of them and must agree with
+ * Field names and value lists are defined by each plugin's own SCHEMA.md, beside
+ * the code it defines. This file is the machine-readable form of them and must agree with
  * them. Where it does not, the schema file wins and this file is wrong.
  */
 
