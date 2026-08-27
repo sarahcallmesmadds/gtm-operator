@@ -1,6 +1,6 @@
 {
   "name": "setup",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Creates the Notion databases the foundation plugins read and write, wires the relations between them, and writes the foundation's config. Nothing else in the marketplace creates a database, and nothing else writes the foundation's config.",
   "author": {
     "name": "Sarah Madden",

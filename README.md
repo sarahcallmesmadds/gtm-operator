@@ -57,6 +57,13 @@ You need a Notion connection that can insert, update, and read user information.
 **A read-only connection authenticates perfectly and then fails on the first
 create**, so `install` checks every capability it uses before it writes anything.
 
+Every plugin now declares its own MCP connectors, so its Connectors tab shows
+the tools it can configure rather than relying on a prerequisite hidden in prose.
+Notion appears on every plugin because each one reads the foundation or a Notion
+source. Optional discovery sources appear only on the plugins that use them.
+Each plugin's `CONNECTORS.md` separates those packaged connectors from external
+credentials and existing Claude connections.
+
 Read [`POST-INSTALL.md`](POST-INSTALL.md) when it finishes. Two jobs are left to
 you because the API cannot reach them, and one of them is load-bearing: nothing
 rolls up task progress until the Tasks status property is converted by hand.

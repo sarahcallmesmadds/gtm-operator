@@ -1,6 +1,6 @@
 {
   "name": "calendar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Writes and reads the Calendar database that the gtm-operator setup plugin created: what is happening in market, and when. Checks what else is already aimed at the same people before it writes anything, asks how it went when a row is marked done, and answers what is in market for a window. Creates no database and writes no config.",
   "author": {
     "name": "Sarah Madden",
