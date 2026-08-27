@@ -20,12 +20,12 @@
  * person asked for and says it read what they asked for — or worse, more.
  *
  * WHAT A BACKFILLED ROW NEVER CARRIES, from `plugins/software/SKILLS.md`:
- * no person field (four fields here are people and all four stay empty), no
- * `Importance` (a judgment about consequence, and a receipt carries no
- * information about it), no `Last reviewed` (a machine pulled the row in and
- * nobody has confirmed any of it — empty is what makes the row show up for
- * review). Handing `draft` any of them is REFUSED, NOT IGNORED: approving a
- * candidate and having something smaller run is the one failure the approval
+ * no person field (four fields here are people and all four stay empty), and no
+ * `Last reviewed` (a machine pulled the row in and nobody has confirmed the
+ * whole row). `Importance` is allowed only when bounded Slack evidence names
+ * what breaks, how fast, and exactly where the evidence came from. Handing
+ * `draft` a forbidden or unsupported field is REFUSED, NOT IGNORED: approving
+ * a candidate and having something smaller run is the one failure the approval
  * gate cannot see.
  */
 
@@ -34,23 +34,29 @@ const path = require('path')
 const schema = require(path.join(__dirname, 'vendor', 'software-schema'))
 const tool = require(path.join(__dirname, 'tool'))
 
-/** The two sources a scope may name. Anything else is refused, not ignored. */
-const SOURCES = ['contracts', 'email']
+/** The sources a scope may name. Anything else is refused, not ignored. */
+const SOURCES = ['contracts', 'docusign', 'ramp', 'quickbooks', 'email', 'slack']
+const RANGE_SOURCES = ['docusign', 'ramp', 'quickbooks', 'email', 'slack']
 
 /**
  * What each source proves, and what it may fill. From `plugins/software/SKILLS.md`:
- * the two sources are not equally good, and the skill has to say which it is
- * looking at. A contract makes a strong candidate; an email makes a thin one,
- * and presenting a thin row as filled would be worse than not finding it,
- * because a thin row looks finished.
+ * the sources are not equally good, and the skill has to say which it is
+ * looking at. A contract makes a strong candidate; payments and email make
+ * thinner ones, and presenting a thin row as filled would be worse than not
+ * finding it, because a thin row looks finished.
  */
 const KINDS = {
-  contract: { source: 'contracts', evidence: 'strong', proves: 'an agreement exists, on these terms' },
+  contract: { source: 'contracts', evidence: 'strong', contractTerms: true, proves: 'an agreement exists, on these terms' },
+  'signed-agreement': { source: 'docusign', evidence: 'strong', contractTerms: true, proves: 'a signed agreement exists, on these terms' },
+  'ramp-transaction': { source: 'ramp', evidence: 'strong', proves: 'the company paid the vendor through Ramp' },
+  'quickbooks-bill': { source: 'quickbooks', evidence: 'strong', proves: 'the vendor appears in an accounting bill' },
+  'quickbooks-payment': { source: 'quickbooks', evidence: 'strong', proves: 'the company paid the vendor through QuickBooks' },
   invoice: { source: 'email', evidence: 'strong', proves: 'somebody is paying for it' },
   receipt: { source: 'email', evidence: 'strong', proves: 'somebody is paying for it' },
   'renewal-notice': { source: 'email', evidence: 'strong', proves: 'a term is live and coming round' },
   'support-thread': { source: 'email', evidence: 'strong', proves: 'somebody is working with the vendor' },
-  announcement: { source: 'email', evidence: 'weak', proves: 'the vendor emails somebody here, which vendors do to people who never bought anything' }
+  announcement: { source: 'email', evidence: 'weak', proves: 'the vendor emails somebody here, which vendors do to people who never bought anything' },
+  'slack-workflow': { source: 'slack', evidence: 'context', proves: 'a team describes relying on the tool for a named workflow' }
 }
 
 /**
@@ -64,6 +70,7 @@ const FILLABLE = [
   'Name',
   'Description',
   'Status',
+  'Importance',
   'Domain',
   'Audience',
   'Contract dates',
@@ -85,7 +92,7 @@ const CONTRACT_GROUP = ['Contract dates', 'Notice deadline', 'Renews', 'Annual c
  * silently dropped: a field that vanished quietly would leave the person
  * believing it was set.
  */
-const NEVER_FILLED = ['Owner', 'Technical owner', 'Admins', 'Billing owner', 'Importance', 'Last reviewed']
+const NEVER_FILLED = ['Owner', 'Technical owner', 'Admins', 'Billing owner', 'Last reviewed']
 
 const isEmpty = tool.isEmpty
 
@@ -105,6 +112,24 @@ function isDay (value) {
     new Date(parsed).toISOString().slice(0, 10) === value
 }
 
+function rangeProblems (source, settings) {
+  const problems = []
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    return [refuse(source, 'missing-settings', `The ${source} source needs a bounded range: { "from": "YYYY-MM-DD", "to": "YYYY-MM-DD" } plus its named account or Slack locations where required.`)]
+  }
+  for (const end of ['from', 'to']) {
+    if (settings[end] === undefined || settings[end] === null || settings[end] === '') {
+      problems.push(refuse(source, 'half-a-range', `The ${source} range has no "${end}". There is no unbounded read, and half a range is the absence of a scope, not a wide one.`))
+    } else if (!isDay(settings[end])) {
+      problems.push(refuse(source, 'not-a-day', `${source}.${end} is ${JSON.stringify(settings[end])}, which is not a day. Use YYYY-MM-DD.`))
+    }
+  }
+  if (isDay(settings.from) && isDay(settings.to) && settings.from > settings.to) {
+    problems.push(refuse(source, 'range-backwards', `The ${source} range runs from ${settings.from} to ${settings.to}, which is backwards.`))
+  }
+  return problems
+}
+
 /**
  * The reading plan for a request, or a refusal that carries NO PLAN AT ALL.
  * Not the half of the request that was fine: reading the good half of a
@@ -120,7 +145,7 @@ function plan (request) {
 
   const sources = request.sources
   if (!Array.isArray(sources) || !sources.length) {
-    add('sources', 'missing', 'Name the sources: some of contracts, email. A run with no sources has nothing it is allowed to read.')
+    add('sources', 'missing', `Name the sources: some of ${SOURCES.join(', ')}. A run with no sources has nothing it is allowed to read.`)
   } else {
     for (const one of sources) {
       if (typeof one !== 'string' || !SOURCES.includes(one)) {
@@ -147,21 +172,13 @@ function plan (request) {
     }
   }
 
+  for (const source of RANGE_SOURCES) {
+    if (named.includes(source)) problems.push(...rangeProblems(source, request[source]))
+  }
+
   if (named.includes('email')) {
     const settings = request.email
-    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
-      add('email', 'missing-settings', 'The email source needs its range: { "from": "YYYY-MM-DD", "to": "YYYY-MM-DD" }. There is no unbounded read; a year is the sensible default to OFFER, because it catches one full renewal cycle, and the person says yes to it out loud.')
-    } else {
-      for (const end of ['from', 'to']) {
-        if (settings[end] === undefined || settings[end] === null || settings[end] === '') {
-          add('email', 'half-a-range', `The email range has no "${end}". There is no unbounded read, and half a range is the absence of a scope, not a wide one.`)
-        } else if (!isDay(settings[end])) {
-          add('email', 'not-a-day', `email.${end} is ${JSON.stringify(settings[end])}, which is not a day. Use YYYY-MM-DD: parsed loosely, a date that is not one rolls forward and reads a window nobody set.`)
-        }
-      }
-      if (isDay(settings.from) && isDay(settings.to) && settings.from > settings.to) {
-        add('email', 'range-backwards', `The email range runs from ${settings.from} to ${settings.to}, which is backwards.`)
-      }
+    if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
       // THE USER'S OWN MAILBOX AND NOBODY ELSE'S, AND SO NO MAILBOX SETTING
       // EXISTS. An earlier draft accepted any non-empty string here and held
       // the ownership question in the skill's prose, which made this gate
@@ -178,6 +195,28 @@ function plan (request) {
     }
   }
 
+  for (const source of ['docusign', 'ramp', 'quickbooks']) {
+    if (!named.includes(source)) continue
+    const settings = request[source]
+    if (settings && typeof settings === 'object' && !Array.isArray(settings) && !text(settings.account)) {
+      add(source, 'no-account', `${source}.account is missing. Name the connected company or account so a multi-account authorization cannot widen the read.`)
+    }
+  }
+
+  if (named.includes('slack')) {
+    const settings = request.slack
+    if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+      const channels = Array.isArray(settings.channels) ? settings.channels.map(text).filter(Boolean) : []
+      const directMessages = Array.isArray(settings.directMessages) ? settings.directMessages.map(text).filter(Boolean) : []
+      if (!channels.length && !directMessages.length) {
+        add('slack', 'no-locations', 'Slack needs at least one named channel or direct-message conversation. This plugin never searches all Slack and never searches all direct messages.')
+      }
+      if (directMessages.some(name => /^all$/i.test(name))) {
+        add('slack', 'all-direct-messages', 'Slack directMessages contains "all". Direct messages are never all; name each conversation.')
+      }
+    }
+  }
+
   if (problems.length) return { ok: false, problems }
 
   return {
@@ -187,6 +226,12 @@ function plan (request) {
     emailRules: named.includes('email')
       ? 'Email is READ-ONLY: never send, reply, label, archive, move or mark anything. Read to find vendors and do nothing else. The user\'s own mailbox only.'
       : null,
+    connectorRules: named.filter(s => !['contracts', 'email'].includes(s)).map(source => ({
+      source,
+      rule: source === 'slack'
+        ? 'Slack is READ-ONLY and bounded to the named channels or direct-message conversations and date range. Use it to identify named workflow dependence and evidence for Importance, never to post, react, edit or delete.'
+        : `${source} is READ-ONLY and bounded to the named account and date range. Search and retrieve evidence only; never create, approve, send, sign, pay or modify anything.`
+    })),
     note: 'Show notReading to the person before starting: a source left out and a source that held nothing produce the same empty result, and only one of them is worth saying out loud.'
   }
 }
@@ -238,13 +283,16 @@ function candidates (found) {
       what,
       where,
       kind: entry.kind,
+      ...(entry.importanceEvidence === undefined ? {} : { importanceEvidence: entry.importanceEvidence }),
       evidence: kind.evidence,
       proves: kind.proves,
-      strength: kind.source === 'contracts'
-        ? 'strong: a contract can fill the whole contract group'
+      strength: kind.contractTerms
+        ? 'strong: an agreement can fill the whole contract group'
         : kind.evidence === 'strong'
           ? 'strong evidence of use, thin fill: the name and honestly little else'
-          : 'weak: vendors email people who never bought anything. Look harder at this one'
+          : kind.evidence === 'weak'
+            ? 'weak: vendors email people who never bought anything. Look harder at this one'
+            : 'context evidence: a named workflow depends on the tool, but that alone does not prove a paid contract'
     })
   })
 
@@ -286,7 +334,7 @@ function draft (candidate) {
   // accepted back so the commands compose: `backfill-create` re-validates by
   // calling draft again, and a skill that saved the draft output and handed
   // it on was refused for fields this module itself had added.
-  const knownTop = ['what', 'where', 'kind', 'row', 'evidence', 'proves', 'strength', 'ok', 'backfill', 'leftEmpty', 'note']
+  const knownTop = ['what', 'where', 'kind', 'row', 'importanceEvidence', 'evidence', 'proves', 'strength', 'ok', 'backfill', 'leftEmpty', 'note']
   for (const key of Object.keys(candidate)) {
     if (knownTop.includes(key)) continue
     if (NEVER_FILLED.includes(key)) {
@@ -315,10 +363,10 @@ function draft (candidate) {
   // else". A receipt carrying Contract dates is a guess wearing evidence's
   // clothes, and a thin row that looks finished is worse than not finding
   // it.
-  if (KINDS[candidate.kind] && KINDS[candidate.kind].source !== 'contracts') {
+  if (KINDS[candidate.kind] && !KINDS[candidate.kind].contractTerms) {
     for (const field of CONTRACT_GROUP) {
       if (row[field] !== undefined) {
-        problems.push(refuse(field, 'not-from-this-evidence', `${field} is filled from a ${candidate.kind}, and the contract group is filled from a contract and nowhere else. An email proves the tool is in use and honestly fills the name and little more; put the document that actually states the terms in the contracts folder and let it carry them.`))
+        problems.push(refuse(field, 'not-from-this-evidence', `${field} is filled from a ${candidate.kind}, and the contract group is filled from a contract or signed DocuSign agreement and nowhere else. Spend, accounting, Slack and email evidence can prove use without proving the terms.`))
       }
     }
   }
@@ -326,11 +374,9 @@ function draft (candidate) {
   for (const field of NEVER_FILLED) {
     if (row[field] !== undefined) {
       problems.push(refuse(field, 'never-filled',
-        field === 'Importance'
-          ? 'Importance is a judgment about consequence and a receipt carries no information about it. It is refused rather than dropped, and it stays empty until a person answers the what-breaks question through `new` or `review`.'
-          : field === 'Last reviewed'
-            ? 'Last reviewed stays empty on a backfilled row: a machine pulled it in and nobody has confirmed any of it. Empty is the honest value, and it is what makes the row show up for review.'
-            : `${field} is a person field and backfill never fills one. An agent guessing at a person is worse than an empty field. Notify the real person instead.`))
+        field === 'Last reviewed'
+          ? 'Last reviewed stays empty on a backfilled row: a machine pulled it in and nobody has confirmed any of it. Empty is the honest value, and it is what makes the row show up for review.'
+          : `${field} is a person field and backfill never fills one. An agent guessing at a person is worse than an empty field. Notify the real person instead.`))
     }
   }
 
@@ -350,6 +396,25 @@ function draft (candidate) {
   const where = text(candidate.where)
   if (!where) {
     problems.push(refuse('where', 'missing', 'The candidate says nothing about where it came from, and provenance is the only claim backfill makes that a reader can check.'))
+  }
+
+  const importanceEvidence = candidate.importanceEvidence
+  if (row.Importance !== undefined || importanceEvidence !== undefined) {
+    if (row.Importance === undefined) {
+      problems.push(refuse('Importance', 'evidence-without-value', 'Slack importance evidence is present but Importance is absent. Either propose the value it supports for approval or remove the unused evidence.'))
+    }
+    if (!importanceEvidence || typeof importanceEvidence !== 'object' || Array.isArray(importanceEvidence)) {
+      problems.push(refuse('Importance', 'unsupported', 'Importance may be proposed only with importanceEvidence from Slack naming where the evidence came from, what breaks, and how fast. A receipt, agreement or payment does not establish business consequence.'))
+    } else {
+      const knownEvidence = ['source', 'where', 'whatBreaks', 'howFast']
+      for (const key of Object.keys(importanceEvidence)) {
+        if (!knownEvidence.includes(key)) problems.push(refuse(`importanceEvidence.${key}`, 'unknown-field', `importanceEvidence.${key} is not part of the evidence contract. Use source, where, whatBreaks and howFast.`))
+      }
+      if (importanceEvidence.source !== 'slack') problems.push(refuse('importanceEvidence.source', 'wrong-source', 'Importance evidence must come from bounded Slack context. Contracts and payments establish terms or spend, not what breaks.'))
+      for (const field of ['where', 'whatBreaks', 'howFast']) {
+        if (!text(importanceEvidence[field])) problems.push(refuse(`importanceEvidence.${field}`, 'missing', `importanceEvidence.${field} is required before Slack context can support Importance.`))
+      }
+    }
   }
 
   // A whitespace-only text value is nothing wearing a value's shape: it
@@ -377,11 +442,12 @@ function draft (candidate) {
     what: text(candidate.what),
     where,
     kind: candidate.kind,
+    ...(importanceEvidence === undefined ? {} : { importanceEvidence }),
     row: Object.fromEntries(FILLABLE.filter(f => row[f] !== undefined && !isEmpty(row[f])).map(f => [f, row[f]])),
     backfill: true,
     leftEmpty: {
       people: 'Owner, Technical owner, Admins and Billing owner are empty. Notify the real people rather than guessing.',
-      importance: 'Importance is empty until a person answers what breaks and how fast.',
+      ...(row.Importance === undefined ? { importance: 'Importance is empty because bounded Slack evidence did not establish what breaks and how fast.' } : {}),
       lastReviewed: 'Last reviewed is empty, which is what makes this row show up for review.'
     },
     note: 'Preview this row IN FULL at the approval gate, saying which kind of evidence it rests on and where it came from. Only a yes goes to `backfill-create`.'
@@ -458,11 +524,10 @@ function fill (existing, candidate) {
  * The Notion property payload for an approved backfill row.
  *
  * NOT `newProperties`, deliberately. That builder enforces the conversation
- * contract — Importance answered, the body written, `Last reviewed` stamped
- * from today — and every one of those is exactly what a backfilled row must
- * not carry. This builds the FILLABLE subset and nothing else, and the
- * absent stamp is the point: an unstamped, ownerless, unweighted row is what
- * makes it show up for review.
+ * contract, writes the body, and stamps `Last reviewed` from today. Backfill
+ * writes only the evidence-supported subset. The absent stamp is the point:
+ * an unstamped, ownerless row is what makes it show up for review. Importance
+ * travels only when bounded Slack evidence passed `draft` above.
  */
 function properties (context, drafted) {
   const checked = draft(drafted)
@@ -481,6 +546,7 @@ function properties (context, drafted) {
 
   put('Name', String(row.Name).trim())
   put('Status', context.value('Status', row.Status))
+  if (row.Importance !== undefined) put('Importance', context.value('Importance', row.Importance))
   // Trimmed the same way newProperties trims, or the two builders write two
   // shapes for one field and the read-back proof learns to disagree with
   // itself.
@@ -510,11 +576,12 @@ function properties (context, drafted) {
  * `readback` is the fetched page's properties, keyed by workspace names.
  * Returns the problems; empty means the absences held.
  */
-function proveAbsent (context, readbackProperties, cameBackEmpty) {
+function proveAbsent (context, readbackProperties, cameBackEmpty, importanceExpected = false) {
   const problems = []
   const dateEmpty = (name) =>
     cameBackEmpty(readbackProperties[`date:${name}:start`]) && cameBackEmpty(readbackProperties[name])
-  for (const logical of NEVER_FILLED) {
+  const mustBeEmpty = importanceExpected ? NEVER_FILLED : [...NEVER_FILLED, 'Importance']
+  for (const logical of mustBeEmpty) {
     const name = context.property(logical)
     const empty = logical === 'Last reviewed'
       ? dateEmpty(name)
@@ -523,7 +590,7 @@ function proveAbsent (context, readbackProperties, cameBackEmpty) {
       problems.push({
         field: logical,
         kind: 'arrived-filled',
-        message: `${logical} came back holding ${JSON.stringify(readbackProperties[`date:${name}:start`] ?? readbackProperties[name])} on a backfilled page, and backfill never writes it. ` +
+        message: `${logical} came back holding ${JSON.stringify(readbackProperties[`date:${name}:start`] ?? readbackProperties[name])} on a backfilled page, and this backfill did not write it. ` +
           (logical === 'Last reviewed'
             ? 'A page that arrives stamped is indistinguishable from one somebody checked, and it drops out of the review signal without anything saying so.'
             : 'Do not report this write as done.')

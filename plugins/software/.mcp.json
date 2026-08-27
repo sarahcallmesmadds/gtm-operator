@@ -15,6 +15,22 @@
     "gmail": {
       "type": "http",
       "url": "https://gmailmcp.googleapis.com/mcp/v1"
+    },
+    "slack": {
+      "type": "http",
+      "url": "https://mcp.slack.com/mcp"
+    },
+    "ramp": {
+      "type": "http",
+      "url": "https://ramp-mcp-remote.ramp.com/mcp"
+    },
+    "quickbooks": {
+      "type": "http",
+      "url": "https://mcp.quickbooks.intuit.com/mcp"
+    },
+    "docusign": {
+      "type": "http",
+      "url": "https://mcp.docusign.com/mcp"
     }
   }
 }

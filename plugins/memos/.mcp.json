@@ -8,6 +8,10 @@
       "type": "http",
       "url": "https://mcp.granola.ai/mcp"
     },
+    "gong": {
+      "type": "http",
+      "url": "https://mcp.gong.io/mcp"
+    },
     "slack": {
       "type": "http",
       "url": "https://mcp.slack.com/mcp"

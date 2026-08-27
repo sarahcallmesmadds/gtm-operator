@@ -30,7 +30,7 @@ Report. Each has its own page body, defined in `plugins/memos/SCHEMA.md`.
 | Skill | What it is for |
 |---|---|
 | `new` | Writes one memo of any of the seven types from free-form notes or explicitly scoped Slack and Gmail context, and carries the correction branch: "fix the memo from Tuesday" becomes a new memo with `Corrects` set |
-| `meeting-notes` | Turns a meeting into a record of what it decided, optionally using named Slack or Gmail context, and offers to write the confirmed actions into Tasks |
+| `meeting-notes` | Turns a Granola or Gong meeting source into a record of what it decided, optionally using named Slack or Gmail context, and offers to write the confirmed actions into Tasks |
 | `team-update` | Assembles the recurring update covering a period from Projects, Calendar, Memos and optionally Tasks, rather than from what somebody remembers |
 | `find` | Finds what was said about something and when, following corrections to the end of the chain. Reads only |
 
@@ -67,6 +67,10 @@ Said here so it is not discovered by a user hitting it:
 - **No outbound Slack or email.** Slack and Gmail are optional read-only context
   for `new` and `meeting-notes`; `team-update` still assembles from the
   foundation databases, writes the row and sends nothing anywhere.
+- **Gong is a transcript source, with an explicit raw-text limit.** Its hosted
+  MCP returns transcript-derived answers rather than raw transcript text, so
+  `meeting-notes` labels that coverage and never claims it read text it could
+  not retrieve.
 
 ## Installing
 

@@ -35,7 +35,9 @@ const ENDPOINTS = {
   intercom: 'https://mcp.intercom.com/mcp',
   pylon: 'https://mcp.usepylon.com/',
   stripe: 'https://mcp.stripe.com',
-  ramp: 'https://ramp-mcp-remote.ramp.com/mcp'
+  ramp: 'https://ramp-mcp-remote.ramp.com/mcp',
+  quickbooks: 'https://mcp.quickbooks.intuit.com/mcp',
+  docusign: 'https://mcp.docusign.com/mcp'
 }
 
 const EXPECTED = {
@@ -45,12 +47,12 @@ const EXPECTED = {
     'notion', 'atlassian', 'granola', 'gong', 'slack', 'gmail',
     'google-drive', 'google-calendar', 'hubspot', 'salesforce', 'stripe', 'ramp'
   ],
-  memos: ['notion', 'granola', 'slack', 'gmail'],
+  memos: ['notion', 'granola', 'gong', 'slack', 'gmail'],
   projects: [
     'notion', 'granola', 'gong', 'slack', 'gmail', 'hubspot', 'salesforce',
     'outreach', 'intercom', 'pylon'
   ],
-  software: ['notion', 'box', 'google-drive', 'gmail'],
+  software: ['notion', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks', 'docusign'],
   'import-leads': ['notion']
 }
 
@@ -82,6 +84,7 @@ const SUPPORT = {
   memos: {
     notion: ['plugins/memos/skills/meeting-notes/SKILL.md', /mcp__\*__notion-create-pages/],
     granola: ['plugins/memos/skills/meeting-notes/SKILL.md', /connected recorder is Granola/],
+    gong: ['plugins/memos/skills/meeting-notes/SKILL.md', /Gong's hosted MCP returns answers derived from calls/],
     slack: ['plugins/memos/skills/new/SKILL.md', /For Slack, use one explicitly named thread/],
     gmail: ['plugins/memos/skills/new/SKILL.md', /For Gmail, use one named thread/]
   },
@@ -98,10 +101,14 @@ const SUPPORT = {
     pylon: ['plugins/projects/skills/problem-scan/SKILL.md', /Customer support \| Intercom, Pylon/]
   },
   software: {
-    notion: ['plugins/software/skills/backfill/SKILL.md', /mcp__\*__notion-create-pages/],
+    notion: ['plugins/software/skills/backfill/SKILL.md', /create the page, re-fetch it/],
     box: ['plugins/software/skills/backfill/SKILL.md', /packaged Box connector/],
     'google-drive': ['plugins/software/skills/backfill/SKILL.md', /packaged Google Drive connector/],
-    gmail: ['plugins/software/skills/backfill/SKILL.md', /packaged Gmail connector/]
+    gmail: ['plugins/software/skills/backfill/SKILL.md', /packaged Gmail connector/],
+    slack: ['plugins/software/skills/backfill/SKILL.md', /bounded Slack evidence/],
+    ramp: ['plugins/software/skills/backfill/SKILL.md', /Ramp and QuickBooks/],
+    quickbooks: ['plugins/software/skills/backfill/SKILL.md', /QuickBooks' hosted MCP/],
+    docusign: ['plugins/software/skills/backfill/SKILL.md', /DocuSign's\s+official MCP/]
   },
   'import-leads': {
     notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]
@@ -198,6 +205,30 @@ check('process ships the maintainer agent that the product promises', () => {
   for (const service of ['Google Drive', 'Slack', 'Gmail', 'Google Calendar', 'Granola', 'Gong', 'HubSpot', 'Salesforce', 'Stripe', 'Ramp']) {
     assert.match(text, new RegExp(service), `the agent never names ${service} as an evidence source`)
   }
+})
+
+const problemAgentPath = path.join(ROOT, 'plugins/projects/agents/problem-statement-agent.md')
+
+check('projects ships the problem-statement agent that the product promises', () => {
+  assert.ok(fs.existsSync(problemAgentPath), 'plugins/projects/agents/problem-statement-agent.md is missing')
+  const text = fs.readFileSync(problemAgentPath, 'utf8')
+  const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the Projects agent has no YAML frontmatter')
+  assert.match(frontmatter[1], /^name:\s*problem-statement-agent$/m)
+  assert.match(frontmatter[1], /^description:\s*>$/m)
+  assert.match(frontmatter[1], /^model:\s*sonnet$/m)
+  assert.match(frontmatter[1], /^maxTurns:\s*20$/m)
+  for (const skill of ['problem-scan', 'problem-statement']) {
+    assert.match(text, new RegExp(`projects:${skill}\\b`), `the agent never routes to projects:${skill}`)
+  }
+  assert.match(text, /only after the user explicitly approves the\s+complete preview/i,
+    'the agent description does not expose the write boundary')
+  assert.match(text, /Do not invoke `projects:scope`/,
+    'the agent does not keep project creation outside the problem-statement job')
+  assert.match(text, /Never run unattended/,
+    'the agent does not carry the unattended-run boundary')
+  assert.match(text, /External connectors are search-and-read sources only/,
+    'the agent does not limit write-capable connectors to read-only discovery')
 })
 
 console.log(failures ? `\n${failures} failed.\n` : `\nAll checks passed. ${marketplace.plugins.length} plugin.\n`)

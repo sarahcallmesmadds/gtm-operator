@@ -674,6 +674,7 @@ const commands = {
     const candidate = readJson(file, 'the candidate', 'fields')
     const context = contextOrExit()
 
+    const checked = backfill.draft(candidate)
     const properties = backfill.properties(context, candidate)
 
     console.log(JSON.stringify({
@@ -685,9 +686,9 @@ const commands = {
         'NO BODY IS WRITTEN. The template sections are written for a reader by somebody who knows the tool, and a ' +
         'backfilled row knows only what a document proved. Inventing What It Does For Us from a receipt is the kind ' +
         'of content the approval gate cannot check.',
-      leftEmpty:
-        'No person field, no Importance, no Last reviewed. That is the design: an unstamped, ownerless, unweighted ' +
-        'row is what makes it show up for review. Say it is a backfill when you report the write.',
+      leftEmpty: checked.row.Importance === undefined
+        ? 'This backfill has no person field, no Importance, and no Last reviewed. Bounded Slack evidence did not establish what breaks and how fast. The unstamped row still shows up for review.'
+        : 'This backfill has no person field and no Last reviewed. Importance is included only because bounded Slack evidence named what breaks, how fast, and where it was said. The unstamped row still shows up for review.',
       note:
         'Create the page, then read it back and run `prove-backfill` with the url the create returned. The proof ' +
         'checks absence as well as presence.'
@@ -702,19 +703,22 @@ const commands = {
     const readback = readJson(readbackFile, 'the page as it came back', 'fields')
     const context = contextOrExit()
 
+    const intended = backfill.properties(context, candidate)
     const result = proveCreate({
       what: 'backfilled tool',
       createdUrl,
       readback,
-      intended: backfill.properties(context, candidate),
+      intended,
       headings: [],
       types: tool.propertyTypes(context)
     })
     // THE ABSENCE HALF. A backfilled page is proved by what is not on it as
-    // much as by what is: a page that arrived stamped, owned or weighted
-    // silently drops out of the review signal.
+    // much as by what is: a page that arrived stamped or owned silently drops
+    // out of the review signal. Importance must be absent unless this exact
+    // candidate carried the evidence-supported value in `intended`.
     const absent = (readback && readback.properties && typeof readback.properties === 'object' && !Array.isArray(readback.properties))
-      ? backfill.proveAbsent(context, readback.properties, cameBackEmpty)
+      ? backfill.proveAbsent(context, readback.properties, cameBackEmpty,
+          Object.prototype.hasOwnProperty.call(intended, context.property('Importance')))
       : []
     const merged = {
       ...result,

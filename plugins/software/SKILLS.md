@@ -237,9 +237,10 @@ rather than a saved view.
 
 ## backfill
 
-**What it does.** Finds the tools you already pay for, by reading a folder of
-contracts and your own mailbox, and offers them as candidates you approve one at a
-time.
+**What it does.** Finds the tools you already pay for by reading signed
+agreements, spend and accounting records, a named contract folder, the user's
+own mailbox and bounded Slack context, then offers them as candidates approved
+one at a time.
 
 **When it runs.** After `setup`, and again whenever enough time has passed for new
 subscriptions to have appeared. It is designed to be re-run, not run once.
@@ -248,17 +249,21 @@ subscriptions to have appeared. It is designed to be re-run, not run once.
 having and nobody will sit down and type a hundred rows, so one that can only be
 filled by hand does not get filled.
 
-### The two sources are not equally good
+### The sources are not equally good
 
 | Source | What it proves | What it can fill |
 |---|---|---|
 | **A folder of contracts** | That an agreement exists, on these terms | Name and the whole contract group. A signature may identify the billing owner, but the field is never filled: name the person in the report instead |
+| **DocuSign** | That a signed agreement exists, on these terms | Name and the whole contract group |
+| **Ramp and QuickBooks** | That the company paid or booked a bill for the vendor | Name, and honestly little else unless an agreement separately proves the terms |
 | **Email**: invoices, receipts, renewal notices, product announcements, support threads | That the tool is in use and somebody is paying for it | Name, and honestly little else |
+| **Slack** | That a named team depends on the tool for a named workflow | Name and, only when the evidence names what breaks and how fast, a proposed Importance value |
 
-**A contract makes a strong candidate and an email makes a thin one, and the skill
-says which it is looking at.** A row built from a receipt knows a tool exists and
-nothing about who owns it or what it matters to. Presenting that as a filled row
-would be worse than not finding it, because a thin row looks finished.
+**An agreement makes a strong contract candidate; spend, accounting, email and
+Slack evidence establish narrower facts, and the skill says which it is looking
+at.** A row built from a receipt knows a tool exists and nothing about who owns
+it or what it matters to. Presenting that as a filled row would be worse than
+not finding it, because a thin row looks finished.
 
 ### The shape: candidates, then approval
 
@@ -279,17 +284,22 @@ The defaults lean closed, and the user sets the scope.
 | **Email is read-only** | It never sends, replies, labels, archives, moves or marks anything. It reads to find vendors and does nothing else |
 | **The user's own mailbox, with a date range** | There is no unbounded read. A year is the sensible default, because it catches one full renewal cycle |
 | **A folder the user names** | Not a whole Drive, and not a search across everything they can see |
-| **Every candidate says where it came from** | Down to the message or the file. Nothing is absorbed anonymously |
+| **A named account and date range for DocuSign, Ramp and QuickBooks** | A multi-account authorization is never treated as permission to read every company |
+| **Named Slack locations and a date range** | Channels or named direct-message conversations; never all Slack and never all DMs |
+| **Every candidate says where it came from** | Down to the agreement, transaction, bill, message, channel or thread. Nothing is absorbed anonymously |
 
 **What it does not do.**
 - **Never fills a person field.** Four fields here are people and all four stay
   empty.
 - **Never sets `Last reviewed`.** Empty is the honest value, because a machine
   pulled the row in and nobody has confirmed any of it.
-- **Never sets `Importance`.** It is a judgment about consequence and a receipt
-  carries no information about it.
+- **Never sets `Importance` from a receipt, payment or agreement.** It may
+  propose Importance only when bounded Slack evidence names the exact message
+  or thread, what breaks and how fast. The row-level approval still decides.
 - Never writes without approval, and never runs unattended.
 - Never reads outside what the user pointed it at.
+- Never writes through an external connector. Notion is the only write
+  destination.
 
 **The duplicate check runs before a candidate is offered**, using the same
 mechanism `new` uses. That is what makes backfill safe to re-run, and it matters

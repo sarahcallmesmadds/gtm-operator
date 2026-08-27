@@ -387,18 +387,21 @@ start rather than merely possible to maintain.
 directory is worth having and nobody will sit down and type a hundred rows, so a
 directory that can only be filled by hand does not get filled.
 
-**Two sources, and they are not equally good.**
+**The sources are not equally good.**
 
 | Source | What it proves | What it can fill |
 |---|---|---|
 | **A folder of contracts.** A Drive folder, or wherever agreements are kept | That a contract exists, on these terms | Name and the whole contract group. A signature may identify the billing owner, but the field is never filled by backfill: name the person in the report instead |
+| **DocuSign.** Signed agreements in the named account and date range | That a signed agreement exists, on these terms | Name and the whole contract group |
+| **Ramp and QuickBooks.** Card transactions, vendor payments and bills | That the company is paying or has booked an obligation to the vendor | Name, and little else unless an agreement separately proves the terms |
 | **Email.** Vendor invoices, receipts, renewal notices, product announcements, support threads | That the tool is in use and somebody is paying for it or working with them | Name, and little else honestly |
+| **Slack.** Bounded channels or named direct-message conversations | That a named team depends on the tool for a named workflow | Name and, only with exact what-breaks/how-fast evidence, a proposed Importance value |
 
-**A contract produces a strong candidate and an email produces a thin one**, and
-the skill has to say which it is looking at. A row created from a receipt knows the
-tool exists and nothing about who owns it or how important it is. Presenting that
-as a filled row would be worse than not finding it, because a thin row looks
-finished.
+**An agreement produces a strong contract candidate; spend, accounting, email
+and Slack produce narrower evidence**, and the skill has to say which it is
+looking at. A row created from a receipt knows the tool exists and nothing about
+who owns it or how important it is. Presenting that as a filled row would be
+worse than not finding it, because a thin row looks finished.
 
 **The shape is candidates then approval**, identical to `process:backfill`. It
 gathers, shows a list saying what it found and where, and the user goes through
@@ -413,8 +416,12 @@ anything is written. A weak detector then produces noise rather than damage.
   year is the sensible default because it catches one full renewal cycle.
 - **A folder the user names.** Not a whole Drive, and not a search across
   everything they can see.
-- **Every candidate says where it came from**, down to the message or the file.
-  Nothing is absorbed anonymously.
+- **DocuSign, Ramp and QuickBooks name the account and date range.** Slack names
+  the channels or direct-message conversations plus a date range, never all
+  direct messages.
+- **Every candidate says where it came from**, down to the agreement,
+  transaction, bill, message, channel or thread. Nothing is absorbed
+  anonymously.
 
 **What it never does.**
 
@@ -423,9 +430,13 @@ anything is written. A weak detector then produces noise rather than damage.
   four fields are people.
 - **Never sets `Last reviewed`.** Empty is the honest value and it is what makes a
   backfilled row show up for review.
-- **Never sets `Importance`.** It is a judgment about consequence and a receipt
-  carries no information about it.
+- **Never sets `Importance` from a receipt, payment or agreement.** It may
+  propose Importance only when bounded Slack evidence names the exact source,
+  what breaks and how fast. That value remains inside the full row-level
+  approval gate.
 - Never writes without approval, and never runs unattended.
+- Never writes through an external connector. Notion is the only write
+  destination.
 
 **The duplicate check runs before a candidate is offered**, using the same
 mechanism `software:new` uses. That is what makes backfill safe to run repeatedly,
@@ -445,9 +456,10 @@ ninety-one.
 | Field | Filled when | By |
 |---|---|---|
 | Name, Description, Domain, Audience, Status | The row is created | `software:new`, partly `software:backfill` |
-| Importance, Customer facing | The row is created, re-confirmed at review | `software:new`, `software:review` |
+| Importance | The row is created, re-confirmed at review, or supported by exact Slack consequence evidence during backfill | `software:new`, `software:review`, narrowly `software:backfill` |
+| Customer facing | The row is created, re-confirmed at review | `software:new`, `software:review` |
 | Owner, Technical owner, Admins, Billing owner | The row is created | `software:new`. Never backfill |
-| The contract group | The row is created, re-confirmed at review | `software:new`, `software:review`, and `software:backfill` from a contract |
+| The contract group | The row is created, re-confirmed at review | `software:new`, `software:review`, and `software:backfill` from a contract or signed DocuSign agreement |
 | Stores PII, SOC 2, SSO | The row is created, re-confirmed at review | `software:new`, `software:review` |
 | AI access | The row is created, re-checked when integrations change | `software:new`, `software:review` |
 | Login, Documentation, Status page | The row is created | `software:new` |
@@ -456,9 +468,9 @@ ninety-one.
 | Artifacts | A doc about this tool is written | `process:new` |
 | Last reviewed | Creation and every full pass. Never by backfill or contracts | `software:new`, `software:review` |
 
-**Four skills are named here and none exist yet.** `software:new`,
-`software:review`, `software:contracts` and `software:backfill`. Writing them is
-what makes this schema real rather than aspirational.
+`software:new`, `software:review`, `software:contracts` and
+`software:backfill` implement these fill events. `software:update` handles a
+named fact change without moving the review stamp.
 
 ### Dropped from the reference
 

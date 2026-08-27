@@ -7,6 +7,11 @@ writes, what it does not do, and the judgment it carries.
 Databases are defined in `plugins/projects/SCHEMA.md` and `plugins/memos/SCHEMA.md`.
 This file does not restate a field name or a value list.
 
+`problem-statement-agent` is the agent surface over the first two skills below.
+It may run the bounded read and synthesis loop, but `problem-scan` still owns the
+read boundary and `problem-statement` still owns the complete preview, explicit
+approval and read-back proof. The agent does not scope or create a project.
+
 **Two of these were names with nothing behind them.** `problem-scan` and `ship`
 are marked below with what they became and where that came from.
 

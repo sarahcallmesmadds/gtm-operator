@@ -59,8 +59,8 @@
     {
       "name": "memos",
       "source": "./plugins/memos",
-      "description": "Time-stamped communication, append-only. Writes one memo of any of seven types from free-form notes or explicitly scoped Slack and Gmail context, turns a meeting into a record of what it decided, assembles the recurring team update from Projects, Calendar, Memos and Tasks rather than from memory, and finds what was said about something and when, following corrections to the end of the chain. There is no update skill and there never will be: a correction is a new memo. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.2.0",
+      "description": "Time-stamped communication, append-only. Writes one memo of any of seven types from free-form notes or explicitly scoped Slack and Gmail context, turns a Granola or Gong meeting source into a record of what it decided, assembles the recurring team update from Projects, Calendar, Memos and Tasks rather than from memory, and finds what was said about something and when, following corrections to the end of the chain. There is no update skill and there never will be: a correction is a new memo. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.3.0",
       "author": {
         "name": "Sarah Madden"
       },
@@ -75,8 +75,8 @@
     {
       "name": "projects",
       "source": "./plugins/projects",
-      "description": "Runs a project from named problem to shipped release. Finds recurring problems in bounded internal, meeting, CRM, sales-engagement and support context, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. External connectors are read-only and Notion is the only write destination. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.2.0",
+      "description": "Runs a project from named problem to shipped release. Its problem-statement agent finds recurring problems in bounded internal, meeting, CRM, sales-engagement and support context, or works from a known problem, then writes the case that one is worth fixing only after explicit approval. The skills scope the work, create tasks, communicate changes and record the release. External connectors are read-only and Notion is the only write destination. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.3.0",
       "author": {
         "name": "Sarah Madden"
       },
@@ -91,8 +91,8 @@
     {
       "name": "software",
       "source": "./plugins/software",
-      "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation after checking for a duplicate, changes the facts when they change without touching the freshness stamp, confirms a whole row is still true and stamps the date only on a real pass, reports which renewals are coming up ordered by consequence rather than by date ending with what it could not see, and backfills the directory from a folder of contracts and your own mailbox, one approval at a time, never filling a person, an importance, or the review stamp. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.3.0",
+      "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds and maintains tools, reports renewals by consequence, and backfills from signed agreements, spend, accounting, a named contract folder, the user's own mailbox and bounded Slack context. External systems are read-only, candidates are approved one at a time, and Slack can support Importance only with exact consequence evidence. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.4.0",
       "author": {
         "name": "Sarah Madden"
       },

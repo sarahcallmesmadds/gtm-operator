@@ -1,7 +1,7 @@
 {
   "name": "projects",
-  "version": "0.2.0",
-  "description": "Runs a project from named problem to shipped release in the databases the gtm-operator setup plugin created. Finds recurring problems in bounded internal, meeting, CRM, sales-engagement and support context, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. External connectors are read-only and Notion is the only write destination. Creates no database and writes no config.",
+  "version": "0.3.0",
+  "description": "Runs a project from named problem to shipped release in the databases the gtm-operator setup plugin created. Its problem-statement agent finds recurring problems in bounded internal, meeting, CRM, sales-engagement and support context, or works from a known problem, then writes the case that one is worth fixing only after explicit approval. The skills scope the work, create tasks, communicate changes and record the release. External connectors are read-only and Notion is the only write destination. Creates no database and writes no config.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"

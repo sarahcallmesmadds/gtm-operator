@@ -7327,3 +7327,54 @@ not a finding, to say so in one line and move on. It did, in one line, and spent
 the round on the branch instead.
 
 Suite green, 1,456 checks.
+
+## Plugin surfaces: Software evidence, Memos Gong, and the Projects problem-statement agent, 2026-08-27
+
+Sarah reviewed the connector and agent tabs in Claude and set three product
+directions.
+
+**Software gets four additional evidence sources, and no broader tool set.** Ramp
+is spend evidence, QuickBooks is bill and payment evidence, DocuSign is the home
+of signed agreements, and Slack supplies bounded context about what breaks if a
+tool disappears. The existing Box, Google Drive and Gmail sources remain. Every
+external connector is search-and-read only; Notion is the sole write
+destination.
+
+The connectors are part of `software:backfill`, not inventory decoration. The
+scope gate now accepts each source explicitly, requires a date range, requires a
+named account for DocuSign, Ramp and QuickBooks, and requires named Slack
+channels or direct-message conversations. It never searches all direct messages.
+The evidence kinds preserve what each source can prove: a contract or signed
+DocuSign agreement may fill contract terms; Ramp, QuickBooks and email establish
+spend or use but not terms; Slack establishes workflow dependence but not a paid
+contract.
+
+**Slack may support Importance, but it cannot guess it.** Backfill still refuses
+every person field and never stamps `Last reviewed`. It may now propose an
+Importance value only with structured Slack evidence naming the exact message or
+thread, what breaks, and how fast. The complete row remains behind the existing
+per-candidate explicit approval gate. The read-back proof requires Importance to
+remain absent when the approved candidate did not carry it.
+
+QuickBooks uses Intuit's official production hosted MCP endpoint. That endpoint
+is still a limited-availability partner pilot, so the plugin documents the
+onboarding requirement and reports it unavailable rather than substituting an
+unofficial server. DocuSign uses the official production MCP endpoint in open
+beta and deliberately does not use its send, sign, edit or workflow actions.
+
+**Memos gets Gong as a meeting source.** Sarah explicitly classified Gong as the
+transcript source. The hosted Gong MCP returns transcript-derived answers rather
+than raw transcript text, so `meeting-notes` labels the evidence that way and
+reports raw text unavailable unless a separate API or export actually returns
+it.
+
+**Projects gets the missing agent surface.** The repository already had
+`problem-scan` and `problem-statement` skills, but no Projects agent file, so the
+work did not appear in the Agents tab. `problem-statement-agent` now orchestrates
+those two skills. It may search and synthesize inside the user-approved boundary,
+but it does not scope a project, propose a solution, or write before the full
+Problem Statement memo receives an explicit yes.
+
+The releases move Software to 0.4.0, Memos to 0.3.0 and Projects to 0.3.0.
+Connector inventories, manifests, marketplace entries and component tests move
+together so the Claude tabs and the behavior contracts cannot drift apart.

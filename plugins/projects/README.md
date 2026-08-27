@@ -25,6 +25,12 @@ lifecycle:
 
 All six are built. `plugins/projects/SKILLS.md` defines them.
 
+The plugin also ships `problem-statement-agent`, which orchestrates
+`problem-scan` and `problem-statement`. It may search and synthesize inside the
+user-approved boundary, but it cannot write until the complete Problem Statement
+memo has an explicit yes. The skills remain the source of truth for every read
+boundary and write gate.
+
 `problem-scan` can ground candidates in bounded Slack and Gmail conversations,
 Granola or Gong meetings, HubSpot or Salesforce CRM records, Outreach activity,
 and Intercom or Pylon support context. Every external connector is optional and
