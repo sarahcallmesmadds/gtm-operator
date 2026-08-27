@@ -7199,8 +7199,8 @@ ever counted.
    45 raw matches. The 19 was read off a truncated view of the output rather
    than counted, and then written into a comment as evidence.
 
-**The third one is the sharpest, because that note sits eleven lines below the
-check's own limit 2: "IT CHECKS DOCUMENTATION AND DESCRIPTIONS ONLY, not
+**The third one is the sharpest, because that note sits in the same comment
+block as the check's own limit 2, below it: "IT CHECKS DOCUMENTATION AND DESCRIPTIONS ONLY, not
 JavaScript comments. A stale count inside a .js comment will not be caught."**
 The wrong number was in a JavaScript comment. The check documented the blind
 spot and the next number written into it fell straight in.
@@ -7257,5 +7257,37 @@ no further location-dependent prose made false by the move, the sixteen and the
 repointed `readFileSync` paths counted back as 1 + 1 + 2 + 4 across four test
 files, no broken link, and the tightened skip correct on both path separators
 and silent for nothing that was live before the move.
+
+Suite green, 1,456 checks.
+
+### Round 5 on the root tidy, Codex CLI confirming, 2026-08-26: three findings, all taken
+
+Per-file coverage stated, high reasoning confirmed by the banner. Round 4's five
+figures were independently re-derived and all five stand, as does 177 + 424 +
+177 = 778, the sixteen citations as 3 shared + 11 vendored + 1 test + 1 README,
+and the eight repointed reads as 1 + 1 + 2 + 4 across four test files.
+
+1. **"eleven lines below" was another number nobody counted, inside the sentence
+   about numbers nobody counted.** The round 3 entry said the wrong test-note
+   figure sat eleven lines below the limit that names the blind spot. They are
+   lines 150 and 171, twenty-one apart. The sentence now says "in the same
+   comment block, below it", which is what the point actually rests on and does
+   not go stale the next time that file is edited. A line distance in prose is a
+   copy of something the file already knows, and copies drift.
+2. **The comment's own heading said "Two limits" and enumerated three.** The
+   third was added on 2026-08-18 and the heading was not moved with it, so this
+   predates the branch. It is taken here because this branch rewrote that third
+   limit and left the heading contradicting it.
+3. **`plugins/memos/README.md` pointed at `scripts/memo.js`, which has never
+   existed.** The rules live in `shared/memo-write.js`, vendored as
+   `scripts/vendor/memo-write.js`, and the README already explains the vendoring
+   four lines further down. `process` and `projects` both point at files that do
+   exist, so memos was the only one wrong. This also predates the branch, and it
+   is taken here because a live pointer to a file that does not exist is exactly
+   what this change was for.
+
+Findings 2 and 3 are older than this branch. Both are taken rather than deferred
+because they sit in files this change edits, and a tidy that steps over a broken
+pointer on its way past is not a tidy.
 
 Suite green, 1,456 checks.

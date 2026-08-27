@@ -79,7 +79,7 @@ and payload is built in the script, every value is checked there, and the
 model makes the calls in between. The same shape as `setup`, `calendar` and
 `process`.
 
-`scripts/memo.js` holds every rule Notion cannot enforce: the templates and
+`scripts/vendor/memo-write.js` holds every rule Notion cannot enforce: the templates and
 their required sections, the one-target rule on `Corrects`, `Period covered`
 required on a Team Update and refused everywhere else, the tags cap, and the
 one writable status.

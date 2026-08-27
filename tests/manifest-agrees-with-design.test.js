@@ -136,7 +136,7 @@ check('the manifest is internally consistent', () => {
  * a noun. English uses the same word for a quantity and for an indefinite
  * article, and no regex is going to separate them reliably.
  *
- * Two limits, both stated rather than hidden, because a check whose gaps are
+ * Three limits, all stated rather than hidden, because a check whose gaps are
  * undocumented reads as covering more than it does:
  *
  * 1. IT SKIPS THE WORD "ONE". English uses "one" as both a quantity and an
