@@ -19,7 +19,7 @@
  * already happened. A scope this file quietly trims reads less than the
  * person asked for and says it read what they asked for — or worse, more.
  *
- * WHAT A BACKFILLED ROW NEVER CARRIES, from `SKILLS-software.md`:
+ * WHAT A BACKFILLED ROW NEVER CARRIES, from `plugins/software/SKILLS.md`:
  * no person field (four fields here are people and all four stay empty), no
  * `Importance` (a judgment about consequence, and a receipt carries no
  * information about it), no `Last reviewed` (a machine pulled the row in and
@@ -38,7 +38,7 @@ const tool = require(path.join(__dirname, 'tool'))
 const SOURCES = ['contracts', 'email']
 
 /**
- * What each source proves, and what it may fill. From `SKILLS-software.md`:
+ * What each source proves, and what it may fill. From `plugins/software/SKILLS.md`:
  * the two sources are not equally good, and the skill has to say which it is
  * looking at. A contract makes a strong candidate; an email makes a thin one,
  * and presenting a thin row as filled would be worse than not finding it,
@@ -55,7 +55,7 @@ const KINDS = {
 
 /**
  * The fields a backfilled row may carry, from the fill-event table in
- * `SCHEMA-software.md`: the what-it-is group partly, and the contract group
+ * `plugins/software/SCHEMA.md`: the what-it-is group partly, and the contract group
  * from a contract. Everything else on the schema is somebody's judgment or
  * somebody's knowledge, and it arrives through `new`, `update`, `review` or a
  * person — never through an import.

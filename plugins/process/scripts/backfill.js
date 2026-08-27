@@ -9,7 +9,7 @@
  * the reading and the writing.
  *
  * THE APPROVAL GATE IS THE WHOLE DESIGN, and everything permissive here rests
- * on it. `SKILLS-process.md` argues that all three discovery modes are
+ * on it. `plugins/process/SKILLS.md` argues that all three discovery modes are
  * shippable precisely because a candidate that turns out to be junk costs one
  * "no": a weak detector produces noise rather than damage. So the judgments
  * below are allowed to be roughly right, and the things that are NOT allowed to
@@ -42,7 +42,7 @@ const SOURCES = ['documents', 'slack', 'email', 'recordings']
  * The sources that are conversations rather than documents.
  *
  * EVERY ONE OF THESE CARRIES A DATE RANGE AND THERE IS NO WAY TO OPT OUT.
- * `SKILLS-process.md`: "There is no unbounded read." A document store is a
+ * `plugins/process/SKILLS.md`: "There is no unbounded read." A document store is a
  * place somebody chose to put things and its size is knowable before you start.
  * A conversation source is a firehose, and "all of Slack" is not a scope, it is
  * the absence of one.
@@ -55,7 +55,7 @@ const WAYS = ['topics', 'repeats', 'sweep']
 /**
  * How many times a question has to be asked before it counts as repeated.
  *
- * Three, from `SKILLS-process.md`, on the reasoning that anything asked that
+ * Three, from `plugins/process/SKILLS.md`, on the reasoning that anything asked that
  * often should have been written down. Twice is a coincidence.
  */
 const REPEAT_MIN = 3
@@ -63,7 +63,7 @@ const REPEAT_MIN = 3
 /**
  * The similarity above which two askings are treated as the same question.
  *
- * NOTHING HAS MEASURED THIS, and `SKILLS-process.md` says so in as many words:
+ * NOTHING HAS MEASURED THIS, and `plugins/process/SKILLS.md` says so in as many words:
  * whether "how do we do refunds" and "what is the refund process" count as the
  * same question needs tuning against real workspaces, which do not exist yet.
  * It is acceptable here and only here, because the output is a candidate list
@@ -338,7 +338,7 @@ function plan (request) {
     /*
      * DIRECT MESSAGES ARE NAMED ONE BY ONE OR NOT READ.
      *
-     * `SKILLS-process.md`: never, unless the user names specific ones. Not "all
+     * `plugins/process/SKILLS.md`: never, unless the user names specific ones. Not "all
      * DMs" as an option, not a checkbox to include them. This is the one place
      * in the plugin where a wide read is refused outright rather than offered
      * with a warning, because a public channel is a place people chose to speak
@@ -745,7 +745,7 @@ function repeats (askings, { threshold = REPEAT_SIMILARITY, min = REPEAT_MIN } =
  * select value and takes the whole write down with it.
  *
  * NOTHING HERE DECIDES ANYTHING. It numbers the candidates, says what it would
- * make each one, and hands the list over. `SKILLS-process.md`: backfill's job
+ * make each one, and hands the list over. `plugins/process/SKILLS.md`: backfill's job
  * is to be usefully wrong in a list you can scan, rather than confidently wrong
  * in your library.
  */

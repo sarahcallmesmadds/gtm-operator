@@ -3,7 +3,7 @@
 /**
  * Every vendored copy matches the shared source it came from.
  *
- * `SKILLS-setup.md` build risk 3 decided that the shared code cannot be shared
+ * `plugins/setup/SKILLS.md` build risk 3 decided that the shared code cannot be shared
  * by requiring it, because Claude Code has no dependency resolution between
  * plugins, and that the workable version is one source in this repository
  * copied into each plugin with a test that fails when a copy has drifted.

@@ -14,7 +14,7 @@
  * them together, and a review round is an expensive way to find a number that
  * grep would have caught.
  *
- * So this parses the relation map out of SKILLS-setup.md and compares it to
+ * So this parses the relation map out of plugins/setup/SKILLS.md and compares it to
  * manifest.js, row by row. If somebody adds a relation to one and not the
  * other, this fails and names which.
  *
@@ -43,7 +43,7 @@ const check = (name, fn) => {
 const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8')
 
 /**
- * Pull the relation map table out of SKILLS-setup.md.
+ * Pull the relation map table out of plugins/setup/SKILLS.md.
  *
  * The table is the design's manifest and it is the row this parser trusts. If
  * the table's shape changes, this parser should fail loudly rather than
@@ -52,7 +52,7 @@ const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8')
  * reviews kept naming: a check that passes without checking.
  */
 function parseRelationMap () {
-  const text = read('SKILLS-setup.md')
+  const text = read('plugins/setup/SKILLS.md')
   const rows = []
   for (const line of text.split('\n')) {
     // | 4 | A memo to what it is about | Memos | `Artifacts` | `Memos` | Two-way |
@@ -79,12 +79,12 @@ const designRelations = parseRelationMap()
 
 check('the relation map was found and parsed', () => {
   assert.ok(designRelations.length > 0,
-    'parsed no rows out of the relation map in SKILLS-setup.md. The table shape probably changed, and this parser must be fixed rather than left matching nothing')
+    'parsed no rows out of the relation map in plugins/setup/SKILLS.md. The table shape probably changed, and this parser must be fixed rather than left matching nothing')
 })
 
 check('the design and the manifest hold the same number of relations', () => {
   assert.strictEqual(designRelations.length, manifest.counts.relations,
-    `SKILLS-setup.md has ${designRelations.length} relations, manifest.js has ${manifest.counts.relations}`)
+    `plugins/setup/SKILLS.md has ${designRelations.length} relations, manifest.js has ${manifest.counts.relations}`)
 })
 
 check('every relation matches row for row', () => {
@@ -152,20 +152,28 @@ check('the manifest is internally consistent', () => {
  *    went stale across three review rounds was in a document or a description,
  *    where a number means how many there are.
  *
- * 3. IT READS `plugins/` AND NOT THE ROOT DESIGN DOCUMENTS. This one has a
- *    known cost: `SKILLS-setup.md` said "add all thirteen relations" for a
- *    whole review round after the manifest dropped to twelve, and this check
- *    stayed green.
+ * 3. IT READS `plugins/` AND SKIPS EVERY `SCHEMA.md` AND `SKILLS.md`. Those are
+ *    the design documents. They sat at the repository root until 2026-08-26,
+ *    when the root tidy moved each one into the plugin it describes, which put
+ *    them inside this walk for the first time. They are still out of scope, and
+ *    the skip in the loop below is what keeps them there.
  *
- *    Extending it was tried on 2026-08-18 and abandoned, because the root
+ *    This has a known cost: `plugins/setup/SKILLS.md` said "add all thirteen
+ *    relations" for a whole review round after the manifest dropped to twelve,
+ *    and this check stayed green.
+ *
+ *    Reading them was tried on 2026-08-18 and abandoned, because the design
  *    documents discuss subsets constantly and the same regex cannot tell a
- *    total from a local quantity. Reading every root document produced 33 hits,
- *    of which one was real. Narrowing to phrasings that read as totals, "all
- *    four", "the two", still produced 10 false positives against 0 real ones,
- *    because "all four databases" means all four of the ones being discussed.
+ *    total from a local quantity. Reading every one produced 33 hits, of which
+ *    one was real. Narrowing to phrasings that read as totals, "all four", "the
+ *    two", still produced 10 false positives against 0 real ones, because "all
+ *    four databases" means all four of the ones being discussed. The 2026-08-26
+ *    move reproduced it exactly: 19 hits, every one a local quantity, such as
+ *    `plugins/calendar/SCHEMA.md` saying that Process's `Type` field "is three
+ *    databases in one".
  *
  *    A check firing 32 times wrongly is a check somebody turns off, and then
- *    the one real hit is lost too. So the root documents are read by people,
+ *    the one real hit is lost too. So the design documents are read by people,
  *    and the cost is written down here rather than hidden behind a green tick.
  */
 const NUMBER_WORDS = {
@@ -197,6 +205,11 @@ check('every count written in prose agrees with the manifest', () => {
     // comments explain concepts, and "one relation with a synced property" is
     // not a count of anything.
     if (!/\.(md|json)$/.test(file)) continue
+    // The design documents, out of scope since 2026-08-18 and living inside
+    // `plugins/` since the 2026-08-26 root tidy. See note 3 above: they discuss
+    // subsets constantly, and every hit this walk takes from them is a local
+    // quantity rather than a total.
+    if (/(^|[/\\])(SCHEMA|SKILLS)\.md$/.test(file)) continue
     const rel = path.relative(ROOT, file)
     for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
       // An explicit note that a number is historical, e.g. a count that used to

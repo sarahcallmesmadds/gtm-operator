@@ -7,8 +7,8 @@
  * See the header on `shared/config-read.js` for why a copy rather than a
  * require.
  *
- * `SCHEMA-software.md` is the human definition and wins over this file where
- * they disagree. `SKILLS-software.md` is the human definition of the skills.
+ * `plugins/software/SCHEMA.md` is the human definition and wins over this file where
+ * they disagree. `plugins/software/SKILLS.md` is the human definition of the skills.
  * `tests/software-schema-agrees.test.js` asserts every list and every field
  * name here against `setup`'s schema.
  *
@@ -21,8 +21,8 @@
  * `process:update` needed on 2026-08-17.
  *
  * WHO STAMPS AT CREATION WAS RULED BY SARAH ON 2026-08-25: creation stamps
- * it, because creation is a full pass. That is `SCHEMA-software.md`'s
- * fill-event table, which this file follows, and `SKILLS-software.md` now
+ * it, because creation is a full pass. That is `plugins/software/SCHEMA.md`'s
+ * fill-event table, which this file follows, and `plugins/software/SKILLS.md` now
  * says the same. The ruling and the history of the disagreement are in
  * `DECISIONS.md`. Changing the answer is one edit to `LAST_REVIEWED_WRITERS`.
  */
@@ -111,7 +111,7 @@ const SECTIONS = [
 ]
 
 /**
- * 400 rather than 600 or 800, from `SCHEMA-software.md`: length here is a
+ * 400 rather than 600 or 800, from `plugins/software/SCHEMA.md`: length here is a
  * signal that content is in the wrong place, and hitting the ceiling routes
  * to writing the Technical Reference. Conditional sections sit outside the
  * count. The agreement test holds this number to the design document, the fix
@@ -121,7 +121,7 @@ const WORD_CEILING = 400
 
 /**
  * The skills allowed to write `Last reviewed`, per the fill-event table in
- * `SCHEMA-software.md`. See the file header: Sarah ruled for this reading on
+ * `plugins/software/SCHEMA.md`. See the file header: Sarah ruled for this reading on
  * 2026-08-25, the design documents agree, and this constant is still the one
  * edit that would change the answer.
  */

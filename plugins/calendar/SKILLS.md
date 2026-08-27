@@ -4,7 +4,7 @@ Part 3 for `calendar`. Three skills, in the same five slots as the other skill
 files: what it does, when it runs, what it reads and writes, what it does not do,
 and the judgment it carries.
 
-The database is defined in `SCHEMA-calendar.md`, including the boundary test for
+The database is defined in `plugins/calendar/SCHEMA.md`, including the boundary test for
 what belongs in it and the database-level views `setup` creates, which is the
 manifest for them and the only place their number is stated. This file does not
 restate a field name or a value list.
@@ -15,10 +15,10 @@ Written 2026-08-17.
 
 ## Rules that apply to every skill in this plugin
 
-The shared rules in `SKILLS-memos.md` apply here unchanged: never invent a select
+The shared rules in `plugins/memos/SKILLS.md` apply here unchanged: never invent a select
 value, verify the write landed, a hard confirmation gate, preview in full inline,
 route to `setup` on first run, pin the Notion API version and the client floor to
-the two values `SKILLS-setup.md` defines, and record only sources you actually
+the two values `plugins/setup/SKILLS.md` defines, and record only sources you actually
 opened.
 
 **One is deliberately not inherited: recording sources.** The shared rule says a

@@ -5,7 +5,7 @@
  *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
- * gate. `SCHEMA-process.md` defines the fields, the values and the templates;
+ * gate. `plugins/process/SCHEMA.md` defines the fields, the values and the templates;
  * this file does not restate a value list, it reads them from the shipped
  * schema.
  *
@@ -14,7 +14,7 @@
  * TWO KINDS OF FINDING, AND THE SPLIT IS THE POINT. `problems` are refusals: a
  * write carrying one is wrong and `properties` throws rather than sending it.
  * `concerns` are questions for a person, and the word ceiling is the reason the
- * split exists. `SCHEMA-process.md` says the skill asks rather than trims at the
+ * split exists. `plugins/process/SCHEMA.md` says the skill asks rather than trims at the
  * ceiling, because running long almost never means a wording problem, it means
  * the artifact is covering more than one thing. Refusing it outright would make
  * the skill trim to get past the gate, which is the exact behaviour the design
@@ -41,7 +41,7 @@ const {
  *
  * Users get Type wrong more often than any other field, so it ships in code as
  * well as in the skill, and the skill shows it rather than deciding alone.
- * `SCHEMA-process.md`, "Which type is this".
+ * `plugins/process/SCHEMA.md`, "Which type is this".
  */
 const TYPE_TREE = [
   { ask: 'Does it record a choice and its reasoning?', then: 'Strategy Decision' },
@@ -643,7 +643,7 @@ function properties (context, final, { defaultsPerson = true, parentType, today,
    *
    * On a create all three are set, because writing an artifact is having read
    * it. `Verified by` is skipped where config records no person and
-   * `Verified date` is set either way, which is the asymmetry `SKILLS-process.md`
+   * `Verified date` is set either way, which is the asymmetry `plugins/process/SKILLS.md`
    * states and the one thing about this group that is not symmetric.
    *
    * `today` is passed rather than read from the clock so a caller can write a

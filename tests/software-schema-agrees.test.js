@@ -156,14 +156,14 @@ check('there is no Tags property, the design rule pinned', () => {
   // A tag is what a row is ABOUT, and a tool is not about anything. Matching
   // the other databases for its own sake is how a field with no meaning gets
   // shipped, so its absence is asserted rather than assumed.
-  assert.strictEqual(typeOf('Tags'), null, 'Software deliberately has no Tags; SCHEMA-software.md says why')
+  assert.strictEqual(typeOf('Tags'), null, 'Software deliberately has no Tags; plugins/software/SCHEMA.md says why')
   assert.ok(!shared.IDENTITY_PROPERTIES.includes('Tags'))
 })
 
 check('Contract link carries the property description the design states, word for word', () => {
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'software', 'SCHEMA.md'), 'utf8')
   const stated = design.match(/The text is:\n\n((?:> .*\n)+)/)
-  assert.ok(stated, 'SCHEMA-software.md no longer states the Contract link description in the form this test reads')
+  assert.ok(stated, 'plugins/software/SCHEMA.md no longer states the Contract link description in the form this test reads')
   const wanted = stated[1].split('\n').map(l => l.replace(/^> /, '').trim()).filter(Boolean).join(' ')
   const property = software.properties.find(p => p.name === 'Contract link')
   assert.strictEqual(property && property.description, wanted,
@@ -187,17 +187,17 @@ check('the required-at-create and never-cleared lists name fields the database h
 })
 
 check('Last reviewed is written by exactly the skills the fill-event table names', () => {
-  // The fill-event table in SCHEMA-software.md names software:new and
+  // The fill-event table in plugins/software/SCHEMA.md names software:new and
   // software:review, the reading Sarah ruled for on 2026-08-25 (creation is a
   // full pass). This reads that table rather than hardcoding the answer, so
   // the constant tracks the document it claims to follow: change the table
   // without the constant, or the constant without the table, and this goes
   // red.
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'software', 'SCHEMA.md'), 'utf8')
   // Anchored on the fill-event row's own wording, because "| Last reviewed |"
   // also opens a row in the field table, whose third cell names no skill.
   const row = design.match(/\| Last reviewed \| Creation[^|]*\| ([^|]+)\|/)
-  assert.ok(row, 'SCHEMA-software.md no longer states Last reviewed\'s fill event in the table form this test reads')
+  assert.ok(row, 'plugins/software/SCHEMA.md no longer states Last reviewed\'s fill event in the table form this test reads')
   const named = (row[1].match(/`software:([a-z-]+)`/g) || []).map(m => m.replace(/`software:([a-z-]+)`/, '$1'))
   assert.deepStrictEqual(shared.LAST_REVIEWED_WRITERS, named,
     `the fill-event table names ${JSON.stringify(named)} and the writer enforces ${JSON.stringify(shared.LAST_REVIEWED_WRITERS)}`)
@@ -215,9 +215,9 @@ check('the single-person fields are the three accountability fields, and Admins 
 // --------------------------------------------------------------- the template
 
 check('the body is the four sections the design defines, Notes conditional and last', () => {
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'software', 'SCHEMA.md'), 'utf8')
   const stated = design.match(/\*\*Body sections, in order:\*\* ([^.]+)\./)
-  assert.ok(stated, 'SCHEMA-software.md no longer states the body sections in the form this test reads')
+  assert.ok(stated, 'plugins/software/SCHEMA.md no longer states the body sections in the form this test reads')
   const wanted = stated[1].split(',').map(s => s.trim().replace(/\s+/g, ' '))
   assert.deepStrictEqual(
     shared.SECTIONS.map(s => s.conditional ? `${s.heading} (conditional)` : s.heading),
@@ -231,10 +231,10 @@ check('the word ceiling is the number the design document states', () => {
   // other place it lives, so the two are held together. This is the exact gap
   // the 2026-08-23 mutation run found in process: a ceiling nothing checked
   // could move to 900 and everything stayed green.
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-software.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'software', 'SCHEMA.md'), 'utf8')
   const stated = design.match(/Ceiling of (\d+) words across the required sections/)
   assert.ok(stated,
-    'SCHEMA-software.md no longer states the ceiling in the form this test reads. ' +
+    'plugins/software/SCHEMA.md no longer states the ceiling in the form this test reads. ' +
     'Fix the regex rather than deleting the check.')
   assert.strictEqual(shared.WORD_CEILING, Number(stated[1]),
     `the design document says ${stated[1]} words and the writer enforces ${shared.WORD_CEILING}`)

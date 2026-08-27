@@ -15,7 +15,7 @@
  * Notion reports another, with nothing failing anywhere.
  *
  * That is not hypothetical. It is exactly what was found on 2026-08-19:
- * `SCHEMA-calendar.md` said a date was required "from `Confirmed` onwards" and
+ * `plugins/calendar/SCHEMA.md` said a date was required "from `Confirmed` onwards" and
  * `manifest.js` had already excluded `Canceled`. Both were approved. This test
  * is the thing that would have caught it.
  *
@@ -73,7 +73,7 @@ check('the status list matches, in the same order', () => {
 })
 
 // Order is asserted as well as membership, and deliberately. Option order is
-// what a user sees in the dropdown, and `SCHEMA-calendar.md` sets it on purpose:
+// what a user sees in the dropdown, and `plugins/calendar/SCHEMA.md` sets it on purpose:
 // types heaviest first, statuses in lifecycle order.
 
 // ------------------------------------------------------------- field names

@@ -36,7 +36,7 @@ function tokens (text) {
  *
  * Overlap over union across the name and the description together, which is the
  * "title and topic" the reference compared. It is a blunt measure and is meant
- * to be: it produces candidates for a person to look at, and `SKILLS-process.md`
+ * to be: it produces candidates for a person to look at, and `plugins/process/SKILLS.md`
  * says the duplicate check runs before structuring precisely so a near match
  * costs one question rather than a merged-away document.
  */

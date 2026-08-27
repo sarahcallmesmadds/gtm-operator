@@ -48,12 +48,12 @@ const check = (name, fn) => {
  * plausible number of rows rather than trusting itself.
  */
 const SOURCES = {
-  process: { file: 'SCHEMA-process.md' },
-  memos: { file: 'SCHEMA-memos.md' },
-  projects: { file: 'SCHEMA-projects.md', after: '## Part 1: Projects schema' },
-  tasks: { file: 'SCHEMA-projects.md', after: '## Part 2: Tasks schema' },
-  software: { file: 'SCHEMA-software.md' },
-  calendar: { file: 'SCHEMA-calendar.md' }
+  process: { file: 'plugins/process/SCHEMA.md' },
+  memos: { file: 'plugins/memos/SCHEMA.md' },
+  projects: { file: 'plugins/projects/SCHEMA.md', after: '## Part 1: Projects schema' },
+  tasks: { file: 'plugins/projects/SCHEMA.md', after: '## Part 2: Tasks schema' },
+  software: { file: 'plugins/software/SCHEMA.md' },
+  calendar: { file: 'plugins/calendar/SCHEMA.md' }
 }
 
 /**

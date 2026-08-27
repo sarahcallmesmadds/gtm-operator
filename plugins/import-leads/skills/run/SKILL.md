@@ -112,7 +112,7 @@ turns the saved pair into the evidence; show both counts and ask whether
 Contacts is how this org works. An org that works in Leads deserves the
 mismatch named before any write is planned: this plugin lands Contacts and
 Accounts, a lead-based import is deliberately out of scope
-(`SKILLS-import-leads.md` records it as Open work waiting for a user who
+(`plugins/import-leads/SKILLS.md` records it as Open work waiting for a user who
 asks), and the person chooses between stopping there and proceeding
 deliberately, with the choice recorded in the run's report. On HubSpot
 there is no measured Lead surface to count, so the same confirmation is
@@ -317,7 +317,7 @@ surfaces, deliberately outside the write contract. The question exists so
 nobody walks away assuming the import set one. An answer wanting them
 stamped is refused by name, like any other field the plugin cannot carry,
 and the ask goes in the run's report: that recorded demand is exactly what
-un-parks the opt-out measurement (`SKILLS-import-leads.md`, Open).
+un-parks the opt-out measurement (`plugins/import-leads/SKILLS.md`, Open).
 
 The checkpoint is deliberately a step of the conversation, not a command:
 there is no request to send and no response to judge, and its refusal is

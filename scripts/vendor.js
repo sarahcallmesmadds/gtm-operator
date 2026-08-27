@@ -3,7 +3,7 @@
 /**
  * Copy the shared sources into every plugin that declares it needs them.
  *
- * WHY THIS EXISTS. `SKILLS-setup.md` build risk 3: the Notion and config code
+ * WHY THIS EXISTS. `plugins/setup/SKILLS.md` build risk 3: the Notion and config code
  * cannot literally be shared across plugins, because Claude Code has no
  * dependency resolution between them and a skill's scripts resolve inside its
  * own plugin. The decision recorded there is one source in this repository,

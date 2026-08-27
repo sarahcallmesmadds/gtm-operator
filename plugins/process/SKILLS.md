@@ -6,7 +6,7 @@ so a gap in one is visible as a gap rather than as something that did not apply.
 The five slots: what it does, when it runs, what it reads and writes, what it
 does not do, and the judgment it carries.
 
-Databases are defined in `SCHEMA-process.md` and `SCHEMA-memos.md`. This
+Databases are defined in `plugins/process/SCHEMA.md` and `plugins/memos/SCHEMA.md`. This
 file does not restate a field name or a value list.
 
 ---
@@ -38,7 +38,7 @@ file does not restate a field name or a value list.
 - **Route to `setup` on first run** when config is absent. Never rely on the
   README.
 - **Pin the Notion API version and the client floor.** Both are defined once, in
-  `SKILLS-setup.md` step 0, and checked there at install. This plugin pins the same
+  `plugins/setup/SKILLS.md` step 0, and checked there at install. This plugin pins the same
   two values rather than restating them, because an unpinned version means the
   plugin breaks on a date nobody chose, and six copies of a version number is how
   five of them go stale.
@@ -108,7 +108,7 @@ when config is absent, and never relies on a README. Config lives at
 ids, data source ids, the property name map, the user's Notion person id, and
 the default review cadence.
 
-**Written 2026-08-17: `SKILLS-setup.md`.** It carries the type explanation, the
+**Written 2026-08-17: `plugins/setup/SKILLS.md`.** It carries the type explanation, the
 creation order, the relation map and the option order for every select. It has
 three skills, `install`, `check` and `add`, and the one this plugin routes to on
 first run is `install`.
@@ -133,7 +133,7 @@ Fields it always sets without asking:
 | Field | Value |
 |---|---|
 | `Status` | `Active`. **`Draft` is only reachable by a person setting it in Notion**, because a skill that writes a draft has written nothing useful |
-| `Owner` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
+| `Owner` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `plugins/setup/SKILLS.md` |
 | `Last checked for accuracy` | today |
 | `Verified by`, `Verified date` | the user, today. **`Verified by` is skipped when there is no person id**, and `Verified date` is set either way |
 | `Review cadence` | the default from config, offered for change in the preview |
@@ -449,7 +449,7 @@ extracting the field tables mechanically rather than by eye.
    created. `Software` has no target at all in v1, and `Projects` only exists if
    `projects` is installed. Setup would have failed at property-creation time,
    during setup, which is the worst moment for it. Both were made conditional,
-   with the rule written into `SCHEMA-process.md`. **Superseded 2026-08-17**:
+   with the rule written into `plugins/process/SCHEMA.md`. **Superseded 2026-08-17**:
    neither is conditional any more, because one setup creates all six databases
    before adding any relation, so every target exists. The rule survives, the
    conditions do not.

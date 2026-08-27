@@ -23,7 +23,7 @@ lifecycle:
 | `comms` | Writes the update that tells the people affected what changed. One Project Update memo |
 | `ship` | Records that a project shipped and closes it. One Release memo, then In progress to Done |
 
-All six are built. `SKILLS-projects.md` in the repository root defines them.
+All six are built. `plugins/projects/SKILLS.md` defines them.
 
 ## The rules the scripts hold
 
@@ -58,7 +58,7 @@ Said here so it is not discovered by a user hitting it:
 - **No task body is written.** Requirements live in the task body, written
   when the task is picked up, by a person.
 - **Projects have no hierarchy, on purpose.** Grouping is Domain and the
-  Strategy Decision relation, and the reasoning is in `SCHEMA-projects.md`
+  Strategy Decision relation, and the reasoning is in `plugins/projects/SCHEMA.md`
   under "Projects have no hierarchy". Do not re-propose a parent project.
 - **Nothing is sent anywhere.** No Slack, no email, in any skill.
 

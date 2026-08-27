@@ -6,11 +6,12 @@ plugins named for the work they do, built from the design documents at the
 root. `setup`, `calendar`, `process`, `memos`, `projects`, `software` and
 `import-leads` are built.
 
-**The design lives in the root documents, not in this file.** `DECISIONS.md`
-holds the reasoning and the reversals, `SCHEMA-*.md` define the databases,
-`SKILLS-*.md` define the skills, and `plugins/setup/scripts/manifest.js` is the
-machine-readable definition of what an install creates. Restating any of it here
-would be a copy, and copies drift.
+**The design lives in the design documents, not in this file.** `DECISIONS.md`
+at the root holds the reasoning and the reversals, each plugin's own
+`SCHEMA.md` defines its database, each plugin's own `SKILLS.md` defines its
+skills, and `plugins/setup/scripts/manifest.js` is the machine-readable
+definition of what an install creates. Restating any of it here would be a
+copy, and copies drift.
 
 ## Layout
 
@@ -19,7 +20,7 @@ would be a copy, and copies drift.
   the foundation's databases or touches the foundation's config. A job plugin may keep
   a private config file of its own, which no other plugin reads or writes;
   `plugins/import-leads/` is the first such plugin, defined by
-  `SKILLS-import-leads.md`. It vendors nothing from `shared/` and reads no
+  `plugins/import-leads/SKILLS.md`. It vendors nothing from `shared/` and reads no
   foundation config
 - `plugins/setup/scripts/manifest.js`: what gets created, in one file
 - `plugins/calendar/`, `plugins/process/`, `plugins/memos/`,
@@ -29,9 +30,9 @@ would be a copy, and copies drift.
   it into each plugin, which declares what it wants in its own manifest under
   `gtmOperator.vendor`. **Re-vendor after touching `shared/`**, or a plugin runs
   against a copy that is one edit behind
-- `SCHEMA-*.md`: one per database, except `SCHEMA-projects.md`, which covers
+- `plugins/<name>/SCHEMA.md`: one per database, except `plugins/projects/SCHEMA.md`, which covers
   Projects and Tasks because they are one job
-- `SKILLS-*.md`: one per plugin
+- `plugins/<name>/SKILLS.md`: one per plugin
 - `tests/`: run by `sh tests/run.sh`
 
 ## Rules that are not obvious from the code

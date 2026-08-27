@@ -1,13 +1,13 @@
 # memos: what each skill does
 
 Part 3 for `memos`. Four skills, each described in the same five slots as
-`SKILLS-process.md` and `SKILLS-projects.md`, so a gap in one is visible as a gap
+`plugins/process/SKILLS.md` and `plugins/projects/SKILLS.md`, so a gap in one is visible as a gap
 rather than as something that did not apply.
 
 The five slots: what it does, when it runs, what it reads and writes, what it
 does not do, and the judgment it carries.
 
-The database is defined in `SCHEMA-memos.md`. This file does not restate a field
+The database is defined in `plugins/memos/SCHEMA.md`. This file does not restate a field
 name or a value list.
 
 Written 2026-08-17.
@@ -67,7 +67,7 @@ schema and why nothing here audits.
 - **Route to `setup` on first run** when config is absent. Never rely on the
   README.
 - **Pin the Notion API version and the client floor.** Both are defined once, in
-  `SKILLS-setup.md` step 0. Pin the same two values here rather than restating
+  `plugins/setup/SKILLS.md` step 0. Pin the same two values here rather than restating
   them.
 - **Record every source you actually opened, and never one you did not.** A
   Sources section that cannot be trusted is worse than no Sources section.
@@ -115,7 +115,7 @@ so is the record that it was withdrawn.
 |---|---|
 | `Status` | `Published`. **`Draft` is only reachable by a person setting it in Notion**, because a skill that writes a draft has written nothing useful. Same rule as `Active` on Process |
 | `Published date` | today |
-| `Author` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
+| `Author` | the user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `plugins/setup/SKILLS.md` |
 
 ### Any plugin may write to any database. No plugin may call another plugin's skill
 
@@ -133,7 +133,7 @@ id.
 this one, plus `projects:comms` for Project Update and
 `projects:problem-statement` for Problem Statement. Nothing stops them producing
 different shapes for the same type. **The page templates must be generated from
-`SCHEMA-memos.md` into every plugin that writes them**, not hand-copied, and a
+`plugins/memos/SCHEMA.md` into every plugin that writes them**, not hand-copied, and a
 test must fail when a copy has drifted. The same problem as the shared Notion
 client, and it wants the same answer.
 
@@ -330,7 +330,7 @@ actually shows up:
 **Neither is repaired, and neither can be.** Which correction to drop and where to
 break a cycle are both judgments about what somebody meant. **Reported and shown
 is the whole remedy**, and it is the same line `check` holds on the two rules no
-view can watch, in `SKILLS-setup.md`.
+view can watch, in `plugins/setup/SKILLS.md`.
 
 **Added 2026-08-17.** The write-time rules were specified and the read-time
 behaviour assumed they had held, which is only true of memos this plugin wrote.
@@ -365,8 +365,8 @@ different things you are doing.
    and it would supersede all of them. Not v1, and worth not designing four
    near-identical skills without noticing.
 2. **Three plugins write Memos rows.** The template definitions have to be
-   generated from `SCHEMA-memos.md` rather than hand-copied, with a test that
+   generated from `plugins/memos/SCHEMA.md` rather than hand-copied, with a test that
    fails on drift. Same shape as the shared Notion client problem in
-   `SKILLS-setup.md`, and it wants one answer covering both.
+   `plugins/setup/SKILLS.md`, and it wants one answer covering both.
 3. **`team-update` reads Tasks, which no other memos skill touches.** If that turns
    out to be rare, the read can be dropped and the skill loses nothing.

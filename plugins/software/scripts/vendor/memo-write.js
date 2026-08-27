@@ -11,13 +11,13 @@
  * beside the files it requires, and `tests/vendor-copies-current.test.js`
  * fails when a copy has drifted. It lived at `plugins/memos/scripts/memo.js`
  * until 2026-08-24, when `projects` gained three skills that write Memos rows
- * (`problem-statement`, `comms`, `ship`) and `SKILLS-memos.md` open item 2
+ * (`problem-statement`, `comms`, `ship`) and `plugins/memos/SKILLS.md` open item 2
  * came due: the memo shapes must be one definition in every plugin that
  * writes them, not a hand copy per plugin.
  *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
- * gate. `SCHEMA-memos.md` defines the fields, the values and the templates;
+ * gate. `plugins/memos/SCHEMA.md` defines the fields, the values and the templates;
  * this file does not restate a value list, it reads them from the shipped
  * schema.
  *
@@ -222,7 +222,7 @@ function sourcesSection (sources) {
 /**
  * The `Corrects` request on a proposed memo, judged before anything is built.
  *
- * ONE TARGET IS THE RULE, from `SKILLS-memos.md`: a memo corrects exactly one
+ * ONE TARGET IS THE RULE, from `plugins/memos/SKILLS.md`: a memo corrects exactly one
  * memo. Correcting several means several memos, or a new memo that corrects
  * nothing and supersedes by being newer. More than one is refused here, which
  * is the write-time half of the rule; `follow` reports violations a person
@@ -361,7 +361,7 @@ function problems (final) {
    * THE FIELD THAT SEPARATES A TEAM UPDATE FROM A PROJECT UPDATE, enforced in
    * both directions. Required on a Team Update, because a summary of a period
    * that does not say which period is not one. Refused on every other type,
-   * because `SKILLS-memos.md` says in as many words that nothing else sets it,
+   * because `plugins/memos/SKILLS.md` says in as many words that nothing else sets it,
    * and dropping it silently would tell the caller it was saved.
    */
   const period = row['Period covered']
@@ -575,7 +575,7 @@ function properties (context, final, { today } = {}) {
   }
 
   /**
-   * The nullable person rule, from `SKILLS-setup.md`. Where config records no
+   * The nullable person rule, from `plugins/setup/SKILLS.md`. Where config records no
    * person, `Author` is OMITTED rather than written empty: a working install,
    * not a failed one. An explicit empty list is somebody asking for no author,
    * which is honoured by leaving the property off a create.

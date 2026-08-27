@@ -52,7 +52,7 @@ confirmation governs.
 ## Batch mode
 
 Reviewing forty rows in a sitting is real use and its shape is deliberately
-undesigned (open question 1 in `SKILLS-software.md`). Until it is designed:
+undesigned (open question 1 in `plugins/software/SKILLS.md`). Until it is designed:
 one row at a time, each with its own walk and its own confirmation. Refuse
 the shortcut of one confirmation covering forty rows — that is the forty
 stamped dates with nothing confirmed.

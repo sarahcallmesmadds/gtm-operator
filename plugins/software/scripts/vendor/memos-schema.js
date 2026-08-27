@@ -18,8 +18,8 @@
  * together: every type, every value list and every field name here is asserted
  * against `setup`'s schema.
  *
- * `SCHEMA-memos.md` is the human definition and wins over this file where they
- * disagree. `SKILLS-memos.md` is the human definition of the skills. The test
+ * `plugins/memos/SCHEMA.md` is the human definition and wins over this file where they
+ * disagree. `plugins/memos/SKILLS.md` is the human definition of the skills. The test
  * is what makes that a check rather than a hope.
  *
  * THE RULE EVERYTHING HERE FOLLOWS FROM: Memos is time-stamped communication
@@ -59,7 +59,7 @@ const WRITABLE_STATUSES = ['Published']
 
 /**
  * Person properties on this database. Written only when config records a
- * person, per the nullable `personId` rule in `SKILLS-setup.md`.
+ * person, per the nullable `personId` rule in `plugins/setup/SKILLS.md`.
  *
  * `Author`, not `Owner`. Nobody maintains a memo, so nothing is owned. The
  * word is the append-only rule reaching the person filling the field.
@@ -90,7 +90,7 @@ const PERIOD_TYPE = 'Team Update'
  * The body sections for each type, in order.
  *
  * At most one conditional section per type, always last, which is the rule
- * `SCHEMA-memos.md` states and `tests/memos-schema-agrees.test.js` pins.
+ * `plugins/memos/SCHEMA.md` states and `tests/memos-schema-agrees.test.js` pins.
  * `Sources` is conditional where content usually comes from somewhere else;
  * `Discussion Notes` is conditional because meeting notes fail by becoming
  * transcripts; `Links` is conditional because a release does not always have
@@ -158,7 +158,7 @@ const BODY_SECTIONS = {
 
 /**
  * Words across the required sections. A maximum, never a minimum, for the
- * reason `SCHEMA-process.md` argues in full: a floor manufactures filler.
+ * reason `plugins/process/SCHEMA.md` argues in full: a floor manufactures filler.
  *
  * 600 rather than Process's 800, because a memo is read once on the day it
  * lands while an artifact is returned to for years. Conditional sections sit

@@ -4,10 +4,10 @@
 values and option order live here and nowhere else. Anything in another document
 that restates them is a copy, and copies drift.
 
-`DECISIONS.md` holds the reasoning and the reversals. `SKILLS-setup.md` holds the
+`DECISIONS.md` holds the reasoning and the reversals. `plugins/setup/SKILLS.md` holds the
 creation order and the relation map.
 
-Companions: `SCHEMA-process.md`, `SCHEMA-memos.md` and `SCHEMA-projects.md`.
+Companions: `plugins/process/SCHEMA.md`, `plugins/memos/SCHEMA.md` and `plugins/projects/SCHEMA.md`.
 Shared fields (Domain, Audience) use identical value lists across all of them. A
 change to one is a change to all.
 
@@ -57,7 +57,7 @@ how the table view should be arranged, not a property of Notion.
 | Description | Text | one sentence, ending with the team that depends on it |
 | Status | Select | 5 values, see below |
 | Importance | Select | 3 values, see below |
-| Domain | Select | the same 8 values as `SCHEMA-process.md`. The function that owns it |
+| Domain | Select | the same 8 values as `plugins/process/SCHEMA.md`. The function that owns it |
 | Audience | Multi-select | the same list. Which teams actually use it |
 | **Who** | | |
 | Owner | Person | accountable for the tool. Whose call it is |

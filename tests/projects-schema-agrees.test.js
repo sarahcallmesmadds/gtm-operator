@@ -225,9 +225,9 @@ check('the three memo types this plugin writes are types the Memos database has'
 // --------------------------------------------------------------- the template
 
 check('the scope document is the four sections the design defines, all required', () => {
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-projects.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'projects', 'SCHEMA.md'), 'utf8')
   const stated = design.match(/\*\*Body sections, in order:\*\* ([^.]+)\./)
-  assert.ok(stated, 'SCHEMA-projects.md no longer states the project body sections in the form this test reads')
+  assert.ok(stated, 'plugins/projects/SCHEMA.md no longer states the project body sections in the form this test reads')
   assert.deepStrictEqual(
     shared.PROJECT_SECTIONS.map(s => s.heading),
     // The document wraps lines, so a heading can carry a newline mid-phrase.
@@ -244,8 +244,8 @@ check('the task template is three sections with Notes conditional and last', () 
 })
 
 check('the task count band is the design\'s four to seven', () => {
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SKILLS-projects.md'), 'utf8')
-  assert.ok(/Four to seven tasks/.test(design), 'SKILLS-projects.md no longer states the band in the form this test reads')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'projects', 'SKILLS.md'), 'utf8')
+  assert.ok(/Four to seven tasks/.test(design), 'plugins/projects/SKILLS.md no longer states the band in the form this test reads')
   assert.deepStrictEqual(shared.TASK_COUNT, { min: 4, max: 7 })
 })
 

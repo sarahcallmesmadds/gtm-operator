@@ -10,7 +10,7 @@ about what not to re-propose. It points here rather than repeating any of it.
 When `sarahcallmesmadds/gtm-operator` exists, the plugin's own machine-readable
 schema is generated from this file, and this file stays the thing a person edits.
 
-Companion: `SCHEMA-process.md`. Shared fields (Domain, Audience, Segment,
+Companion: `plugins/process/SCHEMA.md`. Shared fields (Domain, Audience, Segment,
 L2C Lifecycle, Tags) use identical value lists in both. A change to one is a
 change to both.
 
@@ -36,7 +36,7 @@ maintained and kept true. Every field decision below follows from that one line.
 **Narrowed 2026-08-17.** This said "never updated", full stop, while `Status` held
 three values and moving between two of them is an edit after publication. **A rule
 stated more broadly than it can hold is worse than a narrow one**, because the
-exception nobody wrote down is how people learn to ignore the rule. `SKILLS-memos.md`
+exception nobody wrote down is how people learn to ignore the rule. `plugins/memos/SKILLS.md`
 carries the same three lines as a table of what may change and by what.
 
 ### Fields
@@ -49,8 +49,8 @@ carries the same three lines as a table of what may change and by what.
 | Published date | Date | the timestamp that makes it a record |
 | Author | Person | defaults to whoever runs the skill |
 | Status | Select | Draft, Published, Canceled |
-| Domain | Select | the same 8 values as `SCHEMA-process.md` |
-| Audience | Multi-select | the same list as `SCHEMA-process.md` |
+| Domain | Select | the same 8 values as `plugins/process/SCHEMA.md` |
+| Audience | Multi-select | the same list as `plugins/process/SCHEMA.md` |
 | Segment | Multi-select | optional |
 | L2C Lifecycle | Multi-select | optional, the same 0 to 8 |
 | Tags | Multi-select | optional, max 3, the same list and the same rule. Skills enforce it, `setup:check` reports it, Notion does neither |
@@ -76,7 +76,7 @@ not a rule.
 
 Like every self-relation, these cannot be created in the same call that creates
 the database. See "Self-relations have the same problem" in
-`SCHEMA-process.md`. Pair them as two sides of one relation.
+`plugins/process/SCHEMA.md`. Pair them as two sides of one relation.
 
 ### Type
 
@@ -135,7 +135,7 @@ the room. Their page bodies will not resemble each other. Do not re-merge them.
 ## Memos schema, Part 2: page body templates (2026-08-17)
 
 Seven templates, one per type. Same format as the templates in
-`SCHEMA-process.md`. Drafted and then revised through three review passes, recorded at the end
+`plugins/process/SCHEMA.md`. Drafted and then revised through three review passes, recorded at the end
 of this section.
 
 ### Rules that apply to every Memos type
@@ -161,7 +161,7 @@ of this section.
 
 ### The length rule
 
-Same reasoning as `SCHEMA-process.md`, which holds the full argument. In
+Same reasoning as `plugins/process/SCHEMA.md`, which holds the full argument. In
 short: a maximum only, because a floor manufactures filler and a ceiling stops
 bloat, and the reference skill's 400 word floor had to be followed by a second
 rule telling itself not to pad.

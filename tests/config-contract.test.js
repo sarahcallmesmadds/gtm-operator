@@ -582,7 +582,7 @@ check('an option map missing a value is refused, because the fallback would inve
   // Not a cosmetic gap. `valueName` falls back to the shipped name for a value
   // the map does not carry, so a workspace that renamed one is sent the old
   // name. Notion refuses a value the property does not have, measured against a
-  // live workspace on 2026-08-17 and recorded in `REVIEW-codex-2026-08-17.md`: a
+  // live workspace on 2026-08-17 and recorded in `DECISIONS.md`: a
   // hard 400 naming the value and listing the allowed ones. The failure is all or
   // nothing, so the whole write is lost rather than partly saved.
   const config = completeConfig()
@@ -657,7 +657,7 @@ check('a logical name that is not in the map throws rather than guessing', () =>
 })
 
 check('a null personId is a working install, not a refusal', () => {
-  // SKILLS-setup.md tier 3. Null means every person property is omitted, and no
+  // plugins/setup/SKILLS.md tier 3. Null means every person property is omitted, and no
   // skill fails over it. A reader that refused here would turn a documented
   // fallback into a broken install.
   const config = completeConfig()
