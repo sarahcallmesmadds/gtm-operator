@@ -9,6 +9,12 @@ does not do, and the judgment it carries.
 Databases are defined in `plugins/process/SCHEMA.md` and `plugins/memos/SCHEMA.md`. This
 file does not restate a field name or a value list.
 
+`agents/process-maintainer.md` is the cross-library operator. It does not add a
+sixth workflow or replace any rule here. It chooses among these five skills for
+find, sweep, audit and maintenance work, so the skill remains the source of the
+query, judgment, confirmation gate and proof step. This direction matters: the
+agent calls the skills; a skill never calls the agent and creates a loop.
+
 ---
 
 ## Rules that apply to all five

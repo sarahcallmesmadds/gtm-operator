@@ -40,6 +40,26 @@ off it. That is what makes the library navigable instead of a pile.
 
 All five are built. `plugins/process/SKILLS.md` defines them.
 
+## The agent
+
+`process-maintainer` is the library's operator. Invoke it directly as
+`@process:process-maintainer` when the job spans the library rather than one
+known artifact: finding the current answer, sweeping approved sources for
+missing knowledge, auditing what has gone stale or conflicts, and preparing
+maintenance work.
+
+The agent routes each operation through the five skills above. It may search and
+report autonomously inside a scope the user approved, but it inherits every
+write gate from the skills. An audit finding is not permission to update it, and
+a backfill candidate is not permission to create it.
+
+## Connectors
+
+Notion is required. Atlassian and Granola are packaged as optional
+sources for discovery and backfill. `CONNECTORS.md` names their exact roles and
+the sources, such as Drive, Slack and email, that can be used through an
+existing Claude connection but are not configured by this plugin.
+
 **`backfill` is the one skill that reads things people said** rather than things
 they wrote down for the record, so two rules in it are refusals in code rather
 than advice in the skill document. The scope it is given is refused rather than

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "notion": {
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp"
+    },
+    "box": {
+      "type": "http",
+      "url": "https://mcp.box.com"
+    }
+  }
+}
