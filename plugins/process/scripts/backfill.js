@@ -33,21 +33,25 @@ const schema = require(path.join(__dirname, 'vendor', 'process-schema'))
  * The sources a scope may name. Anything else is refused rather than ignored.
  *
  * `documents` is a body of writing somebody already keeps: a Drive folder, an
- * older Notion database, a Confluence space. The other three are conversations,
- * and they are the ones that carry a date range.
+ * older Notion database, a Confluence space. The others are bounded streams of
+ * conversations, meetings, CRM activity, billing, or spend evidence.
  */
-const SOURCES = ['documents', 'slack', 'email', 'recordings']
+const SOURCES = ['documents', 'slack', 'email', 'recordings', 'calendar', 'crm', 'finance']
 
 /**
- * The sources that are conversations rather than documents.
+ * The sources that are searched rather than sorted as a finite document set.
  *
  * EVERY ONE OF THESE CARRIES A DATE RANGE AND THERE IS NO WAY TO OPT OUT.
  * `plugins/process/SKILLS.md`: "There is no unbounded read." A document store is a
  * place somebody chose to put things and its size is knowable before you start.
- * A conversation source is a firehose, and "all of Slack" is not a scope, it is
- * the absence of one.
+ * An activity source is a firehose, and "all history" is not a scope, it is the
+ * absence of one.
  */
-const CONVERSATION_SOURCES = ['slack', 'email', 'recordings']
+const CONVERSATION_SOURCES = ['slack', 'email', 'recordings', 'calendar', 'crm', 'finance']
+
+const CALENDAR_PROVIDERS = ['google-calendar']
+const CRM_PROVIDERS = ['hubspot', 'salesforce']
+const FINANCE_PROVIDERS = ['stripe', 'ramp']
 
 /** The three ways of looking through conversations. Any combination, or none. */
 const WAYS = ['topics', 'repeats', 'sweep']
@@ -281,7 +285,7 @@ function plan (request) {
         add(source, 'range-not-a-day', `${source} is scoped \`${which}\` ${value}, which is written as a date and is not one. A day past the end of its month rolls forward and reads a window nobody set; a month past 12 does not resolve at all. Both are refused rather than guessed at, because which of the two this is changes what would have been read.`)
         return
       }
-      add(source, 'range-open', `${source} has no usable \`${which}\` date, so this is an unbounded read. There is no unbounded read: a conversation source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
+      add(source, 'range-open', `${source} has no usable \`${which}\` date, so this is an unbounded read. There is no unbounded read: a conversation or activity source is a firehose and "everything" is the absence of a scope rather than a wide one. Use YYYY-MM-DD.`)
     }
     end('from', holder.from, from)
     end('to', holder.to, to)
@@ -418,6 +422,120 @@ function plan (request) {
     }
   } else {
     notReading.push('Call recordings. No recorder was named, so no transcripts are being read. This is where process decisions most often get made and least often get written down, so it is worth knowing it is off.')
+  }
+
+  // ------------------------------------------------------------------ calendar
+
+  if (named('calendar')) {
+    const holder = settingsFor('calendar', req.calendar)
+    const window = range('calendar', holder)
+    const provider = text(holder.provider)
+
+    if (!provider) {
+      const supplied = holder.provider !== undefined && holder.provider !== null
+      add(
+        'calendar',
+        supplied ? 'provider-not-a-name' : 'provider-unnamed',
+        supplied
+          ? `\`calendar.provider\` is ${JSON.stringify(holder.provider)}, which does not name a provider. Use "google-calendar".`
+          : 'Calendar was named with no provider. Name "google-calendar" so the plan says which connected account it expects to read.'
+      )
+    } else if (!CALENDAR_PROVIDERS.includes(provider)) {
+      add('calendar', 'provider-unknown', `"${provider}" is not a packaged calendar provider. Use one of: ${CALENDAR_PROVIDERS.join(', ')}.`)
+    }
+
+    let calendars = null
+    if (holder.calendars === 'all') {
+      calendars = 'all'
+    } else if (Array.isArray(holder.calendars)) {
+      for (const [index, one] of notNames(holder.calendars)) {
+        add('calendar', 'calendar-not-a-name', `\`calendar.calendars[${index}]\` is ${JSON.stringify(one)}, which is not a calendar name. It is refused rather than dropped from the scope.`)
+      }
+      calendars = nameList(holder.calendars)
+      if (!calendars && !notNames(holder.calendars).length) {
+        add('calendar', 'calendars-empty', 'The calendar list is empty. Name the calendars to read, or say "all" deliberately.')
+      }
+    } else if (holder.calendars !== undefined && holder.calendars !== null) {
+      add('calendar', 'calendars-not-a-list', `\`calendar.calendars\` is ${JSON.stringify(holder.calendars)}. It is either "all" or a list of calendar names.`)
+    } else {
+      add('calendar', 'calendars-unset', 'Calendar was named with no calendars. Name the calendars to read, or say "all" deliberately. Neither is assumed.')
+    }
+
+    if (provider && CALENDAR_PROVIDERS.includes(provider) && calendars && window) {
+      reading.calendar = { provider, calendars, ...window }
+    }
+  } else {
+    notReading.push('Calendar. No calendars or event history are being read.')
+  }
+
+  // ----------------------------------------------------------------------- CRM
+
+  if (named('crm')) {
+    const holder = settingsFor('crm', req.crm)
+    const window = range('crm', holder)
+    const providers = nameList(holder.providers)
+    const objects = nameList(holder.objects)
+
+    if (!Array.isArray(holder.providers)) {
+      add('crm', 'providers-not-a-list', `\`crm.providers\` is ${JSON.stringify(holder.providers)}. It must list one or more of: ${CRM_PROVIDERS.join(', ')}.`)
+    } else {
+      for (const [index, one] of notNames(holder.providers)) {
+        add('crm', 'provider-not-a-name', `\`crm.providers[${index}]\` is ${JSON.stringify(one)}, which does not name a provider.`)
+      }
+      if (!providers && !notNames(holder.providers).length) add('crm', 'providers-empty', 'The CRM provider list is empty.')
+      for (const provider of providers || []) {
+        if (!CRM_PROVIDERS.includes(provider)) add('crm', 'provider-unknown', `"${provider}" is not a packaged CRM provider. Use one or more of: ${CRM_PROVIDERS.join(', ')}.`)
+      }
+    }
+
+    if (!Array.isArray(holder.objects)) {
+      add('crm', 'objects-not-a-list', `\`crm.objects\` is ${JSON.stringify(holder.objects)}. Name the account, deal, activity, or other object families to search.`)
+    } else {
+      for (const [index, one] of notNames(holder.objects)) {
+        add('crm', 'object-not-a-name', `\`crm.objects[${index}]\` is ${JSON.stringify(one)}, which does not name an object family.`)
+      }
+      if (!objects && !notNames(holder.objects).length) add('crm', 'objects-empty', 'The CRM object list is empty. Name what to search rather than reading the whole CRM.')
+    }
+
+    const providersKnown = providers && providers.every(provider => CRM_PROVIDERS.includes(provider))
+    if (providersKnown && objects && window) reading.crm = { providers, objects, ...window }
+  } else {
+    notReading.push('CRM. HubSpot and Salesforce account, deal, and activity history are not being read.')
+  }
+
+  // ------------------------------------------------------------------- finance
+
+  if (named('finance')) {
+    const holder = settingsFor('finance', req.finance)
+    const window = range('finance', holder)
+    const providers = nameList(holder.providers)
+    const records = nameList(holder.records)
+
+    if (!Array.isArray(holder.providers)) {
+      add('finance', 'providers-not-a-list', `\`finance.providers\` is ${JSON.stringify(holder.providers)}. It must list one or more of: ${FINANCE_PROVIDERS.join(', ')}.`)
+    } else {
+      for (const [index, one] of notNames(holder.providers)) {
+        add('finance', 'provider-not-a-name', `\`finance.providers[${index}]\` is ${JSON.stringify(one)}, which does not name a provider.`)
+      }
+      if (!providers && !notNames(holder.providers).length) add('finance', 'providers-empty', 'The finance provider list is empty.')
+      for (const provider of providers || []) {
+        if (!FINANCE_PROVIDERS.includes(provider)) add('finance', 'provider-unknown', `"${provider}" is not a packaged finance provider. Use one or more of: ${FINANCE_PROVIDERS.join(', ')}.`)
+      }
+    }
+
+    if (!Array.isArray(holder.records)) {
+      add('finance', 'records-not-a-list', `\`finance.records\` is ${JSON.stringify(holder.records)}. Name the billing, payment, spend, vendor, procurement, or expense record families to search.`)
+    } else {
+      for (const [index, one] of notNames(holder.records)) {
+        add('finance', 'record-not-a-name', `\`finance.records[${index}]\` is ${JSON.stringify(one)}, which does not name a record family.`)
+      }
+      if (!records && !notNames(holder.records).length) add('finance', 'records-empty', 'The finance record list is empty. Name what to search rather than reading every financial record.')
+    }
+
+    const providersKnown = providers && providers.every(provider => FINANCE_PROVIDERS.includes(provider))
+    if (providersKnown && records && window) reading.finance = { providers, records, ...window }
+  } else {
+    notReading.push('Finance. Stripe billing and Ramp spend, vendor, procurement, and expense history are not being read.')
   }
 
   // ---------------------------------------------------------------------- ways
@@ -1310,6 +1428,9 @@ module.exports = {
   REFUSED_ON_A_BACKFILL,
   SOURCES,
   CONVERSATION_SOURCES,
+  CALENDAR_PROVIDERS,
+  CRM_PROVIDERS,
+  FINANCE_PROVIDERS,
   WAYS,
   REPEAT_MIN,
   REPEAT_SIMILARITY,

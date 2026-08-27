@@ -23,13 +23,25 @@ const ENDPOINTS = {
   notion: 'https://mcp.notion.com/mcp',
   atlassian: 'https://mcp.atlassian.com/v1/mcp/authv2',
   box: 'https://mcp.box.com',
-  granola: 'https://mcp.granola.ai/mcp'
+  granola: 'https://mcp.granola.ai/mcp',
+  gong: 'https://mcp.gong.io/mcp',
+  slack: 'https://mcp.slack.com/mcp',
+  gmail: 'https://gmailmcp.googleapis.com/mcp/v1',
+  'google-drive': 'https://drivemcp.googleapis.com/mcp/v1',
+  'google-calendar': 'https://calendarmcp.googleapis.com/mcp/v1',
+  hubspot: 'https://mcp.hubspot.com/anthropic',
+  salesforce: 'https://api.salesforce.com/platform/mcp/v1/platform/sobject-reads',
+  stripe: 'https://mcp.stripe.com',
+  ramp: 'https://ramp-mcp-remote.ramp.com/mcp'
 }
 
 const EXPECTED = {
   setup: ['notion'],
   calendar: ['notion'],
-  process: ['notion', 'atlassian', 'granola'],
+  process: [
+    'notion', 'atlassian', 'granola', 'gong', 'slack', 'gmail',
+    'google-drive', 'google-calendar', 'hubspot', 'salesforce', 'stripe', 'ramp'
+  ],
   memos: ['notion', 'granola'],
   projects: ['notion', 'granola'],
   software: ['notion', 'box'],
@@ -50,7 +62,16 @@ const SUPPORT = {
   process: {
     notion: ['plugins/process/skills/new/SKILL.md', /mcp__\*__notion-create-pages/],
     atlassian: ['plugins/process/scripts/backfill.js', /Confluence space/],
-    granola: ['plugins/process/skills/backfill/SKILL.md', /"recorder": "granola"/]
+    granola: ['plugins/process/skills/backfill/SKILL.md', /`granola`/],
+    gong: ['plugins/process/skills/backfill/SKILL.md', /"recorder": "gong"/],
+    slack: ['plugins/process/skills/backfill/SKILL.md', /`slack`/],
+    gmail: ['plugins/process/skills/backfill/SKILL.md', /`gmail`/],
+    'google-drive': ['plugins/process/skills/backfill/SKILL.md', /`google-drive`/],
+    'google-calendar': ['plugins/process/skills/backfill/SKILL.md', /"provider": "google-calendar"/],
+    hubspot: ['plugins/process/skills/backfill/SKILL.md', /"hubspot"/],
+    salesforce: ['plugins/process/skills/backfill/SKILL.md', /"salesforce"/],
+    stripe: ['plugins/process/skills/backfill/SKILL.md', /"stripe"/],
+    ramp: ['plugins/process/skills/backfill/SKILL.md', /"ramp"/]
   },
   memos: {
     notion: ['plugins/memos/skills/meeting-notes/SKILL.md', /mcp__\*__notion-create-pages/],
@@ -154,6 +175,11 @@ check('process ships the maintainer agent that the product promises', () => {
     'the agent description does not expose the write boundary')
   assert.match(text, /Never run unattended/,
     'the agent does not carry the Process library\'s unattended-run boundary')
+  assert.match(text, /Use connector tools only to search and read/,
+    'the agent does not limit write-capable connectors to read-only Process work')
+  for (const service of ['Google Drive', 'Slack', 'Gmail', 'Google Calendar', 'Granola', 'Gong', 'HubSpot', 'Salesforce', 'Stripe', 'Ramp']) {
+    assert.match(text, new RegExp(service), `the agent never names ${service} as an evidence source`)
+  }
 })
 
 console.log(failures ? `\n${failures} failed.\n` : `\nAll checks passed. ${marketplace.plugins.length} plugin.\n`)
