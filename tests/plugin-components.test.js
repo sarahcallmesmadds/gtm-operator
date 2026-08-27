@@ -101,7 +101,7 @@ const SUPPORT = {
     pylon: ['plugins/projects/skills/problem-scan/SKILL.md', /Customer support \| Intercom, Pylon/]
   },
   software: {
-    notion: ['plugins/software/skills/backfill/SKILL.md', /create the page, re-fetch it/],
+    notion: ['plugins/software/skills/backfill/SKILL.md', /^allowed-tools:.*mcp__\*__notion-create-pages/m],
     box: ['plugins/software/skills/backfill/SKILL.md', /packaged Box connector/],
     'google-drive': ['plugins/software/skills/backfill/SKILL.md', /packaged Google Drive connector/],
     gmail: ['plugins/software/skills/backfill/SKILL.md', /packaged Gmail connector/],
@@ -180,6 +180,34 @@ for (const entry of marketplace.plugins) {
     }
   })
 }
+
+const softwareBackfillPath = path.join(ROOT, 'plugins/software/skills/backfill/SKILL.md')
+
+check('software backfill keeps a least-privilege connector allowlist', () => {
+  const text = fs.readFileSync(softwareBackfillPath, 'utf8')
+  const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the Software backfill skill has no YAML frontmatter')
+  const declarations = frontmatter[1].match(/^allowed-tools:.*$/gm) || []
+  assert.strictEqual(declarations.length, 1, 'the Software backfill skill must declare one allowed-tools line')
+  const allowed = declarations[0]
+
+  const required = [
+    'mcp__*__notion-create-pages',
+    'mcp__*__search_files',
+    'mcp__*__search_threads',
+    'mcp__*__slack_search_public_and_private',
+    'mcp__plugin_software_ramp__*get*',
+    'mcp__*__qbo_accounting_get_ap_aging_detail',
+    'mcp__plugin_software_docusign__*search*'
+  ]
+  for (const tool of required) {
+    assert.ok(allowed.includes(tool), `Software backfill allowed-tools is missing ${tool}`)
+  }
+
+  assert.doesNotMatch(allowed,
+    /mcp__(?:plugin_software_(?:ramp|docusign)|[^,]*QuickBooks)__[^,]*(?:create|update|delete|send|sign|pay|transfer|approve|void)/i,
+    'Software backfill allows a mutation through an external evidence connector')
+})
 
 const agentPath = path.join(ROOT, 'plugins/process/agents/process-maintainer.md')
 
