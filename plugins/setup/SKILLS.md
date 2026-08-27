@@ -7,7 +7,7 @@ is visible as a gap rather than as something that did not apply.
 The five slots: what it does, when it runs, what it reads and writes, what it
 does not do, and the judgment it carries.
 
-Databases are defined in the `SCHEMA-*.md` files. This file defines the order
+Databases are defined in each plugin's own `SCHEMA.md`. This file defines the order
 things are created in, the shape of the relations between them, and the shape of
 the config file every other foundation plugin reads.
 
