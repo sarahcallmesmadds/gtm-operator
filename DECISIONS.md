@@ -7151,3 +7151,31 @@ finding's whole class found no seventh.
 read. It is gitignored, was never public, and is not part of this change.
 
 Suite green after all of it, 1,456 checks.
+
+### Round 2 on the root tidy, Devin CLI, 2026-08-26: one finding, taken
+
+Per-file coverage stated: `README.md`, `CLAUDE.md`, `AGENTS.md` and
+`tests/manifest-agrees-with-design.test.js` whole, the full `main...HEAD` diff
+whole, the new `DECISIONS.md` entries as the provided excerpt, everything else
+by its changed hunks.
+
+**`CLAUDE.md` line 5 still said the plugins were "built from the design
+documents at the root".** The same file's next paragraph, rewritten in this
+branch, already states the new split correctly. The opening sentence four lines
+above it was not looked at.
+
+This is round 1's finding 2 again, in the file that was edited to fix it: a
+sentence the move made false without the rename touching a character of it.
+Grep for a renamed string never finds this class, which is why it has now
+surfaced twice, and why the sweep after this round was for claims about where
+the design documents live rather than for any string the rename produced. That
+sweep found nothing else outside `DECISIONS.md`.
+
+The reviewer reported nothing in its other five categories: no reference to a
+file that does not exist, the tightened prose-count regex correct on both path
+separators and silencing nothing that was live before the move, no prose the
+rename turned into nonsense, the sixteen repointed citations claiming no more
+than `DECISIONS.md` states, and the new entries' counts consistent with the
+diff, including 778 deleted review lines as 177 + 424 + 177.
+
+Suite green, 1,456 checks.
