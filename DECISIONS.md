@@ -7291,3 +7291,39 @@ because they sit in files this change edits, and a tidy that steps over a broken
 pointer on its way past is not a tidy.
 
 Suite green, 1,456 checks.
+
+### Round 6 on the root tidy, Devin CLI confirming, 2026-08-26: nothing found
+
+The confirming round the review order requires. Per-file coverage stated:
+`README.md`, `CLAUDE.md`, `AGENTS.md`, `TESTLOG-2026-08-18.md`,
+`plugins/memos/README.md` and `tests/manifest-agrees-with-design.test.js` whole,
+the six new entries in this file whole, everything else by its changed hunks.
+
+It confirmed from the diff, independently of round 5: the sixteen repointed
+citations as 3 shared + 11 vendored + 1 test + 1 README with every file named,
+the eight repointed reads as 1 + 1 + 2 + 4, and 177 + 424 + 177 = 778 deleted
+review lines. It found no sentence left false by the move, no correction applied
+once where it needed to land twice, no live pointer to a missing file in the
+touched files, and the skip regex correct at the plugin root on both separators.
+
+Six rounds in all: six, one, three, one, three, then nothing. Fourteen findings.
+Two shapes account for nearly all of them, and both are worth carrying forward
+because neither is catchable by grep or by any test in this repository:
+
+- **A sentence the move made false without the rename touching a character of
+  it.** Five of the fourteen. Renaming a string is findable; invalidating a
+  sentence by moving the file around it is not. It has to be swept for by
+  meaning after any move.
+- **A number written into prose that nobody counted.** Six of the fourteen,
+  including one inside the sentence complaining about uncounted numbers, and
+  twice a correction applied to one occurrence when there were two. The remedy
+  that stuck was making each figure travel with the command that derives it.
+
+**The instruction that changed round 6.** Round 4 spent four of its five
+findings on "this number cannot be derived from the material you gave me". None
+was a wrong number. Round 6's packet carried the whole tail of this file with
+real line numbers and said plainly that a number the reviewer cannot check is
+not a finding, to say so in one line and move on. It did, in one line, and spent
+the round on the branch instead.
+
+Suite green, 1,456 checks.
