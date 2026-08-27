@@ -168,7 +168,8 @@ check('the manifest is internally consistent', () => {
  *    one was real. Narrowing to phrasings that read as totals, "all four", "the
  *    two", still produced 10 false positives against 0 real ones, because "all
  *    four databases" means all four of the ones being discussed. The 2026-08-26
- *    move reproduced it exactly: 19 hits, every one a local quantity, such as
+ *    move reproduced it exactly: 45 raw matches and 27 reported failures, every
+ *    one a local quantity, such as
  *    `plugins/calendar/SCHEMA.md` saying that Process's `Type` field "is three
  *    databases in one".
  *

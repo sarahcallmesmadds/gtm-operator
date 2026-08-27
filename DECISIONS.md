@@ -7101,12 +7101,12 @@ plugin README, as the record of a measurement: Notion answers a select value the
 property does not have with a hard 400 `validation_error` naming the value and
 listing the allowed ones, for `select` and `multi_select` alike, all or nothing
 so the page is not created. Deleting the file and leaving the citations would
-have pointed fourteen comments at nothing, which is the fault this file has
+have pointed sixteen comments at nothing, which is the fault this file has
 logged before: burying a measurement the repository already owned. The
 measurement is recorded here in full, twice, so every citation was repointed at
 `DECISIONS.md` rather than dropped.
 
-**What was deliberately not touched.** The seventy-four older references in this
+**What was deliberately not touched.** The 79 older references, across 70 lines, in this
 file. They sit inside dated entries recording what was true on the day they were
 written, and rewriting them would rewrite the record to match today. This entry
 is where a reader who hits an old name learns where the file went.
@@ -7177,5 +7177,40 @@ separators and silencing nothing that was live before the move, no prose the
 rename turned into nonsense, the sixteen repointed citations claiming no more
 than `DECISIONS.md` states, and the new entries' counts consistent with the
 diff, including 778 deleted review lines as 177 + 424 + 177.
+
+Suite green, 1,456 checks.
+
+### Round 3 on the root tidy, Codex CLI confirming, 2026-08-26: three findings, all taken
+
+Per-file coverage stated, high reasoning confirmed by the banner. All three
+findings are numbers written in this branch's own prose, and none of them was
+ever counted.
+
+1. **Round 1's correction was applied in one place and not the other.** The
+   entry said "fourteen" twice, five lines apart. One was fixed and the second
+   was not looked for. Both say sixteen now.
+2. **The preserved-history count was wrong.** The entry said seventy-four older
+   references. Counted properly, the first 7,077 lines carry 79 occurrences
+   across 70 lines. The seventy-four came from a grep whose pattern also matched
+   `REVIEW-codex`, so it was neither figure. The entry now states both numbers,
+   occurrences and lines, because one alone reads as the other.
+3. **The false-positive count in the test's own note was wrong.** It said the
+   move produced 19 hits. The run that produced them reported 27 failures from
+   45 raw matches. The 19 was read off a truncated view of the output rather
+   than counted, and then written into a comment as evidence.
+
+**The third one is the sharpest, because that note sits eleven lines below the
+check's own limit 2: "IT CHECKS DOCUMENTATION AND DESCRIPTIONS ONLY, not
+JavaScript comments. A stale count inside a .js comment will not be caught."**
+The wrong number was in a JavaScript comment. The check documented the blind
+spot and the next number written into it fell straight in.
+
+The reviewer reported nothing in every other category: no further
+location-dependent prose made false by the move, no surviving old filename
+convention outside the deliberately historical entries, all eight repointed
+`readFileSync` paths resolving, every local markdown link resolving, the
+tightened skip matching exactly the twelve plugin-root design documents on both
+path separators and nothing deeper, and the sixteen repointed citations
+claiming no more than this file retains.
 
 Suite green, 1,456 checks.
