@@ -182,6 +182,17 @@ for (const entry of marketplace.plugins) {
 }
 
 const softwareBackfillPath = path.join(ROOT, 'plugins/software/skills/backfill/SKILL.md')
+const memosMeetingNotesPath = path.join(ROOT, 'plugins/memos/skills/meeting-notes/SKILL.md')
+
+check('memos meeting notes can call the packaged Gong server', () => {
+  const text = fs.readFileSync(memosMeetingNotesPath, 'utf8')
+  const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the Memos meeting-notes skill has no YAML frontmatter')
+  const declarations = frontmatter[1].match(/^allowed-tools:.*$/gm) || []
+  assert.strictEqual(declarations.length, 1, 'the Memos meeting-notes skill must declare one allowed-tools line')
+  assert.ok(declarations[0].includes('mcp__plugin_memos_gong__*'),
+    'Memos meeting-notes cannot call tools exposed by its packaged Gong server')
+})
 
 check('software backfill keeps a least-privilege connector allowlist', () => {
   const text = fs.readFileSync(softwareBackfillPath, 'utf8')
