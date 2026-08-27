@@ -242,7 +242,7 @@ check('Owner is set when config records a person', () => {
 })
 
 check('Owner is omitted entirely when config records no person', () => {
-  // SKILLS-setup.md tier 3: omit the property rather than writing an empty
+  // plugins/setup/SKILLS.md tier 3: omit the property rather than writing an empty
   // value. An empty people array is the plugin asserting the row has no owner,
   // which is a different claim from not knowing who the user is.
   const out = row.properties(fakeContext({ personId: null }), { Name: 'x', Type: 'Content', Status: 'Idea' })

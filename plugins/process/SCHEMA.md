@@ -10,7 +10,7 @@ about what not to re-propose. It points here rather than repeating any of it.
 When `sarahcallmesmadds/gtm-operator` exists, the plugin's own machine-readable
 schema is generated from this file, and this file stays the thing a person edits.
 
-Companion: `SCHEMA-memos.md`, which defines the Memos database. Shared fields
+Companion: `plugins/memos/SCHEMA.md`, which defines the Memos database. Shared fields
 (Domain, Audience, Segment, L2C Lifecycle, Tags) use identical value lists in
 both. A change to one is a change to both.
 
@@ -43,8 +43,8 @@ both. A change to one is a change to both.
 | Superseded By | Relation (self) | inverse of Supersedes |
 | Memos | Relation | inverse of `Artifacts` on Memos. What has been announced about this artifact. Added 2026-08-17 when that relation was made two-way |
 | Projects | Relation | inverse of `Artifacts` on Projects. `setup` creates every database, so this is never conditional |
-| Software | Relation | inverse of `Artifacts` on Software. The tools this document concerns. Defined in `SCHEMA-software.md` |
-| Calendar | Relation | inverse of `Artifacts` on Calendar. What this document was the playbook for. Defined in `SCHEMA-calendar.md` |
+| Software | Relation | inverse of `Artifacts` on Software. The tools this document concerns. Defined in `plugins/software/SCHEMA.md` |
+| Calendar | Relation | inverse of `Artifacts` on Calendar. What this document was the playbook for. Defined in `plugins/calendar/SCHEMA.md` |
 
 **Dropped from the reference:** Customer Tasks, MKT Projects (pointed at
 databases that existed in one org only), Teams relation (folded into Audience),
@@ -65,7 +65,7 @@ is created. `Software` and `Projects` are both ordinary fields.
 This previously said `Software` was not created at all in v1 and that `Projects`
 was created only if the Projects database already existed. Both of those were
 written when setup was expected to build a partial foundation. See
-`SKILLS-setup.md` for the two-phase order and the full relation map.
+`plugins/setup/SKILLS.md` for the two-phase order and the full relation map.
 
 **The rule itself still holds and still has teeth**, because a relation property
 requires a target database id at the moment it is created. What changed is that
@@ -85,7 +85,7 @@ therefore two stage**, and this was missed when the rule above was first written
 
 **Generalised 2026-08-17**: `setup` now runs the same two stages across the whole
 foundation rather than per database, creating all six databases first and every
-relation second. See `SKILLS-setup.md`.
+relation second. See `plugins/setup/SKILLS.md`.
 
 Pair them explicitly. `Parent` and `Child Docs` are the two sides of one
 relation. `Supersedes` and `Superseded By` are the two sides of a second, separate
@@ -204,7 +204,7 @@ not the customer's, and it now lives in Tags.
 in the lifecycle, never what kind of doc it is. **Max 3, enforced by the skills and
 reported by `setup:check`.** Notion has no maximum on a multi-select and no filter
 that can count one, measured 2026-08-17 and rejected with a 400, so this is one of
-the two rules no `Needs attention` view can watch. See `SKILLS-setup.md`.
+the two rules no `Needs attention` view can watch. See `plugins/setup/SKILLS.md`.
 
 AI, Data, Meetings, Products, Sales Messaging, Tools, Teammate Onboarding,
 Teammate Offboarding.
@@ -446,7 +446,7 @@ match.
 **Related view:** the `Software` relation, filtered to this document's tools. A
 reader following a process needs to know which systems it touches, and on an SOP
 that beats a sibling list. **Restored 2026-08-17** once Software was put back into
-v1 and `SCHEMA-software.md` defined the database.
+v1 and `plugins/software/SCHEMA.md` defined the database.
 
 ### Enablement
 
@@ -555,7 +555,7 @@ SOP note above.
 
 **All three of these went and came back inside one day.** They were Software views
 originally, dropped when Software was cut from v1, and restored when Software was
-put back and `SCHEMA-software.md` was written. Recorded because the round trip is
+put back and `plugins/software/SCHEMA.md` was written. Recorded because the round trip is
 the useful part: a template cannot name a view of a database nobody has described,
 so the cut was correct at the time and so is the restoration.
 
@@ -575,7 +575,7 @@ so the cut was correct at the time and so is the restoration.
   break it.** A filter cannot reach across the relation to read the parent's
   `Type`, measured 2026-08-17, so there is no view for this one. A rollup looks
   like the way round it and is not: the view is created, reported as successful,
-  and silently loses its filter. See `SKILLS-setup.md`.
+  and silently loses its filter. See `plugins/setup/SKILLS.md`.
 - **Ceiling of 800 words across the required sections. No minimum.** Conditional
   sections (Sources) sit outside the count. See below for why there is no floor
   and what happens at the ceiling.

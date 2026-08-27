@@ -5,7 +5,7 @@
  *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
- * gate. `SCHEMA-projects.md` defines the fields, the values and the template;
+ * gate. `plugins/projects/SCHEMA.md` defines the fields, the values and the template;
  * this file does not restate a value list, it reads them from the shipped
  * schema.
  *

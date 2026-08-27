@@ -4,11 +4,11 @@
 values and option order live here and nowhere else. Anything in another document
 that restates them is a copy, and copies drift.
 
-`DECISIONS.md` holds the reasoning and the reversals. `SKILLS-setup.md` holds the
+`DECISIONS.md` holds the reasoning and the reversals. `plugins/setup/SKILLS.md` holds the
 creation order and the relation map.
 
-Companions: `SCHEMA-process.md`, `SCHEMA-memos.md`, `SCHEMA-projects.md` and
-`SCHEMA-software.md`. Shared fields (Domain, Audience, Segment, L2C Lifecycle) use
+Companions: `plugins/process/SCHEMA.md`, `plugins/memos/SCHEMA.md`, `plugins/projects/SCHEMA.md` and
+`plugins/software/SCHEMA.md`. Shared fields (Domain, Audience, Segment, L2C Lifecycle) use
 identical value lists across all of them. A change to one is a change to all.
 
 The database is called `Calendar`. The plugin that owns it is `calendar`.
@@ -104,7 +104,7 @@ template on a numerous row guarantees blank rows.
 | Format | Select | 6 values. **Events only** |
 | Location | Text | city, venue, or Online. **Events only** |
 | Channel | Multi-select | where it goes out. **Not for events** |
-| Domain | Select | the same 8 values as `SCHEMA-process.md` |
+| Domain | Select | the same 8 values as `plugins/process/SCHEMA.md` |
 | Audience | Multi-select | the same list. **Which internal teams need to know** |
 | Segment | Multi-select | the same list. Who it is aimed at |
 | L2C Lifecycle | Multi-select | the same 0 to 8. Where in the customer journey this lands |
@@ -323,14 +323,14 @@ view and absent from `Undated`, which filters to the two early statuses, so it
 would sit in exactly the blind spot the `Undated` view was added to remove.
 **Added 2026-08-17**, when review found this rule written the same day as the fix
 for the blind spot and falling into it. Its two siblings live in the rules table in
-`SKILLS-setup.md`, which lists every rule Notion cannot enforce and where each is
+`plugins/setup/SKILLS.md`, which lists every rule Notion cannot enforce and where each is
 caught.
 
 **This is a new job for `setup` and it is worth naming.** The 2026-08-17 review
 found that the related views inside page bodies cannot be prebuilt, because they
 filter against the page they sit on. **These are the opposite case.** They are
 database-level, they reference no page, and they are exactly the kind of view that
-should exist before anybody adds a row. Recorded in `SKILLS-setup.md`.
+should exist before anybody adds a row. Recorded in `plugins/setup/SKILLS.md`.
 
 ---
 
@@ -372,7 +372,7 @@ gets recorded, deliberately in prose rather than as a metric.
 has nowhere to put them. Sarah's call is that Calendar is the exception: a row
 here is a short entry about your own plans, not research, and a Sources heading on
 a Tuesday social post is a field nobody fills. Anything genuinely read goes in the
-prose of `What It Is`. `SKILLS-calendar.md` carries the same exception.
+prose of `What It Is`. `plugins/calendar/SKILLS.md` carries the same exception.
 
 **Hard rules.**
 - **Why We Are Doing It is never blank**, on any type. If it cannot be answered,

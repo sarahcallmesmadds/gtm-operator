@@ -33,7 +33,7 @@
  *
  * WHAT NO COMMAND HERE DOES: edit. Memos is append-only. There is no update,
  * no backfill and no audit, and their absence is recorded in
- * `SKILLS-memos.md` as decisions rather than gaps.
+ * `plugins/memos/SKILLS.md` as decisions rather than gaps.
  */
 
 const fs = require('fs')
@@ -749,7 +749,7 @@ const commands = {
    * IT PARTITIONS AND COUNTS, AND JUDGES NOTHING. What is worth a line is the
    * skill's call, made over these buckets. The one section that cannot be
    * assembled is named in the output rather than left to be noticed:
-   * `SKILLS-memos.md` says Needs A Decision From You is the whole point, and
+   * `plugins/memos/SKILLS.md` says Needs A Decision From You is the whole point, and
    * it cannot be derived from status fields.
    */
   window (periodFile, projectsFile, calendarFile, memosFile, tasksFile) {
@@ -891,7 +891,7 @@ const commands = {
    * the same Notion database either way, and config holds every id.
    *
    * AN ACTION WITHOUT A PERSON AND A DATE IS A WISH, and it never reaches
-   * here: `SKILLS-memos.md` sends it to Open Questions instead. So both are
+   * here: `plugins/memos/SKILLS.md` sends it to Open Questions instead. So both are
    * required, and the person is an id, because Notion identifies people by
    * uuid and a guessed owner is the fastest way to make a team stop trusting
    * the notes.

@@ -4,7 +4,7 @@ Part 3 for `software`. Five skills, in the same five slots as the other skill
 files: what it does, when it runs, what it reads and writes, what it does not do,
 and the judgment it carries.
 
-The database is defined in `SCHEMA-software.md`, which also names every field's
+The database is defined in `plugins/software/SCHEMA.md`, which also names every field's
 fill event. This file does not restate a field name or a value list.
 
 Written 2026-08-17. `update` added and the names confirmed 2026-08-18.
@@ -13,10 +13,10 @@ Written 2026-08-17. `update` added and the names confirmed 2026-08-18.
 
 ## Rules that apply to every skill in this plugin
 
-The shared rules in `SKILLS-memos.md` apply here unchanged: never invent a select
+The shared rules in `plugins/memos/SKILLS.md` apply here unchanged: never invent a select
 value, verify the write landed, a hard confirmation gate, preview in full inline,
 route to `setup` on first run, pin the Notion API version and the client floor to
-the two values `SKILLS-setup.md` defines, and record only sources you actually
+the two values `plugins/setup/SKILLS.md` defines, and record only sources you actually
 opened.
 
 Three more belong to this plugin.
@@ -34,7 +34,7 @@ Three more belong to this plugin.
   `new` stamps it at creation, because creation is a full pass (the person just
   answered every group), and `review` stamps it on a confirmed pass.** Ruled by
   Sarah on 2026-08-25, settling this document's earlier review-only wording in
-  favour of the fill-event table in `SCHEMA-software.md`. This is the same
+  favour of the fill-event table in `plugins/software/SCHEMA.md`. This is the same
   correction `process:update` needed on 2026-08-17, where fixing a typo was
   resetting the review clock and suppressing the staleness warning for a whole
   cadence period.

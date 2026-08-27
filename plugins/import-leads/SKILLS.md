@@ -142,7 +142,7 @@ Process. No plugin calls another plugin's skill.
 ## The write contract
 
 This plugin writes to a database it does not own, so this file states which
-fields it fills, the same rule `SKILLS-projects.md` follows. This section is
+fields it fills, the same rule `plugins/projects/SKILLS.md` follows. This section is
 the one home for that list.
 
 **The floor, this plugin's own:** a row without a first and last name is

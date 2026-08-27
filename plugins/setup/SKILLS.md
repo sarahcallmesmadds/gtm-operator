@@ -1,7 +1,7 @@
 # setup: what the plugin does
 
 **This file defines the `setup` plugin.** Three skills, each described in the
-same five slots as `SKILLS-process.md` and `SKILLS-projects.md`, so a gap in one
+same five slots as `plugins/process/SKILLS.md` and `plugins/projects/SKILLS.md`, so a gap in one
 is visible as a gap rather than as something that did not apply.
 
 The five slots: what it does, when it runs, what it reads and writes, what it
@@ -299,7 +299,7 @@ nothing about what to do with an empty workspace.
   page builds its view. **Database-level views are the opposite case and setup
   does create them**, because they reference no page. Calendar carries most of
   them and it is the one database whose default table view is useless. **Its view
-  manifest is the table in `SCHEMA-calendar.md`, which is the only place their
+  manifest is the table in `plugins/calendar/SCHEMA.md`, which is the only place their
   number is stated**, so build from that rather than from a count written here.
   Setup also creates the **Needs attention** views below.
 
@@ -404,7 +404,7 @@ rather than assumed.
 
 **Everywhere else in the design, the wording changed from "required" to "required
 by the skills, and surfaced when it is not"**, because that is what is true. The
-one place still to carry the old wording, `SKILLS-projects.md`, was corrected on
+one place still to carry the old wording, `plugins/projects/SKILLS.md`, was corrected on
 2026-08-17.
 - **Does not create Notion page templates.** See the build risks below; this is an
   assumption that needs measuring before anyone builds against it.
@@ -564,7 +564,7 @@ manifest, and both the creation loop and the phase 7 verification derive their
 count from it. Phase B said nine while the map held thirteen until 2026-08-17,
 which is exactly the drift a manifest prevents.
 
-**This generalises the two-stage rule in `SCHEMA-process.md` and replaces it.**
+**This generalises the two-stage rule in `plugins/process/SCHEMA.md` and replaces it.**
 That rule said a self-relation needs a second call because the database id does
 not exist until the database does. True, and the same is true of every
 cross-database relation. Splitting by phase rather than by database means the rule
@@ -640,7 +640,7 @@ without.
 **Relation 2 is why `Superseded Strategy` got renamed.** Labelling both sides
 means naming both sides, and one name cannot do it. The document doing the
 replacing carries `Supersedes` and the one being replaced carries `Superseded By`.
-Decided 2026-08-17. `SCHEMA-process.md` has been updated.
+Decided 2026-08-17. `plugins/process/SCHEMA.md` has been updated.
 
 **Four databases point at Process and all four call it `Artifacts`.**
 Memos, Projects, Software and Calendar each carry a property of that name, and the
@@ -652,7 +652,7 @@ guess the other side correctly.
 **Relation 10 is the only one-way relation in the design, and it is on purpose.**
 A two-way self-relation needs a different name on each side and connecting two
 tools is symmetric, so there is no honest pair of names. The full blast radius
-takes two reads instead of one. See `SCHEMA-software.md`.
+takes two reads instead of one. See `plugins/software/SCHEMA.md`.
 
 **Relation 4 is two-way, decided 2026-08-17.** The memo carries `Artifacts` and
 the artifact carries `Memos`. One-way would have worked for everything currently
@@ -741,7 +741,7 @@ with custom options.** A throwaway database created with a `STATUS` column came
 back with Notion's three defaults and nothing else, and supplying options was
 rejected both on creation and on alter. **Projects and Tasks now use `Select`**,
 which all four databases already used, so the design got more consistent rather
-than less. See `SCHEMA-projects.md` for the evidence.
+than less. See `plugins/projects/SCHEMA.md` for the evidence.
 
 **2. Can a database template be created through the API.** Not applied, created.
 The schemas define a page body template per type, and if templates cannot be

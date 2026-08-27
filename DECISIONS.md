@@ -7075,3 +7075,42 @@ the same words as a malformed one. The Low: an empty string still
 counted as id-shaped in the membership-add judge and the membership
 proof's entry predicate; both refuse it now. Five new mutations,
 recorded above, each restoring one removed exemption alone.
+
+## The root tidy: schema and skills docs move into their plugins, 2026-08-26
+
+Sarah read the repository root as a stranger would and called it junk. She was
+right about the shape of it: 21 markdown files and 14,470 lines at the root,
+of which the README was 145. Someone arriving from a link had to find the front
+door among twenty other files.
+
+**What moved.** Each `SCHEMA-<plugin>.md` is now `plugins/<plugin>/SCHEMA.md`
+and each `SKILLS-<plugin>.md` is now `plugins/<plugin>/SKILLS.md`. Every one of
+them describes exactly one plugin, so the plugin folder is where it belongs, and
+a reader who opens a plugin now finds its schema and its skills beside its code
+instead of two directories up. The root is six files: README, POST-INSTALL,
+DECISIONS, TESTLOG, CLAUDE and AGENTS.
+
+**What was deleted.** The three `REVIEW-codex-2026-08-17*.md` files, 778 lines
+of one day's review rounds from the design phase, before any plugin existed.
+Nothing in the code read them and every finding they carried was already
+recorded here.
+
+**The one that was not simply deleted.** `REVIEW-codex-2026-08-17.md` was cited
+by fourteen comments across `shared/`, the five vendored copies, a test and a
+plugin README, as the record of a measurement: Notion answers a select value the
+property does not have with a hard 400 `validation_error` naming the value and
+listing the allowed ones, for `select` and `multi_select` alike, all or nothing
+so the page is not created. Deleting the file and leaving the citations would
+have pointed fourteen comments at nothing, which is the fault this file has
+logged before: burying a measurement the repository already owned. The
+measurement is recorded here in full, twice, so every citation was repointed at
+`DECISIONS.md` rather than dropped.
+
+**What was deliberately not touched.** The seventy-four older references in this
+file. They sit inside dated entries recording what was true on the day they were
+written, and rewriting them would rewrite the record to match today. This entry
+is where a reader who hits an old name learns where the file went.
+
+**The mechanical cost.** Eight `readFileSync` paths in four test files, and
+roughly 250 name references across 68 files. No markdown link anywhere pointed
+at a moved file, so nothing linked broke.

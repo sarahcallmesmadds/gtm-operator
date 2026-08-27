@@ -23,8 +23,8 @@
  * which field applies when, and carrying the option colours would be carrying a
  * copy nothing reads.
  *
- * `SCHEMA-process.md` is the human definition and wins over this file where they
- * disagree. `SKILLS-process.md` is the human definition of the skills. The test
+ * `plugins/process/SCHEMA.md` is the human definition and wins over this file where they
+ * disagree. `plugins/process/SKILLS.md` is the human definition of the skills. The test
  * is what makes that a check rather than a hope.
  */
 
@@ -70,7 +70,7 @@ const PARENT_TYPE = 'Strategy Decision'
  *
  * `Verified by` is one of the three verification fields below, and it is the one
  * that is skipped when there is no person id. `Verified date` is set either way,
- * which is the asymmetry `SKILLS-process.md` states for `new`.
+ * which is the asymmetry `plugins/process/SKILLS.md` states for `new`.
  */
 const PERSON_FIELDS = ['Owner', 'Verified by']
 
@@ -188,7 +188,7 @@ const BODY_SECTIONS = {
  *
  * The three Software views went and came back inside one day: dropped when
  * Software was cut from v1, restored 2026-08-17 when it was put back and
- * `SCHEMA-software.md` defined the database. Recorded because the round trip is
+ * `plugins/software/SCHEMA.md` defined the database. Recorded because the round trip is
  * the useful part. A template cannot name a view of a database nobody has
  * described, so the cut was right at the time and so is the restoration.
  */

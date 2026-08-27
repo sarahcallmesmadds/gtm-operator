@@ -39,7 +39,7 @@
  * WHAT NO COMMAND HERE DOES: create a database, write config, edit a
  * published memo, move a task's status, or cancel work already in progress.
  * The last two are people's moves in Notion, recorded as decisions in
- * `SKILLS-projects.md` rather than gaps.
+ * `plugins/projects/SKILLS.md` rather than gaps.
  */
 
 const fs = require('fs')

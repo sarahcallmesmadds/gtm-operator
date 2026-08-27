@@ -5,7 +5,7 @@
  *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
- * gate. `SCHEMA-software.md` defines the fields, the values and the template;
+ * gate. `plugins/software/SCHEMA.md` defines the fields, the values and the template;
  * this file does not restate a value list, it reads them from the shipped
  * schema.
  *
@@ -14,7 +14,7 @@
  * THE RULE THIS FILE HOLDS HARDEST: `Last reviewed` moves only when a review
  * happened. `newProperties` stamps it at creation and `reviewProperties`
  * stamps it on an explicit confirmation, per the fill-event table in
- * `SCHEMA-software.md`; `updateProperties` never writes it, whatever the
+ * `plugins/software/SCHEMA.md`; `updateProperties` never writes it, whatever the
  * update changed. An edit that resets the freshness stamp suppresses the
  * staleness warning for a whole cadence period. (The SKILLS document reads
  * the creation stamp differently; both readings are in `DECISIONS.md`.)

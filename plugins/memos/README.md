@@ -23,7 +23,7 @@ with `Corrects` set.
 
 Every row's `Type` says which of seven communications it is: Memo, Project
 Update, Team Update, Meeting Notes, Problem Statement, Release, Incident
-Report. Each has its own page body, defined in `SCHEMA-memos.md`.
+Report. Each has its own page body, defined in `plugins/memos/SCHEMA.md`.
 
 ## The skills
 
@@ -34,12 +34,12 @@ Report. Each has its own page body, defined in `SCHEMA-memos.md`.
 | `team-update` | Assembles the recurring update covering a period from Projects, Calendar, Memos and optionally Tasks, rather than from what somebody remembers |
 | `find` | Finds what was said about something and when, following corrections to the end of the chain. Reads only |
 
-All four are built. `SKILLS-memos.md` in the repository root defines them.
+All four are built. `plugins/memos/SKILLS.md` defines them.
 
 ## Why there is no update, backfill or audit
 
 Recorded so the gaps read as decisions, with the full argument in
-`SKILLS-memos.md`:
+`plugins/memos/SKILLS.md`:
 
 - **No `update`, ever.** Memos is append-only; this is the plugin's entire
   identity, and the clearest evidence is the missing skill.

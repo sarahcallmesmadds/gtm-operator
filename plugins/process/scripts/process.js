@@ -54,7 +54,7 @@ const literal = value => `'${String(value).split("'").join("''")}'`
  * The similarity threshold above which two artifacts are a near match.
  *
  * DELIBERATELY NOT INHERITED. The reference used 70% on title and topic, and
- * `SKILLS-process.md` says in as many words to pick this against real artifacts
+ * `plugins/process/SKILLS.md` says in as many words to pick this against real artifacts
  * rather than taking that number, because a similarity threshold set blind ends
  * up either silent or unusable.
  *
@@ -90,7 +90,7 @@ function contextOrExit () {
  * WHAT IS GIVEN UP, SAID PLAINLY. The one-to-one check does not run over Memos,
  * so two Memos properties mapped to one Notion name would not be caught here.
  * That check exists to protect writes, and `audit` writes nothing: signal 2
- * reads Memos and this plugin never edits it. `SKILLS-process.md` is explicit
+ * reads Memos and this plugin never edits it. `plugins/process/SKILLS.md` is explicit
  * that Memos is append-only and a correction there is a new memo. `setup`'s
  * `check` is what validates the Memos map as a whole, and it owns that job.
  *
@@ -672,7 +672,7 @@ const { tokens, similarity } = require(path.join(__dirname, 'similar'))
  * an artifact that has never been checked, one whose cadence this version does
  * not recognise, and one whose date will not parse, and collapsing any of those
  * into `fresh` is how a library serves a stale document silently, which
- * `SKILLS-process.md` calls worse than having no answer.
+ * `plugins/process/SKILLS.md` calls worse than having no answer.
  *
  * A cadence of `None` or `On change only` is `exempt` rather than `fresh`: it
  * has opted out of time-based checking and is still subject to every other
@@ -1142,7 +1142,7 @@ const commands = {
     const context = contextOrExit()
 
     const where = []
-    // ONLY Type AND Domain GO INTO THE SQL. `SKILLS-process.md` gives this skill
+    // ONLY Type AND Domain GO INTO THE SQL. `plugins/process/SKILLS.md` gives this skill
     // Type, Domain and Audience as its judgment, but Audience holds several
     // values at once and no multi-value predicate on this surface has been
     // proved: `plugins/setup/scripts/views.js` records a multi-select filter
@@ -1188,7 +1188,7 @@ const commands = {
   },
 
   /**
-   * THE QUERIES `audit` NEEDS, AND IT WRITES NOTHING. `SKILLS-process.md` is
+   * THE QUERIES `audit` NEEDS, AND IT WRITES NOTHING. `plugins/process/SKILLS.md` is
    * explicit: audit reads only, produces a list, and hands it to `update`.
    *
    * Two queries, because signal 2 cannot be answered from the artifacts table.
@@ -1385,7 +1385,7 @@ const commands = {
   /**
    * Change an artifact that already exists.
    *
-   * ONLY WHAT CHANGED GOES IN THE PAYLOAD. `SKILLS-process.md`: does not rewrite
+   * ONLY WHAT CHANGED GOES IN THE PAYLOAD. `plugins/process/SKILLS.md`: does not rewrite
    * a body wholesale when a section is what changed. Sending an unchanged
    * property back is not harmless either, because `Last checked for accuracy` is
    * in that set and rewriting it is the fault the whole verification rule exists

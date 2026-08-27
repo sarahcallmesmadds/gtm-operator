@@ -1,10 +1,10 @@
 # projects: what each skill does
 
 Part 3 for `projects`. Six skills in the same five slots as
-`SKILLS-process.md`: what it does, when it runs, what it reads and
+`plugins/process/SKILLS.md`: what it does, when it runs, what it reads and
 writes, what it does not do, and the judgment it carries.
 
-Databases are defined in `SCHEMA-projects.md` and `SCHEMA-memos.md`.
+Databases are defined in `plugins/projects/SCHEMA.md` and `plugins/memos/SCHEMA.md`.
 This file does not restate a field name or a value list.
 
 **Two of these were names with nothing behind them.** `problem-scan` and `ship`
@@ -14,11 +14,11 @@ are marked below with what they became and where that came from.
 
 ## Rules that apply to all six
 
-**Every cross-cutting rule in `SKILLS-process.md` applies here unchanged**, all
+**Every cross-cutting rule in `plugins/process/SKILLS.md` applies here unchanged**, all
 eight of them: never invent a select value (Notion rejects the whole write with a
 400, tested), verify the write landed, a hard confirmation gate, preview in full
 inline, route to `setup:install` on first run, pin the Notion API version and
-client floor to the two values `SKILLS-setup.md` defines, treat a related view as a view rather than a block, and record only
+client floor to the two values `plugins/setup/SKILLS.md` defines, treat a related view as a view rather than a block, and record only
 sources actually opened. Two more are specific to this plugin.
 
 - **Iterate in chat, write once on approval.** These skills produce projects and
@@ -36,7 +36,7 @@ sources actually opened. Two more are specific to this plugin.
   | `Type` | `Problem Statement`, `Project Update`, `Release` respectively |
   | `Status` | **`Published`.** Skills never write `Draft` |
   | `Published date` | Today. This is what `process:audit` reads, so it is not optional |
-  | `Author` | The user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `SKILLS-setup.md` |
+  | `Author` | The user, from their Notion person id in config. **Skipped when there is none**, see the nullable `personId` rule in `plugins/setup/SKILLS.md` |
   | `Projects` | The related project, when there is one. `problem-statement` may have none |
   | `Artifacts` | Any Process artifact this announced or changed. **`ship` in particular sets this**, since a release usually changes an SOP, and it is what makes the audit signal work |
   | `Domain` | Inherited from the project when there is one, otherwise asked |
@@ -49,7 +49,7 @@ sources actually opened. Two more are specific to this plugin.
   approval, so a memo that reaches Notion has already been approved.
   **Published to Canceled is the only status change permitted after publication**,
   it is a retraction, and it requires a correcting memo saying why. See "What
-  append-only actually means" in `SKILLS-memos.md`.
+  append-only actually means" in `plugins/memos/SKILLS.md`.
 - **A skill never advances a status it did not earn.** Exactly three skills
   touch a project's status, and no skill moves it more than one step:
 
@@ -75,7 +75,7 @@ sources actually opened. Two more are specific to this plugin.
 
 ## setup is no longer part of this plugin
 
-**Moved out 2026-08-17.** See `SKILLS-process.md` and DECISIONS.md. One `setup`
+**Moved out 2026-08-17.** See `plugins/process/SKILLS.md` and DECISIONS.md. One `setup`
 plugin creates every database in the foundation.
 
 This removes the largest source of complexity in the old design: two setups both
@@ -196,7 +196,7 @@ is wider than the rule.** A project carrying updates but no problem statement is
 not caught by it, because narrowing the filter to the memo `Type` needs a filter
 that reads through the relation, and a rollup filter was measured on 2026-08-17 to
 be accepted and then silently discarded. `scope` is the check that holds the rule
-exactly. See `SKILLS-setup.md`.
+exactly. See `plugins/setup/SKILLS.md`.
 
 **What it does not do.**
 - **Does not create tasks.** That is `new`.

@@ -7,13 +7,13 @@
  * See the header on `shared/config-read.js` for why a copy rather than a
  * require.
  *
- * ONE FILE FOR TWO DATABASES, the same split as `SCHEMA-projects.md`: Tasks
+ * ONE FILE FOR TWO DATABASES, the same split as `plugins/projects/SCHEMA.md`: Tasks
  * cannot exist without Projects, so they are one job and one definition.
  * `tests/projects-schema-agrees.test.js` asserts every list and every field
  * name here against `setup`'s schema, for both databases.
  *
- * `SCHEMA-projects.md` is the human definition and wins over this file where
- * they disagree. `SKILLS-projects.md` is the human definition of the skills.
+ * `plugins/projects/SCHEMA.md` is the human definition and wins over this file where
+ * they disagree. `plugins/projects/SKILLS.md` is the human definition of the skills.
  *
  * THE RULE EVERYTHING HERE FOLLOWS FROM: a skill never advances a status it
  * did not earn. Exactly three skills touch a project's status, no skill moves
@@ -31,7 +31,7 @@ const PROJECT_STATUSES = ['Intake', 'Scoped', 'In progress', 'Done', 'Canceled']
 const TASK_STATUSES = ['Not started', 'In progress', 'Blocked', 'Done', 'Canceled']
 
 /**
- * What each skill may leave a project at, from `SKILLS-projects.md`:
+ * What each skill may leave a project at, from `plugins/projects/SKILLS.md`:
  *
  *   scope   Scoped, or Canceled
  *   new     In progress, and only from Scoped
@@ -79,7 +79,7 @@ const L2C = [
 
 /**
  * Person properties, written only when asked or configured, per the nullable
- * `personId` rule in `SKILLS-setup.md`. `Owner` is one accountable person and
+ * `personId` rule in `plugins/setup/SKILLS.md`. `Owner` is one accountable person and
  * `Stakeholders` is the list; the reference blurred these, and shared
  * ownership reads as nobody's.
  */

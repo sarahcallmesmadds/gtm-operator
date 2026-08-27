@@ -221,12 +221,12 @@ check('the word ceiling is the number the design document states', () => {
   // A rewording of that sentence fails this test rather than passing it
   // silently, which is the right direction to fail in: the number moving
   // unnoticed is the failure worth catching.
-  const design = fs.readFileSync(path.join(__dirname, '..', 'SCHEMA-process.md'), 'utf8')
+  const design = fs.readFileSync(path.join(__dirname, '..', 'plugins', 'process', 'SCHEMA.md'), 'utf8')
   const stated = design.match(/Ceiling of (\d+) words across the required sections/)
 
   assert.ok(
     stated,
-    'SCHEMA-process.md no longer states the ceiling in the form this test reads. ' +
+    'plugins/process/SCHEMA.md no longer states the ceiling in the form this test reads. ' +
     'Either the number moved or the sentence was reworded, and this cannot tell which.'
   )
   assert.strictEqual(

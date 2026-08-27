@@ -24,7 +24,7 @@
  * 2026-08-19. They are read, by the completeness check on the recorded name map,
  * and the reasoning is written beside them.
  *
- * `SCHEMA-calendar.md` is the human definition and wins over this file where
+ * `plugins/calendar/SCHEMA.md` is the human definition and wins over this file where
  * they disagree. The test is what makes that a check rather than a hope.
  */
 
@@ -53,7 +53,7 @@ const NOT_FOR_EVENTS = ['Channel']
  * The statuses that require a date.
  *
  * `Canceled` is deliberately absent. Corrected 2026-08-19, after review found
- * `SCHEMA-calendar.md` reading "from Confirmed onwards" while `manifest.js` had
+ * `plugins/calendar/SCHEMA.md` reading "from Confirmed onwards" while `manifest.js` had
  * already excluded it. The rule catches a row promising something will happen
  * without saying when, and a canceled row promises nothing.
  *
@@ -108,7 +108,7 @@ const DEBRIEF = { section: 'How It Went', triggeredBy: 'Done' }
  * this map does not mention falls back to the name this plugin shipped with, so
  * a workspace that renamed a value gets sent the old one. NOTION REFUSES A
  * SELECT VALUE THE PROPERTY DOES NOT HAVE. Measured against a live workspace on
- * 2026-08-17, recorded in `REVIEW-codex-2026-08-17.md`: a hard 400
+ * 2026-08-17, recorded in `DECISIONS.md`: a hard 400
  * `validation_error` naming the offending value and listing the allowed ones,
  * for `select` and `multi_select` alike. THE FAILURE IS ALL OR NOTHING, so the
  * page is not created and a drafted artifact is lost at write time. That is the

@@ -5,7 +5,7 @@
  *
  * Every rule Notion cannot enforce and every rule a model will drift on lives
  * here rather than in the skill prose, because prose is advice and this is a
- * gate. `SCHEMA-calendar.md` defines the fields and the values; this file does
+ * gate. `plugins/calendar/SCHEMA.md` defines the fields and the values; this file does
  * not restate a value list, it reads them from the shipped schema.
  *
  * PURE. It builds a payload and judges a shape. It sends nothing.
@@ -26,7 +26,7 @@ const { TYPES, STATUSES, EVENT_ONLY, NOT_FOR_EVENTS, DATE_REQUIRED_AT, PERSON_FI
  *
  * Users get this wrong more often than any other field, so it ships in code as
  * well as in the skill, and the skill shows it rather than deciding alone.
- * `SCHEMA-calendar.md`, "Which type is this".
+ * `plugins/calendar/SCHEMA.md`, "Which type is this".
  */
 const TYPE_TREE = [
   { ask: 'Do people attend it?', then: 'Event' },
@@ -53,7 +53,7 @@ function fieldsNotAllowedOn (type) {
  * Does this status require a date?
  *
  * `Confirmed` and `Done`. NOT `Canceled`, which was corrected on 2026-08-19
- * after review found `SCHEMA-calendar.md` saying "from Confirmed onwards" while
+ * after review found `plugins/calendar/SCHEMA.md` saying "from Confirmed onwards" while
  * `plugins/setup/scripts/manifest.js` had already excluded `Canceled` with the
  * reasoning written out. The rule catches a row that promises something will
  * happen and does not say when, and a canceled row promises nothing.
@@ -426,7 +426,7 @@ function properties (context, final, { defaultsPerson = true } = {}) {
   }
 
   /**
-   * The nullable person rule, from `SKILLS-setup.md`, and the named owner.
+   * The nullable person rule, from `plugins/setup/SKILLS.md`, and the named owner.
    *
    *   not asked, on a create   the configured person, or nothing
    *   not asked, on an update  left alone here, and cleared by `clearing`

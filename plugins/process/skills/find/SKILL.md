@@ -105,7 +105,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/process.js" trust rows.json 2026-08-23
 most likely to be wrong, and reporting it as fine is the exact failure this skill
 exists to prevent.
 
-**A newer related memo is the other staleness signal**, from `SKILLS-process.md`.
+**A newer related memo is the other staleness signal**, from `plugins/process/SKILLS.md`.
 Memos is a separate database and this version does not query it, so **say that
 gap out loud** rather than implying the trust judgment is complete: the cadence
 was checked and related memos were not.

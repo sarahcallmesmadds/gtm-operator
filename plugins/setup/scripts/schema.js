@@ -11,7 +11,7 @@ const mapped = require('./names')
  * A data stops anyone adding a relation here where it would be created too
  * early.
  *
- * THE SCHEMA-*.md FILES AT THE REPO ROOT ARE THE DEFINITION. This is their
+ * EACH PLUGIN'S SCHEMA.md IS THE DEFINITION. This is their
  * machine-readable form and must agree with them. Where the two disagree, the
  * document wins and this file is wrong. A test checks the agreement.
  *

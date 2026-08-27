@@ -154,7 +154,7 @@ when it started, and after a repair it is not.
 
 ## Views are outside this skill, deliberately
 
-The nine checks in `SKILLS-setup.md` do not include a view, and closing that gap
+The nine checks in `plugins/setup/SKILLS.md` do not include a view, and closing that gap
 means carrying the name map into the view compiler, which changes what gets
 **sent** to Notion rather than what gets read back.
 

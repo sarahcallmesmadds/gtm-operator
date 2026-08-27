@@ -57,7 +57,7 @@ copy is reverted by the next vendor run.
 **Why a copy rather than importing `setup`'s.** Claude Code has no dependency
 resolution between plugins, and a skill's scripts resolve inside its own plugin,
 so an installed `calendar` has no path to `setup`'s files and must not have one.
-The decision is recorded in `SKILLS-setup.md` build risk 3.
+The decision is recorded in `plugins/setup/SKILLS.md` build risk 3.
 
 **The reader cannot write.** There is no way, from this plugin, to change config.
 
@@ -99,10 +99,10 @@ single-day date writes its end column as an explicit `null`. A real range was
 shortened to one day, the payload went verbatim, and the read-back shows the old
 end gone rather than left behind.
 
-**The client floor is not implemented.** `SKILLS-calendar.md` says every skill
+**The client floor is not implemented.** `plugins/calendar/SKILLS.md` says every skill
 here pins the Notion API version and a client floor to the two values
-`SKILLS-setup.md` defines. Only one of those two exists anywhere: the wire
-version appears in prose at `SKILLS-setup.md` step 0, and the config field
+`plugins/setup/SKILLS.md` defines. Only one of those two exists anywhere: the wire
+version appears in prose at `plugins/setup/SKILLS.md` step 0, and the config field
 documented to carry it is never written by `setup`. **The client floor has no
 number anywhere in the repository.** Rather than invent one, this plugin does not
 check it. A made-up number inside a safety check is worse than no check, because
@@ -183,7 +183,7 @@ rather than left to be discovered:
   Notion, which refuses it: a hard 400 naming the value and listing the allowed
   ones, and the page is not created at all. That was measured elsewhere in this
   repository on 2026-08-17, not by this plugin, and is recorded in
-  `REVIEW-codex-2026-08-17.md`.
+  `DECISIONS.md`.
 - **Most of this is still proved by tests and reasoning rather than by a live
   run.** The 2026-08-19 run covered one create, one query, one update and one
   query, on one row. `normaliseRows` now parses the measured shape and its

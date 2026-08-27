@@ -15,7 +15,7 @@
  * installed, `calendar` has no path to `setup`'s files and must not have one:
  * the marketplace is plugins that never call each other. So the choice is
  * between copies that drift silently and copies a test holds together, and
- * `SKILLS-setup.md` build risk 3 already decided it is the second.
+ * `plugins/setup/SKILLS.md` build risk 3 already decided it is the second.
  *
  * WHAT THIS FILE DELIBERATELY CANNOT DO. It cannot write. There is no `begin`,
  * no `complete`, no `recordDatabase`, no `recordNames`. `setup` is the only
@@ -192,7 +192,7 @@ function readRaw () {
  * back to the name this plugin shipped with, so a workspace that renamed a value
  * is sent the old one. Notion refuses a value the property does not have,
  * measured against a live workspace on 2026-08-17 and recorded in
- * `REVIEW-codex-2026-08-17.md`: a hard 400 `validation_error` naming the value
+ * `DECISIONS.md`: a hard 400 `validation_error` naming the value
  * and listing the allowed ones. The failure is all or nothing, so nothing is
  * saved and the whole write is lost, which is why this is refused at read time
  * rather than left for Notion to reject.
@@ -323,7 +323,7 @@ function propertyName (names, logical) {
  * for a value nobody had recorded, which sent a shipped name to a workspace that
  * had renamed it. That produces a hard 400 from Notion, naming the value and
  * listing the allowed ones, measured 2026-08-17 and recorded in
- * `REVIEW-codex-2026-08-17.md`.
+ * `DECISIONS.md`.
  *
  * IT IS STILL NOT PROOF THE OPTION EXISTS. Nothing in a config file can be. The
  * shared rule is that live options are fetched before any value is chosen, and
@@ -479,7 +479,7 @@ function contextFor (key, expected) {
 
     /**
      * Null is a legitimate answer and a working install, not a failure.
-     * `SKILLS-setup.md` tier 3: where no person could be resolved, every person
+     * `plugins/setup/SKILLS.md` tier 3: where no person could be resolved, every person
      * property is OMITTED rather than written empty, and no skill fails over it.
      */
     personId: (config.notion && config.notion.personId) || null,

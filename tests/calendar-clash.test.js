@@ -3,7 +3,7 @@
 /**
  * The clash check and the duplicate check.
  *
- * The semantics under test are specified in `SKILLS-calendar.md`, and the ones
+ * The semantics under test are specified in `plugins/calendar/SKILLS.md`, and the ones
  * that matter most are the ones that are easy to get subtly wrong and impossible
  * to notice afterwards:
  *

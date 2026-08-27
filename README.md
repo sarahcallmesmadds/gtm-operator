@@ -118,8 +118,8 @@ is the first; outbound email follows.
 |---|---|
 | [`DECISIONS.md`](DECISIONS.md) | The running record. Decisions, reversals, and what Notion does when measured |
 | [`POST-INSTALL.md`](POST-INSTALL.md) | The two jobs the API cannot do for you |
-| `SCHEMA-*.md` | One per database, except that `SCHEMA-projects.md` covers Projects and Tasks, which are one job. Field names, types, values and option order live here and nowhere else |
-| `SKILLS-*.md` | One per plugin. What each skill does, what it refuses to do, and why |
+| `plugins/<name>/SCHEMA.md` | One per database, except that `plugins/projects/SCHEMA.md` covers Projects and Tasks, which are one job. Field names, types, values and option order live here and nowhere else |
+| `plugins/<name>/SKILLS.md` | One per plugin. What each skill does, what it refuses to do, and why |
 | `TESTLOG-*.md` | What was run against a live workspace, and what came back |
 | [`plugins/`](plugins) | The plugins themselves |
 | `tests/` | The suite |

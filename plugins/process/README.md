@@ -38,7 +38,7 @@ off it. That is what makes the library navigable instead of a pile.
 | `audit` | Says what has gone stale, contradicts something else, or was never verified. Reads only and writes nothing |
 | `backfill` | Fills the library from material you already have, proposing candidates you approve one at a time. Writes no owner and marks nothing verified |
 
-All five are built. `SKILLS-process.md` in the repository root defines them.
+All five are built. `plugins/process/SKILLS.md` defines them.
 
 **`backfill` is the one skill that reads things people said** rather than things
 they wrote down for the record, so two rules in it are refusals in code rather
@@ -63,10 +63,10 @@ Said here so it is not discovered by a user hitting it:
   judgment.
 - **A calibrated repeated-question threshold.** `backfill` decides whether two
   wordings are the same question by the same blunt token overlap the duplicate
-  check uses, and `SKILLS-process.md` says that needs tuning against real
+  check uses, and `plugins/process/SKILLS.md` says that needs tuning against real
   workspaces, which do not exist yet. It is acceptable there and only there,
   because the output is a candidate list rather than a document.
-- **A calibrated duplicate threshold.** `SKILLS-process.md` says in as many words
+- **A calibrated duplicate threshold.** `plugins/process/SKILLS.md` says in as many words
   to pick this against real artifacts rather than inheriting the reference's 70%.
   The number in the code is uncalibrated, every result says so, and the skill
   shows candidates for a person to judge rather than deciding alone.

@@ -4,7 +4,7 @@
  * The clash check and the duplicate check.
  *
  * Two different questions, both answered before anything is written, and both
- * specified in `SKILLS-calendar.md`. A clash is two different things colliding.
+ * specified in `plugins/calendar/SKILLS.md`. A clash is two different things colliding.
  * A duplicate is the same thing entered twice.
  *
  * WHY BOTH RUN BEFORE DRAFTING. A conflict discovered after the work is planned
@@ -31,7 +31,7 @@
  * originally given was date-range overlap. Two one-day emails on the Monday and
  * the Wednesday do not overlap, so the specified mechanism could not catch its
  * own motivating example. Found in review on 2026-08-19, before any of this was
- * built. See `SKILLS-calendar.md`, "The window is seven days either side".
+ * built. See `plugins/calendar/SKILLS.md`, "The window is seven days either side".
  *
  * Seven either side rather than the calendar week, on Sarah's call: a Friday and
  * the following Monday are obviously the same problem, and a week that starts on
@@ -178,7 +178,7 @@ function targetingValues (row, field) {
  * no `L2C Lifecycle` has said something, and it is compared on what it said.
  * Read the other way, every row missing one of the two would land in the "nobody
  * said" pile, which is most rows, and a bucket holding everything says nothing.
- * `SKILLS-calendar.md` states this explicitly.
+ * `plugins/calendar/SKILLS.md` states this explicitly.
  */
 function hasTargeting (row) {
   return TARGETING.some(field => targetingValues(row, field).length > 0)
@@ -323,7 +323,7 @@ function normaliseLink (value) {
 /**
  * The duplicate check.
  *
- * Two tests, per `SKILLS-calendar.md`:
+ * Two tests, per `plugins/calendar/SKILLS.md`:
  *
  *   the same Link .................. strongest signal there is, needs no judgment
  *   a matching Name on the same date  the realistic case

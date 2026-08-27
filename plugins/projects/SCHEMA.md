@@ -10,7 +10,7 @@ about what not to re-propose. It points here rather than repeating any of it.
 Both databases belong to `projects`, and `setup` creates them together.
 Tasks cannot exist without Projects, so they are one job.
 
-Companions: `SCHEMA-process.md` and `SCHEMA-memos.md`. Shared fields
+Companions: `plugins/process/SCHEMA.md` and `plugins/memos/SCHEMA.md`. Shared fields
 (Domain, Segment, L2C Lifecycle) use identical value lists across all four
 databases. A change to one is a change to all.
 
@@ -29,14 +29,14 @@ databases. A change to one is a change to all.
 | Level of Effort | Select | Low, Med, High, TBD |
 | Owner | Person | one accountable person, not a list |
 | Stakeholders | Person (multi) | who is consulted or affected |
-| Domain | Select | the same 8 values as `SCHEMA-process.md` |
+| Domain | Select | the same 8 values as `plugins/process/SCHEMA.md` |
 | Segment | Multi-select | the same list, see "LOB impact" below |
 | L2C Lifecycle | Multi-select | the same 0 to 8, see "Impact to Funnel" below |
 | Timeline | Date range | start and target end |
 | Business outcome | Text | what success looks like in a sentence |
 | Artifacts | Relation to Process | what this project produced or changed |
 | Memos | Relation | updates and releases about this project |
-| Calendar | Relation | inverse of `Project` on Calendar. What this project is putting in market, and when. Added 2026-08-17, see `SCHEMA-calendar.md` |
+| Calendar | Relation | inverse of `Project` on Calendar. What this project is putting in market, and when. Added 2026-08-17, see `plugins/calendar/SCHEMA.md` |
 | Tasks | Relation | |
 | Created time | Created time | |
 
@@ -189,7 +189,7 @@ is now one: a project's problem statement is the memo of that `Type` attached
 through `Memos`.
 
 **The rule is still required and still not enforceable by Notion.** The `Needs
-attention` view in `SKILLS-setup.md` now catches a project with no memos at all,
+attention` view in `plugins/setup/SKILLS.md` now catches a project with no memos at all,
 which is the widest check a view can make. Narrowing it to the memo `Type` needs
 a filter that reads through the relation, and a rollup filter was measured on
 2026-08-17 to be accepted, reported as created, and read back as `filters: []`.
