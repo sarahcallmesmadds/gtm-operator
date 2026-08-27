@@ -87,9 +87,8 @@ in order and wires every relation itself.
 
 ## problem-scan
 
-**This was a name with nothing behind it. Below is a proposal.** It has no
-ancestor in the reference skills, so unlike the others it is not reconstructed
-from anything that ran.
+This has no ancestor in the reference skills, so unlike the others it is not
+reconstructed from anything that ran.
 
 **What it does.** Finds problems that keep coming up and that nobody has written
 down, and hands them to `problem-statement`.
@@ -107,9 +106,20 @@ planning.
 each: the problem, who described it, how often it came up, and where. You pick
 the ones worth writing up and it hands each to `problem-statement` pre-filled.
 
-Scope is the same as `backfill` and the same rules apply: public channels either
-all or a chosen set, direct messages only when specifically named, a connected
-call recorder if there is one, and always a date range. **Never all DMs.**
+Scope is the same as `backfill` and the same rules apply. Slack public channels
+are all or a chosen set; direct messages are only the conversations specifically
+named; Gmail is the user's own mailbox; one of Granola or Gong is selected per
+recording pass; HubSpot and Salesforce reads name object families and account or
+deal filters; Outreach reads name the accounts, prospects, sequences, tasks or
+meetings; and Intercom or Pylon reads name the customer accounts, contacts,
+conversations or issues. Every source carries a date range. **Never all DMs and
+never an unbounded external read.**
+
+All external connectors are context-only here. The skill uses read and search
+tools even when a server exposes writes. It never sends, drafts, updates,
+assigns, enrols, labels, archives or changes anything outside Notion, and this
+skill itself writes nothing to Notion. Gong answers are labelled
+transcript-derived because its hosted MCP does not return raw transcript text.
 
 **What it does not do.**
 - Writes nothing to Notion. Not a row, not a draft.
@@ -117,6 +127,7 @@ call recorder if there is one, and always a date range. **Never all DMs.**
 - Does not rank or prioritise them. Priority is set at the end of `scope`, once
   effort is known, and guessing earlier is guessing.
 - Does not read outside the scope you set.
+- Does not write to any external connector.
 
 **The judgment it carries.** Telling a recurring problem from a one-off
 complaint. Two signals, and it should say which fired:
@@ -294,8 +305,8 @@ Type = Project Update, using that template: What Changed, Why, Who Is Affected
 And When, What You Need To Do. Relates it to the project.
 
 **What it does not do.**
-- Does not send anything anywhere. v1 has no Slack, no email. It writes the memo
-  and gives you the link.
+- Does not send anything anywhere. Slack and Gmail are read-only context for
+  `problem-scan`; `comms` writes the memo and gives you the link.
 - Does not edit a previous update. Append-only, so a correction is a new memo
   relating to the old one through `Corrects`.
 - Does not change the project's status.
@@ -330,9 +341,8 @@ name the concrete system, field or threshold, and keep each to about fifteen to
 twenty words.
 
 **What it does not do.**
-- **Does not post to Slack.** The reference version did, and v1 has no Slack. It
-  writes the memo and stops. Reinstating the post is a v2 change that brings a
-  whole integration with it.
+- **Does not post to Slack.** Slack is read-only context for `problem-scan`.
+  `ship` writes the memo and stops. Outbound posting remains a separate feature.
 - Does not mark a project Done without writing the release. The two are one
   action, because a project that closes with no record of what shipped leaves the
   library with a gap exactly where someone will look.
@@ -375,7 +385,7 @@ requirements skills in the reference set. Structure and reasoning only.
 
 | Not carried | Why |
 |---|---|
-| Posting to Slack from `ship` | v1 has no Slack. A memo and a link instead |
+| Posting to Slack from `ship` | The connector is read-only context. `ship` produces a memo and a link instead |
 | The Problem Gate's "opportunity play" bypass phrase | A magic phrase that skips the one hard check is how the check stops meaning anything |
 | Six project types each with their own task pattern | Untestable variety. One task-breakdown standard, applied with judgment |
 | A separate `prd` skill | Requirements live in the task body. A separate document about a task, kept beside the task, is two things that disagree |

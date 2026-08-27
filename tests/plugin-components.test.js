@@ -31,6 +31,9 @@ const ENDPOINTS = {
   'google-calendar': 'https://calendarmcp.googleapis.com/mcp/v1',
   hubspot: 'https://mcp.hubspot.com/anthropic',
   salesforce: 'https://api.salesforce.com/platform/mcp/v1/platform/sobject-reads',
+  outreach: 'https://api.outreach.io/mcp',
+  intercom: 'https://mcp.intercom.com/mcp',
+  pylon: 'https://mcp.usepylon.com/',
   stripe: 'https://mcp.stripe.com',
   ramp: 'https://ramp-mcp-remote.ramp.com/mcp'
 }
@@ -42,9 +45,12 @@ const EXPECTED = {
     'notion', 'atlassian', 'granola', 'gong', 'slack', 'gmail',
     'google-drive', 'google-calendar', 'hubspot', 'salesforce', 'stripe', 'ramp'
   ],
-  memos: ['notion', 'granola'],
-  projects: ['notion', 'granola'],
-  software: ['notion', 'box'],
+  memos: ['notion', 'granola', 'slack', 'gmail'],
+  projects: [
+    'notion', 'granola', 'gong', 'slack', 'gmail', 'hubspot', 'salesforce',
+    'outreach', 'intercom', 'pylon'
+  ],
+  software: ['notion', 'box', 'google-drive', 'gmail'],
   'import-leads': ['notion']
 }
 
@@ -75,15 +81,27 @@ const SUPPORT = {
   },
   memos: {
     notion: ['plugins/memos/skills/meeting-notes/SKILL.md', /mcp__\*__notion-create-pages/],
-    granola: ['plugins/memos/skills/meeting-notes/SKILL.md', /connected recorder is Granola/]
+    granola: ['plugins/memos/skills/meeting-notes/SKILL.md', /connected recorder is Granola/],
+    slack: ['plugins/memos/skills/new/SKILL.md', /For Slack, use one explicitly named thread/],
+    gmail: ['plugins/memos/skills/new/SKILL.md', /For Gmail, use one named thread/]
   },
   projects: {
     notion: ['plugins/projects/skills/problem-statement/SKILL.md', /mcp__\*__notion-create-pages/],
-    granola: ['plugins/projects/skills/problem-scan/SKILL.md', /recorder is Granola/]
+    granola: ['plugins/projects/skills/problem-scan/SKILL.md', /Granola, Gong/],
+    gong: ['plugins/projects/skills/problem-scan/SKILL.md', /Gong's hosted MCP/],
+    slack: ['plugins/projects/skills/problem-scan/SKILL.md', /Internal conversations \| Slack/],
+    gmail: ['plugins/projects/skills/problem-scan/SKILL.md', /Email \| Gmail/],
+    hubspot: ['plugins/projects/skills/problem-scan/SKILL.md', /HubSpot, Salesforce/],
+    salesforce: ['plugins/projects/skills/problem-scan/SKILL.md', /HubSpot, Salesforce/],
+    outreach: ['plugins/projects/skills/problem-scan/SKILL.md', /Sales engagement \| Outreach/],
+    intercom: ['plugins/projects/skills/problem-scan/SKILL.md', /Customer support \| Intercom, Pylon/],
+    pylon: ['plugins/projects/skills/problem-scan/SKILL.md', /Customer support \| Intercom, Pylon/]
   },
   software: {
     notion: ['plugins/software/skills/backfill/SKILL.md', /mcp__\*__notion-create-pages/],
-    box: ['plugins/software/skills/backfill/SKILL.md', /packaged Box connector/]
+    box: ['plugins/software/skills/backfill/SKILL.md', /packaged Box connector/],
+    'google-drive': ['plugins/software/skills/backfill/SKILL.md', /packaged Google Drive connector/],
+    gmail: ['plugins/software/skills/backfill/SKILL.md', /packaged Gmail connector/]
   },
   'import-leads': {
     notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]

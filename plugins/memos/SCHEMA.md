@@ -117,10 +117,9 @@ the room. Their page bodies will not resemble each other. Do not re-merge them.
 
 ### Three calls made on 2026-08-17
 
-- **No Slack field in v1.** The plugin would either have to actually post to
-  Slack, which is a large scope addition and a second integration to test, or
-  carry a checkbox that does nothing, which is worse. Nothing else in v1 sends
-  anything anywhere.
+- **No outbound Slack field in v1.** Read-only Slack and Gmail context can inform
+  a memo, but publishing to Slack is separate, unbuilt behavior. Nothing in v1
+  sends anything anywhere.
 - **Status drops `In review`.** v1 has no approval workflow, and a status nobody
   advances becomes noise. Draft, Published, Canceled.
 - **The `Artifacts` relation is kept, and it is the most important new field.**

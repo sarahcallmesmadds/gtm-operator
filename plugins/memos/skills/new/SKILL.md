@@ -1,7 +1,7 @@
 ---
 name: new
-description: Write one memo into the Memos log, of any of the seven types, from free-form notes. Use when the user says "send a memo", "put this on the record", "write up this recommendation", "announce this", "write the problem statement", "write the release note", "write the incident report", or asks to fix or correct an existing memo, which becomes a new correcting memo. Writes one page and its body. Writes nothing without an explicit yes, and never edits anything.
-allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page
+description: Write one memo into the Memos log, of any of the seven types, from free-form notes or explicitly scoped Slack and Gmail context. Use when the user says "send a memo", "put this on the record", "write up this recommendation", "announce this", "write the problem statement", "write the release note", "write the incident report", or asks to fix or correct an existing memo, which becomes a new correcting memo. Writes one page and its body. Writes nothing without an explicit yes, and never edits anything.
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_messages_and_files, mcp__*__read_channel, mcp__*__read_thread, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread
 ---
 
 # new
@@ -53,6 +53,18 @@ read it.
 ---
 
 ## Step 1. Is this a memo at all
+
+When the user asks the memo to use Slack or Gmail context, agree the read scope
+before opening it. For Slack, use one explicitly named thread or a named channel
+plus date range; a direct message is read only when that exact conversation is
+named. For Gmail, use one named thread or a search in the authenticated user's
+own mailbox plus a date range. Refuse an incomplete scope rather than widening
+or silently narrowing it.
+
+Slack and Gmail are read-only context sources. Never send, draft, react, label,
+archive, move or mark anything. Record every thread or message actually opened
+in the memo's structured `sources`, and never list a source that was only
+available but not read.
 
 The most common mistake will be writing process documentation as a memo,
 because a memo is quicker. The test: **will somebody return to this and

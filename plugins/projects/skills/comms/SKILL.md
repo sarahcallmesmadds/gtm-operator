@@ -66,8 +66,8 @@ as unlinked rather than filed.
 
 ## What this skill does not do
 
-- **Does not send anything anywhere.** v1 has no Slack and no email. It
-  writes the memo and gives you the link.
+- **Does not send anything anywhere.** Slack and Gmail are read-only context
+  for `problem-scan`; `comms` writes the memo and gives you the link.
 - **Does not edit a previous update.** Append-only: a correction is a new
   memo relating to the old one through `Corrects`, via `memos:new`.
 - **Does not change the project's status.** `new` and `ship` own the two

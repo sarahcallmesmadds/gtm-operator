@@ -326,11 +326,7 @@ that harder rather than easier.
    Reviewing forty in a sitting is the actual use, and it needs a shape that does
    not turn into forty conversations or into forty stamped dates with nothing
    confirmed.
-2. **Email access is not specified.** The skill reads a mailbox, and which
-   connection it uses, what happens when there is none, and how the date range is
-   enforced are all build questions rather than design ones. They are also the
-   part most likely to go wrong quietly.
-3. **Nothing writes `Integrates with`.** The schema names a person or `review` as
+2. **Nothing writes `Integrates with`.** The schema names a person or `review` as
    its fill event, which is the weakest fill event in the design. If the
    blast-radius map turns out to matter, it needs a real moment when it gets
    filled.

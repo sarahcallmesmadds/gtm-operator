@@ -24,6 +24,10 @@ than trims at it.
 | `contracts` | What is coming up and what happens if you do nothing, ordered by consequence rather than by date, ending with a count of the rows it could not assess |
 | `backfill` | Finds the tools you already pay for, from a folder of contracts and your own mailbox, offered as candidates approved one at a time. Never fills a person, an importance, or the review stamp, and the proof checks those absences |
 
+`backfill` packages Box and Google Drive for one named contract folder and Gmail
+for a bounded search in the user's own mailbox. All three are read-only sources;
+Notion is the only service this plugin writes to.
+
 ## What is deliberately not built
 
 - **No `find`.** The questions people ask a tool directory are view

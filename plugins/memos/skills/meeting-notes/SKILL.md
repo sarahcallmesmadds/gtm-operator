@@ -1,7 +1,7 @@
 ---
 name: meeting-notes
-description: Turn a meeting into a record of what it decided, as one Meeting Notes memo, and offer to write the confirmed actions into Tasks. Use when the user says "write up the meeting", "notes from the call", "what did we decide", hands over a transcript, or asks after any meeting whose decisions somebody outside the room needs. Proposes decisions for confirmation, never invents one, and writes nothing without an explicit yes.
-allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page
+description: Turn a meeting into a record of what it decided, using the transcript plus explicitly scoped Slack or Gmail context when requested, as one Meeting Notes memo, and offer to write the confirmed actions into Tasks. Use when the user says "write up the meeting", "notes from the call", "what did we decide", hands over a transcript, or asks after any meeting whose decisions somebody outside the room needs. Proposes decisions for confirmation, never invents one, and writes nothing without an explicit yes.
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_meetings, mcp__*__get_meeting_transcript, mcp__*__search_messages_and_files, mcp__*__read_channel, mcp__*__read_thread, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread
 ---
 
 # meeting-notes
@@ -41,6 +41,14 @@ When the connected recorder is Granola, use its meeting search and read tools.
 Raw transcripts come from `get_meeting_transcript` and require a paid Granola
 plan; when that tool is unavailable, work from the meeting notes or ask the
 user to provide the transcript rather than claiming it was read.
+
+If the user names related Slack or Gmail context, read only the exact thread or
+the bounded channel or own-mailbox search they approve. Those messages can
+clarify what led into the meeting or what was settled afterwards, but they do
+not replace the meeting source. Never post, send, draft, react, label, archive,
+move or mark anything in either service. Say which context was actually opened
+in the preview and final report, and keep an unavailable or unapproved connector
+under `notReading`. Meeting Notes has no Sources section, so do not invent one.
 
 If reading the transcript in full is the work, do that before writing
 anything. A decision on page nine reads exactly like no decision if page nine

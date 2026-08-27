@@ -7,6 +7,38 @@
     "granola": {
       "type": "http",
       "url": "https://mcp.granola.ai/mcp"
+    },
+    "gong": {
+      "type": "http",
+      "url": "https://mcp.gong.io/mcp"
+    },
+    "slack": {
+      "type": "http",
+      "url": "https://mcp.slack.com/mcp"
+    },
+    "gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
+    },
+    "hubspot": {
+      "type": "http",
+      "url": "https://mcp.hubspot.com/anthropic"
+    },
+    "salesforce": {
+      "type": "http",
+      "url": "https://api.salesforce.com/platform/mcp/v1/platform/sobject-reads"
+    },
+    "outreach": {
+      "type": "http",
+      "url": "https://api.outreach.io/mcp"
+    },
+    "intercom": {
+      "type": "http",
+      "url": "https://mcp.intercom.com/mcp"
+    },
+    "pylon": {
+      "type": "http",
+      "url": "https://mcp.usepylon.com/"
     }
   }
 }

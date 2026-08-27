@@ -29,8 +29,8 @@ Report. Each has its own page body, defined in `plugins/memos/SCHEMA.md`.
 
 | Skill | What it is for |
 |---|---|
-| `new` | Writes one memo of any of the seven types from free-form notes, and carries the correction branch: "fix the memo from Tuesday" becomes a new memo with `Corrects` set |
-| `meeting-notes` | Turns a meeting into a record of what it decided, and offers to write the confirmed actions into Tasks |
+| `new` | Writes one memo of any of the seven types from free-form notes or explicitly scoped Slack and Gmail context, and carries the correction branch: "fix the memo from Tuesday" becomes a new memo with `Corrects` set |
+| `meeting-notes` | Turns a meeting into a record of what it decided, optionally using named Slack or Gmail context, and offers to write the confirmed actions into Tasks |
 | `team-update` | Assembles the recurring update covering a period from Projects, Calendar, Memos and optionally Tasks, rather than from what somebody remembers |
 | `find` | Finds what was said about something and when, following corrections to the end of the chain. Reads only |
 
@@ -64,7 +64,9 @@ Said here so it is not discovered by a user hitting it:
 - **No date filtering in SQL outside what was measured.** `team-update`
   fetches whole tables and the script partitions by period, because the only
   date SQL measured on this surface is calendar's own window query.
-- **No Slack.** `team-update` writes the row and sends nothing anywhere.
+- **No outbound Slack or email.** Slack and Gmail are optional read-only context
+  for `new` and `meeting-notes`; `team-update` still assembles from the
+  foundation databases, writes the row and sends nothing anywhere.
 
 ## Installing
 

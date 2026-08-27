@@ -83,7 +83,8 @@ signal work, and a release usually changes an SOP.
 
 ## What this skill does not do
 
-- **Does not post to Slack.** v1 has no Slack. It writes the memo and stops.
+- **Does not post to Slack.** Slack is read-only context for `problem-scan`;
+  `ship` writes the memo and stops.
 - **Does not mark a project Done without writing the release**, and the
   script holds that mechanically.
 - **Does not close over open tasks silently.** It lists them and asks.
