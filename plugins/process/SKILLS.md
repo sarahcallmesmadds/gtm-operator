@@ -228,12 +228,13 @@ never does.
 
 ### The flow
 
-1. **Pick the sources.** Existing documents, conversations, call recordings, or
-   any combination.
-2. **Set the scope.** Which channels, which mailbox, which date range. See "What
-   it is allowed to read" below.
-3. **For conversations, pick how to look.** Any combination of the three below,
-   not one chosen at install time.
+1. **Pick the sources.** Existing documents, conversations, call recordings,
+   calendars, CRM activity, billing, spend, or any combination.
+2. **Set the scope.** Which folders, channels, mailbox, calendars, recorders,
+   CRM objects, financial record families, and date ranges. See "What it is
+   allowed to read" below.
+3. **For searched sources, pick how to look.** Any combination of the three
+   below, not one chosen at install time.
 4. **It gathers candidates**, each one a line: what it found, where, and what
    type it would be.
 5. **You go through the list.** Yes, no, or skip for now.
@@ -259,16 +260,21 @@ Scope is the user's to set, and the defaults lean closed.
 | **Public channels** | Either all of them, or a set the user picks. Both are offered, because a small workspace may want everything and a large one certainly does not |
 | **Direct messages** | **Never, unless the user names specific ones.** Not "all DMs" as an option, not a checkbox to include them. The user hands over particular conversations or the plugin does not look |
 | **Email** | The user's own mailbox, with a date range |
-| **Call recordings** | Whatever call recorder the user has connected. Optional, and off unless they connect one |
-| **Date range** | Applies to every conversation source. There is no unbounded read |
+| **Call recordings** | Granola or Gong when connected. Optional, and off unless the user names one |
+| **Calendar** | Google Calendar, with explicit calendars and a date range |
+| **CRM** | HubSpot or Salesforce, with explicit object families and a date range |
+| **Finance** | Stripe or Ramp, with explicit record families and a date range |
+| **Date range** | Applies to every conversation and activity source. There is no unbounded read |
 
 **A call recorder is a first-class source.** Meetings are where process decisions
 actually get made, and most of them are never written down anywhere else, so a
 workspace with a recorder connected has better raw material than one without.
-The plugin reads transcripts from whatever recorder the environment exposes
-rather than integrating with one by name. Granola is the one testable today.
-Others work if they expose a way to read transcripts. **Setup asks whether a
-recorder is connected and does not assume one.**
+The plugin reads raw transcripts when the connected surface exposes them.
+Granola does. Gong is treated as a call-transcript source, but its hosted MCP
+returns transcript-derived answers rather than raw transcript text. That
+distinction must appear in Coverage, and raw Gong transcript coverage is marked
+unavailable unless a Gong API or export surface actually returns the text.
+**Setup asks whether a recorder is connected and does not assume one.**
 
 **Every candidate says where it came from**, down to the channel, the thread, or
 the meeting and date. Nothing is absorbed anonymously. This matters more here
@@ -287,6 +293,9 @@ here, because the output is a candidate list rather than a document.
 | An existing knowledge base (a Drive folder, an old Notion database, a Confluence space) | **Sorting.** Read each page, work out its type, map it into the schema, flag anything with no owner or no clear type |
 | Conversations (Slack, email) | **Finding.** Surface process knowledge nobody ever wrote down |
 | Call recordings, if a recorder is connected | **Finding.** The same job, on the material where decisions are most often made and least often written down |
+| Calendar events | **Finding.** Surface recurring operating cadence, handoffs, attendees, and meeting descriptions |
+| CRM activity (HubSpot, Salesforce) | **Finding.** Surface operating rules embedded in account, deal, and activity history |
+| Billing and spend (Stripe, Ramp) | **Finding.** Surface recurring billing, payment, vendor, procurement, and expense workflows |
 
 Writes approved artifacts one at a time, each previewed in full.
 

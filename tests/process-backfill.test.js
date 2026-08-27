@@ -131,6 +131,15 @@ check('a scope naming no source is refused, because there is nothing to point it
   assert.strictEqual(out.ok, false)
 })
 
+check('the scoped source inventory covers documents, conversations, meetings, CRM and finance', () => {
+  assert.deepStrictEqual(backfill.SOURCES, [
+    'documents', 'slack', 'email', 'recordings', 'calendar', 'crm', 'finance'
+  ])
+  assert.deepStrictEqual(backfill.CALENDAR_PROVIDERS, ['google-calendar'])
+  assert.deepStrictEqual(backfill.CRM_PROVIDERS, ['hubspot', 'salesforce'])
+  assert.deepStrictEqual(backfill.FINANCE_PROVIDERS, ['stripe', 'ramp'])
+})
+
 check('an unknown source is refused rather than skipped', () => {
   const out = backfill.plan({ sources: ['confluence'] })
   assert.ok(faults(out).includes('sources:unknown-source'), JSON.stringify(faults(out)))
@@ -248,6 +257,100 @@ check('call recordings need the recorder named, because setup does not assume on
   assert.strictEqual(with_.reading.recordings.recorder, 'granola')
 })
 
+check('Gong is accepted as the named call-transcript source', () => {
+  const out = backfill.plan({
+    sources: ['recordings'],
+    recordings: { recorder: 'gong', ...WINDOW },
+    ways: ['sweep']
+  })
+  assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))
+  assert.strictEqual(out.reading.recordings.recorder, 'gong')
+})
+
+check('calendar scope names its connector, calendars and date window', () => {
+  const out = backfill.plan({
+    sources: ['calendar'],
+    calendar: { provider: 'google-calendar', calendars: ['primary', 'sales'], ...WINDOW },
+    ways: ['topics'],
+    topics: ['customer handoff']
+  })
+  assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))
+  assert.deepStrictEqual(out.reading.calendar, {
+    provider: 'google-calendar', calendars: ['primary', 'sales'], ...WINDOW
+  })
+
+  const open = backfill.plan({
+    sources: ['calendar'],
+    calendar: { provider: 'google-calendar', calendars: 'all', from: WINDOW.from },
+    ways: ['sweep']
+  })
+  assert.ok(faults(open).includes('calendar:range-open'), JSON.stringify(faults(open)))
+
+  const malformed = backfill.plan({
+    sources: ['calendar'],
+    calendar: { provider: 42, calendars: ['primary'], ...WINDOW },
+    ways: ['sweep']
+  })
+  assert.ok(faults(malformed).includes('calendar:provider-not-a-name'), JSON.stringify(faults(malformed)))
+  assert.deepStrictEqual(malformed.reading, {})
+})
+
+check('CRM scope supports HubSpot and read-only Salesforce without accepting an unknown provider', () => {
+  const request = {
+    sources: ['crm'],
+    crm: { providers: ['hubspot', 'salesforce'], objects: ['accounts', 'deals', 'activities'], ...WINDOW },
+    ways: ['sweep']
+  }
+  const out = backfill.plan(request)
+  assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))
+  assert.deepStrictEqual(out.reading.crm.providers, ['hubspot', 'salesforce'])
+  assert.deepStrictEqual(out.reading.crm.objects, ['accounts', 'deals', 'activities'])
+
+  const unknown = backfill.plan({
+    ...request,
+    crm: { ...request.crm, providers: ['hubspot', 'pipedrive'] }
+  })
+  assert.ok(faults(unknown).includes('crm:provider-unknown'), JSON.stringify(faults(unknown)))
+  assert.deepStrictEqual(unknown.reading, {})
+
+  const malformed = backfill.plan({
+    ...request,
+    crm: { ...request.crm, objects: ['accounts', 42] }
+  })
+  assert.ok(faults(malformed).includes('crm:object-not-a-name'), JSON.stringify(faults(malformed)))
+  assert.deepStrictEqual(malformed.reading, {})
+})
+
+check('finance scope supports Stripe and Ramp and requires named record families', () => {
+  const request = {
+    sources: ['finance'],
+    finance: {
+      providers: ['stripe', 'ramp'],
+      records: ['subscriptions', 'invoices', 'transactions', 'vendors', 'expenses'],
+      ...WINDOW
+    },
+    ways: ['topics'],
+    topics: ['refunds and approvals']
+  }
+  const out = backfill.plan(request)
+  assert.strictEqual(out.ok, true, JSON.stringify(out.refusals))
+  assert.deepStrictEqual(out.reading.finance.providers, ['stripe', 'ramp'])
+
+  const empty = backfill.plan({
+    ...request,
+    finance: { ...request.finance, records: [] }
+  })
+  assert.ok(faults(empty).includes('finance:records-empty'), JSON.stringify(faults(empty)))
+  assert.deepStrictEqual(empty.reading, {})
+
+  const unknown = backfill.plan({
+    ...request,
+    finance: { ...request.finance, providers: ['stripe', 'quickbooks'] }
+  })
+  assert.ok(faults(unknown).includes('finance:provider-unknown'), JSON.stringify(faults(unknown)))
+  assert.deepStrictEqual(unknown.reading, {})
+})
+
 check('slack needs channels said out loud, and "all" is one of the two answers', () => {
   const silent = backfill.plan({ sources: ['slack'], slack: { ...WINDOW }, ways: ['sweep'] })
   assert.ok(faults(silent).includes('slack:channels-unset'), JSON.stringify(faults(silent)))
@@ -318,7 +421,7 @@ check('TOPICS GETS THE SHAPE GUARD EVERY OTHER LIST HAS', () => {
 check('WHAT IS NOT BEING READ IS SAID, source by source and way by way', () => {
   const out = backfill.plan({ sources: ['documents'], documents: { where: 'Drive/GTM' } })
   const said = out.notReading.join(' ')
-  for (const absent of ['Slack', 'Email', 'Call recordings']) {
+  for (const absent of ['Slack', 'Email', 'Call recordings', 'Calendar', 'CRM', 'Finance']) {
     assert.ok(said.includes(absent), `${absent} was left out silently:\n${said}`)
   }
   for (const way of backfill.WAYS) {
@@ -1816,7 +1919,10 @@ check('A RECORD INSIDE A FILE IS CHECKED TOO, not read as a record missing every
     ['documents', ['Drive/GTM']],
     ['slack', 'bad'],
     ['email', ['boss@corp.com']],
-    ['recordings', 42]
+    ['recordings', 42],
+    ['calendar', 'bad'],
+    ['crm', ['hubspot']],
+    ['finance', 42]
   ]) {
     const request = { sources: [source], [source]: value }
     if (source !== 'documents') Object.assign(request, { ways: ['topics'], topics: ['refunds'] })
@@ -2198,7 +2304,7 @@ check('A REFUSED SCOPE EMPTIES ALL FOUR, topics and what it is not reading inclu
   // reads as a run that is taking the rest, and this is the field the skill
   // tells a person to read before starting.
   assert.strictEqual(out.notReading.length, 1, `a refused plan still listed what it was leaving out:\n${out.notReading.join('\n')}`)
-  for (const source of ['Documents', 'Email', 'Call recordings']) {
+  for (const source of ['Documents', 'Email', 'Call recordings', 'Calendar', 'CRM', 'Finance']) {
     assert.ok(!out.notReading.join(' ').includes(source), `${source} was named as an exclusion by a plan that reads nothing`)
   }
 

@@ -1,6 +1,6 @@
 ---
 name: backfill
-description: Fill the Process library from material that already exists, by proposing candidates you approve one at a time. Reads a document store, Slack, email or call transcripts inside a scope you set, offers what it found as a list, and writes only the yeses. Never fills an owner and never marks anything verified. Triggers on "backfill the library", "import our old SOPs", "what should be written down that isn't", "pull our process docs into Notion".
+description: Fill the Process library from material that already exists, by proposing candidates you approve one at a time. Reads scoped documents, Slack, email, call transcripts, calendars, CRM activity, billing, or spend evidence, offers what it found as a list, and writes only the yeses. Never fills an owner and never marks anything verified. Triggers on "backfill the library", "import our old SOPs", "what should be written down that isn't", "pull our process docs into Notion".
 ---
 
 # backfill
@@ -37,14 +37,34 @@ Ask which sources, and for each one, how far back. Put the answer in
 
 ```json
 {
-  "sources": ["documents", "slack", "recordings"],
+  "sources": ["documents", "slack", "email", "recordings", "calendar", "crm", "finance"],
   "documents": { "where": "Drive › GTM handbook" },
-  "slack": { "channels": ["#gtm", "#support"], "dms": [], "from": "2026-01-01", "to": "2026-08-01" },
-  "recordings": { "recorder": "granola", "from": "2026-01-01", "to": "2026-08-01" },
-  "ways": ["repeats", "topics"],
+  "slack": { "channels": ["#gtm", "#support"], "dms": [], "from": "2026-01-01", "to": "2026-08-27" },
+  "email": { "mailbox": "own", "from": "2026-01-01", "to": "2026-08-27" },
+  "recordings": { "recorder": "gong", "from": "2026-01-01", "to": "2026-08-27" },
+  "calendar": { "provider": "google-calendar", "calendars": ["primary"], "from": "2026-01-01", "to": "2026-08-27" },
+  "crm": { "providers": ["hubspot", "salesforce"], "objects": ["accounts", "deals", "activities"], "from": "2026-01-01", "to": "2026-08-27" },
+  "finance": { "providers": ["stripe", "ramp"], "records": ["subscriptions", "invoices", "transactions", "vendors", "expenses"], "from": "2026-01-01", "to": "2026-08-27" },
+  "ways": ["repeats", "topics", "sweep"],
   "topics": ["how refunds get handled", "how inbound leads get routed"]
 }
 ```
+
+The packaged connectors map onto those sources like this:
+
+| Source | Packaged connectors |
+|---|---|
+| `documents` | `notion`, `atlassian`, `google-drive` |
+| `slack` | `slack` |
+| `email` | `gmail` |
+| `recordings` | `granola`, `gong` |
+| `calendar` | `google-calendar` |
+| `crm` | `hubspot`, `salesforce` |
+| `finance` | `stripe`, `ramp` |
+
+One recording source is named per scope. Run a separate scoped pass when both
+Granola and Gong should be searched, then combine the candidate list before the
+approval step.
 
 **This is the only gate there is.** Everywhere else in this skill, being wrong
 costs a "no" from the person. Not here: by the time there is a candidate list,
@@ -57,12 +77,15 @@ What it will refuse:
 |---|---|
 | No source, or one it does not know | A run that quietly drops a source reports on less than was asked about |
 | Settings for a source that is not in `sources` | The request disagrees with itself. Either the source was left off the list or its settings were left behind, and those want opposite repairs |
-| A conversation source with no date range, or half a range | There is no unbounded read. "All of Slack" is the absence of a scope, not a wide one |
+| A conversation or activity source with no date range, or half a range | There is no unbounded read. "All history" is the absence of a scope, not a wide one |
 | `"dms": "all"` | Direct messages are named one by one or not read. A public channel is somewhere people chose to speak in front of the workspace; a direct message is not |
 | Anyone's mailbox but the user's own | An approval gate on the output does not make reading somebody else's mail acceptable, because the reading already happened |
 | A `mailbox` that is set to something unreadable, such as a list | Absent means the user's own. Something supplied and unreadable is a scope somebody set, and replacing it with the default reads a mailbox nobody agreed to |
 | Call recordings with no recorder named | Setup asks whether one is connected and does not assume |
 | Slack with no channels said out loud | "All" and a named list are both offered. Neither is assumed |
+| Calendar with no provider or calendar list | A connected account and a defined set of calendars are both part of the read boundary |
+| CRM with no provider list or object families | "The CRM" is not a scope; use `hubspot` or `salesforce` and name what to search |
+| Finance with no provider list or record families | Financial data is sensitive and large; use `stripe` or `ramp` and name what to search |
 | Topics without choosing that way of looking, or the other way round | Turning a mode on quietly is how a run reads more than was agreed |
 | A list entry that is not a name, anywhere | Dropping it is narrowing. `sources: ["slack", 42]` covering one source and reporting success is the failure this whole step exists to prevent |
 | A date written as one that is not one, such as `2026-02-30` | Parsed loosely it rolls forward into March and reads a window nobody set |
@@ -74,6 +97,22 @@ refused scope is still reading a scope nobody agreed to.
 **Show `notReading` to the person before you start.** A source that was left out
 and a source that held nothing produce the same empty result, and only one of
 them is worth saying out loud.
+
+**Every connector is read-only in this skill.** Some packaged servers also
+offer write tools, but this skill never sends messages or email, changes a
+calendar or CRM record, creates a Stripe object, approves Ramp work, initiates a
+payment or transfer, or changes a card or credential.
+
+**Gong is a transcript source, with a capability distinction.** Its hosted MCP
+currently returns answers derived from calls and emails, not raw transcript
+text. Use those answers as transcript-derived evidence and label them that way.
+If raw transcript text is required and no Gong API or export surface is
+connected, list that source as unavailable rather than claiming it was read.
+
+In Claude Code, an already installed Salesforce CLI or Ramp CLI can be a
+read-only fallback when the hosted connector is unavailable. The plugin does
+not install either CLI. Confirm the org or account first and never use a CLI to
+create, update, delete, deploy, approve, pay, transfer, or change credentials.
 
 ---
 

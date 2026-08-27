@@ -55,10 +55,12 @@ a backfill candidate is not permission to create it.
 
 ## Connectors
 
-Notion is required. Atlassian and Granola are packaged as optional
-sources for discovery and backfill. `CONNECTORS.md` names their exact roles and
-the sources, such as Drive, Slack and email, that can be used through an
-existing Claude connection but are not configured by this plugin.
+Notion is required. Eleven optional connectors are packaged for discovery and
+backfill across documents, conversations, meetings, CRM, billing, and spend.
+They are Atlassian, Google Drive, Slack, Gmail, Google Calendar, Granola, Gong,
+HubSpot, Salesforce, Stripe, and Ramp. `CONNECTORS.md` names their exact roles,
+authentication requirements, read-only boundary, and optional local CLI
+fallbacks.
 
 **`backfill` is the one skill that reads things people said** rather than things
 they wrote down for the record, so two rules in it are refusals in code rather
