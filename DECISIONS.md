@@ -7112,7 +7112,7 @@ written, and rewriting them would rewrite the record to match today. This entry
 is where a reader who hits an old name learns where the file went.
 
 **The mechanical cost.** Eight `readFileSync` paths in four test files, and
-roughly 250 name references across 68 files. No markdown link anywhere pointed
+270 name references across 68 files. No markdown link anywhere pointed
 at a moved file, so nothing linked broke.
 
 ### Round 1 on the root tidy, Codex CLI, 2026-08-26: six findings, all taken
@@ -7212,5 +7212,50 @@ convention outside the deliberately historical entries, all eight repointed
 tightened skip matching exactly the twelve plugin-root design documents on both
 path separators and nothing deeper, and the sixteen repointed citations
 claiming no more than this file retains.
+
+Suite green, 1,456 checks.
+
+### Round 4 on the root tidy, Devin CLI confirming, 2026-08-26: one finding taken, four answered by re-deriving
+
+Per-file coverage stated: `README.md`, `CLAUDE.md`, `AGENTS.md` and
+`tests/manifest-agrees-with-design.test.js` whole, the full `main...HEAD` diff
+whole, the new entries as the supplied excerpt, everything else by its changed
+hunks.
+
+**Taken.** `TESTLOG-2026-08-18.md` still said "the two `REVIEW-codex-*` files"
+where three were deleted. That sentence was edited in this branch to record the
+deletion, and its original "two" was carried through the edit unlooked-at. It is
+the same fault as round 3's finding 1, a correction applied to the sentence
+without checking the number inside it.
+
+**Four findings said a count could not be checked from the material.** They were
+not wrong numbers; the reviewer was handed only the new entries rather than the
+whole file, so it could not re-derive them. Every one was re-derived here
+instead, and one was wrong:
+
+| Claim | Derived | Verdict |
+|---|---|---|
+| 21 files at the old root | `git ls-tree main --name-only`, `.md` only | 21, stands |
+| 14,470 lines at the old root | sum of `git show main:<f>` over those 21 | 14,470, stands |
+| 79 occurrences across 70 lines | `head -7077 DECISIONS.md`, old names | 79 and 70, stands |
+| roughly 250 renames across 68 files | `git grep` at main, old names, excluding `DECISIONS.md` and the three deleted reviews | **270 across 68**, corrected |
+| 45 raw matches and 27 failures | the suite output of the run that produced them | 45 and 27, stands |
+
+The rename count now states 270 rather than "roughly 250". "Roughly" is not
+good enough on this branch, where four of the eleven findings so far have been
+a number nobody counted.
+
+**The reviewer's underlying point stands even where its findings did not.** A
+count in this file is only as good as somebody's ability to re-derive it, which
+is the same reason `README.md` says a count written beside the thing it counts
+is a copy, and copies drift. Each figure above now travels with the command
+that produces it.
+
+Everything else came back clean: no old filename convention in any added line,
+no further location-dependent prose made false by the move, the sixteen and the
+`CLAUDE.md` opening both corrected in every place they occur, the eight
+repointed `readFileSync` paths counted back as 1 + 1 + 2 + 4 across four test
+files, no broken link, and the tightened skip correct on both path separators
+and silent for nothing that was live before the move.
 
 Suite green, 1,456 checks.
