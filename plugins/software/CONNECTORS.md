@@ -6,8 +6,10 @@
 |---|---|---|
 | Notion | Reads and maintains the Software directory created by `setup` | Yes |
 | Box | Optional contract-folder source for `backfill` | No |
+| Google Drive | Optional named contract-folder source for `backfill` | No |
+| Gmail | Optional evidence from the user's own mailbox for `backfill` | No |
 
-`backfill` can also use a named Google Drive folder and the user's own email
-when those connections already exist in Claude. They are not declared here
-because this plugin does not ship their OAuth client configuration. Email is
-always read-only in this plugin.
+The folder source is always one folder the user names, never a whole Box or
+Drive. Gmail is always read-only and bounded to the authenticated user's own
+mailbox plus a date range. The plugin never sends, drafts, labels, archives,
+moves or marks email, and it never writes to Box or Drive.

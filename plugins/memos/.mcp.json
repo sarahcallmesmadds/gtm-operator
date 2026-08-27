@@ -7,6 +7,14 @@
     "granola": {
       "type": "http",
       "url": "https://mcp.granola.ai/mcp"
+    },
+    "slack": {
+      "type": "http",
+      "url": "https://mcp.slack.com/mcp"
+    },
+    "gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
     }
   }
 }

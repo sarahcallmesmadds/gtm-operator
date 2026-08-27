@@ -103,8 +103,9 @@ an explicit yes, `create`, read back, `prove` with the created url.
 
 ## What this skill does not do
 
-- **Does not send the update anywhere.** There is no Slack field and no Slack
-  integration in v1. It writes the row.
+- **Does not send the update anywhere.** There is no outbound Slack field.
+  Read-only Slack and Gmail context is available to other skills, while this
+  skill writes the row and stops.
 - **Does not invent progress**, and does not restate detail the related view
   carries.
 - **Does not fill Needs A Decision From You by guessing.** It proposes and the

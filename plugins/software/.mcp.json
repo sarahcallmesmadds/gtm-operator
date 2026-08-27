@@ -7,6 +7,14 @@
     "box": {
       "type": "http",
       "url": "https://mcp.box.com"
+    },
+    "google-drive": {
+      "type": "http",
+      "url": "https://drivemcp.googleapis.com/mcp/v1"
+    },
+    "gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
     }
   }
 }

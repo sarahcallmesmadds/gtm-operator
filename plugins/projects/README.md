@@ -25,6 +25,11 @@ lifecycle:
 
 All six are built. `plugins/projects/SKILLS.md` defines them.
 
+`problem-scan` can ground candidates in bounded Slack and Gmail conversations,
+Granola or Gong meetings, HubSpot or Salesforce CRM records, Outreach activity,
+and Intercom or Pylon support context. Every external connector is optional and
+read-only; Notion is the plugin's only write destination.
+
 ## The rules the scripts hold
 
 - **A skill never advances a status it did not earn.** `scope` leaves a row
@@ -60,7 +65,9 @@ Said here so it is not discovered by a user hitting it:
 - **Projects have no hierarchy, on purpose.** Grouping is Domain and the
   Strategy Decision relation, and the reasoning is in `plugins/projects/SCHEMA.md`
   under "Projects have no hierarchy". Do not re-propose a parent project.
-- **Nothing is sent anywhere.** No Slack, no email, in any skill.
+- **Nothing is sent anywhere.** External connectors provide read-only context.
+  No skill posts, sends, drafts, updates, assigns or changes anything in Slack,
+  Gmail, Gong, HubSpot, Salesforce, Outreach, Intercom or Pylon.
 
 ## Installing
 

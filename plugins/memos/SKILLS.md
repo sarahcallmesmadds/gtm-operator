@@ -71,6 +71,10 @@ schema and why nothing here audits.
   them.
 - **Record every source you actually opened, and never one you did not.** A
   Sources section that cannot be trusted is worse than no Sources section.
+- **Slack and Gmail are optional, bounded context sources.** Read them only when
+  the user names a thread or approves a channel or own-mailbox search with a
+  date range. Direct messages are named one conversation at a time. Never post,
+  send, draft, react, label, archive, move or mark anything in either service.
 - **Nothing in a published memo's content is edited, ever.** Not a typo, not a
   name, not a date. The body and every content property are frozen at publication.
 
@@ -149,8 +153,9 @@ practical trigger is realising that a conversation reached a conclusion nobody
 outside it will hear about.
 
 **What it reads and writes.** Reads the live select options before choosing any
-value. Reads whatever context you point it at. Writes one page: properties, then
-the body from that type's template. Writes the Sources section from what it
+value. Reads whatever context you point it at, including an explicitly named or
+bounded Slack or Gmail source. Writes one page: properties, then the body from
+that type's template. Writes the Sources section from what it
 actually read. Verifies the body wrote.
 
 **It writes all seven types**, including Project Update and Problem Statement.
@@ -248,8 +253,9 @@ clearest argument for one setup creating everything: a plugin that could only se
 its own database could not write this at all.
 
 **What it does not do.**
-- **Does not send it anywhere.** There is no Slack field and no Slack integration
-  in v1. It writes the row.
+- **Does not send it anywhere.** There is no outbound Slack field. Read-only
+  Slack and Gmail context is available to other skills; this skill writes the
+  row and stops.
 - **Does not invent progress.** If nothing moved, it says nothing moved, which is
   information.
 - **Does not restate the detail.** What Shipped is one line per item, and the

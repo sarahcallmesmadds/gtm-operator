@@ -59,8 +59,8 @@
     {
       "name": "memos",
       "source": "./plugins/memos",
-      "description": "Time-stamped communication, append-only. Writes one memo of any of seven types from free-form notes, turns a meeting into a record of what it decided, assembles the recurring team update from Projects, Calendar, Memos and Tasks rather than from memory, and finds what was said about something and when, following corrections to the end of the chain. There is no update skill and there never will be: a correction is a new memo. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.1.2",
+      "description": "Time-stamped communication, append-only. Writes one memo of any of seven types from free-form notes or explicitly scoped Slack and Gmail context, turns a meeting into a record of what it decided, assembles the recurring team update from Projects, Calendar, Memos and Tasks rather than from memory, and finds what was said about something and when, following corrections to the end of the chain. There is no update skill and there never will be: a correction is a new memo. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.2.0",
       "author": {
         "name": "Sarah Madden"
       },
@@ -75,8 +75,8 @@
     {
       "name": "projects",
       "source": "./plugins/projects",
-      "description": "Runs a project from named problem to shipped release. Finds problems that keep coming up and nobody has written down, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. A skill never advances a status it did not earn, and scoping refuses to finish without a problem statement. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.1.2",
+      "description": "Runs a project from named problem to shipped release. Finds recurring problems in bounded internal, meeting, CRM, sales-engagement and support context, writes the case that one is worth fixing, works out what a project is and deliberately is not before it is built, creates the tasks and starts the work, tells the people affected what changed, and records what shipped when it closes. External connectors are read-only and Notion is the only write destination. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.2.0",
       "author": {
         "name": "Sarah Madden"
       },
@@ -92,7 +92,7 @@
       "name": "software",
       "source": "./plugins/software",
       "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation after checking for a duplicate, changes the facts when they change without touching the freshness stamp, confirms a whole row is still true and stamps the date only on a real pass, reports which renewals are coming up ordered by consequence rather than by date ending with what it could not see, and backfills the directory from a folder of contracts and your own mailbox, one approval at a time, never filling a person, an importance, or the review stamp. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": {
         "name": "Sarah Madden"
       },
