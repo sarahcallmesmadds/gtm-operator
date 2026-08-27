@@ -21,18 +21,17 @@ const marketplace = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin/m
 
 const ENDPOINTS = {
   notion: 'https://mcp.notion.com/mcp',
-  atlassian: 'https://mcp.atlassian.com/v1/mcp',
+  atlassian: 'https://mcp.atlassian.com/v1/mcp/authv2',
   box: 'https://mcp.box.com',
-  gong: 'https://mcp.gong.io/mcp',
   granola: 'https://mcp.granola.ai/mcp'
 }
 
 const EXPECTED = {
   setup: ['notion'],
   calendar: ['notion'],
-  process: ['notion', 'atlassian', 'box', 'gong', 'granola'],
-  memos: ['notion', 'gong', 'granola'],
-  projects: ['notion', 'gong', 'granola'],
+  process: ['notion', 'atlassian', 'box', 'granola'],
+  memos: ['notion', 'granola'],
+  projects: ['notion', 'granola'],
   software: ['notion', 'box'],
   'import-leads': ['notion']
 }

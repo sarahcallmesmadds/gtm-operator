@@ -4,10 +4,6 @@
       "type": "http",
       "url": "https://mcp.notion.com/mcp"
     },
-    "gong": {
-      "type": "http",
-      "url": "https://mcp.gong.io/mcp"
-    },
     "granola": {
       "type": "http",
       "url": "https://mcp.granola.ai/mcp"

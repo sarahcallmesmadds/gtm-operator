@@ -7,7 +7,6 @@
 | Notion | Reads and maintains the Process library created by `setup` | Yes |
 | Atlassian | Optional document source for Confluence material during `backfill` | No |
 | Box | Optional document source during `backfill` | No |
-| Gong | Optional call-transcript source during `backfill` | No |
 | Granola | Optional meeting-transcript source during `backfill` | No |
 
 `backfill` can also use Google Drive, Slack and the user's own email when those

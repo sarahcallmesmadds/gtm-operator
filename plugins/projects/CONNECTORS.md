@@ -5,7 +5,6 @@
 | Connector | Role | Required |
 |---|---|---|
 | Notion | Reads and writes Projects, Tasks, Memos and related Process artifacts | Yes |
-| Gong | Optional call source for `problem-scan` | No |
 | Granola | Optional meeting source for `problem-scan` | No |
 
 `problem-scan` can also read Slack and the user's own email when those
