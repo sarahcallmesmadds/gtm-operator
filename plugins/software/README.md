@@ -22,11 +22,13 @@ than trims at it.
 | `update` | Changes the facts that changed, one row at a time, with no sweep in the way. Never moves `Last reviewed` |
 | `review` | The full pass, walking the four groups in order, and the only skill after creation that moves `Last reviewed` — on an explicit confirmation |
 | `contracts` | What is coming up and what happens if you do nothing, ordered by consequence rather than by date, ending with a count of the rows it could not assess |
-| `backfill` | Finds the tools you already pay for, from a folder of contracts and your own mailbox, offered as candidates approved one at a time. Never fills a person, an importance, or the review stamp, and the proof checks those absences |
+| `backfill` | Finds the tools you already pay for from agreements, spend, accounting, a named contract folder, your own mailbox and bounded Slack context, offered as candidates approved one at a time. Never fills a person or the review stamp. Importance needs exact Slack evidence and the row-level yes |
 
-`backfill` packages Box and Google Drive for one named contract folder and Gmail
-for a bounded search in the user's own mailbox. All three are read-only sources;
-Notion is the only service this plugin writes to.
+`backfill` packages Box and Google Drive for one named contract folder, Gmail
+for a bounded search in the user's own mailbox, DocuSign for signed agreements,
+Ramp and QuickBooks for spend evidence, and Slack for bounded evidence of what
+breaks if a tool disappears. Every external connector is read-only; Notion is
+the only service this plugin writes to.
 
 ## What is deliberately not built
 

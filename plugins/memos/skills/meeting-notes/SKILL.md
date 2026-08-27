@@ -1,7 +1,7 @@
 ---
 name: meeting-notes
-description: Turn a meeting into a record of what it decided, using the transcript plus explicitly scoped Slack or Gmail context when requested, as one Meeting Notes memo, and offer to write the confirmed actions into Tasks. Use when the user says "write up the meeting", "notes from the call", "what did we decide", hands over a transcript, or asks after any meeting whose decisions somebody outside the room needs. Proposes decisions for confirmation, never invents one, and writes nothing without an explicit yes.
-allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_meetings, mcp__*__get_meeting_transcript, mcp__*__search_messages_and_files, mcp__*__read_channel, mcp__*__read_thread, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread
+description: Turn a meeting into a record of what it decided, using a Granola or Gong meeting source plus explicitly scoped Slack or Gmail context when requested, as one Meeting Notes memo, and offer to write the confirmed actions into Tasks. Use when the user says "write up the meeting", "notes from the call", "what did we decide", hands over a transcript, or asks after any meeting whose decisions somebody outside the room needs. Proposes decisions for confirmation, never invents one, and writes nothing without an explicit yes.
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_meetings, mcp__*__get_meeting_transcript, mcp__plugin_memos_gong__*, mcp__*__search_messages_and_files, mcp__*__read_channel, mcp__*__read_thread, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread
 ---
 
 # meeting-notes
@@ -41,6 +41,13 @@ When the connected recorder is Granola, use its meeting search and read tools.
 Raw transcripts come from `get_meeting_transcript` and require a paid Granola
 plan; when that tool is unavailable, work from the meeting notes or ask the
 user to provide the transcript rather than claiming it was read.
+
+When the connected recorder is Gong, use it as the transcript source for this
+workflow. Gong's hosted MCP returns answers derived from calls and emails rather
+than raw transcript text. Label that evidence `transcript-derived`. If exact raw
+transcript text is required and no separate Gong API or export surface returns
+it, report raw transcript coverage as unavailable instead of claiming the text
+was read.
 
 If the user names related Slack or Gmail context, read only the exact thread or
 the bounded channel or own-mailbox search they approve. Those messages can
@@ -131,5 +138,6 @@ Create each task, re-fetch it, and run `prove-task` per task.
 - **Does not accept an action without a person and a date.**
 - **Does not create tasks without asking**, and never silently.
 - **Does not read a recording the user did not point it at.**
+- **Does not call transcript-derived Gong evidence a raw transcript.**
 - **Does not edit a published memo.** A correction to the notes is a new memo
   with `Corrects` set, through `new`.

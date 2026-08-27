@@ -196,15 +196,20 @@ this is the general path for somebody who is not standing in a project.
 **When it runs.** After any meeting whose decisions somebody outside the room
 needs. Recurring meetings, workshops, working sessions, one-off calls.
 
-**What it reads and writes.** Reads a transcript from whatever call recorder is
-connected, which `setup` asked about, or notes you paste, or both. Writes one
-Memos row of type Meeting Notes. Offers to write the actions into Tasks.
+**What it reads and writes.** Reads a Granola or Gong meeting source, or notes
+you paste, or both. Granola may return the raw transcript on a paid plan. Gong's
+hosted MCP returns transcript-derived answers rather than raw transcript text,
+and the skill labels that distinction. Writes one Memos row of type Meeting
+Notes. Offers to write the actions into Tasks.
 
 **What it does not do.**
 - **Does not paste the transcript into the body.** Discussion Notes is conditional
   and it is for reasoning that will matter later, not for a record of everything
   said. Meeting notes fail by becoming transcripts, and a transcript is unfindable
   a month later.
+- **Does not call transcript-derived Gong evidence a raw transcript.** If exact
+  text is required and no separate Gong API or export returns it, raw transcript
+  coverage is reported unavailable.
 - **Does not invent decisions.** If nothing was settled, it writes that, because a
   meeting that decided nothing is worth knowing about.
 - **Does not accept an action without a person and a date.** An action missing

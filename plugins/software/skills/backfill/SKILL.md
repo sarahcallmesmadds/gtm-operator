@@ -1,7 +1,7 @@
 ---
 name: backfill
-description: Find the tools you already pay for, by reading a folder of contracts and your own mailbox, and offer them as candidates approved one at a time. Use after setup, when the user says "backfill the directory", "find what we subscribe to", "import our tools", "what are we paying for", or whenever enough time has passed for new subscriptions to appear. Email is read-only and the user's own; never fills a person, an importance, or the review stamp; writes nothing without a yes per row.
-allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_files, mcp__*__read_file_content, mcp__*__download_file_content, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread, mcp__*__list_threads
+description: Find the tools you already pay for from signed agreements, spend and accounting records, a named contract folder, your own mailbox, and bounded Slack context, then offer them as candidates approved one at a time. Use after setup, when the user says "backfill the directory", "find what we subscribe to", "import our tools", "what are we paying for", or whenever enough time has passed for new subscriptions to appear. Every external source is read-only; never fills a person or the review stamp; Importance requires exact Slack evidence and the row-level yes.
+allowed-tools: Write, Bash(node:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-create-pages, mcp__*__notion-update-page, mcp__*__search_files, mcp__*__read_file_content, mcp__*__download_file_content, mcp__*__search_threads, mcp__*__get_message, mcp__*__get_thread, mcp__*__list_threads, mcp__*__search_messages_and_files, mcp__*__read_channel, mcp__*__read_thread, mcp__*__slack_search_channels, mcp__*__slack_search_public_and_private, mcp__*__slack_read_channel, mcp__*__slack_read_thread, mcp__*__slack_read_file, mcp__plugin_software_ramp__*get*, mcp__plugin_software_ramp__*list*, mcp__plugin_software_ramp__*search*, mcp__plugin_software_ramp__*read*, mcp__plugin_software_ramp__*query*, mcp__*__qbo_accounting_get_ap_aging_detail, mcp__*__qbo_accounting_get_ap_aging_summary, mcp__*__profit_loss_quickbooks_account, mcp__*__cash_flow_quickbooks_account, mcp__*__company_info, mcp__plugin_software_docusign__*get*, mcp__plugin_software_docusign__*list*, mcp__plugin_software_docusign__*search*, mcp__plugin_software_docusign__*read*, mcp__plugin_software_docusign__*download*, mcp__plugin_software_docusign__*fetch*
 ---
 
 # backfill
@@ -40,9 +40,13 @@ Ask which sources and, for email, how far back. Put the answer in
 
 ```json
 {
-  "sources": ["contracts", "email"],
+  "sources": ["contracts", "docusign", "ramp", "quickbooks", "email", "slack"],
   "contracts": { "folder": "Always Allow › Contracts" },
-  "email": { "from": "2025-08-25", "to": "2026-08-25" }
+  "docusign": { "account": "Always Allow", "from": "2025-08-27", "to": "2026-08-27" },
+  "ramp": { "account": "Always Allow", "from": "2025-08-27", "to": "2026-08-27" },
+  "quickbooks": { "account": "Always Allow", "from": "2025-08-27", "to": "2026-08-27" },
+  "email": { "from": "2025-08-27", "to": "2026-08-27" },
+  "slack": { "channels": ["#revops", "#finance"], "directMessages": [], "from": "2025-08-27", "to": "2026-08-27" }
 }
 ```
 
@@ -64,15 +68,34 @@ The rules it holds:
   shapes are the default (their own) and a refusal.
 - **Email is read-only.** Never send, reply, label, archive, move or mark
   anything. Read to find vendors and do nothing else.
+- **Every connected business system is read-only here.** Ramp and QuickBooks
+  are spend and accounting evidence. DocuSign is signed-agreement evidence.
+  Search and retrieve only. Never create, approve, send, sign, pay, transfer,
+  edit, void or delete anything.
+- **Every system has a date range, and financial systems name the account.** A
+  multi-account authorization is not permission to read every company.
+- **Slack names channels and direct-message conversations plus a date range.**
+  Never search all Slack and never search all direct messages. Use only search
+  and read tools; never post, react, edit or delete.
 - Show `notReading` before starting: a source left out and a source that held
   nothing produce the same empty result.
 
 ## Step 2. Read, and collect findings
 
-From the folder: agreements, order forms, renewals. From email: invoices,
-receipts, renewal notices, support threads, product announcements. Collect
-each as `{ what, where, kind }` — `where` down to the file or the message,
-because nothing is absorbed anonymously — and run `backfill-candidates`.
+Read the approved sources only:
+
+| Source | Evidence kinds | What it establishes |
+|---|---|---|
+| Named Box or Google Drive folder | `contract` | An agreement and its terms |
+| DocuSign | `signed-agreement` | A signed agreement and its terms |
+| Ramp | `ramp-transaction` | The company paid the vendor |
+| QuickBooks | `quickbooks-bill`, `quickbooks-payment` | A booked bill or payment |
+| Gmail | `invoice`, `receipt`, `renewal-notice`, `support-thread`, `announcement` | Payment, use, or a weaker vendor signal |
+| Slack | `slack-workflow` | A named team relies on the tool for a named workflow |
+
+Collect each as `{ what, where, kind }`. `where` goes down to the agreement,
+transaction, bill, message, channel or thread and date, because nothing is
+absorbed anonymously. Then run `backfill-candidates`.
 
 When the named contract folder is in Box, use the packaged Box connector to
 find files inside that folder and read their content. When it is in Google
@@ -80,13 +103,19 @@ Drive, use the packaged Google Drive connector. Do not widen either search to
 the rest of Box or Drive. Use the packaged Gmail connector for the bounded
 search in the user's own mailbox.
 
-**The two sources are not equally good, and every candidate says which it
-rests on.** A contract proves an agreement on these terms and can fill the
-whole contract group. An email proves the tool is in use and fills the name
-and honestly little else. An announcement is the weak one: vendors email
-people who never bought anything. The output carries the strength per
-candidate; a finding with no kind comes back under `needKind` — offer the
-kinds, do not decide alone.
+**The sources are not equally good, and every candidate says which it rests
+on.** A contract or signed DocuSign agreement can fill the whole contract
+group. Ramp, QuickBooks and most email evidence establish payment or use, but
+not the contract terms. Slack establishes workflow dependence, but not a paid
+contract. An announcement is the weak one: vendors email people who never
+bought anything. The output carries the strength per candidate; a finding with
+no kind comes back under `needKind`, so offer the kinds and do not decide alone.
+
+QuickBooks' hosted MCP is a limited-availability Intuit partner pilot. If the
+connected account is not onboarded, put QuickBooks under `notReading` with that
+reason. Do not substitute a community server or ask for credentials. DocuSign's
+official MCP is an open beta and exposes write-capable agreement workflows, but
+this skill uses search and retrieval only.
 
 ## Step 3. The duplicate check, per candidate
 
@@ -108,22 +137,28 @@ For each yes, put the fields the evidence supports on `candidate.row` and run
 
 - **Never a person field.** Four fields here are people and all four stay
   empty. Notify the real people instead of guessing.
-- **Never `Importance`.** A receipt carries no information about consequence.
-  It stays empty until a person answers the what-breaks question.
+- **`Importance` only from bounded Slack evidence.** A receipt, payment or
+  contract carries no information about consequence. To propose Importance,
+  attach `importanceEvidence` with `source: "slack"`, the exact message or
+  thread under `where`, `whatBreaks`, and `howFast`. The value is still a
+  proposal in the full row preview and still needs that candidate's explicit
+  yes. Without all four evidence fields, the gate refuses it rather than
+  dropping it. Without sufficient evidence, leave Importance empty.
 - **Never `Last reviewed`.** A machine pulled the row in; empty is honest,
   and it is what makes the row show up for review.
-- Handing the gate any of those is **refused, not ignored** — approving a
-  candidate and having something smaller run is the one failure the approval
-  gate cannot see. So is any field outside the fillable set, and any invented
-  select value, now rather than at write time.
+- Handing the gate a person field, `Last reviewed`, or an unsupported
+  `Importance` is **refused, not ignored**. Approving a candidate and having
+  something smaller run is the one failure the approval gate cannot see. So is
+  any field outside the fillable set, and any invented select value, now rather
+  than at write time.
 - From a contract, put the PDF's Drive link in `Contract link` — that link is
   how the row can ever answer an exact question about the terms.
 
 Preview the full row, then `backfill-create`, create the page, re-fetch it,
 and run `prove-backfill` with the url the create returned. **The proof checks
-absence as well as presence**: a backfilled page that came back stamped,
-owned or weighted is reported as a failed write, because it silently drops
-out of the review signal.
+absence as well as presence**: a backfilled page that came back stamped or
+owned is reported as a failed write. Importance must also be absent unless the
+approved candidate carried the exact Slack-supported value.
 
 **Say it is a backfill when you report it.** The row has no owner and nothing
 has verified it; that is the design, not a gap.
@@ -143,6 +178,8 @@ Filling nothing is a finished answer, not a failure.
 
 - **Never runs unattended.** No scheduled runs, no unsupervised generation.
 - **Never reads outside what it was pointed at.**
+- **Never writes through Ramp, QuickBooks, DocuSign, Slack, Gmail, Box or
+  Google Drive.** Notion is the only write destination.
 - **Never sends, labels or moves an email.**
 - **Never decides what belongs in the directory.** It offers judgment; a
   person applies it.

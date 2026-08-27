@@ -105,16 +105,37 @@ check('a clean scope gets a plan, with the email rules and what is not being rea
   const plan = backfill.plan(cleanScope())
   assert.strictEqual(plan.ok, true)
   assert.deepStrictEqual(plan.reading, ['contracts', 'email'])
-  assert.deepStrictEqual(plan.notReading, [])
+  assert.deepStrictEqual(plan.notReading, ['docusign', 'ramp', 'quickbooks', 'slack'])
   assert.ok(/READ-ONLY/.test(plan.emailRules))
   const one = backfill.plan({ sources: ['contracts'], contracts: { folder: 'x' } })
-  assert.deepStrictEqual(one.notReading, ['email'])
+  assert.deepStrictEqual(one.notReading, ['docusign', 'ramp', 'quickbooks', 'email', 'slack'])
   assert.strictEqual(one.emailRules, null)
 })
 
 check('an unknown source is refused, not dropped', () => {
-  const scope = cleanScope(); scope.sources.push('slack')
+  const scope = cleanScope(); scope.sources.push('salesforce')
   assert.ok(kindsOf(backfill.plan(scope)).includes('sources:unknown-source'))
+})
+
+check('the connector sources require bounded, account-specific scopes', () => {
+  assert.deepStrictEqual(backfill.SOURCES, ['contracts', 'docusign', 'ramp', 'quickbooks', 'email', 'slack'])
+  const clean = {
+    sources: ['docusign', 'ramp', 'quickbooks', 'slack'],
+    docusign: { account: 'Always Allow', from: '2025-08-27', to: '2026-08-27' },
+    ramp: { account: 'Always Allow', from: '2025-08-27', to: '2026-08-27' },
+    quickbooks: { account: 'Always Allow', from: '2025-08-27', to: '2026-08-27' },
+    slack: { channels: ['#revops'], directMessages: [], from: '2025-08-27', to: '2026-08-27' }
+  }
+  const planned = backfill.plan(clean)
+  assert.strictEqual(planned.ok, true)
+  assert.strictEqual(planned.connectorRules.length, 4)
+
+  const noAccount = JSON.parse(JSON.stringify(clean)); delete noAccount.ramp.account
+  assert.ok(kindsOf(backfill.plan(noAccount)).includes('ramp:no-account'))
+  const noSlackLocation = JSON.parse(JSON.stringify(clean)); noSlackLocation.slack.channels = []
+  assert.ok(kindsOf(backfill.plan(noSlackLocation)).includes('slack:no-locations'))
+  const allDms = JSON.parse(JSON.stringify(clean)); allDms.slack.directMessages = ['all']
+  assert.ok(kindsOf(backfill.plan(allDms)).includes('slack:all-direct-messages'))
 })
 
 check('settings for a source that is not listed are a contradiction, not a spare part', () => {
@@ -219,13 +240,38 @@ check('every never-filled field refuses the whole draft, not just its own field'
   // pass vacuously if the list were emptied, which mutation run 1 proved by
   // doing exactly that — the loop ran zero times and the check stayed green.
   assert.deepStrictEqual(backfill.NEVER_FILLED,
-    ['Owner', 'Technical owner', 'Admins', 'Billing owner', 'Importance', 'Last reviewed'])
+    ['Owner', 'Technical owner', 'Admins', 'Billing owner', 'Last reviewed'])
   for (const field of backfill.NEVER_FILLED) {
-    const one = candidate({ [field]: field === 'Importance' ? 'Standard' : field === 'Last reviewed' ? '2026-08-25' : 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' })
+    const one = candidate({ [field]: field === 'Last reviewed' ? '2026-08-25' : 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' })
     const drafted = backfill.draft(one)
     assert.strictEqual(drafted.ok, false, `${field} did not refuse`)
     assert.ok(kindsOf(drafted).includes(`${field}:never-filled`))
   }
+})
+
+check('Importance needs exact Slack consequence evidence and still travels through the approval draft', () => {
+  assert.ok(kindsOf(backfill.draft(candidate({ Importance: 'Business critical' }))).includes('Importance:unsupported'))
+
+  const supported = candidate({ Importance: 'Business critical' })
+  supported.importanceEvidence = {
+    source: 'slack',
+    where: '#sales, thread 1724800000.000000, 2026-08-21',
+    whatBreaks: 'Sales cannot review calls or coach live deals',
+    howFast: 'The workflow stops the same day'
+  }
+  const drafted = backfill.draft(supported)
+  assert.strictEqual(drafted.ok, true)
+  assert.strictEqual(drafted.row.Importance, 'Business critical')
+  assert.ok(!('importance' in drafted.leftEmpty))
+  assert.strictEqual(drafted.importanceEvidence.source, 'slack')
+
+  const wrongSource = candidate({ Importance: 'Important' })
+  wrongSource.importanceEvidence = { ...supported.importanceEvidence, source: 'contract' }
+  assert.ok(kindsOf(backfill.draft(wrongSource)).includes('importanceEvidence.source:wrong-source'))
+
+  const evidenceOnly = candidate()
+  evidenceOnly.importanceEvidence = supported.importanceEvidence
+  assert.ok(kindsOf(backfill.draft(evidenceOnly)).includes('Importance:evidence-without-value'))
 })
 
 check('a field outside the fillable set is refused, and so is a missing name, status or provenance', () => {
@@ -270,13 +316,22 @@ check('the shared value gates run at draft time, with the candidate still on the
 // ------------------------------------------------------------------ the payload
 
 check('the payload writes every fillable field through the map and never carries the review stamp', () => {
-  const out = backfill.properties(context, candidate({
+  const supported = candidate({
     Description: 'Records calls; Sales depends on it.',
+    Importance: 'Business critical',
     Domain: 'Sales Enablement',
     Audience: ['Sales', 'RevOps']
-  }))
+  })
+  supported.importanceEvidence = {
+    source: 'slack',
+    where: '#sales, thread 1724800000.000000, 2026-08-21',
+    whatBreaks: 'Sales cannot review calls or coach live deals',
+    howFast: 'The workflow stops the same day'
+  }
+  const out = backfill.properties(context, supported)
   assert.strictEqual(out['W Name'], 'Gong')
   assert.strictEqual(out['W Status'], 'V Active')
+  assert.strictEqual(out['W Importance'], 'V Business critical')
   assert.strictEqual(out['W Description'], 'Records calls; Sales depends on it.')
   assert.strictEqual(out['W Domain'], 'V Sales Enablement')
   assert.deepStrictEqual(out['W Audience'], ['V Sales', 'V RevOps'])
@@ -289,12 +344,12 @@ check('the payload writes every fillable field through the map and never carries
   // Named alternatives, not a substring net: /Owner/ never matched the
   // lowercase o in "Technical owner" or "Billing owner".
   for (const key of Object.keys(out)) {
-    assert.ok(!/Last reviewed|Importance|W Owner|Technical owner|Billing owner|Admins/.test(key), `the payload carries ${key}`)
+    assert.ok(!/Last reviewed|W Owner|Technical owner|Billing owner|Admins/.test(key), `the payload carries ${key}`)
   }
 })
 
 check('the payload builder refuses what draft refuses, rather than building around it', () => {
-  assert.throws(() => backfill.properties(context, candidate({ Importance: 'Standard' })), /never-filled|Importance/)
+  assert.throws(() => backfill.properties(context, candidate({ Importance: 'Standard' })), /unsupported|Importance/)
 })
 
 check('the draft output composes: it can be handed straight back to the payload builder', () => {
@@ -328,6 +383,10 @@ check('a backfilled page is proved by what is absent, and an arrived stamp fails
   assert.strictEqual(caught[0].field, 'Last reviewed')
   const owned = { 'W Name': 'Gong', 'W Owner': '["user://aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]' }
   assert.ok(backfill.proveAbsent(context, owned, cameBackEmpty).some(p => p.field === 'Owner'))
+  const unexpectedImportance = { 'W Name': 'Gong', 'W Importance': 'V Standard' }
+  assert.ok(backfill.proveAbsent(context, unexpectedImportance, cameBackEmpty).some(p => p.field === 'Importance'))
+  assert.deepStrictEqual(backfill.proveAbsent(context, unexpectedImportance, cameBackEmpty, true), [],
+    'an evidence-supported Importance value is expected rather than treated as an accidental fill')
   const emptyShapes = { 'W Owner': '[]', 'W Importance': '' }
   assert.deepStrictEqual(backfill.proveAbsent(context, emptyShapes, cameBackEmpty), [], 'Notion\'s three empty shapes must all read as absent')
 })
