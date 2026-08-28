@@ -1,13 +1,14 @@
 # software: what each skill does
 
-Part 3 for `software`. Five skills, in the same five slots as the other skill
-files: what it does, when it runs, what it reads and writes, what it does not do,
-and the judgment it carries.
+Part 3 for `software`. Each skill is described in the same five slots as
+the other skill files: what it does, when it runs, what it reads and writes,
+what it does not do, and the judgment it carries.
 
 The database is defined in `plugins/software/SCHEMA.md`, which also names every field's
 fill event. This file does not restate a field name or a value list.
 
 Written 2026-08-17. `update` added and the names confirmed 2026-08-18.
+`evaluate` added 2026-08-27.
 
 ---
 
@@ -38,6 +39,38 @@ Three more belong to this plugin.
   correction `process:update` needed on 2026-08-17, where fixing a typo was
   resetting the review clock and suppressing the staleness warning for a whole
   cadence period.
+
+---
+
+## evaluate
+
+**What it does.** Produces a source-backed decision for a new candidate,
+replacement, vendor demo, proof of concept, or build-versus-buy question.
+
+**When it runs.** Before a purchase or build decision, while a POC needs a next
+gate, or when somebody suspects the proposed tool overlaps the current stack.
+Recording a chosen tool is `new`; changing directory facts is `update`;
+confirming an active row is `review`; contract deadlines are `contracts`.
+
+**What it reads and writes.** It reads the complete Software directory through
+a count-checked, bookended survey; fetches linked Process artifacts; and may
+read only the accounts, folders, conversations, meetings, calls, mailbox,
+domains, exact export artifacts, and dates the user approved. It writes temporary normalized JSON needed
+for deterministic checks and returns the evaluation inline. **It writes no
+Notion row and changes no external system.**
+
+**What it does not do.** It never buys, pays, approves, signs, cancels, contacts
+a vendor, accepts credentials, creates or updates a Software row, or silently
+calls another plugin's write path. `software:renew` is not part of this release.
+
+**The judgment it carries.** Evidence stage is a ceiling. A demo cannot become
+a Buy; an incomplete POC becomes `Complete POC`; current price and material
+terms must be verified before any Buy; Build needs a tested technical path,
+known operating behavior, comparable cost, maintainability, and an accountable
+technical owner. A one-way `Integrates with` relation requires both outbound
+and reverse dependency discovery. Competing terminal options resolve only by
+strict dominance on a priority accepted in the initial read scope or a dated accountable choice;
+otherwise the answer is `Insufficient evidence`.
 
 ---
 

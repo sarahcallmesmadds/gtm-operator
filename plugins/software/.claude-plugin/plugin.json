@@ -1,7 +1,7 @@
 {
   "name": "software",
-  "version": "0.4.0",
-  "description": "The Software directory in the databases the gtm-operator setup plugin created: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds one tool in conversation, changes the facts when they change, confirms a whole row is still true, reports which renewals are coming up ordered by consequence rather than by date, and finds tools from signed agreements, spend, accounting, a named contract folder, the user's own mailbox and bounded Slack context. External systems are read-only, candidates are approved one at a time, and Slack can support Importance only with exact consequence evidence. Creates no database and writes no config.",
+  "version": "0.5.0",
+  "description": "The Software directory in the databases the gtm-operator setup plugin created: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds and maintains tools, reports contract deadlines, backfills from bounded evidence, and evaluates candidates, replacements, demos, POCs, and build-versus-buy questions through a read-only source-backed workflow with deterministic stage ceilings. External evidence systems are read-only; evaluation never changes the directory or contacts a vendor. Creates no database and writes no config.",
   "author": {
     "name": "Sarah Madden",
     "url": "https://github.com/sarahcallmesmadds"
@@ -20,6 +20,7 @@
     "vendor": [
       "config-read.js",
       "software-schema.js",
+      "process-schema.js",
       "memos-schema.js",
       "memo-write.js",
       "prove-create.js",

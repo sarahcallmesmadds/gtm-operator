@@ -23,12 +23,26 @@ than trims at it.
 | `review` | The full pass, walking the four groups in order, and the only skill after creation that moves `Last reviewed` — on an explicit confirmation |
 | `contracts` | What is coming up and what happens if you do nothing, ordered by consequence rather than by date, ending with a count of the rows it could not assess |
 | `backfill` | Finds the tools you already pay for from agreements, spend, accounting, a named contract folder, your own mailbox and bounded Slack context, offered as candidates approved one at a time. Never fills a person or the review stamp. Importance needs exact Slack evidence and the row-level yes |
+| `evaluate` | A read-only, source-backed decision workflow for a candidate, replacement, demo, POC, or build-versus-buy question. Proves the full current directory and its reverse dependencies before applying a stage ceiling |
 
 `backfill` packages Box and Google Drive for one named contract folder, Gmail
 for a bounded search in the user's own mailbox, DocuSign for signed agreements,
 Ramp and QuickBooks for spend evidence, and Slack for bounded evidence of what
 breaks if a tool disappears. Every external connector is read-only; Notion is
 the only service this plugin writes to.
+
+`evaluate` can additionally use meeting metadata from Google Calendar, approved
+Granola notes or transcripts, transcript-derived Gong evidence, and current
+vendor or independent web sources. Every read stays inside a named account,
+folder, conversation, meeting, call, mailbox, domain, and date range. Its stage
+ceiling is deliberate: research or a demo may justify more research or a POC;
+an unfinished POC may justify completing it; only a complete POC or final
+decision can reach Buy or Build, and then only when every evidence gate passes.
+
+The result is returned inline. It does not buy, contact a vendor, create or
+change a Software row, or create a decision memo. After the user decides it may
+offer `software:new`, `software:update`, or `process:new` as a separate handoff
+with that skill's own preview, confirmation, and read-back proof.
 
 ## What is deliberately not built
 
@@ -45,6 +59,8 @@ the only service this plugin writes to.
 - **No Tool Changelog.** Right idea, wrong version: its unattended watchers
   keep it out of v1, and when it ships it is a foundation plugin, because it
   owns a database.
+- **No renewal decision workflow yet.** `software:renew` follows a separate
+  plan and is not part of this release.
 
 ## The rules the scripts hold
 
@@ -62,5 +78,7 @@ the only service this plugin writes to.
 - Every contracts report ends with what it could not assess, because an
   empty date does not match a date filter in Notion, and a report that
   silently omits half the directory reads as "nothing is due".
+- Every evaluation recommendation is bounded by its evidence stage. Missing or
+  conflicting proof closes the gate; it never defaults to a positive answer.
 
 Needs the `setup` plugin, which it reads config from and never calls.

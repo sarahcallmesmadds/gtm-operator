@@ -381,6 +381,11 @@ start rather than merely possible to maintain.
 | A full pass over an existing row | `software:review` | The same row, re-confirmed, `Last reviewed` stamped |
 | Finding tools you already pay for | `software:backfill` | Candidates, approved one at a time |
 
+`software:evaluate` is deliberately absent from this table. It is the read-only
+decision before a row or contract fact changes, and an evaluation recommendation
+does not create or update anything. After a user decides, `software:new` or
+`software:update` is a separate invocation with its own confirmation and proof.
+
 ### software:backfill
 
 **The problem it solves.** Nobody knows what their company subscribes to. The
@@ -470,7 +475,8 @@ ninety-one.
 
 `software:new`, `software:review`, `software:contracts` and
 `software:backfill` implement these fill events. `software:update` handles a
-named fact change without moving the review stamp.
+named fact change without moving the review stamp. `software:evaluate` has no
+fill event because its checked report is read-only.
 
 ### Dropped from the reference
 
@@ -617,6 +623,6 @@ reasoning is not lost and the same ground is not re-covered.
 3. **Four person fields is one more than the reference had**, and the reference
    documented that group as its worst filled. `Admins` is the one to drop first if
    real use proves the point.
-4. **Four skills are named and none are designed.** `software:new`,
-   `software:review`, `software:contracts`, `software:backfill`. The last one needs
-   the most care, because it reads somebody's mailbox.
+4. ~~**Four skills are named and none are designed.**~~ **Resolved by the built
+   plugin.** `new`, `update`, `review`, `contracts`, `backfill`, and the read-only
+   `evaluate` workflow now each carry their own executable contract.

@@ -52,7 +52,10 @@ const EXPECTED = {
     'notion', 'granola', 'gong', 'slack', 'gmail', 'hubspot', 'salesforce',
     'outreach', 'intercom', 'pylon'
   ],
-  software: ['notion', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks', 'docusign'],
+  software: [
+    'notion', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks',
+    'docusign', 'google-calendar', 'granola', 'gong'
+  ],
   'import-leads': ['notion']
 }
 
@@ -108,7 +111,10 @@ const SUPPORT = {
     slack: ['plugins/software/skills/backfill/SKILL.md', /bounded Slack evidence/],
     ramp: ['plugins/software/skills/backfill/SKILL.md', /Ramp and QuickBooks/],
     quickbooks: ['plugins/software/skills/backfill/SKILL.md', /QuickBooks' hosted MCP/],
-    docusign: ['plugins/software/skills/backfill/SKILL.md', /DocuSign's\s+official MCP/]
+    docusign: ['plugins/software/skills/backfill/SKILL.md', /DocuSign's\s+official MCP/],
+    'google-calendar': ['plugins/software/skills/evaluate/references/decision-model.md', /Google Calendar \| Vendor and internal meeting metadata/],
+    granola: ['plugins/software/skills/evaluate/references/decision-model.md', /Granola \| Notes or transcripts from approved meetings/],
+    gong: ['plugins/software/skills/evaluate/SKILL.md', /Gong's hosted MCP returns transcript-derived answers/]
   },
   'import-leads': {
     notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]
@@ -218,6 +224,95 @@ check('software backfill keeps a least-privilege connector allowlist', () => {
   assert.doesNotMatch(allowed,
     /mcp__(?:plugin_software_(?:ramp|docusign)|[^,]*QuickBooks)__[^,]*(?:create|update|delete|send|sign|pay|transfer|approve|void)/i,
     'Software backfill allows a mutation through an external evidence connector')
+})
+
+const softwareEvaluatePath = path.join(ROOT, 'plugins/software/skills/evaluate/SKILL.md')
+const softwareAgentPath = path.join(ROOT, 'plugins/software/agents/software-evaluator.md')
+const softwareCommandPath = path.join(ROOT, 'plugins/software/scripts/software.js')
+const softwareSkillsInventoryPath = path.join(ROOT, 'plugins/software/SKILLS.md')
+
+check('software ships the evaluator agent with the skill\'s audited read-only tools', () => {
+  assert.ok(fs.existsSync(softwareAgentPath), 'plugins/software/agents/software-evaluator.md is missing')
+  const agent = fs.readFileSync(softwareAgentPath, 'utf8')
+  const skill = fs.readFileSync(softwareEvaluatePath, 'utf8')
+  const command = fs.readFileSync(softwareCommandPath, 'utf8')
+  const frontmatter = agent.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the Software evaluator agent has no YAML frontmatter')
+  assert.match(frontmatter[1], /^name:\s*software-evaluator$/m)
+  assert.match(frontmatter[1], /^description:\s*>$/m)
+  assert.match(frontmatter[1], /^model:\s*sonnet$/m)
+  assert.match(frontmatter[1], /^effort:\s*medium$/m)
+  assert.match(frontmatter[1], /^maxTurns:\s*60$/m)
+  assert.match(frontmatter[1], /^color:\s*purple$/m)
+  assert.match(frontmatter[1], /^tools:\s*$/m, 'the agent must declare tools explicitly rather than inherit them')
+  assert.match(agent, /software:evaluate/, 'the agent does not route through software:evaluate')
+  assert.match(frontmatter[1], /makes no Software directory change without a separate Software skill/i,
+    'the agent description does not expose the separate-skill write boundary')
+  assert.match(agent, /Never run unattended/, 'the evaluator does not carry the unattended-run boundary')
+
+  const unquote = value => value.trim().replace(/^['"]|['"]$/g, '')
+  const agentToolsBlock = frontmatter[1].match(/^tools:\s*\n((?:\s+-\s+.*\n?)+)/m)
+  assert.ok(agentToolsBlock, 'the Software evaluator agent has no explicit tools list')
+  const agentTools = [...agentToolsBlock[1].matchAll(/^\s+-\s+(.+)$/gm)].map(match => unquote(match[1]))
+  for (const tool of ['Skill', 'Write']) assert.ok(agentTools.includes(tool), `agent tools omit ${tool}`)
+  const skillFrontmatter = skill.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(skillFrontmatter, 'software:evaluate has no YAML frontmatter')
+  const skillHooks = skillFrontmatter[1].match(/^hooks:\n[\s\S]*$/m)
+  assert.ok(skillHooks, 'software:evaluate has no safety hooks')
+  assert.match(skillHooks[0], /^  PreToolUse:$/m, 'software:evaluate has no scoped PreToolUse guard')
+  assert.match(skillHooks[0], /^  PostToolUse:$/m, 'software:evaluate has no state-capture PostToolUse guard')
+  const postToolUse = skillHooks[0].slice(skillHooks[0].indexOf('  PostToolUse:'))
+  for (const guardedResponse of ['WebSearch', 'WebFetch', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks', 'docusign', 'google-calendar', 'granola', 'gong', 'notion']) {
+    assert.ok(postToolUse.includes(guardedResponse), `software:evaluate PostToolUse credential scan omits ${guardedResponse}`)
+  }
+  const guardSource = fs.readFileSync(path.join(ROOT, 'plugins/software/scripts/guard-evidence-safety.js'), 'utf8')
+  assert.match(guardSource, /function recordConnectorSearch[\s\S]*?return withFileLock\(file, \(\) => \{/, 'connector search authorization updates are not serialized')
+  assert.doesNotMatch(frontmatter[1], /^hooks:/m, 'the evaluator agent must not duplicate the skill\'s stateful hooks')
+  assert.match(agent, /skill also owns the one stateful safety-hook set/i,
+    'the evaluator agent does not explain that software:evaluate owns the single hook registration')
+  const allowedBlock = skillFrontmatter[1].match(/^allowed-tools:\s*\n((?:\s+-\s+.*\n?)+)/m)
+  assert.ok(allowedBlock, 'software:evaluate has no explicit allowed-tools list')
+  const skillTools = [...allowedBlock[1].matchAll(/^\s+-\s+(.+)$/gm)].map(match => unquote(match[1]))
+  const expectedBash = [
+    'evaluate-reference', 'evaluate-run-start', 'evaluate-run-cleanup', 'evaluate-scope', 'evaluate-survey', 'evaluate-attest-related',
+    'evaluate-directory-proof', 'evaluate-dependencies', 'scan-evidence-file',
+    'read-scanned-evidence-file', 'evaluate-evidence', 'evaluate-assess', 'evaluate-check'
+  ].map(command => `Bash(node "\${CLAUDE_PLUGIN_ROOT}/scripts/software.js" ${command}:*)`).sort()
+  assert.deepStrictEqual(skillTools.filter(one => one.startsWith('Bash(')).sort(), expectedBash,
+    'software:evaluate Bash must be restricted to its shipped command prefixes')
+  assert.deepStrictEqual(agentTools.filter(one => one.startsWith('Bash(')).sort(), expectedBash,
+    'direct evaluator Bash must exactly match software:evaluate, including the fixed reference loader')
+  assert.match(skill, /run `evaluate-reference` and load its complete\s+output/i,
+    'software:evaluate does not require loading the complete operative reference')
+  assert.match(agent, /run (?:its|the) fixed\s+`evaluate-reference` command/i,
+    'the directly invoked evaluator does not require loading the operative reference')
+  assert.ok(!skillTools.includes('Bash(node:*)'), 'software:evaluate must not grant arbitrary Node execution')
+  const skillExternal = skillTools.filter(one => one.startsWith('mcp__')).sort()
+  const agentExternal = agentTools.filter(one => one.startsWith('mcp__')).sort()
+  assert.deepStrictEqual(agentExternal, skillExternal,
+    'the evaluator agent MCP list must exactly match software:evaluate\'s audited external read methods')
+  const mutationMethod = /(?:^|[_-])(?:create|update|delete|send|post|approve|pay|transfer|sign|void|cancel|edit|write)(?:[_*-]|$)/i
+  assert.ok(!agentExternal.some(tool => mutationMethod.test(tool.split('__').pop())),
+    'the evaluator agent includes an external mutation method')
+  for (const method of ['create_page', 'update-record', 'send*', 'approve_bill']) {
+    assert.ok(mutationMethod.test(method), `the evaluator mutation-method assertion cannot recognize ${method}`)
+  }
+  assert.ok(!agentTools.some(one => one === 'mcp__*__*' || one === 'mcp__*'), 'the evaluator agent inherits a broad MCP wildcard')
+  assert.deepStrictEqual(skillExternal.filter(tool => tool.startsWith('mcp__*__') && !/notion-(?:fetch|query-data-sources)$/.test(tool)), [],
+    'software:evaluate must not admit globally configured evidence connectors that bypass its plugin-scoped guard')
+  const skillBuiltins = skillTools.filter(one => !one.startsWith('mcp__')).sort()
+  const agentBuiltins = agentTools.filter(one => !one.startsWith('mcp__') && one !== 'Skill').sort()
+  assert.deepStrictEqual(agentBuiltins, skillBuiltins,
+    'the evaluator agent built-in tools must exactly match software:evaluate, plus Skill for routing')
+  assert.match(command, /evaluationGuard\.attestRelatedReadSequence\(/,
+    'the fixed related-read command bypasses the hook-owned survey sequence')
+  assert.match(command, /evaluationGuard\.trustedSurveySequenceAttestation\(/,
+    'the fixed directory-proof command bypasses the hook-owned five-phase survey sequence')
+})
+
+check('software skill inventory does not duplicate a stale fixed skill count', () => {
+  const inventory = fs.readFileSync(softwareSkillsInventoryPath, 'utf8')
+  assert.doesNotMatch(inventory, /\b(?:six|6)\s+skills\b/i)
 })
 
 const agentPath = path.join(ROOT, 'plugins/process/agents/process-maintainer.md')

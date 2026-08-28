@@ -33,6 +33,19 @@
  *   node software.js backfill-create <candidate.json>         the creation payload, stamp-free
  *   node software.js prove-backfill <candidate.json> <readback.json> <created-url>
  *   node software.js backfill-fill <existing.json> <candidate.json>   blanks only, never overwrites
+ *   node software.js evaluate-reference                              print the shipped operative decision model
+ *   node software.js evaluate-run-start                              private artifact directory and private guard pointer
+ *   node software.js evaluate-run-cleanup <run-dir>                  remove every private run artifact and private pointer
+ *   node software.js evaluate-scope <request.json>                    canonical approved read scope
+ *   node software.js evaluate-survey <request.json> <scope.json>      bookended whole-directory query plan
+ *   node software.js evaluate-attest-related <scope.json> <survey-plan.json> <artifact-pages.json>
+ *   node software.js evaluate-directory-proof <scope.json> <survey-plan.json> <before.json> <rows.json> <after.json>
+ *   node software.js evaluate-dependencies <scope.json> <directory-proof.json> <artifact-pages.json>
+ *   node software.js scan-evidence-file <path>                        in-place secret-shape scan
+ *   node software.js read-scanned-evidence-file <scope.json> <path>  exact-path scan-and-read for a clean export
+ *   node software.js evaluate-evidence <scope.json> <evidence.json>   provenance and boundary validation
+ *   node software.js evaluate-assess <request.json> <scope.json> <dependencies.json> <evidence.json>
+ *   node software.js evaluate-check <draft.json> <assessment.json>    source and output-contract check
  *
  * WHAT NO COMMAND HERE DOES: create a database, write config, delete or
  * archive a row, fill a person field nobody named, or move `Last reviewed`
@@ -41,12 +54,18 @@
  */
 
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const config = require(path.join(__dirname, 'vendor', 'config-read'))
 const schema = require(path.join(__dirname, 'vendor', 'software-schema'))
+const processSchema = require(path.join(__dirname, 'vendor', 'process-schema'))
 const tool = require(path.join(__dirname, 'tool'))
 const backfill = require(path.join(__dirname, 'backfill'))
+const evaluate = require(path.join(__dirname, 'evaluate'))
+const evaluationGuard = require(path.join(__dirname, 'guard-evidence-safety'))
+const decisionEvidence = require(path.join(__dirname, 'decision-evidence'))
+const { pointerFileFor } = require(path.join(__dirname, 'evaluation-run'))
 const { proveCreate } = require(path.join(__dirname, 'vendor', 'prove-create'))
 const { pageIdentity } = require(path.join(__dirname, 'vendor', 'page-id'))
 const { cameBackEmpty, listOfNames } = require(path.join(__dirname, 'vendor', 'notion-compare'))
@@ -63,6 +82,30 @@ function contextOrExit () {
     process.exit(1)
   }
   return context
+}
+
+function processContextOrExit () {
+  const context = config.contextFor('process', processSchema.IDENTITY)
+  if (!context.ok) {
+    console.error(context.message)
+    process.exit(1)
+  }
+  return context
+}
+
+function privateEvaluationFile (file, what) {
+  const pointerFile = pointerFileFor(process.cwd())
+  let scopeFile
+  try { scopeFile = fs.readFileSync(pointerFile, 'utf8').trim() } catch (_) {
+    throw new Error(`${what} requires an active software:evaluate run.`)
+  }
+  const runDir = path.dirname(scopeFile)
+  const resolved = path.resolve(file)
+  if (!path.isAbsolute(file) || resolved !== file || resolved !== scopeFile &&
+      (resolved !== runDir && !resolved.startsWith(`${runDir}${path.sep}`))) {
+    throw new Error(`${what} must be an absolute path inside the active software:evaluate run directory.`)
+  }
+  return resolved
 }
 
 /**
@@ -644,6 +687,181 @@ const commands = {
         'THIS LINE IS HALF THE ANSWER: an empty date does not match a date filter in Notion, so these rows are exactly the ones any filtered view silently omits, and a report without this count reads as "nothing is due".',
       note: 'Read-only. Nothing was changed, nothing was cancelled, no vendor was contacted, and Last reviewed did not move: reading a list is not reviewing a row. Hand what needs attention to `review`.'
     }, null, 2))
+  },
+
+  // ------------------------------------------------------------- evaluation
+
+  'evaluate-reference' () {
+    process.stdout.write(fs.readFileSync(path.join(__dirname, '..', 'skills', 'evaluate', 'references', 'decision-model.md'), 'utf8'))
+  },
+
+  'evaluate-run-start' () {
+    const pointerFile = pointerFileFor(process.cwd())
+    const started = evaluationGuard.withFileLock(pointerFile, () => {
+      if (fs.existsSync(pointerFile)) {
+        const previousScope = fs.readFileSync(pointerFile, 'utf8').trim()
+        const previousDir = path.dirname(previousScope)
+        const validPointer = path.isAbsolute(previousScope) && previousScope === path.join(previousDir, 'read-scope.json') &&
+          path.basename(previousDir).startsWith('gtm-software-evaluate-') && path.dirname(previousDir) === path.resolve(os.tmpdir())
+        if (!validPointer) throw new Error('Refusing to replace a malformed software:evaluate scope pointer.')
+        if (fs.existsSync(previousDir)) {
+          throw new Error(`A software:evaluate run is already active at ${previousDir}. Clean that exact run before starting another one.`)
+        }
+        fs.rmSync(pointerFile, { force: true })
+      }
+      const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gtm-software-evaluate-'))
+      fs.chmodSync(runDir, 0o700)
+      const scopeFile = path.join(runDir, 'read-scope.json')
+      try {
+        fs.writeFileSync(pointerFile, `${scopeFile}\n`, { mode: 0o600, flag: 'wx' })
+        return { runDir, scopeFile, pointerFile, note: 'Keep every request, response, evidence, assessment, and report artifact inside runDir. Run evaluate-run-cleanup on every success or refusal.' }
+      } catch (err) {
+        fs.rmSync(runDir, { recursive: true, force: true })
+        throw err
+      }
+    })
+    if (!started) throw new Error('Could not acquire the private software:evaluate scope-pointer lock.')
+    console.log(JSON.stringify(started, null, 2))
+  },
+
+  'evaluate-run-cleanup' (givenRunDir) {
+    if (!givenRunDir) throw new Error('Usage: node software.js evaluate-run-cleanup <run-dir>')
+    const runDir = path.resolve(givenRunDir)
+    const prefix = `${path.resolve(os.tmpdir(), 'gtm-software-evaluate-')}`
+    if (!runDir.startsWith(prefix) || path.dirname(runDir) !== path.dirname(prefix)) {
+      throw new Error('Refusing cleanup outside the private software:evaluate temporary-run directory family.')
+    }
+    const pointerFile = pointerFileFor(process.cwd())
+    const expectedScopeFile = path.join(runDir, 'read-scope.json')
+    const cleaned = evaluationGuard.withFileLock(pointerFile, () => {
+      let pointer = ''
+      try { pointer = fs.readFileSync(pointerFile, 'utf8').trim() } catch (_) {}
+      if (pointer !== expectedScopeFile) {
+        throw new Error('Refusing cleanup because this run does not own the active software:evaluate scope pointer.')
+      }
+      fs.rmSync(runDir, { recursive: true, force: true })
+      fs.rmSync(pointerFile, { force: true })
+      return true
+    })
+    if (!cleaned) throw new Error('Could not acquire the private software:evaluate scope-pointer lock for cleanup.')
+    console.log(JSON.stringify({ cleaned: true, note: 'The private evaluation run directory and its matching ignored pointer were removed.' }, null, 2))
+  },
+
+  'evaluate-scope' (file) {
+    if (!file) throw new Error('Usage: node software.js evaluate-scope <request.json>')
+    const result = evaluate.evaluateScope(readJson(file, 'the evaluation request', 'fields'))
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'evaluate-survey' (requestFile, scopeFile) {
+    if (!requestFile || !scopeFile) throw new Error('Usage: node software.js evaluate-survey <request.json> <scope.json>')
+    const request = readJson(requestFile, 'the survey request', 'fields')
+    const scope = readJson(scopeFile, 'the approved evaluation scope', 'fields')
+    const context = contextOrExit()
+    console.log(JSON.stringify(evaluate.surveyPlan(request, scope, context), null, 2))
+  },
+
+  'evaluate-attest-related' (scopeFile, planFile, artifactsFile) {
+    if (!scopeFile || !planFile || !artifactsFile) {
+      throw new Error('Usage: node software.js evaluate-attest-related <scope.json> <survey-plan.json> <artifact-pages.json>')
+    }
+    const scope = readJson(scopeFile, 'the approved evaluation scope', 'fields')
+    const plan = readJson(planFile, 'the survey plan', 'fields')
+    const artifacts = readJson(artifactsFile, 'the related page reads', 'fields')
+    const result = evaluationGuard.attestRelatedReadSequence({ cwd: process.cwd() }, scope, plan, artifacts)
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'evaluate-directory-proof' (scopeFile, planFile, beforeFile, rowsFile, afterFile) {
+    if (!scopeFile || !planFile || !beforeFile || !rowsFile || !afterFile) {
+      throw new Error('Usage: node software.js evaluate-directory-proof <scope.json> <survey-plan.json> <before-manifest.json> <software-rows.json> <after-manifest.json>')
+    }
+    const scope = readJson(scopeFile, 'the approved evaluation scope', 'fields')
+    const plan = readJson(planFile, 'the survey plan', 'fields')
+    const before = readJson(beforeFile, 'the before manifest', 'fields')
+    const details = readJson(rowsFile, 'the complete Software rows', 'fields')
+    const after = readJson(afterFile, 'the after manifest', 'fields')
+    const sequence = evaluationGuard.trustedSurveySequenceAttestation({ cwd: process.cwd() }, scope, plan, before, details, after)
+    const result = sequence.ok
+      ? evaluate.directoryProof(scope, plan, before, details, after, contextOrExit(), sequence)
+      : sequence
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'evaluate-dependencies' (scopeFile, proofFile, artifactsFile) {
+    if (!scopeFile || !proofFile || !artifactsFile) {
+      throw new Error('Usage: node software.js evaluate-dependencies <scope.json> <directory-proof.json> <artifact-pages.json>')
+    }
+    const result = evaluate.dependencies(
+      readJson(privateEvaluationFile(scopeFile, 'The scope file'), 'the approved evaluation scope', 'fields'),
+      readJson(privateEvaluationFile(proofFile, 'The proof file'), 'the directory proof', 'fields'),
+      readJson(privateEvaluationFile(artifactsFile, 'The artifacts file'), 'the related Process artifact pages', 'fields'),
+      processContextOrExit().names
+    )
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'scan-evidence-file' (file) {
+    if (!file) throw new Error('Usage: node software.js scan-evidence-file <path>')
+    const result = decisionEvidence.scanFile(file)
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.clean) process.exitCode = 1
+  },
+
+  'read-scanned-evidence-file' (scopeFile, file) {
+    if (!scopeFile || !file) throw new Error('Usage: node software.js read-scanned-evidence-file <scope.json> <path>')
+    const scope = readJson(scopeFile, 'the evaluation scope', 'fields')
+    const scopeProblem = evaluate.acceptedScopeProblem(scope)
+    if (scopeProblem) throw new Error(`read-scanned-evidence-file requires an unchanged accepted scope. ${scopeProblem}`)
+    const artifact = scope.sourceBoundaries && scope.sourceBoundaries['user-export'] && scope.sourceBoundaries['user-export'].artifact
+    if (!path.isAbsolute(file) || path.resolve(file) !== file || artifact !== file) {
+      throw new Error('The export read must name the exact absolute user-export artifact accepted in scope.')
+    }
+    const result = decisionEvidence.readScannedFile(file)
+    if (!result.clean) {
+      console.log(JSON.stringify({ clean: false, categories: result.categories, message: result.message }, null, 2))
+      process.exitCode = 1
+      return
+    }
+    process.stdout.write(result.content)
+  },
+
+  'evaluate-evidence' (scopeFile, evidenceFile) {
+    if (!scopeFile || !evidenceFile) throw new Error('Usage: node software.js evaluate-evidence <scope.json> <evidence.json>')
+    const result = decisionEvidence.validateEvidence(
+      readJson(privateEvaluationFile(scopeFile, 'The scope file'), 'the approved evaluation scope', 'fields'),
+      readJson(privateEvaluationFile(evidenceFile, 'The evidence file'), 'the normalized evidence', 'fields')
+    )
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'evaluate-assess' (requestFile, scopeFile, dependenciesFile, evidenceFile) {
+    if (!requestFile || !scopeFile || !dependenciesFile || !evidenceFile) {
+      throw new Error('Usage: node software.js evaluate-assess <request.json> <scope.json> <dependencies.json> <evidence.json>')
+    }
+    const result = evaluate.assessment(
+      readJson(privateEvaluationFile(requestFile, 'The request file'), 'the assessment request', 'fields'),
+      readJson(privateEvaluationFile(scopeFile, 'The scope file'), 'the approved evaluation scope', 'fields'),
+      readJson(privateEvaluationFile(dependenciesFile, 'The dependencies file'), 'the dependency inventory', 'fields'),
+      readJson(privateEvaluationFile(evidenceFile, 'The evidence file'), 'the normalized evidence', 'fields')
+    )
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
+  },
+
+  'evaluate-check' (draftFile, assessmentFile) {
+    if (!draftFile || !assessmentFile) throw new Error('Usage: node software.js evaluate-check <draft.json> <assessment.json>')
+    const result = evaluate.checkReport(
+      readJson(privateEvaluationFile(draftFile, 'The draft file'), 'the evaluation report draft', 'fields'),
+      readJson(privateEvaluationFile(assessmentFile, 'The assessment file'), 'the deterministic assessment', 'fields')
+    )
+    console.log(JSON.stringify(result, null, 2))
+    if (!result.ok) process.exitCode = 1
   },
 
   // ------------------------------------------------------------- the backfill

@@ -91,8 +91,8 @@
     {
       "name": "software",
       "source": "./plugins/software",
-      "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds and maintains tools, reports renewals by consequence, and backfills from signed agreements, spend, accounting, a named contract folder, the user's own mailbox and bounded Slack context. External systems are read-only, candidates are approved one at a time, and Slack can support Importance only with exact consequence evidence. Needs the setup plugin, which it reads config from and never calls.",
-      "version": "0.4.0",
+      "description": "The Software directory: what we use, who owns it, what we pay and when that comes round again, and what would break if it went away. Adds and maintains tools, reports renewals by consequence, backfills from bounded evidence, and evaluates candidates, replacements, demos, POCs, and build-versus-buy questions through a read-only source-backed workflow with deterministic stage ceilings. External evidence systems are read-only; evaluation never changes the directory or contacts a vendor. Needs the setup plugin, which it reads config from and never calls.",
+      "version": "0.5.0",
       "author": {
         "name": "Sarah Madden"
       },
