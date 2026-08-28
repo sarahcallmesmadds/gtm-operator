@@ -105,6 +105,18 @@ function privateEvaluationFile (file, what) {
       (resolved !== runDir && !resolved.startsWith(`${runDir}${path.sep}`))) {
     throw new Error(`${what} must be an absolute path inside the active software:evaluate run directory.`)
   }
+  let realRunDir
+  let realTarget
+  try {
+    realRunDir = fs.realpathSync(runDir)
+    realTarget = fs.realpathSync(resolved)
+  } catch (_) {
+    throw new Error(`${what} must name an existing file inside the active software:evaluate run directory.`)
+  }
+  const relative = path.relative(realRunDir, realTarget)
+  if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`${what} must remain inside the active software:evaluate run directory.`)
+  }
   return resolved
 }
 

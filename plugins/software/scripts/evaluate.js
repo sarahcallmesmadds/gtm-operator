@@ -1382,12 +1382,13 @@ function checkReport (draft, assessment) {
     if (!claimId) problems.push(`claims[${index}] has no stable id.`)
     else if (claimIds.has(claimId)) problems.push(`claims[${index}] repeats id ${JSON.stringify(claimId)}.`)
     else claimIds.add(claimId)
-    if (!Array.isArray(claim.evidenceIds) || claim.evidenceIds.length !== 1) problems.push(`claims[${index}] must project exactly one source evidence record.`)
+    const conflictClaim = claim.stance === 'conflict'
+    if (!Array.isArray(claim.evidenceIds) || (conflictClaim ? claim.evidenceIds.length < 2 : claim.evidenceIds.length !== 1)) problems.push(`claims[${index}] must project ${conflictClaim ? 'both sides of the conflict' : 'exactly one source evidence record'}.`)
     else {
       const records = claim.evidenceIds.map(id => assessment.evidenceIndex[id]).filter(Boolean)
       for (const id of claim.evidenceIds) if (!assessment.evidenceIndex[id]) problems.push(`claims[${index}] cites unknown evidence ${JSON.stringify(id)}.`)
       if (records.some(record => record.criterion !== claim.criterion)) problems.push(`claims[${index}] mixes evidence from a different criterion.`)
-      if (records.length === 1 && claim.claim !== records[0].claim) problems.push(`claims[${index}] must copy the cited source claim exactly.`)
+      if (!conflictClaim && records.length === 1 && claim.claim !== records[0].claim) problems.push(`claims[${index}] must copy the cited source claim exactly.`)
       if (claim.stance === 'conflict') {
         const stances = new Set(records.map(record => record.stance))
         if (!stances.has('supports') || !stances.has('contradicts')) problems.push(`claims[${index}] does not cite both sides of its stated conflict.`)
