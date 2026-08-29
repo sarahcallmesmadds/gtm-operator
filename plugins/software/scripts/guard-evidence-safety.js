@@ -672,33 +672,35 @@ function recordNotionSurvey (input, supplied) {
   const runDir = activeRunDirectory(input, document)
   const file = notionAuthorizationFile(runDir)
   if (!file) return false
-  const planFingerprint = fingerprint(plan)
-  let saved = null
-  try {
-    const existing = JSON.parse(fs.readFileSync(file, 'utf8'))
-    if (existing.scopeId === document.scope.scopeId && existing.planFingerprint === planFingerprint && isRecord(existing.details)) saved = existing
-  } catch (_) {}
-  if (!saved || !requestCursor) {
-    saved = {
-      contract: 'software-evaluation-notion-authorizations/v1',
-      scopeId: document.scope.scopeId,
-      planFingerprint,
-      details: {
-        surveyRunId: plan.surveyRunId,
-        execution: 'software-details',
-        query: plan.queries.details.sql,
-        queryFingerprint: plan.queries.details.fingerprint,
-        envelopes: []
+  return withFileLock(file, () => {
+    const planFingerprint = fingerprint(plan)
+    let saved = null
+    try {
+      const existing = JSON.parse(fs.readFileSync(file, 'utf8'))
+      if (existing.scopeId === document.scope.scopeId && existing.planFingerprint === planFingerprint && isRecord(existing.details)) saved = existing
+    } catch (_) {}
+    if (!saved || !requestCursor) {
+      saved = {
+        contract: 'software-evaluation-notion-authorizations/v1',
+        scopeId: document.scope.scopeId,
+        planFingerprint,
+        details: {
+          surveyRunId: plan.surveyRunId,
+          execution: 'software-details',
+          query: plan.queries.details.sql,
+          queryFingerprint: plan.queries.details.fingerprint,
+          envelopes: []
+        }
       }
     }
-  }
-  const prior = saved.details.envelopes[saved.details.envelopes.length - 1]
-  if (requestCursor && (!prior || prior.has_more !== true || prior.next_cursor !== requestCursor)) return false
-  saved.details.envelopes.push(envelope)
-  const temporary = `${file}.${process.pid}.tmp`
-  fs.writeFileSync(temporary, `${JSON.stringify(saved)}\n`, { mode: 0o600 })
-  fs.renameSync(temporary, file)
-  return true
+    const prior = saved.details.envelopes[saved.details.envelopes.length - 1]
+    if (requestCursor && (!prior || prior.has_more !== true || prior.next_cursor !== requestCursor)) return false
+    saved.details.envelopes.push(envelope)
+    const temporary = `${file}.${process.pid}.tmp`
+    fs.writeFileSync(temporary, `${JSON.stringify(saved)}\n`, { mode: 0o600 })
+    fs.renameSync(temporary, file)
+    return true
+  })
 }
 
 function surveyRelatedIdentityGroups (input, document) {
