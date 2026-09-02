@@ -7378,3 +7378,104 @@ Problem Statement memo receives an explicit yes.
 The releases move Software to 0.4.0, Memos to 0.3.0 and Projects to 0.3.0.
 Connector inventories, manifests, marketplace entries and component tests move
 together so the Claude tabs and the behavior contracts cannot drift apart.
+
+---
+
+## import-leads: the enrichment connectors it packages, and the two CRMs it deliberately does not, 2026-09-02
+
+Sarah opened the plugin in the Claude UI and asked why the Connectors tab
+showed no CRM and no enrichment tool. The tab showed Notion alone, which
+is exactly what `.mcp.json` declared, and the reason was written in
+`CONNECTORS.md`. The tab was truthful and the plugin looked thinner than it
+is.
+
+**Four enrichment connectors are now declared.** They are Clay, Lusha,
+Apollo and ZoomInfo, her call, with Attio raised in the same breath (below). The
+enrichment step of `run` already offered the gaps to whatever enrichment the
+session had connected; declaring the four means a person installing the
+plugin can see where enrichment can come from and authorise one from the
+Connectors tab without being told in prose. Nothing else changes at the seam:
+the plugin still carries no vendor code, still names no tool's API, still
+offers the gaps to whichever tool is actually connected, and still gates every
+paid lookup behind a named yes. Any one of the four is enough, none is
+required, only the four are pre-approved for `run`, and an enrichment tool
+not on the list but already connected is offered the same way with its
+calls asking permission first. The endpoints are each vendor's hosted MCP server, all
+OAuth, each answering the MCP initialise call with a 401 challenge on
+2026-09-02, which is the same answer Notion gives. Clay's endpoint is not
+on Clay's own pages, which point Claude users at the connector directory
+instead; it is confirmed by the server's OAuth resource metadata, which names
+`https://api.clay.com/v3/mcp` as the resource. A third-party write-up reports
+Clay's OAuth server refusing a client registered under a name containing
+"Claude", with a local `mcp-remote` bridge as the workaround. That was not
+reproduced here and is recorded in `CONNECTORS.md` as a snag to expect, not
+as a fact.
+
+**HubSpot and Salesforce stay undeclared, and that is the enforcement, not an
+omission.** She asked whether a person who authorises a CRM connector they do
+not need could still be made to use the CLI route. The answer is that the
+route is not a preference the skill could drift from: every CRM request is a
+spec the script emits, every answer is judged from the raw saved response,
+and the judging commands refuse a reshaped one, so a response fetched through
+a connector's tools has nowhere to go. Declaring the connectors would only ask
+for an authorisation nothing uses, and the component test already treats an
+extra connector as a defect for that reason.
+
+**The `sf` CLI cannot be installed by the plugin, so `check` now says when it
+is missing and hands over the fix.** She asked whether the plugin could
+install it. A plugin does not run installers on a person's machine; what it
+can do is tell the difference between "the CLI is not here" and "the alias is
+wrong", which are different findings with different fixes. `check` runs
+`sf --version` first on Salesforce, and when the command is not found it
+reports the missing CLI under Not ready at all with the install and login
+commands inline, marks only the four Salesforce-dependent checks as not
+checked, and still runs everything else in the standing half. HubSpot needs
+no tool installed.
+
+**Attio is Open work, not a connector.** A third CRM is a backend: `crm` in
+config, request specs, response judges, the read-back proof and its own
+release gate, the shape the Salesforce port took. Declaring an Attio
+connector before that exists would list a service the skills cannot write
+to. Recorded under Open in the plugin's `SKILLS.md`.
+
+**Round 1, Codex and the Devin app, answered the same day.** Codex: the
+`sf --version` test sat after the mailing-fields probe a first run needs, so
+it now comes first in the standing half; a missing CLI blanked out checks
+that do not need it, so only the Salesforce-dependent ones go unchecked and
+the missing CLI is reported under Not ready at all; the component test
+matched only the sentence naming the connectors, so it now asserts the
+offering, fill-blanks, paid-gate and nothing-connected rules separately.
+Devin: `run`'s allowed-tools admitted only Notion, so a packaged connector
+showed in the tab and could not be called without a prompt on every lookup.
+It now admits the four servers by read-shaped names only. The scoped name
+keeps the plugin's hyphen: Claude Code normalises the server segment by
+replacing anything outside `[a-zA-Z0-9_-]` with an underscore, which the
+binary's own text states (2.1.258) and the process plugin's `google-drive`
+tools show in practice, so the prefix is `mcp__plugin_import-leads_<server>__`.
+The Devin CLI's round landed after that commit, agreed on the allowlist and
+the self-fulfilling test, added three prose corrections to this entry, taken,
+and asked that the component test's evidence for each connector be the
+allowed-tools surface rather than the sentence naming it, which it now is.
+Codex round 3 made the limit of the allowlist explicit: a name pattern such
+as `*get*` is a shape, and would also pre-approve a vendor tool named
+`get_and_update_contact`, so the patterns cannot prove a tool only reads.
+Accepted as a cost, and written into `run`, `CONNECTORS.md` and the test:
+the guard is the skill's rule that it never requests a write-shaped tool,
+which the test asserts as text, and pinning exact vendor tool names waits
+for a session that connects each server and records its inventory. That is
+recorded under Open in the plugin's `SKILLS.md`.
+Round 4 closed the last two holes Codex found, the test now compares the
+whole MCP half of the allowlist against the exact set rather than checking
+shapes, and the first-run path tests the CLI the moment Salesforce is
+chosen, which the Devin app found the same day. Devin's CLI then asked
+that the component test's per-connector evidence be the prose naming each
+connector, the reverse of what Codex asked in round 2; both hold now, the
+prose is the evidence and the exact allowlist is asserted beside it. It
+also asked that one new bullet in `check` drop its bold label and colon.
+Declined: the two bullets beside it predate this branch in the same
+style, and one restyled bullet in three would be the odder result.
+
+The release moves `import-leads` to 0.4.0. The connector inventory, the
+manifest, the marketplace entry, both skills, the README and the component
+test move together, so the Connectors tab and the behaviour contract cannot
+drift apart.

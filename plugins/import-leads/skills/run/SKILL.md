@@ -1,7 +1,7 @@
 ---
 name: run
 description: Import one named lead list into the CRM config names, HubSpot or Salesforce, planned end to end and pushed only after an explicit yes. Use when a lead list arrives, the user says "import this list", "get these leads into HubSpot", "get these leads into Salesforce", "load this conference CSV", or hands over a CSV file or a Notion page of contacts. Reads the one named source, the CRM, the Process artifacts, its own config and the alias map; writes exactly what the approved plan names, verifies by reading every write back, and writes back to a Notion source. Writes nothing without an explicit yes.
-allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page
+allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page, mcp__plugin_import-leads_clay__*search*, mcp__plugin_import-leads_clay__*enrich*, mcp__plugin_import-leads_clay__*match*, mcp__plugin_import-leads_clay__*lookup*, mcp__plugin_import-leads_clay__*find*, mcp__plugin_import-leads_clay__*get*, mcp__plugin_import-leads_lusha__*search*, mcp__plugin_import-leads_lusha__*enrich*, mcp__plugin_import-leads_lusha__*match*, mcp__plugin_import-leads_lusha__*lookup*, mcp__plugin_import-leads_lusha__*find*, mcp__plugin_import-leads_lusha__*get*, mcp__plugin_import-leads_apollo__*search*, mcp__plugin_import-leads_apollo__*enrich*, mcp__plugin_import-leads_apollo__*match*, mcp__plugin_import-leads_apollo__*lookup*, mcp__plugin_import-leads_apollo__*find*, mcp__plugin_import-leads_apollo__*get*, mcp__plugin_import-leads_zoominfo__*search*, mcp__plugin_import-leads_zoominfo__*enrich*, mcp__plugin_import-leads_zoominfo__*match*, mcp__plugin_import-leads_zoominfo__*lookup*, mcp__plugin_import-leads_zoominfo__*find*, mcp__plugin_import-leads_zoominfo__*get*
 ---
 
 # run
@@ -77,7 +77,9 @@ draft, and `config-write` only on an explicit yes. The file is written once;
 any other refusal is fixed by hand, not rewritten.
 
 **On a salesforce first run, ask the org which mailing fields it carries
-before the draft is shown.** `mailing-fields-probe <orgAlias>` emits two
+before the draft is shown**, after `sf --version` has answered, because a
+missing CLI is a different finding from a wrong alias and `check` says
+what installs it. `mailing-fields-probe <orgAlias>` emits two
 read-only queries, one per code field, and `mailing-fields-judge` turns the
 two saved responses (state first) into one measured verdict per field:
 `MailingStateCode` where the org answered it, the plain name where the org
@@ -140,8 +142,25 @@ Process. No plugin calls another plugin's skill.
 ## Step 3. Enrich, blanks only, with a gate
 
 Name the gaps. Offer them to whatever enrichment the session actually has
-connected; this plugin carries no vendor code, and no enrichment tool at all
-means a working import with its gaps named honestly.
+connected. The plugin packages four enrichment connectors so they show in its
+Connectors tab and can be authorised from there: `clay`, `lusha`, `apollo`
+and `zoominfo`. Any one of them is enough and none of them is required.
+Only those four are pre-approved for this skill; a different enrichment
+tool the session already has connected is offered the gaps the same way,
+and its calls ask the person's permission first. This plugin carries no
+vendor code, and no enrichment tool at all means a working import with its
+gaps named honestly.
+
+The four packaged servers are admitted to this skill's tools by read-shaped
+names only (search, enrich, match, lookup, find, get). A name pattern is a
+shape, not proof that a tool only reads, so the pre-approval is not the
+guard. The guard is this rule: this skill never calls or requests a
+write-shaped tool, including Clay table writes and Apollo sequence sends,
+and an approval prompt does not change that. A vendor's lookup that reads
+but sits under a name the list does not cover is the one case that asks
+the person before it runs, rather than failing. That prompt is a
+permission, not the confirmation: the named yes for a paid step is still
+asked in conversation, before the lookup, whatever the tool is called.
 
 - **Fill blanks only.** An enrichment result never overwrites a value the
   source list provided.

@@ -8,8 +8,7 @@ This plugin owns no database and no schema file. A job plugin is named for its
 job, and this one's job is taking a lead list from wherever it lives and landing
 it in the CRM correctly. It reads the source list, its own config and the alias
 map that config names, reads its judgment from Process artifacts, and reads and
-writes the one CRM its config names: HubSpot, or Salesforce once the port's
-build lands.
+writes the one CRM its config names: HubSpot or Salesforce.
 
 Written 2026-08-25. The plugin and skill names are Sarah's, confirmed the same
 day: the tier-2 placeholder name `list-building` is retired, because this
@@ -229,7 +228,10 @@ and both execute only what the approved plan names.**
 3. **Enrich, blanks only.** Gaps are named, and whatever enrichment the
    session actually has connected is offered the gaps. The plugin carries no
    enrichment vendor code at all; providers ship their own plugins, and this
-   plugin's side is the gate. Paid verification runs only on a named yes.
+   plugin's side is the gate. Since 2026-09-02 it packages four enrichment
+   connectors, Clay, Lusha, Apollo and ZoomInfo, so they show in its
+   Connectors tab; any one is enough and none is required. Paid
+   verification runs only on a named yes.
    Personal addresses (gmail, yahoo and kin) are detected here and presented
    for the person's call, Sarah's rule of 2026-08-26: removed, or enriched
    to find the work email, with the enrichment offer made before anything is
@@ -456,8 +458,8 @@ config write both skills share, which happens only on an explicit yes.
 **The judgment it carries.** Telling the kinds of not-ready apart: a row that
 can never import (refused, with the gap named), a row that needs a person's
 answer (ambiguous match, uncovered status), and a setup that is not ready at
-all (missing artifact; no portal or key on HubSpot, no resolvable org alias
-on Salesforce). Collapsing those into one number would make
+all (missing artifact; no portal or key on HubSpot; no `sf` CLI or no
+resolvable org alias on Salesforce). Collapsing those into one number would make
 the preview useless, so they are reported separately, the same distinction
 the foundation's audit makes between empty and unknown.
 
@@ -472,6 +474,18 @@ them, and the gate does the rest. A filled value names its source or it is
 refused, and person fields stay empty whatever a tool claims. There is nothing
 to configure, so there is nothing to be locked into, and someone with no
 enrichment tool still gets a working import with its gaps named honestly.
+
+Packaging connectors is not the same as carrying vendor code, which is why
+the plugin does both halves differently. Clay, Lusha, Apollo and ZoomInfo
+are declared in `.mcp.json` (2026-09-02) so a person installing the plugin
+sees where enrichment can come from and can authorise one without leaving
+the Connectors tab, and only those four are pre-approved for `run`; the
+skill still names no tool's API and still offers the gaps to whatever is
+actually connected, with a tool outside the four asking permission before
+each call. HubSpot and Salesforce are
+deliberately not declared: the CRM route is the script's own specs and raw
+saved responses, and a connector the skills never call would only ask for
+an authorisation nothing uses.
 
 ---
 
@@ -659,6 +673,18 @@ itself, passed on 2026-08-26 and is recorded in `DECISIONS.md`.
    design, and it waits for a user who asks for it, the backend rule's own
    trigger. As of 2026-08-26 the run confirms the record kind at scope, so
    that user finds the decision at the door.
+3. **A third CRM.** Sarah named Attio on 2026-09-02. It is a backend, not a
+   connector: the config's `crm`, the request specs, the response judges,
+   the read-back proof and a release gate of its own, the same shape as the
+   Salesforce port. Declaring an Attio connector without that work would
+   list a service the skills cannot write to, so nothing is declared until
+   the port exists.
+4. **The packaged enrichment servers' exact tool names.** `run` pre-approves
+   them by read-shaped name patterns, which are shapes rather than proof
+   that a tool only reads. The guard is the skill's rule that it never
+   requests a write-shaped tool. Pinning exact names waits for a session
+   that connects each of the four and records what it exposes, after which
+   the allowlist and the component test narrow to that inventory.
 
 Settled, with the answers where they now live:
 

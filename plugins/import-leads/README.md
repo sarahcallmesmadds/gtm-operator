@@ -51,6 +51,16 @@ The alias map is a user-owned JSON file, `{"aliases": {"variant":
 "canonical"}}`, holding the company-name answers already settled so they are
 not re-asked.
 
+## Connectors
+
+Notion is required. Clay, Lusha, Apollo and ZoomInfo are packaged as
+enrichment connectors so they show in the plugin's Connectors tab; any one is
+enough and none is required, and the enrichment step offers the gaps to
+whichever is connected. HubSpot and Salesforce are reached through the Service
+Key file and the `sf` CLI rather than through a connector, for the reasons in
+`CONNECTORS.md`. On Salesforce, `check` says when the `sf` CLI is missing and
+hands over the install and login commands.
+
 ## What is not proved
 
 Read this before trusting any of it.

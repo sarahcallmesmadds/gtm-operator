@@ -37,7 +37,11 @@ const ENDPOINTS = {
   stripe: 'https://mcp.stripe.com',
   ramp: 'https://ramp-mcp-remote.ramp.com/mcp',
   quickbooks: 'https://mcp.quickbooks.intuit.com/mcp',
-  docusign: 'https://mcp.docusign.com/mcp'
+  docusign: 'https://mcp.docusign.com/mcp',
+  clay: 'https://api.clay.com/v3/mcp',
+  lusha: 'https://mcp.lusha.com',
+  apollo: 'https://mcp.apollo.io/mcp',
+  zoominfo: 'https://mcp.zoominfo.com/mcp'
 }
 
 const EXPECTED = {
@@ -53,7 +57,7 @@ const EXPECTED = {
     'outreach', 'intercom', 'pylon'
   ],
   software: ['notion', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks', 'docusign'],
-  'import-leads': ['notion']
+  'import-leads': ['notion', 'clay', 'lusha', 'apollo', 'zoominfo']
 }
 
 // A connector also needs a concrete consuming surface. These references keep
@@ -111,7 +115,13 @@ const SUPPORT = {
     docusign: ['plugins/software/skills/backfill/SKILL.md', /DocuSign's\s+official MCP/]
   },
   'import-leads': {
-    notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]
+    notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/],
+    // The prose of the enrichment step is the evidence here; the exact
+    // allowlist surface is asserted separately below, so both have to hold.
+    clay: ['plugins/import-leads/skills/run/SKILL.md', /Connectors tab and can be authorised from there: `clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough/],
+    lusha: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/],
+    apollo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/],
+    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/]
   }
 }
 
@@ -180,6 +190,59 @@ for (const entry of marketplace.plugins) {
     }
   })
 }
+
+const importLeadsRunPath = path.join(ROOT, 'plugins/import-leads/skills/run/SKILL.md')
+
+check('import-leads run can call its packaged enrichment servers, read-shaped names only, and still offers gaps to whatever is connected', () => {
+  const text = fs.readFileSync(importLeadsRunPath, 'utf8')
+  const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the import-leads run skill has no YAML frontmatter')
+  const declarations = frontmatter[1].match(/^allowed-tools:.*$/gm) || []
+  assert.strictEqual(declarations.length, 1, 'the import-leads run skill must declare one allowed-tools line')
+  const allowed = declarations[0]
+  // The plugin name keeps its hyphen in the scoped tool name: the server
+  // segment is normalised by replacing anything outside [a-zA-Z0-9_-], so a
+  // hyphen survives (Claude Code 2.1.258, measured 2026-09-02 on the
+  // google-drive server of the process plugin).
+  const entries = allowed.replace(/^allowed-tools:\s*/, '').split(',').map(one => one.trim()).filter(Boolean)
+  const servers = ['clay', 'lusha', 'apollo', 'zoominfo']
+  const verbs = ['search', 'enrich', 'match', 'lookup', 'find', 'get']
+  const expectedEntries = servers.flatMap(server => verbs.map(verb => `mcp__plugin_import-leads_${server}__*${verb}*`)).sort()
+  // Every entry under one of the four prefixes is compared against the exact
+  // set: a missing pattern, a substituted one, or any extra one under those
+  // prefixes fails, so the allowlist cannot widen without this line changing.
+  const enrichmentEntries = entries.filter(one => servers.some(server => one.startsWith(`mcp__plugin_import-leads_${server}__`))).sort()
+  assert.deepStrictEqual(enrichmentEntries, expectedEntries,
+    'import-leads run must admit exactly the six read-shaped names per packaged server and nothing else under those prefixes')
+  // The whole MCP half of the allowlist is compared against the exact set,
+  // the three Notion entries plus the twenty-four above, so a broad pattern
+  // under any shape (mcp__*__search*, mcp__*__*) or an entry for an
+  // unlisted server fails rather than slipping past a shape check.
+  const notionEntries = ['mcp__*__notion-fetch', 'mcp__*__notion-query-data-sources', 'mcp__*__notion-update-page']
+  const mcpEntries = entries.filter(one => one.startsWith('mcp__')).sort()
+  assert.deepStrictEqual(mcpEntries, notionEntries.concat(expectedEntries).sort(),
+    'import-leads run must pre-approve exactly the three Notion tools and the twenty-four packaged enrichment patterns, nothing else under mcp__')
+  // A name pattern is a shape, not proof a tool only reads: `*get*` would
+  // also match a vendor tool named get_and_update_contact. This line proves
+  // only that no pattern carries a mutation verb; the guard against writes is
+  // the skill's own rule, asserted below, and pinning exact vendor tool names
+  // waits for a session that connects each server and records its inventory.
+  assert.doesNotMatch(allowed,
+    /mcp__plugin_import-leads_(?:clay|lusha|apollo|zoominfo)__[^,]*(?:create|update|delete|send|write|add|run|trigger|sequence)/i,
+    'import-leads run allowed-tools carries a mutation verb in a packaged-server pattern')
+  assert.match(text, /this skill never calls or requests a\s+write-shaped tool, including Clay table writes and Apollo sequence sends,\s+and an approval prompt does not change that/,
+    'the run skill no longer holds the rule that write-shaped enrichment tools are never requested')
+  // The consuming contract, separately from the names: the names alone would
+  // pass with the offering behaviour deleted.
+  assert.match(text, /Name the gaps\. Offer them to whatever enrichment the session actually has\s+connected\./,
+    'the enrichment step no longer offers the gaps to whatever is connected')
+  assert.match(text, /\*\*Fill blanks only\.\*\* An enrichment result never overwrites a value the\s+source list provided\./,
+    'the enrichment step no longer holds the fill-blanks rule')
+  assert.match(text, /\*\*Anything metered or paid is named and confirmed before it runs\.\*\*/,
+    'the enrichment step no longer gates paid lookups')
+  assert.match(text, /no enrichment tool at all\s+means a working import with its\s+gaps named honestly/,
+    'the enrichment step no longer works with nothing connected')
+})
 
 const softwareBackfillPath = path.join(ROOT, 'plugins/software/skills/backfill/SKILL.md')
 const memosMeetingNotesPath = path.join(ROOT, 'plugins/memos/skills/meeting-notes/SKILL.md')

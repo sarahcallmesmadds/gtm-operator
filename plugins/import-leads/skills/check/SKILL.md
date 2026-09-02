@@ -29,12 +29,30 @@ skill sends is a read.
 
 ## The standing half: is the setup ready at all
 
-Run `check-standing`. It reports, in one pass:
+**First, when config already names salesforce, run `sf --version`**, and on
+a first run do the same the moment salesforce is chosen (the Config bullet
+below says where), because every
+Salesforce request in this half goes through that CLI, the mailing-fields
+probe on a first run included. When the command is not found, the org
+cannot be reached from this machine at all, which is a different finding
+from a wrong alias: report it under **Not ready at all**, hand over the two
+commands that fix it, `npm install -g @salesforce/cli` and then
+`sf org login web --alias <the alias config names>`, and mark only the
+Salesforce-dependent checks as not checked (the org display, the probe, the
+Marketing User flag, and the mailing-fields probe on a first run). The rest
+of this half does not need the CLI and still runs. The plugin does not run
+the install itself; installing a command-line tool is the person's call on
+their own machine. HubSpot needs no tool installed: the Service Key file is
+the whole credential.
+
+Then run `check-standing`. It reports, in one pass:
 
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
-  `config-write` only on an explicit yes. On salesforce, run
-  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge` first, two
+  `config-write` only on an explicit yes. On salesforce, run `sf --version`
+  the moment salesforce is chosen and before any other `sf` command, with
+  the missing-CLI finding above if it is not there, then
+  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge`, two
   read-only queries with one measured verdict per code field, and pass the
   judged pair as the draft's `mailingFields`, which it refuses to assemble
   without (a picklist org refuses the plain fields' values; a plain org
@@ -44,6 +62,13 @@ Run `check-standing`. It reports, in one pass:
   any output. On Salesforce there is nothing key-shaped to check: the org
   alias is resolved instead, by sending the emitted org display spec and
   running `org-judge` on the saved response.
+- **Which enrichment connector is connected.** The plugin packages `clay`,
+  `lusha`, `apollo` and `zoominfo` so they appear in its Connectors tab.
+  This skill calls none of them, so it reads the answer from the tools the
+  session exposes, without calling any, and says which of the four, or
+  which other enrichment tool, is there. When that cannot be told from the
+  session, ask the person. None connected is a fact to report, not a
+  failure: `run` still works with its gaps named.
 - **The alias map**: exists and parses, or what is wrong with it.
 - **The probe**: a single read-only request. Send it and run `probe-judge` on
   the saved response. A connection is alive when the store answered with the
@@ -98,7 +123,7 @@ number would make the preview useless:
   conflicts, rows with no email (unknown is not new), and titles the
   personas artifact does not cover.
 - **Not ready at all**: a missing artifact, a config refusal, a dead
-  connection.
+  connection, and on Salesforce a missing `sf` CLI.
 
 ## What this skill does not do
 
