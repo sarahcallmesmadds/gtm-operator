@@ -7389,8 +7389,8 @@ is exactly what `.mcp.json` declared, and the reason was written in
 `CONNECTORS.md`. The tab was truthful and the plugin looked thinner than it
 is.
 
-**Four enrichment connectors are now declared.** Clay, Lusha, Apollo and
-ZoomInfo, her call, with Attio raised in the same breath (below). The
+**Four enrichment connectors are now declared.** They are Clay, Lusha,
+Apollo and ZoomInfo, her call, with Attio raised in the same breath (below). The
 enrichment step of `run` already offered the gaps to whatever enrichment the
 session had connected; declaring the four means a person installing the
 plugin can see where enrichment can come from and authorise one from the
