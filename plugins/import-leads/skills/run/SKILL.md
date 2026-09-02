@@ -1,7 +1,7 @@
 ---
 name: run
 description: Import one named lead list into the CRM config names, HubSpot or Salesforce, planned end to end and pushed only after an explicit yes. Use when a lead list arrives, the user says "import this list", "get these leads into HubSpot", "get these leads into Salesforce", "load this conference CSV", or hands over a CSV file or a Notion page of contacts. Reads the one named source, the CRM, the Process artifacts, its own config and the alias map; writes exactly what the approved plan names, verifies by reading every write back, and writes back to a Notion source. Writes nothing without an explicit yes.
-allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page
+allowed-tools: Read, Write, Bash(node:*), Bash(curl:*), Bash(sf:*), mcp__*__notion-fetch, mcp__*__notion-query-data-sources, mcp__*__notion-update-page, mcp__plugin_import-leads_clay__*search*, mcp__plugin_import-leads_clay__*enrich*, mcp__plugin_import-leads_clay__*match*, mcp__plugin_import-leads_clay__*lookup*, mcp__plugin_import-leads_clay__*find*, mcp__plugin_import-leads_clay__*get*, mcp__plugin_import-leads_lusha__*search*, mcp__plugin_import-leads_lusha__*enrich*, mcp__plugin_import-leads_lusha__*match*, mcp__plugin_import-leads_lusha__*lookup*, mcp__plugin_import-leads_lusha__*find*, mcp__plugin_import-leads_lusha__*get*, mcp__plugin_import-leads_apollo__*search*, mcp__plugin_import-leads_apollo__*enrich*, mcp__plugin_import-leads_apollo__*match*, mcp__plugin_import-leads_apollo__*lookup*, mcp__plugin_import-leads_apollo__*find*, mcp__plugin_import-leads_apollo__*get*, mcp__plugin_import-leads_zoominfo__*search*, mcp__plugin_import-leads_zoominfo__*enrich*, mcp__plugin_import-leads_zoominfo__*match*, mcp__plugin_import-leads_zoominfo__*lookup*, mcp__plugin_import-leads_zoominfo__*find*, mcp__plugin_import-leads_zoominfo__*get*
 ---
 
 # run
@@ -146,6 +146,15 @@ and `zoominfo`. Any one of them is enough, none of them is required, and a
 different enrichment tool the session already has connected is offered the
 same way. This plugin carries no vendor code, and no enrichment tool at all
 means a working import with its gaps named honestly.
+
+The four packaged servers are admitted to this skill's tools by read-shaped
+names only (search, enrich, match, lookup, find, get). Anything else they
+expose, and Clay's table writes and Apollo's sequence sends are the ones to
+know about, is never called by this skill: a call outside those names is
+not pre-approved and asks the person before it runs. A vendor's lookup
+under a name this list does not cover asks the same way rather than
+failing, and the answer to that prompt is the same named yes the paid step
+already needs.
 
 - **Fill blanks only.** An enrichment result never overwrites a value the
   source list provided.

@@ -189,6 +189,40 @@ for (const entry of marketplace.plugins) {
   })
 }
 
+const importLeadsRunPath = path.join(ROOT, 'plugins/import-leads/skills/run/SKILL.md')
+
+check('import-leads run can call its packaged enrichment servers, read-shaped names only, and still offers gaps to whatever is connected', () => {
+  const text = fs.readFileSync(importLeadsRunPath, 'utf8')
+  const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)
+  assert.ok(frontmatter, 'the import-leads run skill has no YAML frontmatter')
+  const declarations = frontmatter[1].match(/^allowed-tools:.*$/gm) || []
+  assert.strictEqual(declarations.length, 1, 'the import-leads run skill must declare one allowed-tools line')
+  const allowed = declarations[0]
+  // The plugin name keeps its hyphen in the scoped tool name: the server
+  // segment is normalised by replacing anything outside [a-zA-Z0-9_-], so a
+  // hyphen survives (Claude Code 2.1.258, measured 2026-09-02 on the
+  // google-drive server of the process plugin).
+  for (const server of ['clay', 'lusha', 'apollo', 'zoominfo']) {
+    assert.ok(allowed.includes(`mcp__plugin_import-leads_${server}__`),
+      `import-leads run allowed-tools never admits the packaged ${server} server`)
+    assert.ok(!allowed.includes(`mcp__plugin_import-leads_${server}__*,`) && !allowed.endsWith(`mcp__plugin_import-leads_${server}__*`),
+      `import-leads run admits every ${server} tool; enrichment needs read-shaped names only`)
+  }
+  assert.doesNotMatch(allowed,
+    /mcp__plugin_import-leads_(?:clay|lusha|apollo|zoominfo)__[^,]*(?:create|update|delete|send|write|add|run|trigger|sequence)/i,
+    'import-leads run pre-approves a write-shaped enrichment tool')
+  // The consuming contract, separately from the names: the names alone would
+  // pass with the offering behaviour deleted.
+  assert.match(text, /Name the gaps\. Offer them to whatever enrichment the session actually has\s+connected\./,
+    'the enrichment step no longer offers the gaps to whatever is connected')
+  assert.match(text, /\*\*Fill blanks only\.\*\* An enrichment result never overwrites a value the\s+source list provided\./,
+    'the enrichment step no longer holds the fill-blanks rule')
+  assert.match(text, /\*\*Anything metered or paid is named and confirmed before it runs\.\*\*/,
+    'the enrichment step no longer gates paid lookups')
+  assert.match(text, /no enrichment tool at all\s+means a working import with its gaps named honestly/,
+    'the enrichment step no longer works with nothing connected')
+})
+
 const softwareBackfillPath = path.join(ROOT, 'plugins/software/skills/backfill/SKILL.md')
 const memosMeetingNotesPath = path.join(ROOT, 'plugins/memos/skills/meeting-notes/SKILL.md')
 

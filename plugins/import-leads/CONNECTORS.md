@@ -16,7 +16,9 @@ code for any of them: the enrichment step names the gaps, offers them to
 whichever of these the session has connected, and gates every paid lookup
 behind a named yes. An enrichment tool that is not on this list but is already
 connected to the session is offered the same way. With nothing connected the
-import still runs, with its gaps named.
+import still runs, with its gaps named. The `run` skill pre-approves the
+four servers' tools by read-shaped names only (search, enrich, match,
+lookup, find, get); a call outside those names asks the person first.
 
 One known snag, unverified here: Clay's OAuth server has been reported to
 refuse a client that registers under a name containing "Claude" (the error

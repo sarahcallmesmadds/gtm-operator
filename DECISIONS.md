@@ -7435,6 +7435,21 @@ release gate, the shape the Salesforce port took. Declaring an Attio
 connector before that exists would list a service the skills cannot write
 to. Recorded under Open in the plugin's `SKILLS.md`.
 
+**Round 1, Codex and the Devin app, answered the same day.** Codex: the
+`sf --version` test sat after the mailing-fields probe a first run needs, so
+it now comes first in the standing half; a missing CLI blanked out checks
+that do not need it, so only the Salesforce-dependent ones go unchecked and
+the missing CLI is reported under Not ready at all; the component test
+matched only the sentence naming the connectors, so it now asserts the
+offering, fill-blanks, paid-gate and nothing-connected rules separately.
+Devin: `run`'s allowed-tools admitted only Notion, so a packaged connector
+showed in the tab and could not be called without a prompt on every lookup.
+It now admits the four servers by read-shaped names only. The scoped name
+keeps the plugin's hyphen: Claude Code normalises the server segment by
+replacing anything outside `[a-zA-Z0-9_-]` with an underscore, which the
+binary's own text states (2.1.258) and the process plugin's `google-drive`
+tools show in practice, so the prefix is `mcp__plugin_import-leads_<server>__`.
+
 The release moves `import-leads` to 0.4.0. The connector inventory, the
 manifest, the marketplace entry, both skills, the README and the component
 test move together, so the Connectors tab and the behaviour contract cannot
