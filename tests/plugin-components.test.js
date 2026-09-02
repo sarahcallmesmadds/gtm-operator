@@ -116,10 +116,12 @@ const SUPPORT = {
   },
   'import-leads': {
     notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/],
-    clay: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_clay__\*enrich\*/m],
-    lusha: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_lusha__\*enrich\*/m],
-    apollo: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_apollo__\*enrich\*/m],
-    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_zoominfo__\*enrich\*/m]
+    // The prose of the enrichment step is the evidence here; the exact
+    // allowlist surface is asserted separately below, so both have to hold.
+    clay: ['plugins/import-leads/skills/run/SKILL.md', /Connectors tab and can be authorised from there: `clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough/],
+    lusha: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/],
+    apollo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/],
+    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`\. Any one of them is enough and none of them is required/]
   }
 }
 

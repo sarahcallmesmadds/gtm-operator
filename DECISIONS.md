@@ -7464,6 +7464,16 @@ the guard is the skill's rule that it never requests a write-shaped tool,
 which the test asserts as text, and pinning exact vendor tool names waits
 for a session that connects each server and records its inventory. That is
 recorded under Open in the plugin's `SKILLS.md`.
+Round 4 closed the last two holes Codex found, the test now compares the
+whole MCP half of the allowlist against the exact set rather than checking
+shapes, and the first-run path tests the CLI the moment Salesforce is
+chosen, which the Devin app found the same day. Devin's CLI then asked
+that the component test's per-connector evidence be the prose naming each
+connector, the reverse of what Codex asked in round 2; both hold now, the
+prose is the evidence and the exact allowlist is asserted beside it. It
+also asked that one new bullet in `check` drop its bold label and colon.
+Declined: the two bullets beside it predate this branch in the same
+style, and one restyled bullet in three would be the odder result.
 
 The release moves `import-leads` to 0.4.0. The connector inventory, the
 manifest, the marketplace entry, both skills, the README and the component

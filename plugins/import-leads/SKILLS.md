@@ -8,8 +8,7 @@ This plugin owns no database and no schema file. A job plugin is named for its
 job, and this one's job is taking a lead list from wherever it lives and landing
 it in the CRM correctly. It reads the source list, its own config and the alias
 map that config names, reads its judgment from Process artifacts, and reads and
-writes the one CRM its config names: HubSpot, or Salesforce once the port's
-build lands.
+writes the one CRM its config names: HubSpot or Salesforce.
 
 Written 2026-08-25. The plugin and skill names are Sarah's, confirmed the same
 day: the tier-2 placeholder name `list-building` is retired, because this
