@@ -29,7 +29,9 @@ skill sends is a read.
 
 ## The standing half: is the setup ready at all
 
-**First, when config names salesforce, run `sf --version`**, because every
+**First, when config already names salesforce, run `sf --version`**, and on
+a first run do the same the moment salesforce is chosen (the Config bullet
+below says where), because every
 Salesforce request in this half goes through that CLI, the mailing-fields
 probe on a first run included. When the command is not found, the org
 cannot be reached from this machine at all, which is a different finding
@@ -47,8 +49,10 @@ Then run `check-standing`. It reports, in one pass:
 
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
-  `config-write` only on an explicit yes. On salesforce, run
-  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge` first, two
+  `config-write` only on an explicit yes. On salesforce, run `sf --version`
+  the moment salesforce is chosen and before any other `sf` command, with
+  the missing-CLI finding above if it is not there, then
+  `mailing-fields-probe <orgAlias>` and `mailing-fields-judge`, two
   read-only queries with one measured verdict per code field, and pass the
   judged pair as the draft's `mailingFields`, which it refuses to assemble
   without (a picklist org refuses the plain fields' values; a plain org

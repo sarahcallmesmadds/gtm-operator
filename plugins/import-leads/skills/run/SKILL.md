@@ -77,7 +77,9 @@ draft, and `config-write` only on an explicit yes. The file is written once;
 any other refusal is fixed by hand, not rewritten.
 
 **On a salesforce first run, ask the org which mailing fields it carries
-before the draft is shown.** `mailing-fields-probe <orgAlias>` emits two
+before the draft is shown**, after `sf --version` has answered, because a
+missing CLI is a different finding from a wrong alias and `check` says
+what installs it. `mailing-fields-probe <orgAlias>` emits two
 read-only queries, one per code field, and `mailing-fields-judge` turns the
 two saved responses (state first) into one measured verdict per field:
 `MailingStateCode` where the org answered it, the plain name where the org

@@ -212,8 +212,14 @@ check('import-leads run can call its packaged enrichment servers, read-shaped na
   const enrichmentEntries = entries.filter(one => servers.some(server => one.startsWith(`mcp__plugin_import-leads_${server}__`))).sort()
   assert.deepStrictEqual(enrichmentEntries, expectedEntries,
     'import-leads run must admit exactly the six read-shaped names per packaged server and nothing else under those prefixes')
-  assert.ok(!entries.some(one => /^mcp__\*__\*|^mcp__\*$|^mcp__plugin_import-leads_/.test(one) && !expectedEntries.includes(one)),
-    'import-leads run admits a broad MCP wildcard or an unlisted packaged-server pattern')
+  // The whole MCP half of the allowlist is compared against the exact set,
+  // the three Notion entries plus the twenty-four above, so a broad pattern
+  // under any shape (mcp__*__search*, mcp__*__*) or an entry for an
+  // unlisted server fails rather than slipping past a shape check.
+  const notionEntries = ['mcp__*__notion-fetch', 'mcp__*__notion-query-data-sources', 'mcp__*__notion-update-page']
+  const mcpEntries = entries.filter(one => one.startsWith('mcp__')).sort()
+  assert.deepStrictEqual(mcpEntries, notionEntries.concat(expectedEntries).sort(),
+    'import-leads run must pre-approve exactly the three Notion tools and the twenty-four packaged enrichment patterns, nothing else under mcp__')
   // A name pattern is a shape, not proof a tool only reads: `*get*` would
   // also match a vendor tool named get_and_update_contact. This line proves
   // only that no pattern carries a mutation verb; the guard against writes is
