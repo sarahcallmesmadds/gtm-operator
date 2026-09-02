@@ -117,7 +117,7 @@ number would make the preview useless:
   conflicts, rows with no email (unknown is not new), and titles the
   personas artifact does not cover.
 - **Not ready at all**: a missing artifact, a config refusal, a dead
-  connection.
+  connection, and on Salesforce a missing `sf` CLI.
 
 ## What this skill does not do
 

@@ -148,13 +148,14 @@ same way. This plugin carries no vendor code, and no enrichment tool at all
 means a working import with its gaps named honestly.
 
 The four packaged servers are admitted to this skill's tools by read-shaped
-names only (search, enrich, match, lookup, find, get). Anything else they
-expose, and Clay's table writes and Apollo's sequence sends are the ones to
-know about, is never called by this skill: a call outside those names is
-not pre-approved and asks the person before it runs. A vendor's lookup
-under a name this list does not cover asks the same way rather than
-failing, and the answer to that prompt is the same named yes the paid step
-already needs.
+names only (search, enrich, match, lookup, find, get). Their write-shaped
+tools, and Clay's table writes and Apollo's sequence sends are the ones to
+know about, are never called by this skill, and an approval prompt does not
+change that: this skill does not ask for them. A vendor's lookup that reads
+but sits under a name the list does not cover is the one case that asks the
+person before it runs, rather than failing. That prompt is a permission,
+not the confirmation: the named yes for a paid step is still asked in
+conversation, before the lookup, whatever the tool is called.
 
 - **Fill blanks only.** An enrichment result never overwrites a value the
   source list provided.

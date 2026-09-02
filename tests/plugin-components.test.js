@@ -116,10 +116,10 @@ const SUPPORT = {
   },
   'import-leads': {
     notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/],
-    clay: ['plugins/import-leads/skills/run/SKILL.md', /Connectors tab and can be authorised from there: `clay`/],
-    lusha: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/],
-    apollo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/],
-    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/]
+    clay: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_clay__\*enrich\*/m],
+    lusha: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_lusha__\*enrich\*/m],
+    apollo: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_apollo__\*enrich\*/m],
+    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /^allowed-tools:.*mcp__plugin_import-leads_zoominfo__\*enrich\*/m]
   }
 }
 
@@ -202,12 +202,18 @@ check('import-leads run can call its packaged enrichment servers, read-shaped na
   // segment is normalised by replacing anything outside [a-zA-Z0-9_-], so a
   // hyphen survives (Claude Code 2.1.258, measured 2026-09-02 on the
   // google-drive server of the process plugin).
-  for (const server of ['clay', 'lusha', 'apollo', 'zoominfo']) {
-    assert.ok(allowed.includes(`mcp__plugin_import-leads_${server}__`),
-      `import-leads run allowed-tools never admits the packaged ${server} server`)
-    assert.ok(!allowed.includes(`mcp__plugin_import-leads_${server}__*,`) && !allowed.endsWith(`mcp__plugin_import-leads_${server}__*`),
-      `import-leads run admits every ${server} tool; enrichment needs read-shaped names only`)
-  }
+  const entries = allowed.replace(/^allowed-tools:\s*/, '').split(',').map(one => one.trim()).filter(Boolean)
+  const servers = ['clay', 'lusha', 'apollo', 'zoominfo']
+  const verbs = ['search', 'enrich', 'match', 'lookup', 'find', 'get']
+  const expectedEntries = servers.flatMap(server => verbs.map(verb => `mcp__plugin_import-leads_${server}__*${verb}*`)).sort()
+  // Every entry under one of the four prefixes is compared against the exact
+  // set: a missing pattern, a substituted one, or any extra one under those
+  // prefixes fails, so the allowlist cannot widen without this line changing.
+  const enrichmentEntries = entries.filter(one => servers.some(server => one.startsWith(`mcp__plugin_import-leads_${server}__`))).sort()
+  assert.deepStrictEqual(enrichmentEntries, expectedEntries,
+    'import-leads run must admit exactly the six read-shaped names per packaged server and nothing else under those prefixes')
+  assert.ok(!entries.some(one => /^mcp__\*__\*$|^mcp__\*$|^mcp__plugin_import-leads_/.test(one) && !expectedEntries.includes(one)),
+    'import-leads run admits a broad MCP wildcard or an unlisted packaged-server pattern')
   assert.doesNotMatch(allowed,
     /mcp__plugin_import-leads_(?:clay|lusha|apollo|zoominfo)__[^,]*(?:create|update|delete|send|write|add|run|trigger|sequence)/i,
     'import-leads run pre-approves a write-shaped enrichment tool')

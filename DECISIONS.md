@@ -7384,13 +7384,13 @@ together so the Claude tabs and the behavior contracts cannot drift apart.
 ## import-leads: the enrichment connectors it packages, and the two CRMs it deliberately does not, 2026-09-02
 
 Sarah opened the plugin in the Claude UI and asked why the Connectors tab
-showed neither CRM and no enrichment tool. The tab showed Notion alone, which
+showed no CRM and no enrichment tool. The tab showed Notion alone, which
 is exactly what `.mcp.json` declared, and the reason was written in
 `CONNECTORS.md`. The tab was truthful and the plugin looked thinner than it
 is.
 
-**Four enrichment connectors are now declared: Clay, Lusha, Apollo and
-ZoomInfo.** Her call, with Attio raised in the same breath (below). The
+**Four enrichment connectors are now declared.** Clay, Lusha, Apollo and
+ZoomInfo, her call, with Attio raised in the same breath (below). The
 enrichment step of `run` already offered the gaps to whatever enrichment the
 session had connected; declaring the four means a person installing the
 plugin can see where enrichment can come from and authorise one from the
@@ -7401,7 +7401,7 @@ paid lookup behind a named yes. Any one of the four is enough, none is
 required, and an enrichment tool not on the list but already connected is
 offered the same way. The endpoints are each vendor's hosted MCP server, all
 OAuth, each answering the MCP initialise call with a 401 challenge on
-2026-09-02, which is the same answer Notion's gives. Clay's endpoint is not
+2026-09-02, which is the same answer Notion gives. Clay's endpoint is not
 on Clay's own pages, which point Claude users at the connector directory
 instead; it is confirmed by the server's OAuth resource metadata, which names
 `https://api.clay.com/v3/mcp` as the resource. A third-party write-up reports
@@ -7426,8 +7426,10 @@ install it. A plugin does not run installers on a person's machine; what it
 can do is tell the difference between "the CLI is not here" and "the alias is
 wrong", which are different findings with different fixes. `check` runs
 `sf --version` first on Salesforce, and when the command is not found it
-reports the rest of the standing half as not checked, with the install and
-login commands inline. HubSpot needs no tool installed.
+reports the missing CLI under Not ready at all with the install and login
+commands inline, marks only the four Salesforce-dependent checks as not
+checked, and still runs everything else in the standing half. HubSpot needs
+no tool installed.
 
 **Attio is Open work, not a connector.** A third CRM is a backend: `crm` in
 config, request specs, response judges, the read-back proof and its own
@@ -7449,6 +7451,10 @@ keeps the plugin's hyphen: Claude Code normalises the server segment by
 replacing anything outside `[a-zA-Z0-9_-]` with an underscore, which the
 binary's own text states (2.1.258) and the process plugin's `google-drive`
 tools show in practice, so the prefix is `mcp__plugin_import-leads_<server>__`.
+The Devin CLI's round landed after that commit, agreed on the allowlist and
+the self-fulfilling test, added three prose corrections to this entry, taken,
+and asked that the component test's evidence for each connector be the
+allowed-tools surface rather than the sentence naming it, which it now is.
 
 The release moves `import-leads` to 0.4.0. The connector inventory, the
 manifest, the marketplace entry, both skills, the README and the component

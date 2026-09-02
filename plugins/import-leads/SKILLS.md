@@ -459,8 +459,8 @@ config write both skills share, which happens only on an explicit yes.
 **The judgment it carries.** Telling the kinds of not-ready apart: a row that
 can never import (refused, with the gap named), a row that needs a person's
 answer (ambiguous match, uncovered status), and a setup that is not ready at
-all (missing artifact; no portal or key on HubSpot, no resolvable org alias
-on Salesforce). Collapsing those into one number would make
+all (missing artifact; no portal or key on HubSpot; no `sf` CLI or no
+resolvable org alias on Salesforce). Collapsing those into one number would make
 the preview useless, so they are reported separately, the same distinction
 the foundation's audit makes between empty and unknown.
 
