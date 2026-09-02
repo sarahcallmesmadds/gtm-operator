@@ -14,11 +14,16 @@ The four enrichment connectors are packaged so they show in the plugin's
 Connectors tab and can be authorised from there. The plugin carries no vendor
 code for any of them: the enrichment step names the gaps, offers them to
 whichever of these the session has connected, and gates every paid lookup
-behind a named yes. An enrichment tool that is not on this list but is already
-connected to the session is offered the same way. With nothing connected the
-import still runs, with its gaps named. The `run` skill pre-approves the
+behind a named yes. Only these four are pre-approved for the `run` skill. An
+enrichment tool that is not on this list but is already connected to the
+session is offered the gaps the same way, and its calls ask the person's
+permission first. With nothing connected the import still runs, with its
+gaps named. The `run` skill pre-approves the
 four servers' tools by read-shaped names only (search, enrich, match,
-lookup, find, get); a call outside those names asks the person first.
+lookup, find, get). A name pattern is a shape, not proof that a tool only
+reads, so the guard is the skill's own rule: it never requests a
+write-shaped tool, approval or not. An unlisted lookup that reads asks the
+person first.
 
 One known snag, unverified here: Clay's OAuth server has been reported to
 refuse a client that registers under a name containing "Claude" (the error

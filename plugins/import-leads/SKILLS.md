@@ -480,8 +480,10 @@ Packaging connectors is not the same as carrying vendor code, which is why
 the plugin does both halves differently. Clay, Lusha, Apollo and ZoomInfo
 are declared in `.mcp.json` (2026-09-02) so a person installing the plugin
 sees where enrichment can come from and can authorise one without leaving
-the Connectors tab; the skill still names no tool's API and still offers
-the gaps to whatever is actually connected. HubSpot and Salesforce are
+the Connectors tab, and only those four are pre-approved for `run`; the
+skill still names no tool's API and still offers the gaps to whatever is
+actually connected, with a tool outside the four asking permission before
+each call. HubSpot and Salesforce are
 deliberately not declared: the CRM route is the script's own specs and raw
 saved responses, and a connector the skills never call would only ask for
 an authorisation nothing uses.
@@ -678,6 +680,12 @@ itself, passed on 2026-08-26 and is recorded in `DECISIONS.md`.
    Salesforce port. Declaring an Attio connector without that work would
    list a service the skills cannot write to, so nothing is declared until
    the port exists.
+4. **The packaged enrichment servers' exact tool names.** `run` pre-approves
+   them by read-shaped name patterns, which are shapes rather than proof
+   that a tool only reads. The guard is the skill's rule that it never
+   requests a write-shaped tool. Pinning exact names waits for a session
+   that connects each of the four and records what it exposes, after which
+   the allowlist and the component test narrow to that inventory.
 
 Settled, with the answers where they now live:
 

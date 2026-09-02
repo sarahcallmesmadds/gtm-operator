@@ -212,11 +212,18 @@ check('import-leads run can call its packaged enrichment servers, read-shaped na
   const enrichmentEntries = entries.filter(one => servers.some(server => one.startsWith(`mcp__plugin_import-leads_${server}__`))).sort()
   assert.deepStrictEqual(enrichmentEntries, expectedEntries,
     'import-leads run must admit exactly the six read-shaped names per packaged server and nothing else under those prefixes')
-  assert.ok(!entries.some(one => /^mcp__\*__\*$|^mcp__\*$|^mcp__plugin_import-leads_/.test(one) && !expectedEntries.includes(one)),
+  assert.ok(!entries.some(one => /^mcp__\*__\*|^mcp__\*$|^mcp__plugin_import-leads_/.test(one) && !expectedEntries.includes(one)),
     'import-leads run admits a broad MCP wildcard or an unlisted packaged-server pattern')
+  // A name pattern is a shape, not proof a tool only reads: `*get*` would
+  // also match a vendor tool named get_and_update_contact. This line proves
+  // only that no pattern carries a mutation verb; the guard against writes is
+  // the skill's own rule, asserted below, and pinning exact vendor tool names
+  // waits for a session that connects each server and records its inventory.
   assert.doesNotMatch(allowed,
     /mcp__plugin_import-leads_(?:clay|lusha|apollo|zoominfo)__[^,]*(?:create|update|delete|send|write|add|run|trigger|sequence)/i,
-    'import-leads run pre-approves a write-shaped enrichment tool')
+    'import-leads run allowed-tools carries a mutation verb in a packaged-server pattern')
+  assert.match(text, /this skill never calls or requests a\s+write-shaped tool, including Clay table writes and Apollo sequence sends,\s+and an approval prompt does not change that/,
+    'the run skill no longer holds the rule that write-shaped enrichment tools are never requested')
   // The consuming contract, separately from the names: the names alone would
   // pass with the offering behaviour deleted.
   assert.match(text, /Name the gaps\. Offer them to whatever enrichment the session actually has\s+connected\./,
@@ -225,7 +232,7 @@ check('import-leads run can call its packaged enrichment servers, read-shaped na
     'the enrichment step no longer holds the fill-blanks rule')
   assert.match(text, /\*\*Anything metered or paid is named and confirmed before it runs\.\*\*/,
     'the enrichment step no longer gates paid lookups')
-  assert.match(text, /no enrichment tool at all\s+means a working import with its gaps named honestly/,
+  assert.match(text, /no enrichment tool at all\s+means a working import with its\s+gaps named honestly/,
     'the enrichment step no longer works with nothing connected')
 })
 

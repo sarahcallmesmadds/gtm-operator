@@ -7398,8 +7398,9 @@ Connectors tab without being told in prose. Nothing else changes at the seam:
 the plugin still carries no vendor code, still names no tool's API, still
 offers the gaps to whichever tool is actually connected, and still gates every
 paid lookup behind a named yes. Any one of the four is enough, none is
-required, and an enrichment tool not on the list but already connected is
-offered the same way. The endpoints are each vendor's hosted MCP server, all
+required, only the four are pre-approved for `run`, and an enrichment tool
+not on the list but already connected is offered the same way with its
+calls asking permission first. The endpoints are each vendor's hosted MCP server, all
 OAuth, each answering the MCP initialise call with a 401 challenge on
 2026-09-02, which is the same answer Notion gives. Clay's endpoint is not
 on Clay's own pages, which point Claude users at the connector directory
@@ -7455,6 +7456,14 @@ The Devin CLI's round landed after that commit, agreed on the allowlist and
 the self-fulfilling test, added three prose corrections to this entry, taken,
 and asked that the component test's evidence for each connector be the
 allowed-tools surface rather than the sentence naming it, which it now is.
+Codex round 3 made the limit of the allowlist explicit: a name pattern such
+as `*get*` is a shape, and would also pre-approve a vendor tool named
+`get_and_update_contact`, so the patterns cannot prove a tool only reads.
+Accepted as a cost, and written into `run`, `CONNECTORS.md` and the test:
+the guard is the skill's rule that it never requests a write-shaped tool,
+which the test asserts as text, and pinning exact vendor tool names waits
+for a session that connects each server and records its inventory. That is
+recorded under Open in the plugin's `SKILLS.md`.
 
 The release moves `import-leads` to 0.4.0. The connector inventory, the
 manifest, the marketplace entry, both skills, the README and the component

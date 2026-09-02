@@ -29,21 +29,21 @@ skill sends is a read.
 
 ## The standing half: is the setup ready at all
 
-Run `check-standing`. It reports, in one pass. **On Salesforce, run
-`sf --version` before anything else in this half**, because every
-Salesforce request below goes through that CLI, the mailing-fields probe on
-a first run included. When the command is not found, the org cannot be
-reached from this machine at all, which is a different finding from a wrong
-alias: report it under **Not ready at all**, hand over the two commands that
-fix it, `npm install -g @salesforce/cli` and then
+**First, when config names salesforce, run `sf --version`**, because every
+Salesforce request in this half goes through that CLI, the mailing-fields
+probe on a first run included. When the command is not found, the org
+cannot be reached from this machine at all, which is a different finding
+from a wrong alias: report it under **Not ready at all**, hand over the two
+commands that fix it, `npm install -g @salesforce/cli` and then
 `sf org login web --alias <the alias config names>`, and mark only the
 Salesforce-dependent checks as not checked (the org display, the probe, the
 Marketing User flag, and the mailing-fields probe on a first run). The rest
-of this half does not need the CLI and still runs: the config file, the
-alias map, the enrichment connectors and the Process artifacts. The plugin
-does not run the install itself; installing a command-line tool is the
-person's call on their own machine. HubSpot needs no tool installed: the
-Service Key file is the whole credential.
+of this half does not need the CLI and still runs. The plugin does not run
+the install itself; installing a command-line tool is the person's call on
+their own machine. HubSpot needs no tool installed: the Service Key file is
+the whole credential.
+
+Then run `check-standing`. It reports, in one pass:
 
 - **Config**: readable, or the refusal naming what is wrong. No config means
   a first run: gather the answers, `config-draft`, show the whole draft, and
@@ -60,9 +60,11 @@ Service Key file is the whole credential.
   running `org-judge` on the saved response.
 - **Which enrichment connector is connected.** The plugin packages `clay`,
   `lusha`, `apollo` and `zoominfo` so they appear in its Connectors tab.
-  Say which of them, or which other enrichment tool, the session actually
-  has. None connected is a fact to report, not a failure: `run` still works
-  with its gaps named.
+  This skill calls none of them, so it reads the answer from the tools the
+  session exposes, without calling any, and says which of the four, or
+  which other enrichment tool, is there. When that cannot be told from the
+  session, ask the person. None connected is a fact to report, not a
+  failure: `run` still works with its gaps named.
 - **The alias map**: exists and parses, or what is wrong with it.
 - **The probe**: a single read-only request. Send it and run `probe-judge` on
   the saved response. A connection is alive when the store answered with the

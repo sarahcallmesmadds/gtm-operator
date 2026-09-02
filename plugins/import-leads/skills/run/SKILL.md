@@ -142,20 +142,23 @@ Process. No plugin calls another plugin's skill.
 Name the gaps. Offer them to whatever enrichment the session actually has
 connected. The plugin packages four enrichment connectors so they show in its
 Connectors tab and can be authorised from there: `clay`, `lusha`, `apollo`
-and `zoominfo`. Any one of them is enough, none of them is required, and a
-different enrichment tool the session already has connected is offered the
-same way. This plugin carries no vendor code, and no enrichment tool at all
-means a working import with its gaps named honestly.
+and `zoominfo`. Any one of them is enough and none of them is required.
+Only those four are pre-approved for this skill; a different enrichment
+tool the session already has connected is offered the gaps the same way,
+and its calls ask the person's permission first. This plugin carries no
+vendor code, and no enrichment tool at all means a working import with its
+gaps named honestly.
 
 The four packaged servers are admitted to this skill's tools by read-shaped
-names only (search, enrich, match, lookup, find, get). Their write-shaped
-tools, and Clay's table writes and Apollo's sequence sends are the ones to
-know about, are never called by this skill, and an approval prompt does not
-change that: this skill does not ask for them. A vendor's lookup that reads
-but sits under a name the list does not cover is the one case that asks the
-person before it runs, rather than failing. That prompt is a permission,
-not the confirmation: the named yes for a paid step is still asked in
-conversation, before the lookup, whatever the tool is called.
+names only (search, enrich, match, lookup, find, get). A name pattern is a
+shape, not proof that a tool only reads, so the pre-approval is not the
+guard. The guard is this rule: this skill never calls or requests a
+write-shaped tool, including Clay table writes and Apollo sequence sends,
+and an approval prompt does not change that. A vendor's lookup that reads
+but sits under a name the list does not cover is the one case that asks
+the person before it runs, rather than failing. That prompt is a
+permission, not the confirmation: the named yes for a paid step is still
+asked in conversation, before the lookup, whatever the tool is called.
 
 - **Fill blanks only.** An enrichment result never overwrites a value the
   source list provided.
