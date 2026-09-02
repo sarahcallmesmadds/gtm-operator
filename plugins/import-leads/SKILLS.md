@@ -229,7 +229,10 @@ and both execute only what the approved plan names.**
 3. **Enrich, blanks only.** Gaps are named, and whatever enrichment the
    session actually has connected is offered the gaps. The plugin carries no
    enrichment vendor code at all; providers ship their own plugins, and this
-   plugin's side is the gate. Paid verification runs only on a named yes.
+   plugin's side is the gate. Since 2026-09-02 it packages four enrichment
+   connectors, Clay, Lusha, Apollo and ZoomInfo, so they show in its
+   Connectors tab; any one is enough and none is required. Paid
+   verification runs only on a named yes.
    Personal addresses (gmail, yahoo and kin) are detected here and presented
    for the person's call, Sarah's rule of 2026-08-26: removed, or enriched
    to find the work email, with the enrichment offer made before anything is
@@ -473,6 +476,16 @@ refused, and person fields stay empty whatever a tool claims. There is nothing
 to configure, so there is nothing to be locked into, and someone with no
 enrichment tool still gets a working import with its gaps named honestly.
 
+Packaging connectors is not the same as carrying vendor code, which is why
+the plugin does both halves differently. Clay, Lusha, Apollo and ZoomInfo
+are declared in `.mcp.json` (2026-09-02) so a person installing the plugin
+sees where enrichment can come from and can authorise one without leaving
+the Connectors tab; the skill still names no tool's API and still offers
+the gaps to whatever is actually connected. HubSpot and Salesforce are
+deliberately not declared: the CRM route is the script's own specs and raw
+saved responses, and a connector the skills never call would only ask for
+an authorisation nothing uses.
+
 ---
 
 ## One CRM per install
@@ -659,6 +672,12 @@ itself, passed on 2026-08-26 and is recorded in `DECISIONS.md`.
    design, and it waits for a user who asks for it, the backend rule's own
    trigger. As of 2026-08-26 the run confirms the record kind at scope, so
    that user finds the decision at the door.
+3. **A third CRM.** Sarah named Attio on 2026-09-02. It is a backend, not a
+   connector: the config's `crm`, the request specs, the response judges,
+   the read-back proof and a release gate of its own, the same shape as the
+   Salesforce port. Declaring an Attio connector without that work would
+   list a service the skills cannot write to, so nothing is declared until
+   the port exists.
 
 Settled, with the answers where they now live:
 

@@ -44,6 +44,21 @@ Run `check-standing`. It reports, in one pass:
   any output. On Salesforce there is nothing key-shaped to check: the org
   alias is resolved instead, by sending the emitted org display spec and
   running `org-judge` on the saved response.
+- **The `sf` CLI itself, on Salesforce.** Every Salesforce request goes
+  through it, so run `sf --version` before the org display spec. When the
+  command is not found, the org cannot be reached from this machine at all,
+  and that is a different finding from a wrong alias: say so, hand over the
+  two commands that fix it, `npm install -g @salesforce/cli` and then
+  `sf org login web --alias <the alias config names>`, and report the rest
+  of the standing half as not checked rather than as failed. The plugin
+  does not run the install itself; installing a command-line tool is the
+  person's call on their own machine. HubSpot needs no tool installed: the
+  Service Key file is the whole credential.
+- **Which enrichment connector is connected.** The plugin packages `clay`,
+  `lusha`, `apollo` and `zoominfo` so they appear in its Connectors tab.
+  Say which of them, or which other enrichment tool, the session actually
+  has. None connected is a fact to report, not a failure: `run` still works
+  with its gaps named.
 - **The alias map**: exists and parses, or what is wrong with it.
 - **The probe**: a single read-only request. Send it and run `probe-judge` on
   the saved response. A connection is alive when the store answered with the

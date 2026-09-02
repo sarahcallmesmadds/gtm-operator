@@ -140,7 +140,11 @@ Process. No plugin calls another plugin's skill.
 ## Step 3. Enrich, blanks only, with a gate
 
 Name the gaps. Offer them to whatever enrichment the session actually has
-connected; this plugin carries no vendor code, and no enrichment tool at all
+connected. The plugin packages four enrichment connectors so they show in its
+Connectors tab and can be authorised from there: `clay`, `lusha`, `apollo`
+and `zoominfo`. Any one of them is enough, none of them is required, and a
+different enrichment tool the session already has connected is offered the
+same way. This plugin carries no vendor code, and no enrichment tool at all
 means a working import with its gaps named honestly.
 
 - **Fill blanks only.** An enrichment result never overwrites a value the

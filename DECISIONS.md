@@ -7378,3 +7378,64 @@ Problem Statement memo receives an explicit yes.
 The releases move Software to 0.4.0, Memos to 0.3.0 and Projects to 0.3.0.
 Connector inventories, manifests, marketplace entries and component tests move
 together so the Claude tabs and the behavior contracts cannot drift apart.
+
+---
+
+## import-leads: the enrichment connectors it packages, and the two CRMs it deliberately does not, 2026-09-02
+
+Sarah opened the plugin in the Claude UI and asked why the Connectors tab
+showed neither CRM and no enrichment tool. The tab showed Notion alone, which
+is exactly what `.mcp.json` declared, and the reason was written in
+`CONNECTORS.md`. The tab was truthful and the plugin looked thinner than it
+is.
+
+**Four enrichment connectors are now declared: Clay, Lusha, Apollo and
+ZoomInfo.** Her call, with Attio raised in the same breath (below). The
+enrichment step of `run` already offered the gaps to whatever enrichment the
+session had connected; declaring the four means a person installing the
+plugin can see where enrichment can come from and authorise one from the
+Connectors tab without being told in prose. Nothing else changes at the seam:
+the plugin still carries no vendor code, still names no tool's API, still
+offers the gaps to whichever tool is actually connected, and still gates every
+paid lookup behind a named yes. Any one of the four is enough, none is
+required, and an enrichment tool not on the list but already connected is
+offered the same way. The endpoints are each vendor's hosted MCP server, all
+OAuth, each answering the MCP initialise call with a 401 challenge on
+2026-09-02, which is the same answer Notion's gives. Clay's endpoint is not
+on Clay's own pages, which point Claude users at the connector directory
+instead; it is confirmed by the server's OAuth resource metadata, which names
+`https://api.clay.com/v3/mcp` as the resource. A third-party write-up reports
+Clay's OAuth server refusing a client registered under a name containing
+"Claude", with a local `mcp-remote` bridge as the workaround. That was not
+reproduced here and is recorded in `CONNECTORS.md` as a snag to expect, not
+as a fact.
+
+**HubSpot and Salesforce stay undeclared, and that is the enforcement, not an
+omission.** She asked whether a person who authorises a CRM connector they do
+not need could still be made to use the CLI route. The answer is that the
+route is not a preference the skill could drift from: every CRM request is a
+spec the script emits, every answer is judged from the raw saved response,
+and the judging commands refuse a reshaped one, so a response fetched through
+a connector's tools has nowhere to go. Declaring the connectors would only ask
+for an authorisation nothing uses, and the component test already treats an
+extra connector as a defect for that reason.
+
+**The `sf` CLI cannot be installed by the plugin, so `check` now says when it
+is missing and hands over the fix.** She asked whether the plugin could
+install it. A plugin does not run installers on a person's machine; what it
+can do is tell the difference between "the CLI is not here" and "the alias is
+wrong", which are different findings with different fixes. `check` runs
+`sf --version` first on Salesforce, and when the command is not found it
+reports the rest of the standing half as not checked, with the install and
+login commands inline. HubSpot needs no tool installed.
+
+**Attio is Open work, not a connector.** A third CRM is a backend: `crm` in
+config, request specs, response judges, the read-back proof and its own
+release gate, the shape the Salesforce port took. Declaring an Attio
+connector before that exists would list a service the skills cannot write
+to. Recorded under Open in the plugin's `SKILLS.md`.
+
+The release moves `import-leads` to 0.4.0. The connector inventory, the
+manifest, the marketplace entry, both skills, the README and the component
+test move together, so the Connectors tab and the behaviour contract cannot
+drift apart.

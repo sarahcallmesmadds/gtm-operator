@@ -37,7 +37,11 @@ const ENDPOINTS = {
   stripe: 'https://mcp.stripe.com',
   ramp: 'https://ramp-mcp-remote.ramp.com/mcp',
   quickbooks: 'https://mcp.quickbooks.intuit.com/mcp',
-  docusign: 'https://mcp.docusign.com/mcp'
+  docusign: 'https://mcp.docusign.com/mcp',
+  clay: 'https://api.clay.com/v3/mcp',
+  lusha: 'https://mcp.lusha.com',
+  apollo: 'https://mcp.apollo.io/mcp',
+  zoominfo: 'https://mcp.zoominfo.com/mcp'
 }
 
 const EXPECTED = {
@@ -53,7 +57,7 @@ const EXPECTED = {
     'outreach', 'intercom', 'pylon'
   ],
   software: ['notion', 'box', 'google-drive', 'gmail', 'slack', 'ramp', 'quickbooks', 'docusign'],
-  'import-leads': ['notion']
+  'import-leads': ['notion', 'clay', 'lusha', 'apollo', 'zoominfo']
 }
 
 // A connector also needs a concrete consuming surface. These references keep
@@ -111,7 +115,11 @@ const SUPPORT = {
     docusign: ['plugins/software/skills/backfill/SKILL.md', /DocuSign's\s+official MCP/]
   },
   'import-leads': {
-    notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/]
+    notion: ['plugins/import-leads/skills/run/SKILL.md', /mcp__\*__notion-update-page/],
+    clay: ['plugins/import-leads/skills/run/SKILL.md', /Connectors tab and can be authorised from there: `clay`/],
+    lusha: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/],
+    apollo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/],
+    zoominfo: ['plugins/import-leads/skills/run/SKILL.md', /`clay`, `lusha`, `apollo`\s+and `zoominfo`/]
   }
 }
 
